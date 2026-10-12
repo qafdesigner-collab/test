@@ -40,7 +40,7 @@ File: [`xauusd_mtf_strategy.pine`](xauusd_mtf_strategy.pine). This is one overla
 ### Signal confirmation
 - Every condition is checked on the **closed** candle (`calc_on_every_tick = false`, plus a `barstate.isconfirmed` gate). The order fills at the **next bar's open**.
 - BUY/SELL markers are `plotshape` marks on the signal bar. They are never moved, deleted or backdated. The detailed text labels (Full layout) are capped at 500 by TradingView, so the oldest ones disappear on long histories, but the markers stay.
-- **Pivots:** a triangle is drawn at the pivot's *location*. A small circle marks the bar on which it *became known*, which is `pivot length` bars later. Logic only uses a pivot from its confirmation bar onwards. S/R boxes are drawn starting at the pivot's location but are created on the confirmation bar.
+- **Pivots:** a dot is drawn at the pivot's *location*. A small cross marks the bar on which it *became known*, which is `pivot length` bars later. Logic only uses a pivot from its confirmation bar onwards. S/R boxes are drawn starting at the pivot's location but are created on the confirmation bar.
 - **"Confirmed" means the rule conditions were satisfied at the candle close. It does not mean the trade will win.**
 
 ### Setup score

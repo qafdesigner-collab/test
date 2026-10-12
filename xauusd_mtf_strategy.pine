@@ -61,7 +61,7 @@ volRegMax  = input.float(2.5, "Max ATR / baseline", step = 0.05, group = G_TRD, 
 
 G_STR = "5. Market structure & S/R zones"
 pivLen   = input.int(5, "Pivot length (bars each side)", minval = 2, group = G_STR,
-     tooltip = "A swing high/low is only known pivLen bars AFTER it forms. Triangles are drawn at the pivot's location; small circles mark the bar on which it became known.")
+     tooltip = "A swing high/low is only known pivLen bars AFTER it forms. Dots are drawn at the pivot's location; small crosses mark the bar on which it became known.")
 zoneATR  = input.float(0.25, "Zone half-width (x ATR)", minval = 0.05, step = 0.05, group = G_STR)
 maxZones = input.int(4, "Active zones per side", minval = 1, maxval = 10, group = G_STR)
 
@@ -656,11 +656,11 @@ fill(pE, pT2, color.new(color.green, 90), "Reward area")
 plotshape(longSig, "BUY signal", shape.labelup, location.belowbar, color.new(color.teal, 0), text = "BUY", textcolor = color.white, size = size.tiny)
 plotshape(shortSig, "SELL signal", shape.labeldown, location.abovebar, color.new(color.maroon, 0), text = "SELL", textcolor = color.white, size = size.tiny)
 
-// Pivots: triangle = where the swing is; circle = bar on which it became known
-plotshape(showPivots ? ph : na, "Swing high (location)", shape.triangledown, location.absolute, color.new(color.red, 30), offset = -pivLen, size = size.tiny)
-plotshape(showPivots ? pl : na, "Swing low (location)", shape.triangleup, location.absolute, color.new(color.green, 30), offset = -pivLen, size = size.tiny)
-plotshape(showPivots and not na(ph), "Swing high confirmed here", shape.circle, location.abovebar, color.new(color.red, 50), size = size.tiny)
-plotshape(showPivots and not na(pl), "Swing low confirmed here", shape.circle, location.belowbar, color.new(color.green, 50), size = size.tiny)
+// Pivots: large dot at the swing price = where the swing is; small circle above/below bar = bar on which it became known
+plot(showPivots ? ph : na, "Swing high (location)", color.new(color.red, 30), 4, plot.style_circles, offset = -pivLen)
+plot(showPivots ? pl : na, "Swing low (location)", color.new(color.green, 30), 4, plot.style_circles, offset = -pivLen)
+plotshape(showPivots and not na(ph), "Swing high confirmed here", shape.xcross, location.abovebar, color.new(color.red, 50), size = size.tiny)
+plotshape(showPivots and not na(pl), "Swing low confirmed here", shape.xcross, location.belowbar, color.new(color.green, 50), size = size.tiny)
 
 bgcolor(newsBlk ? color.new(color.yellow, 85) : na, title = "News blackout")
 
