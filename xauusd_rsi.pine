@@ -1,0 +1,24 @@
+//@version=6
+// =============================================================================
+// XAUUSD RSI panel - companion to the Easy strategy
+// The strategy uses RSI(14) as its momentum filter:
+//   BUY needs RSI above 50 and rising, SELL needs RSI below 50 and falling.
+// Green/red background marks bars where that BUY/SELL momentum rule is true.
+// That is a filter condition, not a signal on its own.
+// =============================================================================
+indicator("XAUUSD RSI (strategy momentum filter)", shorttitle = "XAU RSI", overlay = false)
+
+len = input.int(14, "RSI length", minval = 2)
+ob  = input.int(70, "Overbought", minval = 50, maxval = 100)
+os  = input.int(30, "Oversold", minval = 0, maxval = 50)
+
+r     = ta.rsi(close, len)
+rPrev = r[1]
+momUp = r > 50 and r > rPrev
+momDn = r < 50 and r < rPrev
+
+plot(r, "RSI", color.new(color.purple, 0), 2)
+hline(ob, "Overbought", color.new(color.red, 40), hline.style_dashed)
+hline(50, "Mid (filter line)", color.new(color.gray, 30))
+hline(os, "Oversold", color.new(color.green, 40), hline.style_dashed)
+bgcolor(momUp ? color.new(color.teal, 88) : momDn ? color.new(color.red, 88) : na, title = "Momentum rule true")

@@ -110,8 +110,9 @@ volOK  = atr / atrAvg >= 0.7 and atr / atrAvg <= 2.5
 emaF   = ta.ema(close, EMA_FAST)
 emaS   = ta.ema(close, EMA_SLOW)
 rsi    = ta.rsi(close, RSI_LEN)
-rsiUp  = rsi > 50 and rsi > rsi[1]
-rsiDn  = rsi < 50 and rsi < rsi[1]
+rsiPrev = rsi[1]
+rsiUp  = rsi > 50 and rsi > rsiPrev
+rsiDn  = rsi < 50 and rsi < rsiPrev
 lowLow   = ta.lowest(low, PB_BARS)
 lowClose = ta.lowest(close, PB_BARS)
 hiHigh   = ta.highest(high, PB_BARS)
@@ -168,6 +169,12 @@ var box   supBox = na
 var float lastSL = na
 var float lastSH = na
 var int   bias = 0
+var bool  supIsBuy = false
+var bool  resIsSell = false
+var bool  supTested = false
+var bool  resTested = false
+var int   supBar = na
+var int   resBar = na
 
 zw = atr * ZONE_ATR
 if not na(ph)
@@ -178,6 +185,9 @@ if not na(ph)
     if not na(resBox)
         box.set_right(resBox, bar_index)
     bool sellZone = trend15 == -1 and trend60 == -1
+    resIsSell := sellZone
+    resTested := false
+    resBar    := bar_index
     resBox := box.new(bar_index - PIV_LEN, resTop, bar_index, resBot, border_color = color.new(color.red, sellZone ? 20 : 60), bgcolor = color.new(color.red, sellZone ? 75 : 90),
          text = sellZone ? "SELL ZONE (15m+1h down)" : "Resistance", text_color = color.new(color.red, 20), text_size = size.tiny, text_halign = text.align_right)
 if not na(pl)
@@ -188,8 +198,79 @@ if not na(pl)
     if not na(supBox)
         box.set_right(supBox, bar_index)
     bool buyZone = trend15 == 1 and trend60 == 1
+    supIsBuy  := buyZone
+    supTested := false
+    supBar    := bar_index
     supBox := box.new(bar_index - PIV_LEN, supTop, bar_index, supBot, border_color = color.new(color.green, buyZone ? 20 : 60), bgcolor = color.new(color.green, buyZone ? 75 : 90),
          text = buyZone ? "BUY ZONE (15m+1h up)" : "Support", text_color = color.new(color.green, 20), text_size = size.tiny, text_halign = text.align_right)
+
+// =============================================================================
+// ZONE CHECK - measured on this chart's own history (not a prediction)
+// First fresh touch of each zone is tested: "held" = price moves 1 x ATR away
+// from the zone before trading 0.2 x ATR through its far side. If both happen
+// in the same candle it counts as NOT held (conservative). No costs included.
+// =============================================================================
+ZT_ATR = 1.0
+prevLow  = low[1]
+prevHigh = high[1]
+var int   zlState = 0
+var bool  zlIsBuy = false
+var float zlWin = na
+var float zlFail = na
+var int   zlStart = na
+var int   zhState = 0
+var bool  zhIsSell = false
+var float zhWin = na
+var float zhFail = na
+var int   zhStart = na
+var int   zBuyN = 0
+var int   zBuyW = 0
+var int   zSupN = 0
+var int   zSupW = 0
+var int   zSellN = 0
+var int   zSellW = 0
+var int   zResN = 0
+var int   zResW = 0
+
+if zlState == 0 and supLive and not supTested and bar_index > supBar and low <= supTop and prevLow > supTop
+    supTested := true
+    zlState   := 1
+    zlIsBuy   := supIsBuy
+    zlWin     := supTop + ZT_ATR * atr
+    zlFail    := supBot - 0.2 * atr
+    zlStart   := bar_index
+if zlState == 1
+    bool lFail = low < zlFail
+    bool lWin  = bar_index > zlStart and high >= zlWin
+    if lFail or lWin
+        int won = lWin and not lFail ? 1 : 0
+        if zlIsBuy
+            zBuyN += 1
+            zBuyW += won
+        else
+            zSupN += 1
+            zSupW += won
+        zlState := 0
+
+if zhState == 0 and resLive and not resTested and bar_index > resBar and high >= resBot and prevHigh < resBot
+    resTested := true
+    zhState   := 1
+    zhIsSell  := resIsSell
+    zhWin     := resBot - ZT_ATR * atr
+    zhFail    := resTop + 0.2 * atr
+    zhStart   := bar_index
+if zhState == 1
+    bool hFail = high > zhFail
+    bool hWin  = bar_index > zhStart and low <= zhWin
+    if hFail or hWin
+        int won = hWin and not hFail ? 1 : 0
+        if zhIsSell
+            zSellN += 1
+            zSellW += won
+        else
+            zResN += 1
+            zResW += won
+        zhState := 0
 
 // Break of structure (close beyond last swing) sets the bias
 if not na(lastSH) and close > lastSH and close[1] <= lastSH
@@ -431,13 +512,14 @@ if accId != "" and strategy.opentrades == 0
 // =============================================================================
 // DASHBOARD
 // =============================================================================
-var table dash = table.new(position.top_right, 4, 13, bgcolor = color.new(#131722, 10), border_width = 1, border_color = color.new(color.gray, 70))
+var table dash = table.new(position.top_right, 4, 17, bgcolor = color.new(#131722, 10), border_width = 1, border_color = color.new(color.gray, 70))
 var table res  = table.new(position.bottom_right, 7, 7, bgcolor = color.new(#131722, 10), border_width = 1, border_color = color.new(color.gray, 70))
 f_t(int d) => d == 1 ? "▲ Up" : d == -1 ? "▼ Down" : "• Flat"
 f_c(int d) => d == 1 ? color.new(color.teal, 20) : d == -1 ? color.new(color.red, 20) : color.new(color.gray, 40)
 f_cell(table t, int c, int r, string s, color bg) =>
     table.cell(t, c, r, s, text_color = color.white, bgcolor = bg, text_size = size.small)
 var bool merged = false
+f_pct(int w, int n) => n > 0 ? str.tostring(float(w) / n * 100, "#") + "% of " + str.tostring(n) : "no touches yet"
 H = color.new(color.gray, 60)
 N = color.new(#131722, 10)
 
@@ -463,9 +545,14 @@ if barstate.islast
         f_cell(dash, 0, 7, "Today: " + str.tostring(dayTrades) + "/" + str.tostring(maxTrades) + " trades, P/L $" + str.tostring(dayPnL, "#.##"), N)
         f_cell(dash, 0, 8, "Volume: " + (volAvail ? "tick volume from this feed" : "none on this feed") + " (not real orders)", N)
         f_cell(dash, 0, 9, "Est. pressure (20 bars): buyers " + str.tostring(buyPct, "#") + "% / sellers " + str.tostring(100 - buyPct, "#") + "%  - estimate, not real orders", buyPct > 55 ? color.new(color.teal, 40) : buyPct < 45 ? color.new(color.red, 40) : N)
-        f_cell(dash, 0, 10, "UNVALIDATED - backtest before use", color.new(color.orange, 50))
+        f_cell(dash, 0, 10, "RSI " + str.tostring(RSI_LEN) + ": " + str.tostring(rsi, "#.#") + (rsi > rsiPrev ? " rising" : " falling") + (rsi >= 70 ? "  (overbought)" : rsi <= 30 ? "  (oversold)" : ""), rsi > 50 ? color.new(color.teal, 40) : color.new(color.red, 40))
+        f_cell(dash, 0, 11, "Zone check on this chart's history (held = +1 ATR before break):", H)
+        f_cell(dash, 0, 12, "BUY ZONE held " + f_pct(zBuyW, zBuyN) + "   |   plain Support " + f_pct(zSupW, zSupN), N)
+        f_cell(dash, 0, 13, "SELL ZONE held " + f_pct(zSellW, zSellN) + "   |   plain Resistance " + f_pct(zResW, zResN), N)
+        f_cell(dash, 0, 14, "Past results only, no costs - not a guarantee. Under ~50 touches = unreliable.", N)
+        f_cell(dash, 0, 15, "UNVALIDATED - backtest before use", color.new(color.orange, 50))
         if not merged
-            for r = 4 to 10
+            for r = 4 to 15
                 table.merge_cells(dash, 0, r, 3, r)
 
     if isFull and showStats
