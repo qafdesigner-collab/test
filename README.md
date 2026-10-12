@@ -6,6 +6,19 @@ File: [`xauusd_mtf_strategy.pine`](xauusd_mtf_strategy.pine). This is one overla
 
 ---
 
+## Easy version: `xauusd_easy.pine`
+A simpler edition of the same strategy, for everyday use. **Unvalidated, not compiled, not backtested.**
+- About 20 settings instead of about 80. The rest are fixed values, listed in the `FIXED SETTINGS` block at the top of the script.
+- Modes are **Safe / Normal / Scalp**. Setups and direction are chosen from simple dropdowns.
+- The dashboard shows a **Status** line explaining why no trade is being taken right now, e.g. "Outside London/NY" or "Daily loss limit hit".
+- **BUY ZONE / SELL ZONE:** a support zone is labelled BUY ZONE when the 15m and 1h trends were both up at the moment the zone was confirmed. A resistance zone is labelled SELL ZONE when both were down. Other zones are labelled Support or Resistance. Labels never change afterwards. A zone label does **not** mean a higher chance of winning; only a backtest can show that.
+- **Buyer/seller pressure (estimate):** each candle's tick volume is split by where the candle closed within its range, then summed over 20 bars. The result is shown on the dashboard and can optionally be used as a filter. It is an **estimate, not real buyer/seller orders**: spot gold has no central exchange, so real buy/sell volume isn't available on these feeds.
+- The results table splits BUY/SELL × Pullback/Retest and adds totals, max drawdown and the longest losing streak.
+
+The full version (`xauusd_mtf_strategy.pine`) keeps every option. Its instructions are below.
+
+---
+
 ## B. Plain-English rules
 
 ### Timeframes

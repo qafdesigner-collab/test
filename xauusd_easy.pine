@@ -1,0 +1,501 @@
+//@version=6
+// =============================================================================
+// XAUUSD Easy Strategy  —  simplified edition (UNVALIDATED, NOT BACKTESTED)
+// -----------------------------------------------------------------------------
+// Same idea as xauusd_mtf_strategy.pine, with ~20 settings instead of ~80.
+// Fixed internal values are listed in the "FIXED SETTINGS" block below.
+//
+//  * Signals are checked only after the candle closes; orders fill next bar.
+//  * 15m / 1h trend use the last CLOSED bar only (no future data).
+//  * "Setup score" = how many filters agree. It is NOT a chance of winning.
+//  * Gold spot "volume" is tick volume from your feed, not real buy/sell orders.
+// =============================================================================
+strategy("XAUUSD Easy Strategy", shorttitle = "XAU Easy", overlay = true,
+     initial_capital = 10000, currency = currency.USD,
+     pyramiding = 0,
+     commission_type = strategy.commission.cash_per_contract, commission_value = 0.20,
+     slippage = 0, margin_long = 5, margin_short = 5,
+     process_orders_on_close = false, calc_on_every_tick = false,
+     fill_orders_on_standard_ohlc = true,
+     max_labels_count = 500, max_boxes_count = 500)
+
+// =============================================================================
+// SETTINGS (everything you normally need)
+// =============================================================================
+G1 = "What to trade"
+modeIn    = input.string("Normal", "Mode", options = ["Safe", "Normal", "Scalp"], group = G1,
+     tooltip = "Safe: fewer, stricter trades. Normal: middle. Scalp: more trades, smaller targets.\nNone is proven better - compare them in the Strategy Tester.")
+setupsIn  = input.string("Both", "Setups", options = ["Both", "Pullback only", "Retest only"], group = G1)
+dirIn     = input.string("Both", "Direction", options = ["Both", "Buy only", "Sell only"], group = G1)
+
+G2 = "Stop & targets"
+stopIn    = input.string("Structure", "Stop-loss", options = ["Structure", "ATR"], group = G2,
+     tooltip = "Structure: just beyond the last swing / broken zone.\nATR: a fixed multiple of current volatility.\nThe first stop is never moved further away.")
+targetIn  = input.string("R-multiple", "Targets", options = ["R-multiple", "Fixed pips"], group = G2)
+pipSize   = input.float(0.10, "Gold pip size", minval = 0.001, step = 0.01, group = G2, tooltip = "Most brokers: 0.10 (10 pips = $1.00). Some: 0.01.")
+tp1Pips   = input.float(10, "TP1 pips (Fixed pips only)", minval = 1, group = G2)
+tp2Pips   = input.float(20, "TP2 pips (Fixed pips only)", minval = 1, group = G2)
+halfAtTP1 = input.bool(true, "Close half at TP1, then stop to breakeven", group = G2)
+trailOn   = input.bool(false, "Trail the stop after TP1", group = G2)
+
+G3 = "Costs & risk"
+costRT     = input.float(0.40, "Your round-trip cost per oz ($)", minval = 0, step = 0.01, group = G3,
+     tooltip = "Spread + commission + slippage. Set Properties > Commission to HALF of this per order so the tester charges the same amount once.")
+riskPct    = input.float(0.5, "Risk per trade (% of account)", minval = 0.05, maxval = 5, step = 0.05, group = G3)
+maxTrades  = input.int(6, "Max trades per day", minval = 1, group = G3)
+dayLossPct = input.float(2.0, "Stop trading after daily loss of (%)", minval = 0.1, step = 0.1, group = G3)
+
+G4 = "Filters"
+useSess = input.bool(true, "Only London & New York sessions", group = G4,
+     tooltip = "London 08:00-16:30 London time, New York 08:00-17:00 New York time. Summer/winter time handled automatically.")
+useVol  = input.bool(false, "Require above-average (tick) volume", group = G4)
+usePress = input.bool(false, "Require buyer/seller pressure (estimate)", group = G4,
+     tooltip = "ESTIMATE, not real orders. Each candle's volume is split by where it closed in its range (close near high = mostly buyers). Summed over 20 bars. BUY needs > 55% buyer pressure, SELL needs < 45%. Spot gold has no central exchange, so true buyer/seller volume does not exist on these feeds.")
+n1On = input.bool(false, "News 1", inline = "n1", group = G4)
+n1T  = input.time(timestamp("01 Jan 2026 13:30 +0000"), "", inline = "n1", group = G4, tooltip = "No new trades 15 min before to 30 min after.")
+n2On = input.bool(false, "News 2", inline = "n2", group = G4)
+n2T  = input.time(timestamp("01 Jan 2026 13:30 +0000"), "", inline = "n2", group = G4)
+n3On = input.bool(false, "News 3", inline = "n3", group = G4)
+n3T  = input.time(timestamp("01 Jan 2026 13:30 +0000"), "", inline = "n3", group = G4)
+
+G5 = "Backtest dates"
+fromT = input.time(timestamp("01 Jan 2021 00:00 +0000"), "From", group = G5, tooltip = "Run training / validation / test periods separately.")
+toT   = input.time(timestamp("31 Dec 2030 23:59 +0000"), "To", group = G5)
+
+G6 = "Display"
+layoutIn  = input.string("Full", "Dashboard", options = ["Compact", "Full"], group = G6)
+showStats = input.bool(true, "Results table (Full only)", group = G6)
+
+// =============================================================================
+// FIXED SETTINGS (edit here only if you know why)
+// =============================================================================
+EMA_FAST    = 20
+EMA_SLOW    = 50
+RSI_LEN     = 14
+ATR_LEN     = 14
+PIV_LEN     = 5      // a swing is confirmed 5 bars after it forms
+ZONE_ATR    = 0.25   // S/R zone half-height
+PB_BARS     = 5      // pullback must touch fast EMA within 5 bars
+RETEST_BARS = 12     // retest must happen within 12 bars of breakout
+SL_BUF_ATR  = 0.2
+MIN_SL_ATR  = 0.5
+MAX_SL_ATR  = 3.0    // skip trade if stop would be wider
+MAX_COST    = 25.0   // skip trade if cost > 25% of first target
+COOLDOWN    = 5      // bars to wait after a trade closes
+BE_OFFSET   = 0.20   // breakeven + $0.20
+TRAIL_ATR   = 2.0
+MAX_LEV     = 10.0
+NEWS_BEFORE = 15
+NEWS_AFTER  = 30
+
+// Mode presets (unvalidated starting points)
+minScore = modeIn == "Safe" ? 80 : modeIn == "Normal" ? 65 : 50
+atrMult  = modeIn == "Safe" ? 2.0 : modeIn == "Normal" ? 1.5 : 1.0
+tp1R     = modeIn == "Scalp" ? 0.8 : 1.0
+tp2R     = modeIn == "Safe" ? 2.5 : modeIn == "Normal" ? 2.0 : 1.5
+strictHTF = modeIn != "Scalp"   // Safe/Normal: 15m AND 1h agree. Scalp: 15m agrees, 1h not against.
+
+usePB = setupsIn != "Retest only"
+useBR = setupsIn != "Pullback only"
+allowL = dirIn != "Sell only"
+allowS = dirIn != "Buy only"
+isFull = layoutIn == "Full"
+
+// =============================================================================
+// INDICATORS
+// =============================================================================
+atr    = ta.atr(ATR_LEN)
+atrAvg = ta.sma(atr, 100)
+volOK  = atr / atrAvg >= 0.7 and atr / atrAvg <= 2.5
+emaF   = ta.ema(close, EMA_FAST)
+emaS   = ta.ema(close, EMA_SLOW)
+rsi    = ta.rsi(close, RSI_LEN)
+rsiUp  = rsi > 50 and rsi > rsi[1]
+rsiDn  = rsi < 50 and rsi < rsi[1]
+lowLow   = ta.lowest(low, PB_BARS)
+lowClose = ta.lowest(close, PB_BARS)
+hiHigh   = ta.highest(high, PB_BARS)
+hiClose  = ta.highest(close, PB_BARS)
+volAvail = ta.cum(nz(volume)) > 0
+volHigh  = volume > ta.sma(volume, 20) * 1.2
+volPass  = not useVol or not volAvail or volHigh
+
+// Estimated buyer / seller pressure (candle-position split of tick volume)
+PRESS_LEN = 20
+barRange = high - low
+buyFrac  = barRange > 0 ? (close - low) / barRange : 0.5
+barVol   = volAvail ? nz(volume) : 1.0
+buyV     = barVol * buyFrac
+sellV    = barVol - buyV
+buySum   = math.sum(buyV, PRESS_LEN)
+sellSum  = math.sum(sellV, PRESS_LEN)
+buyPct   = buySum + sellSum > 0 ? buySum / (buySum + sellSum) * 100 : 50.0
+pressL   = not usePress or buyPct > 55
+pressS   = not usePress or buyPct < 45
+
+f_trend() =>
+    float f = ta.ema(close, EMA_FAST)
+    float s = ta.ema(close, EMA_SLOW)
+    int t = close > s and f > s ? 1 : close < s and f < s ? -1 : 0
+    t
+f_trendClosed() =>
+    int t = f_trend()
+    t[1]
+
+chartTrend = f_trend()
+// Higher timeframes: last CLOSED bar only (no repainting)
+trend15 = nz(request.security(syminfo.tickerid, "15", f_trendClosed(), lookahead = barmerge.lookahead_on), 0)
+trend60 = nz(request.security(syminfo.tickerid, "60", f_trendClosed(), lookahead = barmerge.lookahead_on), 0)
+// Dashboard only
+trendOther = nz(request.security(syminfo.tickerid, timeframe.multiplier == 1 ? "5" : "1", f_trend()), 0)
+trend1 = timeframe.multiplier == 1 ? chartTrend : trendOther
+trend5 = timeframe.multiplier == 1 ? trendOther : chartTrend
+
+// =============================================================================
+// SWINGS & S/R ZONES (confirmed pivots only)
+// =============================================================================
+ph = ta.pivothigh(high, PIV_LEN, PIV_LEN)
+pl = ta.pivotlow(low, PIV_LEN, PIV_LEN)
+
+var float resTop = na
+var float resBot = na
+var bool  resLive = false
+var box   resBox = na
+var float supTop = na
+var float supBot = na
+var bool  supLive = false
+var box   supBox = na
+var float lastSL = na
+var float lastSH = na
+var int   bias = 0
+
+zw = atr * ZONE_ATR
+if not na(ph)
+    lastSH  := ph
+    resTop  := ph + zw
+    resBot  := ph - zw
+    resLive := true
+    if not na(resBox)
+        box.set_right(resBox, bar_index)
+    bool sellZone = trend15 == -1 and trend60 == -1
+    resBox := box.new(bar_index - PIV_LEN, resTop, bar_index, resBot, border_color = color.new(color.red, sellZone ? 20 : 60), bgcolor = color.new(color.red, sellZone ? 75 : 90),
+         text = sellZone ? "SELL ZONE (15m+1h down)" : "Resistance", text_color = color.new(color.red, 20), text_size = size.tiny, text_halign = text.align_right)
+if not na(pl)
+    lastSL  := pl
+    supTop  := pl + zw
+    supBot  := pl - zw
+    supLive := true
+    if not na(supBox)
+        box.set_right(supBox, bar_index)
+    bool buyZone = trend15 == 1 and trend60 == 1
+    supBox := box.new(bar_index - PIV_LEN, supTop, bar_index, supBot, border_color = color.new(color.green, buyZone ? 20 : 60), bgcolor = color.new(color.green, buyZone ? 75 : 90),
+         text = buyZone ? "BUY ZONE (15m+1h up)" : "Support", text_color = color.new(color.green, 20), text_size = size.tiny, text_halign = text.align_right)
+
+// Break of structure (close beyond last swing) sets the bias
+if not na(lastSH) and close > lastSH and close[1] <= lastSH
+    bias := 1
+if not na(lastSL) and close < lastSL and close[1] >= lastSL
+    bias := -1
+
+// Zone breaks -> start waiting for a retest
+var float bLTop = na
+var float bLBot = na
+var int   bLBar = na
+var float bSTop = na
+var float bSBot = na
+var int   bSBar = na
+if resLive and close > resTop
+    resLive := false
+    box.set_right(resBox, bar_index)
+    box.set_bgcolor(resBox, color.new(color.gray, 92))
+    bLTop := resTop
+    bLBot := resBot
+    bLBar := bar_index
+else if resLive
+    box.set_right(resBox, bar_index)
+if supLive and close < supBot
+    supLive := false
+    box.set_right(supBox, bar_index)
+    box.set_bgcolor(supBox, color.new(color.gray, 92))
+    bSTop := supTop
+    bSBot := supBot
+    bSBar := bar_index
+else if supLive
+    box.set_right(supBox, bar_index)
+if not na(bLTop) and (close < bLBot or bar_index - bLBar > RETEST_BARS)
+    bLTop := na
+if not na(bSBot) and (close > bSTop or bar_index - bSBar > RETEST_BARS)
+    bSBot := na
+
+// =============================================================================
+// SETUPS
+// =============================================================================
+pbLong  = usePB and emaF > emaS and lowLow <= emaF + 0.2 * atr and lowClose > emaS and close > emaF and close > open and close > high[1] and close - emaF <= atr
+pbShort = usePB and emaF < emaS and hiHigh >= emaF - 0.2 * atr and hiClose < emaS and close < emaF and close < open and close < low[1] and emaF - close <= atr
+brLong  = useBR and not na(bLTop) and bar_index > bLBar and low <= bLTop + 0.15 * atr and close > bLTop and close > open
+brShort = useBR and not na(bSBot) and bar_index > bSBar and high >= bSBot - 0.15 * atr and close < bSBot and close < open
+
+// =============================================================================
+// GATES: why a trade can / cannot be taken
+// =============================================================================
+var int   tSide = 0
+var string tId = ""
+var float tEntry = na
+var float tSL = na
+var float tStop = na
+var float tTP1 = na
+var float tTP2 = na
+var bool  tp1Done = false
+var int   tSigBar = na
+var int   tClosedAt = 0
+var int   lastExit = na
+
+if tSide != 0 and strategy.position_size == 0 and bar_index > tSigBar
+    tSide := 0
+    lastExit := bar_index
+
+dayKey = dayofmonth(time, "America/New_York")
+var float dayStart = strategy.initial_capital
+var int dayTrades = 0
+if dayKey != dayKey[1]
+    dayStart := strategy.equity
+    dayTrades := 0
+dayPnL  = strategy.equity - dayStart
+dayStop = dayPnL <= -dayStart * dayLossPct / 100
+
+inSess = not useSess or not na(time(timeframe.period, "0800-1630", "Europe/London")) or not na(time(timeframe.period, "0800-1700", "America/New_York"))
+f_news(bool on, int t) =>
+    on and time_close > t - NEWS_BEFORE * 60000 and time < t + NEWS_AFTER * 60000
+newsBlk = f_news(n1On, n1T) or f_news(n2On, n2T) or f_news(n3On, n3T)
+inDates = time >= fromT and time <= toT
+tfOK    = timeframe.isminutes and (timeframe.multiplier == 1 or timeframe.multiplier == 5)
+coolOK  = na(lastExit) or bar_index - lastExit >= COOLDOWN
+inTrade = strategy.position_size != 0 or tSide != 0
+
+status = not tfOK ? "Use a 1m or 5m chart" : not chart.is_standard ? "Use normal candles" : not inDates ? "Outside backtest dates" :
+     inTrade ? "In a trade" : dayStop ? "Daily loss limit hit" : dayTrades >= maxTrades ? "Max trades today" :
+     not coolOK ? "Cooldown after last trade" : not inSess ? "Outside London/NY" : newsBlk ? "News blackout" : "Ready - waiting for a setup"
+canTrade = barstate.isconfirmed and status == "Ready - waiting for a setup"
+
+// =============================================================================
+// STOP, TARGETS, COST CHECK, SCORE
+// =============================================================================
+f_htf(int d) =>
+    strictHTF ? (trend15 == d and trend60 == d) : (trend15 == d and trend60 != -d)
+
+f_score(int d, bool room) =>
+    float p = 0.0
+    p += trend15 == d ? 20 : 0
+    p += trend60 == d ? 20 : 0
+    p += chartTrend == d ? 10 : 0
+    p += bias == d ? 15 : 0
+    p += (d == 1 ? rsiUp : rsiDn) ? 15 : 0
+    p += volOK ? 10 : 0
+    p += room ? 10 : 0
+    int(math.round(p))
+
+// Long
+lType = brLong ? "Retest" : pbLong ? "Pullback" : ""
+lRaw  = stopIn == "ATR" ? atrMult * atr : close - ((brLong ? bLBot : lastSL) - SL_BUF_ATR * atr)
+lDist = not na(lRaw) and lRaw > 0 ? math.max(lRaw, MIN_SL_ATR * atr) : na
+lT1   = targetIn == "Fixed pips" ? tp1Pips * pipSize : tp1R * lDist
+lT2   = targetIn == "Fixed pips" ? tp2Pips * pipSize : tp2R * lDist
+lFirst = halfAtTP1 ? lT1 : lT2
+lOK   = not na(lDist) and lDist <= MAX_SL_ATR * atr and lT2 > lT1 and lT2 >= lDist and costRT / lFirst * 100 <= MAX_COST
+lScore = f_score(1, not resLive or resBot - close >= lFirst)
+// Short
+sType = brShort ? "Retest" : pbShort ? "Pullback" : ""
+sRaw  = stopIn == "ATR" ? atrMult * atr : ((brShort ? bSTop : lastSH) + SL_BUF_ATR * atr) - close
+sDist = not na(sRaw) and sRaw > 0 ? math.max(sRaw, MIN_SL_ATR * atr) : na
+sT1   = targetIn == "Fixed pips" ? tp1Pips * pipSize : tp1R * sDist
+sT2   = targetIn == "Fixed pips" ? tp2Pips * pipSize : tp2R * sDist
+sFirst = halfAtTP1 ? sT1 : sT2
+sOK   = not na(sDist) and sDist <= MAX_SL_ATR * atr and sT2 > sT1 and sT2 >= sDist and costRT / sFirst * 100 <= MAX_COST
+sScore = f_score(-1, not supLive or close - supTop >= sFirst)
+
+f_qty(float dist) =>
+    float q = strategy.equity * riskPct / 100 / ((dist + costRT) * syminfo.pointvalue)
+    q := math.min(q, strategy.equity * MAX_LEV / (close * syminfo.pointvalue))
+    math.floor(q)
+
+buyRaw  = canTrade and allowL and lType != "" and lOK and f_htf(1) and lScore >= minScore and volPass and pressL and f_qty(lDist) >= 1
+sellRaw = canTrade and allowS and sType != "" and sOK and f_htf(-1) and sScore >= minScore and volPass and pressS and f_qty(sDist) >= 1
+buy  = buyRaw and not sellRaw
+sell = sellRaw and not buyRaw
+
+if brLong
+    bLTop := na
+if brShort
+    bSBot := na
+
+// =============================================================================
+// ORDERS
+// =============================================================================
+if buy or sell
+    tSide     := buy ? 1 : -1
+    string typ = buy ? lType : sType
+    tId       := (buy ? "BUY " : "SELL ") + typ
+    float d    = buy ? lDist : sDist
+    tEntry    := close
+    tSL       := close - tSide * d
+    tStop     := tSL
+    tTP1      := close + tSide * (buy ? lT1 : sT1)
+    tTP2      := close + tSide * (buy ? lT2 : sT2)
+    tp1Done   := false
+    tSigBar   := bar_index
+    tClosedAt := strategy.closedtrades
+    dayTrades += 1
+    int sc     = buy ? lScore : sScore
+    string msg = syminfo.tickerid + " " + tId + " | TF " + timeframe.period + " | Entry~" + str.tostring(tEntry, format.mintick) +
+         " | SL " + str.tostring(tSL, format.mintick) + " | TP1 " + str.tostring(tTP1, format.mintick) +
+         " | TP2 " + str.tostring(tTP2, format.mintick) + " | Setup score " + str.tostring(sc)
+    strategy.entry(tId, buy ? strategy.long : strategy.short, qty = f_qty(d), alert_message = msg)
+    alert(msg, alert.freq_once_per_bar_close)
+    if isFull
+        label.new(bar_index, tSL, tId + "\nSL " + str.tostring(tSL, format.mintick) + "\nTP1 " + str.tostring(tTP1, format.mintick) + "\nTP2 " + str.tostring(tTP2, format.mintick) + "\nScore " + str.tostring(sc),
+             style = buy ? label.style_label_up : label.style_label_down, color = buy ? color.new(color.teal, 15) : color.new(color.maroon, 15), textcolor = color.white, size = size.small)
+
+// Stop management: only ever moves toward profit
+if tSide != 0 and strategy.position_size != 0
+    if halfAtTP1 and not tp1Done and strategy.closedtrades > tClosedAt
+        tp1Done := true
+    if tp1Done
+        float be = tEntry + tSide * BE_OFFSET
+        tStop := tSide == 1 ? math.max(tStop, be) : math.min(tStop, be)
+        if trailOn
+            float tr = close - tSide * TRAIL_ATR * atr
+            tStop := tSide == 1 ? math.max(tStop, tr) : math.min(tStop, tr)
+
+if tSide != 0
+    if halfAtTP1 and not tp1Done
+        strategy.exit("TP1", tId, qty_percent = 50, limit = tTP1, stop = tStop, comment_profit = "TP1", comment_loss = "SL")
+    strategy.exit("TP2", tId, limit = tTP2, stop = tStop, comment_profit = "TP2", comment_loss = tStop == tSL ? "SL" : "BE/Trail")
+
+if strategy.position_size != 0 and (dayStop or not inDates)
+    strategy.close_all(comment = "Rule exit")
+
+// =============================================================================
+// CHART
+// =============================================================================
+plot(emaF, "EMA 20", color.new(color.orange, 20))
+plot(emaS, "EMA 50", color.new(color.purple, 20), 2)
+on = tSide != 0
+pE  = plot(on ? tEntry : na, "Entry", color.blue, 1, plot.style_linebr)
+pSL = plot(on ? tSL : na, "Stop-loss", color.red, 2, plot.style_linebr)
+plot(on and tStop != tSL ? tStop : na, "Moved stop", color.orange, 2, plot.style_linebr)
+plot(on ? tTP1 : na, "TP1", color.lime, 1, plot.style_linebr)
+pT2 = plot(on ? tTP2 : na, "TP2", color.green, 2, plot.style_linebr)
+fill(pE, pSL, color.new(color.red, 88))
+fill(pE, pT2, color.new(color.green, 90))
+plotshape(buy, "BUY", shape.labelup, location.belowbar, color.teal, text = "BUY", textcolor = color.white, size = size.tiny)
+plotshape(sell, "SELL", shape.labeldown, location.abovebar, color.maroon, text = "SELL", textcolor = color.white, size = size.tiny)
+// Swing markers: dot = where the swing is; x = bar it became known (5 bars later)
+plot(ph, "Swing high (location)", color.new(color.red, 30), 4, plot.style_circles, offset = -PIV_LEN)
+plot(pl, "Swing low (location)", color.new(color.green, 30), 4, plot.style_circles, offset = -PIV_LEN)
+plotshape(not na(ph), "Swing high known", shape.xcross, location.abovebar, color.new(color.red, 50), size = size.tiny)
+plotshape(not na(pl), "Swing low known", shape.xcross, location.belowbar, color.new(color.green, 50), size = size.tiny)
+bgcolor(newsBlk ? color.new(color.yellow, 85) : na, title = "News blackout")
+
+// =============================================================================
+// RESULTS PER SETUP (half-exits merged into one result per trade)
+// 0 BUY Pullback, 1 BUY Retest, 2 SELL Pullback, 3 SELL Retest
+// =============================================================================
+var array<int>   rN = array.new<int>(4, 0)
+var array<int>   rW = array.new<int>(4, 0)
+var array<float> rP = array.new<float>(4, 0.0)
+var array<float> rL = array.new<float>(4, 0.0)
+var int   seen = 0
+var float acc = 0.0
+var string accId = ""
+var int   streak = 0
+var int   worst = 0
+if strategy.closedtrades > seen
+    for i = seen to strategy.closedtrades - 1
+        acc += strategy.closedtrades.profit(i)
+        accId := strategy.closedtrades.entry_id(i)
+    seen := strategy.closedtrades
+if accId != "" and strategy.opentrades == 0
+    int k = accId == "BUY Pullback" ? 0 : accId == "BUY Retest" ? 1 : accId == "SELL Pullback" ? 2 : 3
+    array.set(rN, k, array.get(rN, k) + 1)
+    if acc > 0
+        array.set(rW, k, array.get(rW, k) + 1)
+        array.set(rP, k, array.get(rP, k) + acc)
+        streak := 0
+    else
+        array.set(rL, k, array.get(rL, k) - acc)
+        streak += 1
+        worst := math.max(worst, streak)
+    acc := 0.0
+    accId := ""
+
+// =============================================================================
+// DASHBOARD
+// =============================================================================
+var table dash = table.new(position.top_right, 4, 13, bgcolor = color.new(#131722, 10), border_width = 1, border_color = color.new(color.gray, 70))
+var table res  = table.new(position.bottom_right, 7, 7, bgcolor = color.new(#131722, 10), border_width = 1, border_color = color.new(color.gray, 70))
+f_t(int d) => d == 1 ? "▲ Up" : d == -1 ? "▼ Down" : "• Flat"
+f_c(int d) => d == 1 ? color.new(color.teal, 20) : d == -1 ? color.new(color.red, 20) : color.new(color.gray, 40)
+f_cell(table t, int c, int r, string s, color bg) =>
+    table.cell(t, c, r, s, text_color = color.white, bgcolor = bg, text_size = size.small)
+var bool merged = false
+H = color.new(color.gray, 60)
+N = color.new(#131722, 10)
+
+if barstate.islast
+    f_cell(dash, 0, 0, "1m", H)
+    f_cell(dash, 1, 0, "5m", H)
+    f_cell(dash, 2, 0, "15m", H)
+    f_cell(dash, 3, 0, "1h", H)
+    f_cell(dash, 0, 1, f_t(trend1), f_c(trend1))
+    f_cell(dash, 1, 1, f_t(trend5), f_c(trend5))
+    f_cell(dash, 2, 1, f_t(trend15), f_c(trend15))
+    f_cell(dash, 3, 1, f_t(trend60), f_c(trend60))
+    f_cell(dash, 0, 2, "Setup score  BUY " + str.tostring(lScore) + " / SELL " + str.tostring(sScore) + "  (need " + str.tostring(minScore) + ", not a win %)", N)
+    f_cell(dash, 0, 3, "Status: " + status, status == "Ready - waiting for a setup" ? color.new(color.teal, 40) : color.new(color.orange, 40))
+    if not merged
+        table.merge_cells(dash, 0, 2, 3, 2)
+        table.merge_cells(dash, 0, 3, 3, 3)
+    if isFull
+        float minPips = costRT / (MAX_COST / 100) / pipSize
+        f_cell(dash, 0, 4, "Mode " + modeIn + " | Stop " + stopIn + " | Targets " + targetIn, N)
+        f_cell(dash, 0, 5, "10 pips = $" + str.tostring(10 * pipSize, "#.##") + "   20 pips = $" + str.tostring(20 * pipSize, "#.##"), N)
+        f_cell(dash, 0, 6, "Cost $" + str.tostring(costRT, "#.##") + " -> first target must be ≥ " + str.tostring(minPips, "#.#") + " pips", N)
+        f_cell(dash, 0, 7, "Today: " + str.tostring(dayTrades) + "/" + str.tostring(maxTrades) + " trades, P/L $" + str.tostring(dayPnL, "#.##"), N)
+        f_cell(dash, 0, 8, "Volume: " + (volAvail ? "tick volume from this feed" : "none on this feed") + " (not real orders)", N)
+        f_cell(dash, 0, 9, "Est. pressure (20 bars): buyers " + str.tostring(buyPct, "#") + "% / sellers " + str.tostring(100 - buyPct, "#") + "%  - estimate, not real orders", buyPct > 55 ? color.new(color.teal, 40) : buyPct < 45 ? color.new(color.red, 40) : N)
+        f_cell(dash, 0, 10, "UNVALIDATED - backtest before use", color.new(color.orange, 50))
+        if not merged
+            for r = 4 to 10
+                table.merge_cells(dash, 0, r, 3, r)
+
+    if isFull and showStats
+        f_cell(res, 0, 0, "Setup", H)
+        f_cell(res, 1, 0, "Trades", H)
+        f_cell(res, 2, 0, "Win %", H)
+        f_cell(res, 3, 0, "Avg win", H)
+        f_cell(res, 4, 0, "Avg loss", H)
+        f_cell(res, 5, 0, "PF", H)
+        f_cell(res, 6, 0, "Net $", H)
+        array<string> nm = array.from("BUY Pullback", "BUY Retest", "SELL Pullback", "SELL Retest", "ALL")
+        for r = 0 to 4
+            int n = 0
+            int w = 0
+            float gp = 0.0
+            float gl = 0.0
+            for k = 0 to 3
+                if r == 4 or k == r
+                    n  += array.get(rN, k)
+                    w  += array.get(rW, k)
+                    gp += array.get(rP, k)
+                    gl += array.get(rL, k)
+            f_cell(res, 0, r + 1, array.get(nm, r), N)
+            f_cell(res, 1, r + 1, str.tostring(n), N)
+            f_cell(res, 2, r + 1, n > 0 ? str.tostring(float(w) / n * 100, "#.#") : "–", N)
+            f_cell(res, 3, r + 1, w > 0 ? str.tostring(gp / w, "#.##") : "–", N)
+            f_cell(res, 4, r + 1, n - w > 0 ? str.tostring(gl / (n - w), "#.##") : "–", N)
+            f_cell(res, 5, r + 1, gl > 0 ? str.tostring(gp / gl, "#.##") : "–", N)
+            f_cell(res, 6, r + 1, str.tostring(gp - gl, "#.##"), N)
+        f_cell(res, 0, 6, "Max drawdown $" + str.tostring(strategy.max_drawdown, "#.##") + "   Longest losing streak " + str.tostring(worst), N)
+        if not merged
+            table.merge_cells(res, 0, 6, 6, 6)
+    merged := true
