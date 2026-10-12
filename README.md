@@ -13,6 +13,11 @@ A simpler edition of the same strategy, for everyday use. **Unvalidated, not com
 - The dashboard shows a **Status** line explaining why no trade is being taken right now, e.g. "Outside London/NY" or "Daily loss limit hit".
 - **BUY ZONE / SELL ZONE:** a support zone is labelled BUY ZONE when the 15m and 1h trends were both up at the moment the zone was confirmed. A resistance zone is labelled SELL ZONE when both were down. Other zones are labelled Support or Resistance. Labels never change afterwards. A zone label does **not** mean a higher chance of winning; only a backtest can show that.
 - **Buyer/seller pressure (estimate):** each candle's tick volume is split by where the candle closed within its range, then summed over 20 bars. The result is shown on the dashboard and can optionally be used as a filter. It is an **estimate, not real buyer/seller orders**: spot gold has no central exchange, so real buy/sell volume isn't available on these feeds.
+- **Zone check:** the dashboard measures how often BUY ZONE, SELL ZONE and plain support/resistance zones actually **held** on your chart's own history. "Held" means price moved 1×ATR away from the zone before breaking through it. Only the first fresh touch of each zone counts. If both happen in the same candle, the touch counts as not held. Costs are not included. This is a record of past results, not a prediction. With fewer than about 50 touches it is unreliable.
+- **RSI** value and direction are shown on the dashboard.
+- **Companion panels.** Add each of these as a separate indicator, because a strategy on the price chart can't draw its own lower panes:
+  - `xauusd_rsi.pine`: RSI(14) with 30/50/70 lines. The background is shaded wherever the strategy's momentum rule is true.
+  - `xauusd_buyer_seller_volume.pine`: estimated buyer volume (green, up) and seller volume (red, down), plus a delta line and the buyer/seller % over the last 20 bars.
 - The results table splits BUY/SELL × Pullback/Retest and adds totals, max drawdown and the longest losing streak.
 
 The full version (`xauusd_mtf_strategy.pine`) keeps every option. Its instructions are below.
