@@ -6,6 +6,14 @@ File: [`xauusd_mtf_strategy.pine`](xauusd_mtf_strategy.pine). This is one overla
 
 ---
 
+## All-in-one version: `xauusd_all_in_one.pine`
+This is the Easy strategy, with the RSI and buyer/seller volume panels built in, as **one** script. **Unvalidated, not compiled, not backtested.**
+- The script sits in a lower panel showing RSI(14) with 30/50/70 lines, plus dots where the BUY or SELL momentum rule passes.
+- The same panel shows estimated buyer volume (green, up) and seller volume (red, down). The bars are scaled so they fit under the RSI.
+- Everything that belongs on the price chart uses `force_overlay = true`: zones, BUY/SELL marks, SL/TP lines, EMAs, swing markers, labels and the dashboards.
+- Because the script sits in the lower panel, TradingView's own strategy trade arrows appear in that panel. The script's BUY/SELL marks appear on the candles.
+- The shaded risk/reward fills are left out, because fills can't cross panels.
+
 ## Easy version: `xauusd_easy.pine`
 A simpler edition of the same strategy, for everyday use. **Unvalidated, not compiled, not backtested.**
 - About 20 settings instead of about 80. The rest are fixed values, listed in the `FIXED SETTINGS` block at the top of the script.
