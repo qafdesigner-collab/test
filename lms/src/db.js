@@ -13,10 +13,12 @@ db.exec(`
 CREATE TABLE IF NOT EXISTS schools (
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, code TEXT NOT NULL UNIQUE COLLATE NOCASE,
   city TEXT DEFAULT '', contact TEXT DEFAULT '', active INTEGER DEFAULT 1,
+  is_demo INTEGER DEFAULT 0, expires_at TEXT, created_by INTEGER,
+  lead_status TEXT DEFAULT '', notes TEXT DEFAULT '',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY, school_id INTEGER REFERENCES schools(id) ON DELETE CASCADE,
-  role TEXT NOT NULL CHECK(role IN ('admin','school','teacher','student')),
+  role TEXT NOT NULL CHECK(role IN ('admin','sales','school','teacher','student')),
   username TEXT NOT NULL COLLATE NOCASE, password_hash TEXT NOT NULL, name TEXT NOT NULL,
   class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL,
   avatar TEXT DEFAULT '🦁', stars INTEGER DEFAULT 0, active INTEGER DEFAULT 1,
@@ -92,6 +94,7 @@ function seed() {
   if (get('SELECT COUNT(*) AS n FROM users').n > 0) return;
   tx(() => {
     run(`INSERT INTO users(role,username,password_hash,name,avatar) VALUES('admin','admin',?,'Publisher Admin','👑')`, hash(process.env.ADMIN_PASSWORD || 'admin123'));
+    run(`INSERT INTO users(role,username,password_hash,name,avatar) VALUES('sales','sales1',?,'Sales Demo','💼')`, hash('sales123'));
     const book = run(`INSERT INTO books(title,subject,level,description,color,emoji,vocabulary) VALUES(?,?,?,?,?,?,?)`,
       'KG English', 'English', 'KG', 'Fun phonics, alphabet and first words for kindergarten.', '#ff6b6b', '🔤',
       'apple, ball, cat, dog, egg, fish, goat, hat, ice, jug, kite, lion, moon, nest, orange, pen, queen, rat, sun, tree, umbrella, van, watch, box, yak, zebra').lastInsertRowid;

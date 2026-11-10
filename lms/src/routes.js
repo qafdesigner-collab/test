@@ -165,7 +165,8 @@ function assertSeats(schoolId) {
 }
 
 admin.get('/schools', (_req, res) => {
-  const schools = all('SELECT * FROM schools ORDER BY name');
+  const schools = all(`SELECT s.*, u.name AS sales_name FROM schools s LEFT JOIN users u ON u.id=s.created_by
+    ORDER BY s.is_demo, s.name`);
   for (const s of schools) {
     s.licenses = seatUsage(s.id);
     s.teachers = get(`SELECT COUNT(*) n FROM users WHERE school_id=? AND role='teacher'`, s.id).n;
@@ -189,8 +190,9 @@ admin.post('/schools', (req, res) => {
   res.json({ id });
 });
 admin.put('/schools/:id', (req, res) => {
-  const f = pick(req.body, ['name', 'city', 'contact', 'active']);
+  const f = pick(req.body, ['name', 'city', 'contact', 'active', 'notes', 'lead_status', 'expires_at']);
   if ('active' in f) f.active = f.active ? 1 : 0;
+  if (req.body.convert) { f.is_demo = 0; f.expires_at = null; f.lead_status = 'converted'; }
   update('schools', req.params.id, f);
   if (req.body.username || req.body.password) {
     const a = get(`SELECT id FROM users WHERE school_id=? AND role='school' ORDER BY id LIMIT 1`, req.params.id);
@@ -209,7 +211,98 @@ admin.put('/schools/:id/licenses', (req, res) => {
   });
   res.json({ ok: true });
 });
+
+// sales team management (by publisher admin)
+admin.get('/sales', (_req, res) => res.json(all(`SELECT u.id,u.username,u.name,u.avatar,u.active,
+  (SELECT COUNT(*) FROM schools s WHERE s.created_by=u.id) AS demos,
+  (SELECT COUNT(*) FROM schools s WHERE s.created_by=u.id AND s.is_demo=0) AS converted
+  FROM users u WHERE role='sales' ORDER BY name`)));
+admin.post('/sales', (req, res) => {
+  const name = need(req.body.name, 'Name is required'); const username = need(req.body.username, 'Username is required');
+  const password = need(req.body.password, 'Password is required');
+  if (get('SELECT id FROM users WHERE school_id IS NULL AND username=?', username)) fail(400, 'Username already taken');
+  const r = run(`INSERT INTO users(role,username,password_hash,name,avatar) VALUES('sales',?,?,?,'💼')`, username, hash(password), name);
+  res.json({ id: r.lastInsertRowid });
+});
+admin.put('/sales/:id', (req, res) => {
+  get(`SELECT id FROM users WHERE id=? AND role='sales'`, req.params.id) || fail(404, 'Not found');
+  const f = pick(req.body, ['name']);
+  if ('active' in req.body) f.active = req.body.active ? 1 : 0;
+  if (req.body.password) f.password_hash = hash(req.body.password);
+  update('users', req.params.id, f); res.json({ ok: true });
+});
+admin.delete('/sales/:id', (req, res) => { run(`DELETE FROM users WHERE id=? AND role='sales'`, req.params.id); res.json({ ok: true }); });
 api.use('/admin', admin);
+
+// ================= Sales team: instant demo schools =================
+const sales = express.Router();
+sales.use(requireRole('sales', 'admin'));
+const DEMO_FIELDS = `s.id,s.name,s.code,s.city,s.contact,s.notes,s.lead_status,s.is_demo,s.expires_at,s.active,s.created_at,u.name AS sales_name`;
+sales.get('/demos', (req, res) => {
+  const mine = req.user.role === 'sales' ? 'WHERE s.created_by=?' : 'WHERE s.created_by IS NOT NULL';
+  const rows = all(`SELECT ${DEMO_FIELDS} FROM schools s LEFT JOIN users u ON u.id=s.created_by ${mine} ORDER BY s.id DESC`,
+    ...(req.user.role === 'sales' ? [req.user.id] : []));
+  for (const r of rows) r.books = all('SELECT b.title,b.emoji FROM licenses l JOIN books b ON b.id=l.book_id WHERE l.school_id=?', r.id);
+  res.json(rows);
+});
+sales.post('/demos', (req, res) => {
+  const name = need(req.body.name, 'School name is required');
+  const days = Math.max(1, Math.min(30, int(req.body.days) || 7));
+  let bookIds = (Array.isArray(req.body.book_ids) ? req.body.book_ids : []).map(Number).filter((id) => get('SELECT id FROM books WHERE id=?', id));
+  if (!bookIds.length) fail(400, 'Choose at least one book to demo');
+  const pw = () => String(crypto.randomInt(100000, 1000000));
+  const creds = tx(() => {
+    let code;
+    do { code = 'DEMO' + crypto.randomInt(1000, 10000); } while (get('SELECT id FROM schools WHERE code=?', code));
+    const expires = new Date(Date.now() + days * 864e5).toISOString();
+    const sid = run(`INSERT INTO schools(name,code,city,contact,notes,is_demo,expires_at,created_by,lead_status) VALUES(?,?,?,?,?,1,?,?,'demo')`,
+      name, code, req.body.city || '', req.body.contact || '', req.body.notes || '', expires, req.user.id).lastInsertRowid;
+    const out = { code, expires_at: expires, logins: [] };
+    const add = (role, username, display, avatar, classId = null) => {
+      const password = pw();
+      const id = run('INSERT INTO users(school_id,role,username,password_hash,name,avatar,class_id) VALUES(?,?,?,?,?,?,?)',
+        sid, role, username, hash(password), display, avatar, classId).lastInsertRowid;
+      out.logins.push({ role, username, password, name: display });
+      return id;
+    };
+    for (const b of bookIds) run('INSERT INTO licenses(school_id,book_id,seats) VALUES(?,?,5)', sid, b);
+    add('school', 'principal', 'Principal (demo)', '🏫');
+    const t = add('teacher', 'teacher', 'Demo Teacher', '🌻');
+    const cls = run('INSERT INTO classes(school_id,name,teacher_id) VALUES(?,?,?)', sid, 'Demo Class', t).lastInsertRowid;
+    for (const b of bookIds) run('INSERT INTO class_books VALUES(?,?)', cls, b);
+    add('student', 'student1', 'Demo Student 1', '🐯', cls);
+    add('student', 'student2', 'Demo Student 2', '🦄', cls);
+    return out;
+  });
+  res.json(creds);
+});
+const myDemo = (req, id) => get(`SELECT * FROM schools WHERE id=? AND created_by IS NOT NULL ${req.user.role === 'sales' ? 'AND created_by=' + Number(req.user.id) : ''}`, id) || fail(404, 'Demo not found');
+sales.put('/demos/:id', (req, res) => {
+  const d = myDemo(req, req.params.id);
+  const f = pick(req.body, ['notes', 'contact', 'city']);
+  if (req.body.lead_status && ['demo', 'interested', 'negotiating', 'lost'].includes(req.body.lead_status)) f.lead_status = req.body.lead_status;
+  if (req.body.extend_days && d.is_demo) {
+    const base = Math.max(Date.now(), Date.parse(d.expires_at) || 0);
+    f.expires_at = new Date(base + Math.min(30, int(req.body.extend_days)) * 864e5).toISOString();
+  }
+  update('schools', d.id, f); res.json({ ok: true, expires_at: f.expires_at });
+});
+sales.post('/demos/:id/reset', (req, res) => {
+  const d = myDemo(req, req.params.id);
+  if (!d.is_demo) fail(400, 'This school is already a customer');
+  const logins = all('SELECT id,role,username,name FROM users WHERE school_id=? ORDER BY id', d.id).map((u) => {
+    const password = String(crypto.randomInt(100000, 1000000));
+    run('UPDATE users SET password_hash=? WHERE id=?', hash(password), u.id);
+    return { role: u.role, username: u.username, name: u.name, password };
+  });
+  res.json({ code: d.code, expires_at: d.expires_at, logins });
+});
+sales.delete('/demos/:id', (req, res) => {
+  const d = myDemo(req, req.params.id);
+  if (!d.is_demo) fail(400, 'Converted schools can only be removed by the admin');
+  run('DELETE FROM schools WHERE id=?', d.id); res.json({ ok: true });
+});
+api.use('/sales', sales);
 
 // ================= School admin =================
 const school = express.Router();

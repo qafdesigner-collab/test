@@ -16,7 +16,7 @@ function parseCookies(req) {
 
 function publicUser(u) {
   if (!u) return null;
-  const school = u.school_id ? get('SELECT id,name,code FROM schools WHERE id=?', u.school_id) : null;
+  const school = u.school_id ? get('SELECT id,name,code,is_demo,expires_at FROM schools WHERE id=?', u.school_id) : null;
   return { id: u.id, role: u.role, username: u.username, name: u.name, avatar: u.avatar,
     stars: u.stars, class_id: u.class_id, school };
 }
@@ -25,10 +25,12 @@ function login(req, res) {
   const { code = '', username = '', password = '' } = req.body || {};
   let user;
   if (!String(code).trim()) {
-    user = get(`SELECT * FROM users WHERE school_id IS NULL AND role='admin' AND username=?`, username.trim());
+    user = get(`SELECT * FROM users WHERE school_id IS NULL AND role IN ('admin','sales') AND username=?`, username.trim());
   } else {
     const school = get('SELECT * FROM schools WHERE code=?', code.trim());
     if (!school || !school.active) return res.status(401).json({ error: 'School code not found or inactive' });
+    if (school.is_demo && school.expires_at && school.expires_at < new Date().toISOString())
+      return res.status(401).json({ error: 'This demo has expired. Please contact our sales team.' });
     user = get('SELECT * FROM users WHERE school_id=? AND username=?', school.id, username.trim());
   }
   if (!user || !user.active || !bcrypt.compareSync(String(password), user.password_hash))
@@ -54,7 +56,9 @@ function attachUser(req, _res, next) {
     const s = get('SELECT * FROM sessions WHERE token=? AND expires>?', t, Date.now());
     if (s) {
       const u = get('SELECT * FROM users WHERE id=? AND active=1', s.user_id);
-      if (u && (!u.school_id || get('SELECT active FROM schools WHERE id=?', u.school_id)?.active)) req.user = u;
+      const sc = u?.school_id ? get('SELECT active,is_demo,expires_at FROM schools WHERE id=?', u.school_id) : null;
+      const ok = !u?.school_id || (sc?.active && !(sc.is_demo && sc.expires_at && sc.expires_at < new Date().toISOString()));
+      if (u && ok) req.user = u;
     }
   }
   next();
@@ -68,7 +72,7 @@ const requireRole = (...roles) => (req, res, next) => {
 
 // Which book IDs can this user see?
 function allowedBookIds(user) {
-  if (user.role === 'admin') return all('SELECT id FROM books').map((r) => r.id);
+  if (user.role === 'admin' || user.role === 'sales') return all('SELECT id FROM books').map((r) => r.id);
   if (user.role === 'school') return all('SELECT book_id AS id FROM licenses WHERE school_id=?', user.school_id).map((r) => r.id);
   if (user.role === 'teacher')
     return all(`SELECT DISTINCT cb.book_id AS id FROM class_books cb JOIN classes c ON c.id=cb.class_id
