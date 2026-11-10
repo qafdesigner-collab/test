@@ -15,6 +15,27 @@
       "when": 1794309840397,
       "tag": "0001_rls_and_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794312021252,
+      "tag": "0002_licensing",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794312022044,
+      "tag": "0003_licensing_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794312454721,
+      "tag": "0004_school_profile",
+      "breakpoints": true
     }
   ]
 }

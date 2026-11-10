@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, count, desc, eq, SQL } from 'drizzle-orm';
+import { and, count, desc, eq, like, SQL } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
 import { auditLogs, users } from '../db/schema';
 
@@ -8,16 +8,18 @@ export class AuditService {
   constructor(private readonly db: DbService) {}
 
   /** Write an audit entry inside the current transaction (rolled back together with the change). */
-  async log(action: string, entityType: string, entityId: string | null, summary: string, before?: unknown, after?: unknown) {
+  async log(action: string, entityType: string, entityId: string | null, summary: string, before?: unknown, after?: unknown, schoolId?: string | null) {
     const c = this.db.ctx;
     await this.db.q.insert(auditLogs).values({
-      publisherId: c.publisherId, schoolId: c.schoolId, actorUserId: c.userId, action, entityType, entityId, summary,
+      publisherId: c.publisherId, schoolId: schoolId !== undefined ? schoolId : c.schoolId, actorUserId: c.userId, action, entityType, entityId, summary,
       before: before === undefined ? null : (before as any), after: after === undefined ? null : (after as any), ip: c.ip,
     });
   }
 
-  async list(f: { entityType?: string; entityId?: string; page: number; pageSize: number }) {
+  async list(f: { entityType?: string; entityId?: string; schoolId?: string; action?: string; page: number; pageSize: number }) {
     const where: SQL[] = [];
+    if (f.schoolId) where.push(eq(auditLogs.schoolId, f.schoolId));
+    if (f.action) where.push(like(auditLogs.action, `${f.action}%`));
     if (f.entityType) where.push(eq(auditLogs.entityType, f.entityType));
     if (f.entityId) where.push(eq(auditLogs.entityId, f.entityId));
     const w = where.length ? and(...where) : undefined;

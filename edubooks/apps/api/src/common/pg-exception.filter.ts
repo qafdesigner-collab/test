@@ -19,6 +19,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       '22P02': [400, 'Invalid identifier or value format.'],
       '42501': [403, 'Not allowed for your organisation.'],
     };
+    // RAISE EXCEPTION from our business-rule triggers → 409 with the trigger's message.
+    if (pg?.code === 'P0001') return res.status(409).json({ statusCode: 409, message: pg.message });
     const hit = pg?.code && map[pg.code];
     if (hit) {
       return res.status(hit[0]).json({ statusCode: hit[0], message: hit[1], detail: pg.constraint || pg.detail });

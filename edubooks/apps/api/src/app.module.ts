@@ -8,6 +8,10 @@ import { AuthGuard } from './auth/auth.guard';
 import { StorageModule } from './storage/storage.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { PublishingModule } from './publishing/publishing.module';
+import { CommerceModule } from './commerce/commerce.module';
+import { LicensingModule } from './licensing/licensing.module';
+import { SchoolsModule } from './schools/schools.module';
+import { SchoolAdminModule } from './school-admin/school-admin.module';
 import { TenantInterceptor } from './common/tenant.interceptor';
 import { AllExceptionsFilter } from './common/pg-exception.filter';
 
@@ -15,6 +19,7 @@ import { AllExceptionsFilter } from './common/pg-exception.filter';
   imports: [
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: Number(process.env.RATE_LIMIT_PER_MIN || 300) }]),
     DbModule, AuditModule, AuthModule, StorageModule, CatalogModule, PublishingModule,
+    CommerceModule, LicensingModule, SchoolsModule, SchoolAdminModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -44,6 +44,9 @@ export const schools = pgTable('schools', {
   city: text('city'),
   address: text('address'),
   phone: text('phone'),
+  isDemo: boolean('is_demo').notNull().default(false),
+  demoExpiresAt: timestamp('demo_expires_at', { withTimezone: true }),
+  createdBy: uuid('created_by'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [index('schools_publisher_idx').on(t.publisherId)]);
@@ -241,3 +244,193 @@ export const teachingResources = pgTable('teaching_resources', {
   index('resources_asset_idx').on(t.assetId),
   check('resources_scope_ck', sql`(${t.lessonId} IS NULL OR ${t.unitId} IS NOT NULL) AND (${t.unitId} IS NULL OR ${t.componentId} IS NOT NULL)`),
 ]);
+
+// =====================================================================================
+// Phase 2b/3 — commerce & licensing
+// =====================================================================================
+export const productKindEnum = pgEnum('product_kind', ['SINGLE', 'BUNDLE']);
+export const versionStatusEnum = pgEnum('version_status', ['DRAFT', 'ACTIVE', 'RETIRED']);
+export const orderTypeEnum = pgEnum('order_type', ['NEW', 'RENEWAL', 'ADDITIONAL']);
+export const orderStatusEnum = pgEnum('order_status', ['DRAFT', 'CONFIRMED', 'FULFILLED', 'CANCELLED']);
+export const seatTypeEnum = pgEnum('seat_type', ['STUDENT', 'TEACHER']);
+export const poolStatusEnum = pgEnum('pool_status', ['ACTIVE', 'SUSPENDED', 'EXPIRED', 'REVOKED']);
+export const seatStatusEnum = pgEnum('seat_status', ['AVAILABLE', 'ASSIGNED', 'REVOKED']);
+export const assignmentStatusEnum = pgEnum('assignment_status', ['ACTIVE', 'SUSPENDED', 'REVOKED', 'EXPIRED', 'TRANSFERRED', 'RELEASED']);
+export const transferStatusEnum = pgEnum('transfer_status', ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']);
+export const adjustmentKindEnum = pgEnum('adjustment_kind', ['COMPLIMENTARY', 'TRIAL', 'CORRECTION']);
+const date = (n: string) => timestamp(n, { withTimezone: true });
+
+export const academicYears = pgTable('academic_years', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  startsOn: date('starts_on').notNull(),
+  endsOn: date('ends_on').notNull(),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex('ay_school_name_uq').on(t.schoolId, t.name), check('ay_dates_ck', sql`${t.endsOn} > ${t.startsOn}`)]);
+
+export const products = pgTable('products', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  sku: citext('sku').notNull(),
+  name: text('name').notNull(),
+  kind: productKindEnum('kind').notNull(),
+  gradeId: uuid('grade_id').references(() => grades.id, { onDelete: 'set null' }),
+  description: text('description').notNull().default(''),
+  archived: boolean('archived').notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [uniqueIndex('products_sku_uq').on(t.publisherId, t.sku)]);
+
+/** Immutable once ACTIVE (enforced by a DB trigger): orders always point at a frozen version. */
+export const productVersions = pgTable('product_versions', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  productId: uuid('product_id').notNull().references(() => products.id, { onDelete: 'restrict' }),
+  versionNo: integer('version_no').notNull(),
+  status: versionStatusEnum('status').notNull().default('DRAFT'),
+  priceMinor: bigint('price_minor', { mode: 'number' }),
+  currency: text('currency').notNull().default('PKR'),
+  notes: text('notes').notNull().default(''),
+  activatedAt: date('activated_at'),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex('pv_product_version_uq').on(t.productId, t.versionNo),
+  uniqueIndex('pv_one_active_uq').on(t.productId).where(sql`${t.status} = 'ACTIVE'`),
+]);
+
+export const bundleItems = pgTable('bundle_items', {
+  productVersionId: uuid('product_version_id').notNull().references(() => productVersions.id, { onDelete: 'cascade' }),
+  editionId: uuid('edition_id').notNull().references(() => bookEditions.id, { onDelete: 'restrict' }),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+}, (t) => [primaryKey({ columns: [t.productVersionId, t.editionId] })]);
+
+export const orders = pgTable('orders', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'restrict' }),
+  academicYearId: uuid('academic_year_id').notNull().references(() => academicYears.id, { onDelete: 'restrict' }),
+  orderNo: text('order_no').notNull(),
+  type: orderTypeEnum('type').notNull().default('NEW'),
+  status: orderStatusEnum('status').notNull().default('DRAFT'),
+  notes: text('notes').notNull().default(''),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  confirmedAt: date('confirmed_at'),
+  fulfilledAt: date('fulfilled_at'),
+  cancelledAt: date('cancelled_at'),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex('orders_no_uq').on(t.publisherId, t.orderNo), index('orders_school_idx').on(t.schoolId)]);
+
+export const orderLines = pgTable('order_lines', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'restrict' }),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  productVersionId: uuid('product_version_id').notNull().references(() => productVersions.id, { onDelete: 'restrict' }),
+  studentQty: integer('student_qty').notNull().default(0),
+  teacherQty: integer('teacher_qty').notNull().default(0),
+  unitPriceMinor: bigint('unit_price_minor', { mode: 'number' }),
+}, (t) => [check('ol_qty_ck', sql`${t.studentQty} >= 0 AND ${t.teacherQty} >= 0 AND ${t.studentQty} + ${t.teacherQty} > 0`)]);
+
+export const fulfillments = pgTable('fulfillments', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'restrict' }),
+  orderLineId: uuid('order_line_id').notNull().unique().references(() => orderLines.id, { onDelete: 'restrict' }),
+  fulfilledBy: uuid('fulfilled_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: createdAt(),
+});
+
+export const licenseAdjustments = pgTable('license_adjustments', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'restrict' }),
+  academicYearId: uuid('academic_year_id').notNull().references(() => academicYears.id, { onDelete: 'restrict' }),
+  productVersionId: uuid('product_version_id').notNull().references(() => productVersions.id, { onDelete: 'restrict' }),
+  seatType: seatTypeEnum('seat_type').notNull(),
+  quantity: integer('quantity').notNull(),
+  kind: adjustmentKindEnum('kind').notNull(),
+  reason: text('reason').notNull(),
+  validUntil: date('valid_until'),
+  approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: createdAt(),
+}, (t) => [check('adj_qty_ck', sql`${t.quantity} > 0`)]);
+
+export const licensePools = pgTable('license_pools', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'restrict' }),
+  academicYearId: uuid('academic_year_id').notNull().references(() => academicYears.id, { onDelete: 'restrict' }),
+  productVersionId: uuid('product_version_id').notNull().references(() => productVersions.id, { onDelete: 'restrict' }),
+  seatType: seatTypeEnum('seat_type').notNull(),
+  quantity: integer('quantity').notNull(),
+  fulfillmentId: uuid('fulfillment_id').references(() => fulfillments.id, { onDelete: 'restrict' }),
+  adjustmentId: uuid('adjustment_id').references(() => licenseAdjustments.id, { onDelete: 'restrict' }),
+  validFrom: date('valid_from').notNull(),
+  validUntil: date('valid_until').notNull(),
+  status: poolStatusEnum('status').notNull().default('ACTIVE'),
+  createdAt: createdAt(),
+}, (t) => [
+  check('pool_source_ck', sql`(${t.fulfillmentId} IS NOT NULL) <> (${t.adjustmentId} IS NOT NULL)`),
+  check('pool_qty_ck', sql`${t.quantity} > 0`),
+  check('pool_dates_ck', sql`${t.validUntil} > ${t.validFrom}`),
+  index('pools_school_idx').on(t.schoolId, t.status),
+]);
+
+export const licenseSeats = pgTable('license_seats', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'restrict' }),
+  poolId: uuid('pool_id').notNull().references(() => licensePools.id, { onDelete: 'restrict' }),
+  seatNo: integer('seat_no').notNull(),
+  status: seatStatusEnum('status').notNull().default('AVAILABLE'),
+}, (t) => [uniqueIndex('seats_pool_no_uq').on(t.poolId, t.seatNo), index('seats_pool_status_idx').on(t.poolId, t.status)]);
+
+export const licenseAssignments = pgTable('license_assignments', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'restrict' }),
+  poolId: uuid('pool_id').notNull().references(() => licensePools.id, { onDelete: 'restrict' }),
+  seatId: uuid('seat_id').notNull().references(() => licenseSeats.id, { onDelete: 'restrict' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  status: assignmentStatusEnum('status').notNull().default('ACTIVE'),
+  assignedBy: uuid('assigned_by').references(() => users.id, { onDelete: 'set null' }),
+  assignedAt: createdAt(),
+  endedAt: date('ended_at'),
+  endReason: text('end_reason'),
+  transferredFromId: uuid('transferred_from_id'),
+}, (t) => [
+  // A seat can be held by only one person at a time; a person holds at most one seat per pool.
+  uniqueIndex('assign_seat_live_uq').on(t.seatId).where(sql`${t.status} IN ('ACTIVE','SUSPENDED')`),
+  uniqueIndex('assign_pool_user_live_uq').on(t.poolId, t.userId).where(sql`${t.status} IN ('ACTIVE','SUSPENDED')`),
+  index('assign_user_idx').on(t.userId, t.status),
+]);
+
+export const licenseTransfers = pgTable('license_transfers', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'restrict' }),
+  assignmentId: uuid('assignment_id').notNull().references(() => licenseAssignments.id, { onDelete: 'restrict' }),
+  toUserId: uuid('to_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  reason: text('reason').notNull(),
+  status: transferStatusEnum('status').notNull().default('PENDING'),
+  requestedBy: uuid('requested_by').references(() => users.id, { onDelete: 'set null' }),
+  requestedAt: createdAt(),
+  decidedBy: uuid('decided_by').references(() => users.id, { onDelete: 'set null' }),
+  decidedAt: date('decided_at'),
+  decisionNote: text('decision_note'),
+  newAssignmentId: uuid('new_assignment_id').references(() => licenseAssignments.id),
+}, (t) => [uniqueIndex('transfer_pending_uq').on(t.assignmentId).where(sql`${t.status} = 'PENDING'`)]);
+
+export const accessEntitlements = pgTable('access_entitlements', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'restrict' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  editionId: uuid('edition_id').notNull().references(() => bookEditions.id, { onDelete: 'restrict' }),
+  assignmentId: uuid('assignment_id').notNull().references(() => licenseAssignments.id, { onDelete: 'cascade' }),
+  validUntil: date('valid_until').notNull(),
+  active: boolean('active').notNull().default(true),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex('ent_assign_edition_uq').on(t.assignmentId, t.editionId), index('ent_user_idx').on(t.userId, t.active)]);

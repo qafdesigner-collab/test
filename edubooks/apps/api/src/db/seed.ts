@@ -37,7 +37,9 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
   try {
     if (opts.reset) {
       await db.execute(sql`TRUNCATE publishers, schools, users, user_roles, sessions, audit_logs, grades, subjects, digital_assets,
-        book_packages, book_editions, book_components, book_units, book_lessons, book_pages, teaching_resources CASCADE`);
+        book_packages, book_editions, book_components, book_units, book_lessons, book_pages, teaching_resources,
+        academic_years, products, product_versions, bundle_items, orders, order_lines, fulfillments, license_adjustments, license_pools,
+        license_seats, license_assignments, license_transfers, access_entitlements CASCADE`);
     }
     const existing = await db.select().from(s.publishers).where(sql`slug = 'demo'`);
     if (existing.length) { log('Seed data already present (use --reset to recreate).'); return; }
@@ -56,12 +58,15 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
 
     // Schools (licences & orders arrive in Phase 3)
     const schoolPw = await hashPassword('School@12345'); const teacherPw = await hashPassword('Teacher@12345'); const studentPw = await hashPassword('Student@123');
+    const schoolRows: { id: string; code: string; users: Record<string, string> }[] = [];
     const schoolDefs = [['Sunrise Grammar School', 'SUN01', 'Lahore'], ['Green Valley School', 'GVS02', 'Karachi'], ['Bright Future Academy', 'BFA03', 'Islamabad']];
     for (const [name, code, city] of schoolDefs) {
       const [sc] = await db.insert(s.schools).values({ publisherId: P, name, code, city }).returning();
-      await addUser({ schoolId: sc.id, username: 'principal', displayName: `${name} Admin`, pw: schoolPw, roles: ['SCHOOL_ADMIN'] });
-      await addUser({ schoolId: sc.id, username: 'teacher1', displayName: 'Sample Teacher', pw: teacherPw, roles: ['TEACHER'] });
-      for (let i = 1; i <= 3; i++) await addUser({ schoolId: sc.id, username: `student${i}`, displayName: `Sample Student ${i}`, pw: studentPw, roles: ['STUDENT'] });
+      const u: Record<string, string> = {};
+      u.principal = (await addUser({ schoolId: sc.id, username: 'principal', displayName: `${name} Admin`, pw: schoolPw, roles: ['SCHOOL_ADMIN'] })).id;
+      u.teacher1 = (await addUser({ schoolId: sc.id, username: 'teacher1', displayName: 'Sample Teacher', pw: teacherPw, roles: ['TEACHER'] })).id;
+      for (let i = 1; i <= 3; i++) u[`student${i}`] = (await addUser({ schoolId: sc.id, username: `student${i}`, displayName: `Sample Student ${i}`, pw: studentPw, roles: ['STUDENT'] })).id;
+      schoolRows.push({ id: sc.id, code, users: u });
     }
 
     // Taxonomy
@@ -93,12 +98,14 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
       { title: 'KG Urdu', subject: 'Urdu', color: '#10b981', units: ['حروفِ تہجی (Haroof)', 'آسان الفاظ (Simple Words)'] },
       { title: 'KG General Knowledge', subject: 'General Knowledge', color: '#f59e0b', units: ['Myself and My Family', 'Animals Around Us'] },
     ];
+    const editionByTitle: Record<string, string> = {};
     for (const p of packages) {
       const [pkg] = await db.insert(s.bookPackages).values({ publisherId: P, gradeId: G.KG, subjectId: S[p.subject], title: p.title,
         slug: p.title.toLowerCase().replace(/\s+/g, '-'), description: `${p.title} complete package (sample structure for demonstration).`,
         coverColor: p.color, status: 'PUBLISHED', createdBy: admin.id }).returning();
       const [ed] = await db.insert(s.bookEditions).values({ publisherId: P, packageId: pkg.id, label: '2026 Edition', editionYear: 2026,
         status: 'PUBLISHED', publishedAt: new Date(), publishedBy: admin.id }).returning();
+      editionByTitle[p.title] = ed.id;
       const comps = [
         ...[1, 2, 3].map((n) => ({ type: 'STUDENT_BOOK' as const, title: `Student Book Part ${n}`, partNumber: n, pageCount: 64 })),
         { type: 'HOMEWORK_BOOK' as const, title: 'Homework Book', partNumber: null, pageCount: 48 },
@@ -132,7 +139,55 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
     const [dEd] = await db.insert(s.bookEditions).values({ publisherId: P, packageId: draft.id, label: '2027 Edition', editionYear: 2027 }).returning();
     await db.insert(s.bookComponents).values([1, 2].map((n) => ({ publisherId: P, editionId: dEd.id, type: 'STUDENT_BOOK' as const, title: `Student Book Part ${n}`, partNumber: n, sort: n })));
 
-    log('✅ Seeded: 1 publisher, 3 staff, 3 schools (15 users), 4 grades, 4 subjects, 5 book packages.');
+    // ---------- Commerce & licensing (Phase 3) ----------
+    const now = new Date(); const y = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1; // Aug–Jul academic year
+    const ayStart = new Date(Date.UTC(y, 7, 1)); const ayEnd = new Date(Date.UTC(y + 1, 6, 31, 23, 59, 59));
+    const ays: Record<string, string> = {};
+    for (const sc of schoolRows) {
+      const [ay] = await db.insert(s.academicYears).values({ publisherId: P, schoolId: sc.id, name: `${y}–${String(y + 1).slice(2)}`, startsOn: ayStart, endsOn: ayEnd }).returning();
+      ays[sc.code] = ay.id;
+    }
+    const versions: Record<string, string> = {};
+    const mkProduct = async (sku: string, name: string, kind: 'SINGLE' | 'BUNDLE', titles: string[], priceMinor: number) => {
+      const [pr] = await db.insert(s.products).values({ publisherId: P, sku, name, kind, gradeId: G.KG, description: kind === 'BUNDLE' ? 'One seat unlocks all four KG books.' : '' }).returning();
+      const [v] = await db.insert(s.productVersions).values({ publisherId: P, productId: pr.id, versionNo: 1, priceMinor, currency: 'PKR' }).returning();
+      await db.insert(s.bundleItems).values(titles.map((t) => ({ productVersionId: v.id, editionId: editionByTitle[t], publisherId: P })));
+      await db.update(s.productVersions).set({ status: 'ACTIVE', activatedAt: new Date() }).where(sql`id = ${v.id}`);
+      versions[sku] = v.id;
+    };
+    for (const p of packages) await mkProduct(`KG-${p.subject.slice(0, 3).toUpperCase()}`, `${p.title} package`, 'SINGLE', [p.title], 250000);
+    await mkProduct('KG-BUNDLE', 'KG Complete Bundle', 'BUNDLE', packages.map((p) => p.title), 850000);
+
+    let orderSeq = 1;
+    const fulfil = async (code: string, lines: [string, number, number][], assign: Record<string, string[]>) => {
+      const sc = schoolRows.find((x) => x.code === code)!;
+      const [o] = await db.insert(s.orders).values({ publisherId: P, schoolId: sc.id, academicYearId: ays[code], orderNo: `ORD-SEED-${String(orderSeq++).padStart(4, '0')}`,
+        type: 'NEW', status: 'FULFILLED', createdBy: admin.id, confirmedAt: now, fulfilledAt: now }).returning();
+      for (const [sku, stu, tea] of lines) {
+        const [l] = await db.insert(s.orderLines).values({ publisherId: P, schoolId: sc.id, orderId: o.id, productVersionId: versions[sku], studentQty: stu, teacherQty: tea, unitPriceMinor: sku === 'KG-BUNDLE' ? 850000 : 250000 }).returning();
+        const [f] = await db.insert(s.fulfillments).values({ publisherId: P, schoolId: sc.id, orderLineId: l.id, fulfilledBy: admin.id }).returning();
+        for (const [seatType, qty] of [['STUDENT', stu], ['TEACHER', tea]] as const) {
+          if (!qty) continue;
+          const [pool] = await db.insert(s.licensePools).values({ publisherId: P, schoolId: sc.id, academicYearId: ays[code], productVersionId: versions[sku], seatType, quantity: qty,
+            fulfillmentId: f.id, validFrom: ayStart, validUntil: ayEnd }).returning();
+          const seats = await db.insert(s.licenseSeats).values(Array.from({ length: qty }, (_, i) => ({ publisherId: P, schoolId: sc.id, poolId: pool.id, seatNo: i + 1 }))).returning();
+          const holders = (assign[`${sku}:${seatType}`] ?? []).map((u) => sc.users[u]);
+          const items = await db.select().from(s.bundleItems).where(sql`product_version_id = ${versions[sku]}`);
+          for (const [i, userId] of holders.entries()) {
+            await db.update(s.licenseSeats).set({ status: 'ASSIGNED' }).where(sql`id = ${seats[i].id}`);
+            const [a] = await db.insert(s.licenseAssignments).values({ publisherId: P, schoolId: sc.id, poolId: pool.id, seatId: seats[i].id, userId, assignedBy: sc.users.principal }).returning();
+            await db.insert(s.accessEntitlements).values(items.map((it) => ({ publisherId: P, schoolId: sc.id, userId, editionId: it.editionId, assignmentId: a.id, validUntil: ayEnd })));
+          }
+        }
+      }
+    };
+    await fulfil('SUN01', [['KG-BUNDLE', 30, 3]], { 'KG-BUNDLE:STUDENT': ['student1', 'student2'], 'KG-BUNDLE:TEACHER': ['teacher1'] });
+    await fulfil('GVS02', [['KG-ENG', 20, 2], ['KG-MAT', 20, 2]], { 'KG-ENG:STUDENT': ['student1'], 'KG-ENG:TEACHER': ['teacher1'], 'KG-MAT:STUDENT': ['student1'] });
+    const bfa = schoolRows.find((x) => x.code === 'BFA03')!;
+    const [draftOrder] = await db.insert(s.orders).values({ publisherId: P, schoolId: bfa.id, academicYearId: ays.BFA03, orderNo: 'ORD-SEED-0003', type: 'NEW', createdBy: admin.id, notes: 'Awaiting payment' }).returning();
+    await db.insert(s.orderLines).values({ publisherId: P, schoolId: bfa.id, orderId: draftOrder.id, productVersionId: versions['KG-BUNDLE'], studentQty: 40, teacherQty: 4, unitPriceMinor: 850000 });
+
+    log('✅ Seeded: 1 publisher, 3 staff, 3 schools (15 users), 4 grades, 4 subjects, 5 book packages, 5 products (incl. KG Complete Bundle), 3 orders with licences.');
   } finally {
     await pool.end();
   }
