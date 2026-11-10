@@ -16,10 +16,11 @@ const NAV = [
   { href: '/admin/schools', label: 'Schools', icon: Building2, roles: [A, E, S] },
   { href: '/admin/orders', label: 'Orders', icon: Receipt, roles: [A, S] },
   { href: '/admin/licences', label: 'Licences', icon: KeyRound, roles: [A, E, S] },
+  { href: '/admin/ai', label: 'AI Assistant', icon: Sparkles, roles: [A, E, S] },
   { href: '/admin/catalog', label: 'Grades & Subjects', icon: Tags, roles: [A, E] },
   { href: '/admin/audit', label: 'Audit Log', icon: ScrollText, roles: [A, E, S] },
 ];
-const NEXT = [{ label: 'Digital Reader', icon: BookOpen }, { label: 'AI Assistant', icon: Sparkles }];
+const NEXT = [{ label: 'Games & student portal', icon: BookOpen }];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { data: me, isLoading, isError } = useMe();

@@ -10,6 +10,7 @@ import { className, useBook, useMyClasses } from '@/lib/lms';
 import { Button, Card, Confirm, Field, Input, PageLoader, Select, Textarea } from '@/components/ui';
 import { BookScope } from '@/components/book-scope';
 import { useToast } from '@/components/ui/toast';
+import { AiNotices, SourceChips } from '@/components/ai-bits';
 
 type Step = { title: string; minutes: number; detail: string };
 type Content = { objectives: string; materials: string; warmUp: string; steps: Step[]; practice: string; assessment: string; homework: string; differentiation: string; notes: string };
@@ -44,6 +45,16 @@ function Editor({ id }: { id: string }) {
   const dup = useAction(() => api.post(`/teacher/lesson-plans/${id}/duplicate`), { ok: 'Copy created', keys: ['plans'], after: (r) => router.push(`/teacher/plans/${r.id}`) });
   const del = useAction(() => api.del(`/teacher/lesson-plans/${id}`), { ok: 'Deleted', keys: ['plans'], after: () => router.push('/teacher/plans') });
   const [confirmDel, setConfirmDel] = useState(false);
+  const [aiInfo, setAiInfo] = useState<any>(null);
+  // Fills the editor with an AI draft grounded in the chosen lesson; the teacher edits, then saves.
+  const ai = useAction(() => api.post('/ai/generate', { task: 'LESSON_PLAN', editionId: f.editionId, lessonId: f.lessonId || undefined, durationMin: f.durationMin }), {
+    keys: ['aiStatus'], after: (r: any) => {
+      const o = r.output;
+      setF((x: any) => ({ ...x, title: x.title || o.title, aiGenerated: true, content: { ...x.content, objectives: o.objectives, materials: o.materials, warmUp: o.warmUp,
+        steps: o.steps.map((st: any) => ({ title: st.title, minutes: st.minutes, detail: st.detail })), practice: o.practice, assessment: o.assessment, homework: o.homework,
+        differentiation: o.differentiation, notes: o.notes } }));
+      setAiInfo(r);
+    } });
   if (!f) return <PageLoader />;
   const c: Content = f.content; const setC = (patch: Partial<Content>) => setF({ ...f, content: { ...c, ...patch } });
   const total = c.steps.reduce((n, s) => n + (Number(s.minutes) || 0), 0);
@@ -60,11 +71,14 @@ function Editor({ id }: { id: string }) {
       <Link href="/teacher/plans" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"><ArrowLeft className="size-4" />Lesson planner</Link>
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="flex-1 text-2xl font-semibold">{isNew ? 'New lesson plan' : f.title}</h1>
-        <Button variant="secondary" disabled title="Arrives in Phase 5 (AI assistant)"><Sparkles className="size-4" />Generate with AI</Button>
+        <Button variant="secondary" loading={ai.isPending} disabled={!f.editionId} title={f.editionId ? 'Draft this plan from the lesson pages' : 'Choose a book first'}
+          onClick={() => ai.mutate()}><Sparkles className="size-4" />Generate with AI</Button>
         {!isNew && <><Button variant="ghost" onClick={print}><Printer className="size-4" />Print</Button><Button variant="ghost" onClick={download}><Download className="size-4" />Word</Button>
           <Button variant="ghost" onClick={() => dup.mutate()}><Copy className="size-4" />Duplicate</Button><Button variant="ghost" onClick={() => setConfirmDel(true)} aria-label="Delete"><Trash2 className="size-4 text-red-500" /></Button></>}
         <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!f.title.trim()}>Save</Button>
       </div>
+      {aiInfo && <Card className="space-y-2 p-4"><AiNotices r={aiInfo} /><div className="text-sm text-slate-600">Pages used: <SourceChips editionId={f.editionId} sources={aiInfo.sources} /></div>
+        <p className="text-xs text-slate-500">Review the draft below, change anything you like, then press Save.</p></Card>}
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-4">
           <Card className="space-y-4 p-5">

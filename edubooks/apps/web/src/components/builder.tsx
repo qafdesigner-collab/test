@@ -1,8 +1,8 @@
 'use client';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowDown, ArrowUp, BookOpen, ChevronRight, ExternalLink, FileUp, FolderOpen, GraduationCap, Layers, Lock, Pencil, Plus, Recycle, ShieldAlert, Trash2, UploadCloud,
+  ArrowDown, ArrowUp, BookOpen, Sparkles, ChevronRight, ExternalLink, FileUp, FolderOpen, GraduationCap, Layers, Lock, Pencil, Plus, Recycle, ShieldAlert, Trash2, UploadCloud,
 } from 'lucide-react';
 import { api, fmtBytes, fmtDate, qs } from '@/lib/api';
 import { AUDIENCES, COMPONENT_TYPES, RESOURCE_TYPES } from '@/lib/catalog';
@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/toast';
 // ---------- types ----------
 export interface Lesson { id: string; number: number; title: string; objectives: string; pageStart: number | null; pageEnd: number | null; unitId: string }
 export interface Unit { id: string; number: number; title: string; description: string; componentId: string; lessons: Lesson[] }
-export interface Component { id: string; type: string; title: string; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null }
+export interface Component { id: string; type: string; title: string; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null; indexStatus: string; indexedPages: number; indexError: string | null }
 export interface Resource {
   id: string; title: string; resourceType: string; audience: string; componentId: string | null; unitId: string | null; lessonId: string | null;
   createdAt: string; sharedWith: number; asset: { id: string; originalName: string; ext: string; sizeBytes: number; scanStatus: string };
@@ -244,6 +244,28 @@ function BookPdf({ comp, editionStatus, readOnly }: { comp: Component; editionSt
       {canUpload && <><input ref={input} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ''; }} />
         <Button size="sm" variant="secondary" loading={pct !== null} onClick={() => input.current?.click()}><UploadCloud className="size-4" />{comp.bookFile ? 'Replace PDF' : 'Upload PDF'}</Button></>}
       {comp.bookFile && editionStatus === 'DRAFT' && !readOnly && <Button size="sm" variant="ghost" onClick={() => remove.mutate(undefined)} aria-label="Remove book PDF"><Trash2 className="size-4 text-red-500" /></Button>}
+      {comp.bookFile && <AiIndexStatus comp={comp} />}
+    </div>
+  );
+}
+
+/** Text index used by the AI assistant: status + manual re-index. Polls while running. */
+function AiIndexStatus({ comp }: { comp: Component }) {
+  const qc = useQueryClient();
+  const reindex = useBuilderMutation(() => api.post(`/ai/index/components/${comp.id}`), 'Text extraction started');
+  useEffect(() => {
+    if (comp.indexStatus !== 'RUNNING') return;
+    const t = setInterval(() => qc.invalidateQueries({ queryKey: ['edition'] }), 2000);
+    return () => clearInterval(t);
+  }, [comp.indexStatus, qc]);
+  const label = { NONE: 'Not indexed for AI', RUNNING: 'Extracting text for AI…', DONE: `AI-ready · ${comp.indexedPages} pages of text`, NO_TEXT: 'No text found (scanned PDF?)', ERROR: 'Text extraction failed' }[comp.indexStatus] ?? comp.indexStatus;
+  const tone = comp.indexStatus === 'DONE' ? 'PUBLISHED' : comp.indexStatus === 'RUNNING' ? 'info' : comp.indexStatus === 'NONE' ? 'neutral' : 'danger';
+  return (
+    <div className="flex w-full items-center gap-2 border-t border-slate-200 pt-2 text-xs">
+      <Badge tone={tone}><Sparkles className="size-3" />{label}</Badge>
+      {comp.indexError && <span className="truncate text-slate-500" title={comp.indexError}>{comp.indexError}</span>}
+      <span className="flex-1" />
+      {comp.indexStatus !== 'RUNNING' && <Button size="sm" variant="ghost" onClick={() => reindex.mutate(undefined)} loading={reindex.isPending}>Re-index</Button>}
     </div>
   );
 }

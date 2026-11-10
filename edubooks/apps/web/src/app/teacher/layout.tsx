@@ -1,10 +1,11 @@
 'use client';
-import { BookMarked, ClipboardList, Library, LayoutDashboard, NotebookPen, Users } from 'lucide-react';
+import { BookMarked, ClipboardList, Library, LayoutDashboard, NotebookPen, Sparkles, Users } from 'lucide-react';
 import { Shell } from '@/components/shell';
 
 const NAV = [
   { href: '/teacher', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/teacher/books', label: 'My books', icon: Library },
+  { href: '/teacher/ai', label: 'AI assistant', icon: Sparkles },
   { href: '/teacher/plans', label: 'Lesson planner', icon: NotebookPen },
   { href: '/teacher/assessments', label: 'Homework & tests', icon: ClipboardList },
   { href: '/teacher/questions', label: 'Question bank', icon: BookMarked },

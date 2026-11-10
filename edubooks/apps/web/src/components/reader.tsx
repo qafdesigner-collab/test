@@ -18,7 +18,7 @@ async function loadPdf(url: string): Promise<PDFDoc> {
   return pdfjs.getDocument({ url, withCredentials: true }).promise as unknown as Promise<PDFDoc>;
 }
 
-export function Reader({ editionId, backHref }: { editionId: string; backHref: string }) {
+export function Reader({ editionId, backHref, initial }: { editionId: string; backHref: string; initial?: { componentId?: string; page?: number } }) {
   const toast = useToast(); const qc = useQueryClient();
   const book = useQuery({ queryKey: ['reader', editionId], queryFn: () => api.get(`/reader/editions/${editionId}`) });
   const [compId, setCompId] = useState<string>('');
@@ -39,8 +39,9 @@ export function Reader({ editionId, backHref }: { editionId: string; backHref: s
   // Default part: the first one with pages; resume at last page read.
   useEffect(() => {
     if (!b || compId) return;
-    const c = comps.find((x) => x.hasPdf) ?? comps[0];
-    if (c) { setCompId(c.id); setPage(c.progress?.lastPage ?? 1); }
+    const wanted = initial?.componentId && comps.find((x) => x.id === initial.componentId);
+    const c = wanted || comps.find((x) => x.hasPdf) || comps[0];
+    if (c) { setCompId(c.id); setPage(wanted && initial?.page ? initial.page : c.progress?.lastPage ?? 1); }
   }, [b, compId, comps]);
 
   // Load the PDF of the selected part (short-lived signed URL).
@@ -177,8 +178,9 @@ export function Reader({ editionId, backHref }: { editionId: string; backHref: s
             : docError ? <div className="m-auto"><ErrorBox error={new Error(docError)} /></div>
               : <>{loadingDoc && <Spinner className="absolute left-1/2 top-1/2 size-8" />}<canvas ref={canvas} className={cn('bg-white shadow-xl', kid ? 'rounded-2xl' : 'rounded')} aria-label={`Page ${page} of ${pages}`} /></>}
         </main>
-        {(lessonResources.length > 0 || lessonWork.length > 0) && (
+        {(lessonResources.length > 0 || lessonWork.length > 0 || (!kid && lessonHere)) && (
           <aside className="hidden w-64 shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-3 text-sm xl:block">
+            {!kid && lessonHere && <Link href={`/teacher/ai?editionId=${editionId}&lessonId=${lessonHere.id}`} className="mb-3 block rounded-lg bg-violet-50 px-3 py-2 font-medium text-violet-800 hover:bg-violet-100">✨ AI assistant for this lesson</Link>}
             {lessonWork.length > 0 && <><p className="pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{kid ? '📝 Homework' : 'Assigned work'}</p>
               {lessonWork.map((a: any) => <Link key={a.id} href={kid ? `/homework/${a.id}` : `/teacher/assessments/${a.id}`} className="mb-1 block rounded-lg bg-amber-50 px-3 py-2 font-medium text-amber-900 hover:bg-amber-100">{a.title}</Link>)}</>}
             {lessonResources.length > 0 && <><p className="pb-2 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Resources</p>
