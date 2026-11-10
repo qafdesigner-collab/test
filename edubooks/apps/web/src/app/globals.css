@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* Design tokens — professional theme (publisher / school / teacher). The student portal adds its own playful theme. */
+@theme {
+  --font-sans: "Inter", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+}
+:root { color-scheme: light; }
+body { @apply bg-slate-50 text-slate-800 antialiased; }
+.focus-ring { @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2; }
