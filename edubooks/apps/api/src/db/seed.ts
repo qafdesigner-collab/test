@@ -12,16 +12,19 @@ import { config } from '../config';
 import { hashPassword } from '../auth/password';
 import { createDriver } from '../storage/storage.driver';
 
-/** Builds a tiny valid one-page PDF with the given lines of text. */
-function samplePdf(lines: string[]) {
-  const text = lines.map((l, i) => `BT /F1 ${i ? 14 : 22} Tf 60 ${740 - i * 30} Td (${l.replace(/[()\\]/g, '')}) Tj ET`).join('\n');
-  const objs = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    `<< /Length ${Buffer.byteLength(text)} >>\nstream\n${text}\nendstream`,
-  ];
+/** Builds a small valid PDF: one page per entry, each page a list of text lines (placeholder content only). */
+function samplePdf(lines: string[] | string[][], color = '0.95 0.45 0.2') {
+  const pages = (Array.isArray(lines[0]) ? lines : [lines]) as string[][];
+  const objs: string[] = ['<< /Type /Catalog /Pages 2 0 R >>', '', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'];
+  const kids: number[] = [];
+  for (const pg of pages) {
+    const text = `${color} rg 0 742 420 50 re f 1 1 1 rg ` + pg.map((l, i) => `BT /F1 ${i ? 16 : 22} Tf ${i ? '0.2 0.2 0.3 rg ' : ''}40 ${i ? 680 - i * 34 : 758} Td (${l.replace(/[()\\]/g, '')}) Tj ET`).join('\n');
+    objs.push(`<< /Length ${Buffer.byteLength(text)} >>\nstream\n${text}\nendstream`);
+    const contentNo = objs.length;
+    objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 420 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentNo} 0 R >>`);
+    kids.push(objs.length);
+  }
+  objs[1] = `<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(' ')}] /Count ${kids.length} >>`;
   let out = '%PDF-1.4\n'; const offs: number[] = [];
   objs.forEach((o, i) => { offs.push(Buffer.byteLength(out)); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
   const xref = Buffer.byteLength(out);
@@ -39,7 +42,8 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
       await db.execute(sql`TRUNCATE publishers, schools, users, user_roles, sessions, audit_logs, grades, subjects, digital_assets,
         book_packages, book_editions, book_components, book_units, book_lessons, book_pages, teaching_resources,
         academic_years, products, product_versions, bundle_items, orders, order_lines, fulfillments, license_adjustments, license_pools,
-        license_seats, license_assignments, license_transfers, access_entitlements CASCADE`);
+        license_seats, license_assignments, license_transfers, access_entitlements, classes, class_teachers, enrolments, reader_progress,
+        bookmarks, lesson_plans, question_bank, assessments, assessment_items, assessment_students, submissions, evaluations CASCADE`);
     }
     const existing = await db.select().from(s.publishers).where(sql`slug = 'demo'`);
     if (existing.length) { log('Seed data already present (use --reset to recreate).'); return; }
@@ -116,6 +120,12 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
       ];
       const compRows = await db.insert(s.bookComponents).values(comps.map((c, i) => ({ publisherId: P, editionId: ed.id, sort: i, ...c }))).returning();
       const part1 = compRows[0];
+      // Placeholder digital pages for Part 1 so the reader can be tried. NOT real textbook content.
+      const pagesPdf = samplePdf(Array.from({ length: 26 }, (_, i) => i === 0
+        ? [`${p.title} - Student Book Part 1`, 'SAMPLE PLACEHOLDER BOOK', 'Upload the real PDF in the Package Builder.']
+        : [`${p.title} - Part 1`, `Page ${i + 1}`, 'Sample placeholder page', '(not publisher content)']), p.color === '#3b82f6' ? '0.23 0.51 0.96' : p.color === '#10b981' ? '0.06 0.73 0.5' : p.color === '#f59e0b' ? '0.96 0.62 0.04' : '0.94 0.27 0.27');
+      const bookAsset = await putAsset(`${p.title} Part 1 (sample).pdf`, pagesPdf, 'pdf', 'application/pdf');
+      await db.update(s.bookComponents).set({ bookAssetId: bookAsset.id, pageCount: 26 }).where(sql`id = ${part1.id}`);
       let page = 2;
       for (const [ui, unitTitle] of p.units.entries()) {
         const [u] = await db.insert(s.bookUnits).values({ publisherId: P, componentId: part1.id, number: ui + 1, sort: ui, title: `${unitTitle} (sample)` }).returning();
@@ -186,6 +196,21 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
     const bfa = schoolRows.find((x) => x.code === 'BFA03')!;
     const [draftOrder] = await db.insert(s.orders).values({ publisherId: P, schoolId: bfa.id, academicYearId: ays.BFA03, orderNo: 'ORD-SEED-0003', type: 'NEW', createdBy: admin.id, notes: 'Awaiting payment' }).returning();
     await db.insert(s.orderLines).values({ publisherId: P, schoolId: bfa.id, orderId: draftOrder.id, productVersionId: versions['KG-BUNDLE'], studentQty: 40, teacherQty: 4, unitPriceMinor: 850000 });
+
+    // ---------- Phase 4: a class with teacher, students and one homework ----------
+    const sun = schoolRows.find((x) => x.code === 'SUN01')!;
+    const [kgRose] = await db.insert(s.classes).values({ publisherId: P, schoolId: sun.id, academicYearId: ays.SUN01, gradeId: G.KG, name: 'KG', section: 'Rose' }).returning();
+    await db.insert(s.classTeachers).values({ classId: kgRose.id, userId: sun.users.teacher1, publisherId: P, schoolId: sun.id, subjectId: S.English });
+    await db.insert(s.enrolments).values(['student1', 'student2', 'student3'].map((u) => ({ classId: kgRose.id, studentId: sun.users[u], publisherId: P, schoolId: sun.id, academicYearId: ays.SUN01 })));
+    const [hw] = await db.insert(s.assessments).values({ publisherId: P, schoolId: sun.id, teacherId: sun.users.teacher1, classId: kgRose.id, editionId: editionByTitle['KG English'],
+      kind: 'HOMEWORK', title: 'Sample homework (placeholder questions)', instructions: 'Read each question and choose the answer.', status: 'PUBLISHED', publishedAt: new Date(),
+      dueAt: new Date(Date.now() + 7 * 864e5) }).returning();
+    await db.insert(s.assessmentItems).values([
+      { type: 'MCQ' as const, prompt: 'Which letter comes after A?', options: ['C', 'B', 'D'], answer: [1], points: 1 },
+      { type: 'TRUE_FALSE' as const, prompt: 'An apple is a fruit.', options: [], answer: [true], points: 1 },
+      { type: 'FILL_BLANK' as const, prompt: 'C is for ___ (an animal that says meow).', options: [], answer: ['cat'], points: 1 },
+      { type: 'SHORT' as const, prompt: 'Write one word that starts with B.', options: [], answer: [], points: 2 },
+    ].map((it, position) => ({ ...it, position, publisherId: P, schoolId: sun.id, assessmentId: hw.id })));
 
     log('✅ Seeded: 1 publisher, 3 staff, 3 schools (15 users), 4 grades, 4 subjects, 5 book packages, 5 products (incl. KG Complete Bundle), 3 orders with licences.');
   } finally {

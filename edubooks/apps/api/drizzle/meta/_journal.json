@@ -36,6 +36,20 @@
       "when": 1794312454721,
       "tag": "0004_school_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794313525954,
+      "tag": "0005_lms",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794313526608,
+      "tag": "0006_lms_rls",
+      "breakpoints": true
     }
   ]
 }

@@ -26,7 +26,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return res.status(hit[0]).json({ statusCode: hit[0], message: hit[1], detail: pg.constraint || pg.detail });
     }
     if (err?.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ statusCode: 413, message: 'File is too large.' });
-    this.log.error(err?.message, err?.stack);
+    this.log.error(`${err?.cause?.message ? `[${err.cause.code}] ${err.cause.message} — ` : ''}${String(err?.message).slice(0, 300)}`, err?.stack);
     return res.status(500).json({ statusCode: 500, message: 'Unexpected server error' });
   }
 }

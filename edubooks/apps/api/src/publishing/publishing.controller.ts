@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -68,6 +68,15 @@ export class PublishingController {
   upload(@Param('id', Id()) id: string, @UploadedFiles() files: Express.Multer.File[], @Body() d: UploadResourcesDto, @Req() req: any) {
     return this.db.withContext(req.ctx, () => this.svc.uploadResources(id, files, d));
   }
+  @ManualTx()
+  @Post('components/:id/book-pdf')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FilesInterceptor('file', 1, uploadOpts))
+  bookPdf(@Param('id', Id()) id: string, @UploadedFiles() files: Express.Multer.File[], @Req() req: any) {
+    if (!files?.[0]) throw new BadRequestException('Choose a PDF file');
+    return this.db.withContext(req.ctx, () => this.svc.setBookPdf(id, files[0]));
+  }
+  @Delete('components/:id/book-pdf') delBookPdf(@Param('id', Id()) id: string) { return this.svc.removeBookPdf(id); }
   @Patch('resources/:id') updRes(@Param('id', Id()) id: string, @Body() d: UpdateResourceDto) { return this.svc.updateResource(id, d); }
   @Delete('resources/:id') delRes(@Param('id', Id()) id: string) { return this.svc.deleteResource(id); }
 }

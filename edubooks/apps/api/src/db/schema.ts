@@ -434,3 +434,157 @@ export const accessEntitlements = pgTable('access_entitlements', {
   active: boolean('active').notNull().default(true),
   createdAt: createdAt(),
 }, (t) => [uniqueIndex('ent_assign_edition_uq').on(t.assignmentId, t.editionId), index('ent_user_idx').on(t.userId, t.active)]);
+
+// =====================================================================================
+// Phase 4 — classes, reader, lesson plans, assessments
+// =====================================================================================
+export const assessmentKindEnum = pgEnum('assessment_kind', ['HOMEWORK', 'QUIZ', 'TEST']);
+export const assessmentStatusEnum = pgEnum('assessment_status', ['DRAFT', 'PUBLISHED', 'CLOSED']);
+export const questionTypeEnum = pgEnum('question_type', ['MCQ', 'TRUE_FALSE', 'FILL_BLANK', 'SHORT']);
+export const submissionStatusEnum = pgEnum('submission_status', ['SUBMITTED', 'GRADED', 'RETURNED']);
+export const planStatusEnum = pgEnum('plan_status', ['DRAFT', 'READY']);
+const schoolCols = () => ({
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+});
+
+export const classes = pgTable('classes', {
+  id: id(), ...schoolCols(),
+  academicYearId: uuid('academic_year_id').notNull().references(() => academicYears.id, { onDelete: 'restrict' }),
+  gradeId: uuid('grade_id').references(() => grades.id, { onDelete: 'set null' }),
+  name: text('name').notNull(),
+  section: text('section').notNull().default(''),
+  archived: boolean('archived').notNull().default(false),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex('classes_name_uq').on(t.schoolId, t.academicYearId, t.name, t.section)]);
+
+export const classTeachers = pgTable('class_teachers', {
+  classId: uuid('class_id').notNull().references(() => classes.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  ...schoolCols(),
+  subjectId: uuid('subject_id').references(() => subjects.id, { onDelete: 'set null' }),
+}, (t) => [primaryKey({ columns: [t.classId, t.userId] })]);
+
+export const enrolments = pgTable('enrolments', {
+  classId: uuid('class_id').notNull().references(() => classes.id, { onDelete: 'cascade' }),
+  studentId: uuid('student_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  ...schoolCols(),
+  academicYearId: uuid('academic_year_id').notNull().references(() => academicYears.id),
+  createdAt: createdAt(),
+}, (t) => [primaryKey({ columns: [t.classId, t.studentId] }),
+  // A student belongs to one class per academic year.
+  uniqueIndex('enrol_one_class_per_year_uq').on(t.studentId, t.academicYearId)]);
+
+export const readerProgress = pgTable('reader_progress', {
+  id: id(), ...schoolCols(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  componentId: uuid('component_id').notNull().references(() => bookComponents.id, { onDelete: 'cascade' }),
+  lastPage: integer('last_page').notNull().default(1),
+  maxPage: integer('max_page').notNull().default(1),
+  updatedAt: updatedAt(),
+}, (t) => [uniqueIndex('progress_user_comp_uq').on(t.userId, t.componentId)]);
+
+export const bookmarks = pgTable('bookmarks', {
+  id: id(), ...schoolCols(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  componentId: uuid('component_id').notNull().references(() => bookComponents.id, { onDelete: 'cascade' }),
+  page: integer('page').notNull(),
+  note: text('note').notNull().default(''),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex('bookmark_uq').on(t.userId, t.componentId, t.page)]);
+
+export const lessonPlans = pgTable('lesson_plans', {
+  id: id(), ...schoolCols(),
+  teacherId: uuid('teacher_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  classId: uuid('class_id').references(() => classes.id, { onDelete: 'set null' }),
+  editionId: uuid('edition_id').references(() => bookEditions.id, { onDelete: 'set null' }),
+  lessonId: uuid('lesson_id').references(() => bookLessons.id, { onDelete: 'set null' }),
+  title: text('title').notNull(),
+  planDate: timestamp('plan_date', { withTimezone: true }),
+  durationMin: integer('duration_min').notNull().default(40),
+  // { objectives, materials, warmUp, steps:[{title,minutes,detail}], practice, assessment, homework, differentiation, notes }
+  content: jsonb('content').notNull().default({}),
+  status: planStatusEnum('status').notNull().default('DRAFT'),
+  aiGenerated: boolean('ai_generated').notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [index('plans_teacher_idx').on(t.teacherId)]);
+
+export const questionBank = pgTable('question_bank', {
+  id: id(), ...schoolCols(),
+  ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  editionId: uuid('edition_id').references(() => bookEditions.id, { onDelete: 'set null' }),
+  lessonId: uuid('lesson_id').references(() => bookLessons.id, { onDelete: 'set null' }),
+  type: questionTypeEnum('type').notNull(),
+  prompt: text('prompt').notNull(),
+  options: jsonb('options').notNull().default([]),
+  answer: jsonb('answer').notNull().default([]),
+  difficulty: integer('difficulty').notNull().default(1),
+  shared: boolean('shared').notNull().default(true),
+  createdAt: createdAt(),
+}, (t) => [index('qb_school_idx').on(t.schoolId, t.editionId)]);
+
+export const assessments = pgTable('assessments', {
+  id: id(), ...schoolCols(),
+  teacherId: uuid('teacher_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  classId: uuid('class_id').notNull().references(() => classes.id, { onDelete: 'cascade' }),
+  editionId: uuid('edition_id').references(() => bookEditions.id, { onDelete: 'set null' }),
+  unitId: uuid('unit_id').references(() => bookUnits.id, { onDelete: 'set null' }),
+  lessonId: uuid('lesson_id').references(() => bookLessons.id, { onDelete: 'set null' }),
+  kind: assessmentKindEnum('kind').notNull().default('HOMEWORK'),
+  title: text('title').notNull(),
+  instructions: text('instructions').notNull().default(''),
+  dueAt: timestamp('due_at', { withTimezone: true }),
+  allowLate: boolean('allow_late').notNull().default(true),
+  status: assessmentStatusEnum('status').notNull().default('DRAFT'),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [index('assess_class_idx').on(t.classId, t.status)]);
+
+export const assessmentItems = pgTable('assessment_items', {
+  id: id(), ...schoolCols(),
+  assessmentId: uuid('assessment_id').notNull().references(() => assessments.id, { onDelete: 'cascade' }),
+  position: integer('position').notNull(),
+  type: questionTypeEnum('type').notNull(),
+  prompt: text('prompt').notNull(),
+  options: jsonb('options').notNull().default([]),
+  answer: jsonb('answer').notNull().default([]),
+  points: integer('points').notNull().default(1),
+}, (t) => [index('items_assessment_idx').on(t.assessmentId), check('items_points_ck', sql`${t.points} BETWEEN 0 AND 100`)]);
+
+/** Optional: assign to specific students only. No rows = whole class. */
+export const assessmentStudents = pgTable('assessment_students', {
+  assessmentId: uuid('assessment_id').notNull().references(() => assessments.id, { onDelete: 'cascade' }),
+  studentId: uuid('student_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  ...schoolCols(),
+}, (t) => [primaryKey({ columns: [t.assessmentId, t.studentId] })]);
+
+export const submissions = pgTable('submissions', {
+  id: id(), ...schoolCols(),
+  assessmentId: uuid('assessment_id').notNull().references(() => assessments.id, { onDelete: 'cascade' }),
+  studentId: uuid('student_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  // [{ itemId, response, correct: boolean|null, awarded: number|null }]
+  answers: jsonb('answers').notNull().default([]),
+  score: integer('score'),
+  maxScore: integer('max_score').notNull(),
+  status: submissionStatusEnum('status').notNull().default('SUBMITTED'),
+  late: boolean('late').notNull().default(false),
+  feedback: text('feedback').notNull().default(''),
+  submittedAt: createdAt(),
+  gradedAt: timestamp('graded_at', { withTimezone: true }),
+  gradedBy: uuid('graded_by').references(() => users.id, { onDelete: 'set null' }),
+}, (t) => [uniqueIndex('submission_uq').on(t.assessmentId, t.studentId)]);
+
+export const evaluations = pgTable('evaluations', {
+  id: id(), ...schoolCols(),
+  teacherId: uuid('teacher_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  studentId: uuid('student_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  classId: uuid('class_id').references(() => classes.id, { onDelete: 'set null' }),
+  subjectId: uuid('subject_id').references(() => subjects.id, { onDelete: 'set null' }),
+  term: text('term').notNull().default(''),
+  skill: text('skill').notNull(),
+  rating: integer('rating').notNull(),
+  remarks: text('remarks').notNull().default(''),
+  createdAt: createdAt(),
+}, (t) => [check('eval_rating_ck', sql`${t.rating} BETWEEN 1 AND 5`), index('eval_student_idx').on(t.studentId)]);

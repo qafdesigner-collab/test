@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, count, desc, eq, ilike, inArray, max, or, sql, SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, getTableColumns, ilike, inArray, max, or, sql, SQL } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
 import { qc } from '../db/qualify';
 import {
@@ -217,7 +217,8 @@ export class PublishingService {
     const e = await this.edition(id);
     const [pkg] = await this.q.select({ id: bookPackages.id, title: bookPackages.title, status: bookPackages.status, coverColor: bookPackages.coverColor })
       .from(bookPackages).where(eq(bookPackages.id, e.packageId));
-    const comps = await this.q.select().from(bookComponents).where(eq(bookComponents.editionId, id)).orderBy(asc(bookComponents.sort), asc(bookComponents.partNumber));
+    const comps = await this.q.select({ ...getTableColumns(bookComponents), bookFile: sql<any>`(SELECT json_build_object('id', a.id, 'name', a.original_name, 'size', a.size_bytes) FROM digital_assets a WHERE a.id = ${qc(bookComponents.bookAssetId)})` })
+      .from(bookComponents).where(eq(bookComponents.editionId, id)).orderBy(asc(bookComponents.sort), asc(bookComponents.partNumber));
     const compIds = comps.map((c) => c.id);
     const units = compIds.length ? await this.q.select().from(bookUnits).where(inArray(bookUnits.componentId, compIds)).orderBy(asc(bookUnits.sort), asc(bookUnits.number)) : [];
     const unitIds = units.map((u) => u.id);
@@ -396,6 +397,35 @@ export class PublishingService {
     for (const [i, id] of ids.entries()) await this.q.update(t as any).set({ sort: i }).where(eq(t.id, id));
     await this.touch(editionId);
     await this.audit.log(`publishing.${dto.kind}.reorder`, 'book_edition', editionId, `Reordered ${dto.kind}s`, undefined, { ids });
+    return { ok: true };
+  }
+
+  // =============== the book's own PDF (digital reader) ===============
+  async setBookPdf(componentId: string, file: UploadedTemp) {
+    try {
+      const c = await this.component(componentId);
+      const e = await this.edition(c.editionId);
+      if (e.status === 'ARCHIVED') throw new ConflictException('This edition is archived.');
+      // Page numbering is part of the structure: a published edition may receive its PDF once, but not replace it.
+      if (e.status === 'PUBLISHED' && c.bookAssetId) throw new ConflictException('This edition is published — its book PDF cannot be replaced. Create a new edition.');
+      if (!/\.pdf$/i.test(file.originalname)) throw new BadRequestException('The digital book must be a PDF file');
+      const head = require('fs').readFileSync(file.path);
+      const pages = (head.toString('latin1').match(/\/Type\s*\/Page(?!s)/g) ?? []).length || null;
+      const { asset, reused } = await this.assets.ingest(file);
+      await this.q.update(bookComponents).set({ bookAssetId: asset.id, pageCount: c.pageCount && e.status === 'PUBLISHED' ? c.pageCount : pages ?? c.pageCount })
+        .where(eq(bookComponents.id, componentId));
+      await this.touch(c.editionId);
+      await this.audit.log('publishing.component.book_pdf', 'book_component', componentId, `Attached the book PDF to "${c.title}" (${pages ?? '?'} pages${reused ? ', existing file reused' : ''})`);
+      return { ok: true, pages, reused };
+    } finally {
+      require('fs').promises.rm(file.path, { force: true }).catch(() => undefined);
+    }
+  }
+  async removeBookPdf(componentId: string) {
+    const c = await this.component(componentId);
+    await this.editable(c.editionId, 'structure');
+    await this.q.update(bookComponents).set({ bookAssetId: null }).where(eq(bookComponents.id, componentId));
+    await this.audit.log('publishing.component.book_pdf_remove', 'book_component', componentId, `Removed the book PDF of "${c.title}"`);
     return { ok: true };
   }
 
