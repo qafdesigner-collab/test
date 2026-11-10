@@ -619,3 +619,54 @@ export const aiGenerations = pgTable('ai_generations', {
   usedId: uuid('used_id'),
   createdAt: createdAt(),
 }, (t) => [index('ai_school_time_idx').on(t.schoolId, t.createdAt), index('ai_user_idx').on(t.userId)]);
+
+// =====================================================================================
+// Phase 6 — games, rewards & progress
+// =====================================================================================
+export const gameEngineEnum = pgEnum('game_engine', ['ALPHABET_MATCH', 'PICTURE_WORD', 'COUNTING', 'SORTING', 'MEMORY', 'FILL_BLANK', 'QUIZ', 'SHAPES', 'WORD_BUILD', 'PUZZLE']);
+
+/** A playable game = engine + content. school_id NULL = publisher library (shared by every licensed school). */
+export const gameActivities = pgTable('game_activities', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }),
+  editionId: uuid('edition_id').references(() => bookEditions.id, { onDelete: 'set null' }),
+  lessonId: uuid('lesson_id').references(() => bookLessons.id, { onDelete: 'set null' }),
+  engine: gameEngineEnum('engine').notNull(),
+  title: text('title').notNull(),
+  instructions: text('instructions').notNull().default(''),
+  difficulty: integer('difficulty').notNull().default(1),
+  content: jsonb('content').notNull(),
+  published: boolean('published').notNull().default(false),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [index('games_edition_idx').on(t.editionId, t.lessonId), check('games_difficulty_ck', sql`${t.difficulty} BETWEEN 1 AND 3`)]);
+
+export const gameAssignments = pgTable('game_assignments', {
+  id: id(), ...schoolCols(),
+  activityId: uuid('activity_id').notNull().references(() => gameActivities.id, { onDelete: 'cascade' }),
+  classId: uuid('class_id').notNull().references(() => classes.id, { onDelete: 'cascade' }),
+  teacherId: uuid('teacher_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  dueAt: timestamp('due_at', { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex('game_assign_uq').on(t.activityId, t.classId)]);
+
+export const gameAttempts = pgTable('game_attempts', {
+  id: id(), ...schoolCols(),
+  studentId: uuid('student_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  activityId: uuid('activity_id').notNull().references(() => gameActivities.id, { onDelete: 'cascade' }),
+  assignmentId: uuid('assignment_id').references(() => gameAssignments.id, { onDelete: 'set null' }),
+  score: integer('score').notNull(),
+  maxScore: integer('max_score').notNull(),
+  stars: integer('stars').notNull(),
+  durationMs: integer('duration_ms').notNull().default(0),
+  createdAt: createdAt(),
+}, (t) => [index('attempts_student_idx').on(t.studentId, t.activityId), check('attempt_score_ck', sql`${t.score} >= 0 AND ${t.score} <= ${t.maxScore} AND ${t.stars} BETWEEN 0 AND 3`)]);
+
+export const studentBadges = pgTable('student_badges', {
+  ...schoolCols(),
+  studentId: uuid('student_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  badge: text('badge').notNull(),
+  earnedAt: createdAt(),
+}, (t) => [primaryKey({ columns: [t.studentId, t.badge] })]);

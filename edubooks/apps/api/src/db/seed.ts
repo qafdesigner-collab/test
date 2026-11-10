@@ -44,7 +44,7 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
         book_packages, book_editions, book_components, book_units, book_lessons, book_pages, teaching_resources,
         academic_years, products, product_versions, bundle_items, orders, order_lines, fulfillments, license_adjustments, license_pools,
         license_seats, license_assignments, license_transfers, access_entitlements, classes, class_teachers, enrolments, reader_progress,
-        bookmarks, lesson_plans, question_bank, assessments, assessment_items, assessment_students, submissions, evaluations, ai_generations CASCADE`);
+        bookmarks, lesson_plans, question_bank, assessments, assessment_items, assessment_students, submissions, evaluations, ai_generations, game_activities, game_assignments, game_attempts, student_badges CASCADE`);
     }
     const existing = await db.select().from(s.publishers).where(sql`slug = 'demo'`);
     if (existing.length) { log('Seed data already present (use --reset to recreate).'); return; }
@@ -219,6 +219,36 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
       { type: 'FILL_BLANK' as const, prompt: 'C is for ___ (an animal that says meow).', options: [], answer: ['cat'], points: 1 },
       { type: 'SHORT' as const, prompt: 'Write one word that starts with B.', options: [], answer: [], points: 2 },
     ].map((it, position) => ({ ...it, position, publisherId: P, schoolId: sun.id, assessmentId: hw.id })));
+
+    // ---------- Phase 6: game library (generic early-years content, not publisher textbook content) ----------
+    const firstLesson = async (title: string) => ((await db.execute(sql`SELECT l.id FROM book_lessons l JOIN book_units u ON u.id = l.unit_id JOIN book_components c ON c.id = u.component_id
+      WHERE c.edition_id = ${editionByTitle[title]} ORDER BY c.sort, u.sort, l.sort LIMIT 1`)).rows[0] as any)?.id ?? null;
+    const games: [string, (typeof s.gameEngineEnum.enumValues)[number], string, string, unknown][] = [
+      ['KG English', 'ALPHABET_MATCH', 'Big and small letters', 'Match each capital letter with its small letter.', { pairs: 'ABCDEF'.split('').map((l) => ({ a: l, b: l.toLowerCase() })) }],
+      ['KG English', 'PICTURE_WORD', 'Picture and word', 'Match the picture with its word.', { pairs: [['🍎', 'apple'], ['⚽', 'ball'], ['🐱', 'cat'], ['🐶', 'dog'], ['🥚', 'egg'], ['🐟', 'fish']].map(([a, b]) => ({ a, b })) }],
+      ['KG English', 'MEMORY', 'Animal memory', 'Turn two cards. Find the matching pairs!', { pairs: [['🐱', 'cat'], ['🐶', 'dog'], ['🐮', 'cow'], ['🐷', 'pig'], ['🦆', 'duck'], ['🐑', 'sheep']].map(([a, b]) => ({ a, b })) }],
+      ['KG English', 'WORD_BUILD', 'Build the word', 'Tap the letters in the right order.', { words: [['cat', '🐱'], ['dog', '🐶'], ['sun', '☀️'], ['hat', '🎩'], ['bus', '🚌']].map(([word, hint]) => ({ word, hint })) }],
+      ['KG English', 'FILL_BLANK', 'Missing letter', 'Choose the missing letter.', { sentences: [
+        { text: 'c___t 🐱', answer: 'a', options: ['a', 'o', 'u'] }, { text: 'd___g 🐶', answer: 'o', options: ['a', 'o', 'i'] }, { text: 's___n ☀️', answer: 'u', options: ['u', 'e', 'a'] }] }],
+      ['KG English', 'PUZZLE', 'Apple puzzle', 'Swap the pieces to make the picture.', { picture: '🍎', word: 'apple', size: 3 }],
+      ['KG Maths', 'COUNTING', 'Count the fruit', 'How many can you see?', { things: ['🍎', '🍌', '🍓', '🍊'], min: 1, max: 10, rounds: 6 }],
+      ['KG Maths', 'SHAPES', 'Find the shape', 'Tap the shape I ask for.', { shapes: ['circle', 'square', 'triangle', 'rectangle', 'star', 'heart'], rounds: 6 }],
+      ['KG Maths', 'QUIZ', 'Little sums', 'Choose the right answer.', { questions: [
+        { prompt: '1 + 1 = ?', options: ['1', '2', '3'], answer: 1 }, { prompt: '2 + 2 = ?', options: ['4', '3', '5'], answer: 0 }, { prompt: '3 + 1 = ?', options: ['2', '5', '4'], answer: 2 }] }],
+      ['KG Maths', 'SORTING', 'Big or small?', 'Drag each picture to the right group.', { categories: [{ name: 'Big', items: ['🐘', '🦒', '🚌'] }, { name: 'Small', items: ['🐜', '🐭', '🐞'] }] }],
+      ['KG General Knowledge', 'SORTING', 'Animals and fruit', 'Put each picture in its group.', { categories: [{ name: 'Animals', items: ['🐶', '🐱', '🐮', '🐴'] }, { name: 'Fruit', items: ['🍎', '🍌', '🍇', '🍐'] }] }],
+      ['KG General Knowledge', 'QUIZ', 'Where do they live?', 'Choose the right answer.', { questions: [
+        { prompt: 'Where does a fish live? 🐟', options: ['In water', 'In a tree'], answer: 0 }, { prompt: 'Where does a bird live? 🐦', options: ['In a nest', 'In the sea'], answer: 0 }] }],
+      ['KG Urdu', 'ALPHABET_MATCH', 'حروف اور الفاظ', 'ہر حرف کو اس کے لفظ سے ملائیں', { pairs: [['ا', 'انار'], ['ب', 'بکری'], ['پ', 'پتنگ'], ['ت', 'تتلی']].map(([a, b]) => ({ a, b })) }],
+    ];
+    const gameIds: Record<string, string> = {};
+    for (const [book, engine, title, instructions, content] of games) {
+      const [g] = await db.insert(s.gameActivities).values({ publisherId: P, editionId: editionByTitle[book], lessonId: await firstLesson(book), engine, title, instructions, content,
+        published: true, createdBy: admin.id }).returning();
+      gameIds[title] = g.id;
+    }
+    for (const t of ['Picture and word', 'Count the fruit'])
+      await db.insert(s.gameAssignments).values({ publisherId: P, schoolId: sun.id, activityId: gameIds[t], classId: kgRose.id, teacherId: sun.users.teacher1 });
 
     log('✅ Seeded: 1 publisher, 3 staff, 3 schools (15 users), 4 grades, 4 subjects, 5 book packages, 5 products (incl. KG Complete Bundle), 3 orders with licences.');
   } finally {
