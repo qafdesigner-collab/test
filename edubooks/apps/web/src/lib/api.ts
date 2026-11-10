@@ -17,7 +17,7 @@ async function parse(res: Response) {
 
 export const api = {
   get: <T = any>(path: string) => fetch(`/api${path}`, { credentials: 'same-origin' }).then(parse) as Promise<T>,
-  send: <T = any>(method: 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown) =>
+  send: <T = any>(method: 'POST' | 'PATCH' | 'DELETE' | 'PUT', path: string, body?: unknown) =>
     fetch(`/api${path}`, {
       method, credentials: 'same-origin',
       headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
@@ -26,6 +26,7 @@ export const api = {
   post: <T = any>(p: string, b?: unknown) => api.send<T>('POST', p, b ?? {}),
   patch: <T = any>(p: string, b: unknown) => api.send<T>('PATCH', p, b),
   del: <T = any>(p: string) => api.send<T>('DELETE', p),
+  put: <T = any>(p: string, b: unknown) => api.send<T>('PUT', p, b),
   /** Multipart upload with progress (fetch has no upload progress). */
   upload: <T = any>(path: string, form: FormData, onProgress?: (pct: number) => void) =>
     new Promise<T>((resolve, reject) => {

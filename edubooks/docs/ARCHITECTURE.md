@@ -1,6 +1,6 @@
 # EduBooks LMS — Architecture
 
-> Status: **Phases 1, 2, 2b and 3 are implemented** — foundation, Book Package Management, products & bundles, schools, orders and the full licensing system, plus the School Admin portal. Phases 4–7 follow this design.
+> Status: **Phases 1–4 are implemented** — foundation, Book Package Management, products & bundles, schools, orders, the full licensing system, School Admin portal, classes, the digital reader, lesson planner, homework/quizzes/tests with marking, question bank, gradebook and report cards. Phases 5–7 follow this design.
 > A clickable UX prototype of the whole idea lives in `/lms` (Node + SQLite). It's for demos only and isn't production code.
 
 ---
@@ -138,6 +138,7 @@ erDiagram
 | Audit | Every licence mutation writes `audit_logs` in the same transaction. |
 | Sold versions never change | DB triggers reject any change to an ACTIVE/RETIRED product version or its bundle items; pools are immutable after creation. |
 | School admins cannot escalate | RLS `WITH CHECK` + table CHECK: school-scoped users can only create SCHOOL_ADMIN/TEACHER/STUDENT roles in their own school. |
+| Answers stay secret | Students never receive correct answers before their work is marked; questions are frozen once anyone has answered. |
 | Correlated subqueries | Always reference outer columns with `qc()` (fully qualified) — drizzle renders single-table columns unqualified. Regression-tested. |
 
 ---
@@ -201,7 +202,7 @@ Rule: dependencies only point "down". `licensing` is the single authority on "ca
 | Commerce ✅ | `/commerce/products`, `/commerce/products/:id/versions` (+ `/activate`), `/commerce/orders` (+ `/confirm`, `/fulfil`) |
 | Licensing ✅ | `/licensing/pools`, `/licensing/pools/:id/assign`, `/licensing/assignments/:id/(suspend\|revoke)`, `/licensing/transfers` (+ `/approve`, `/reject`), `/licensing/dashboard`, `/licensing/reports/usage` |
 | Schools ✅ | Publisher: `/schools` (+ `/demo`, `/:id/academic-years`, `/:id/suspend`, `/:id/convert-demo`) · School admin: `/school/overview`, `/school/users` (+ `/import`, `/:id/reset-password`), `/school/pools/:id/assign`, `/school/assignments/:id/release`, `/school/transfers`, `/school/profile` · Any school user: `/library` |
-| LMS (P4) | `/library` (my entitled editions), `/reader/:editionId/progress`, `/bookmarks`, `/lesson-plans`, `/assessments`, `/assessments/:id/submissions`, `/question-bank` |
+| LMS ✅ | `/library` · `/classes` (+ `/:id/teachers`, `/:id/students`) · `/reader/editions/:id`, `/reader/components/:id/pdf`, `/reader/progress`, `/reader/bookmarks` · `/teacher/lesson-plans`, `/teacher/question-bank`, `/teacher/assessments` (+ `/publish`, `/close`, `/from-bank`), `/teacher/submissions/:id`, `/teacher/classes/:id/gradebook`, `/teacher/students/:id/report`, `/teacher/evaluations` · `/student/homework` (+ `/:id/submit`), `/student/report` |
 | AI (P5) | `/ai/lesson-plan`, `/ai/questions`, `/ai/worksheet`, `/ai/activities` (all take `lessonId` and return text with source refs), `/ai/usage` |
 | Games (P6) | `/games`, `/games/:id/lessons`, `/game-attempts` |
 
@@ -215,7 +216,7 @@ Rule: dependencies only point "down". `licensing` is the single authority on "ca
 | 2. Publisher portal | Book Package Builder (packages, editions, components, units, lessons, resources), grades/subjects, dashboard, audit viewer | ✅ |
 | 2b. | Products, product versions, grade bundles | ✅ |
 | 3. Commerce & licensing | Schools, academic years, orders, fulfilment → pools & seats, assignment, expiry, transfers + approvals, licence dashboard, sales demo schools, School Admin portal (accounts, CSV import, allocation), **licensing test suite** | ✅ |
-| 4. School & teacher LMS | Classes & sections, enrolments, teacher assignments, teacher dashboard, PDF reader (pdf.js, bookmarks, progress), assignments, quizzes, grading, evaluations | |
+| 4. School & teacher LMS ✅ | Classes & sections, enrolments, teacher assignments, teacher dashboard, PDF reader (pdf.js, bookmarks, progress), assignments, quizzes, grading, evaluations | |
 | 5. AI | PDF text extraction → `book_pages` → embeddings (pgvector), grounded generators with page citations, teacher approval flow, usage tracking | |
 | 6. Student portal | Playful UI, library, homework, games engine (10 types), rewards & achievements | |
 | 7. Production | Load and security tests, accessibility audit, backups (pg_dump/PITR + bucket versioning), Docker/CI, runbooks | |

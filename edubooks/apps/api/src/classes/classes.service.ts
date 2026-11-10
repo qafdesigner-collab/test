@@ -24,7 +24,7 @@ export class ClassesService {
       id: classes.id, name: classes.name, section: classes.section, academicYearId: classes.academicYearId, academicYear: academicYears.name,
       gradeId: classes.gradeId, gradeName: grades.name,
       students: sql<number>`(SELECT count(*)::int FROM enrolments e WHERE e.class_id = ${qc(classes.id)})`,
-      teachers: sql<any[]>`(SELECT coalesce(json_agg(json_build_object('id', u.id, 'displayName', u.display_name, 'subject', s.name) ORDER BY u.display_name), '[]')
+      teachers: sql<any[]>`(SELECT coalesce(json_agg(json_build_object('id', u.id, 'displayName', u.display_name, 'subject', s.name, 'subjectId', ct.subject_id) ORDER BY u.display_name), '[]')
         FROM class_teachers ct JOIN users u ON u.id = ct.user_id LEFT JOIN subjects s ON s.id = ct.subject_id WHERE ct.class_id = ${qc(classes.id)})`,
     }).from(classes).innerJoin(academicYears, eq(academicYears.id, classes.academicYearId)).leftJoin(grades, eq(grades.id, classes.gradeId))
       .where(and(...w)).orderBy(asc(grades.sort), asc(classes.name), asc(classes.section));

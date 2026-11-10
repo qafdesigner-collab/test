@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/toast';
 // ---------- types ----------
 export interface Lesson { id: string; number: number; title: string; objectives: string; pageStart: number | null; pageEnd: number | null; unitId: string }
 export interface Unit { id: string; number: number; title: string; description: string; componentId: string; lessons: Lesson[] }
-export interface Component { id: string; type: string; title: string; partNumber: number | null; description: string; pageCount: number | null; units: Unit[] }
+export interface Component { id: string; type: string; title: string; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null }
 export interface Resource {
   id: string; title: string; resourceType: string; audience: string; componentId: string | null; unitId: string | null; lessonId: string | null;
   createdAt: string; sharedWith: number; asset: { id: string; originalName: string; ext: string; sizeBytes: number; scanStatus: string };
@@ -184,6 +184,7 @@ function NodePanel({ tree, sel, setSel, onExpand }: { tree: EditionTree; sel: Se
               {!readOnly && <div className="flex gap-1"><Button size="sm" variant="secondary" onClick={() => setEditComp(true)}><Pencil className="size-3.5" />Edit</Button>
                 {!locked && <Button size="sm" variant="ghost" onClick={() => setConfirmDel(true)} aria-label="Delete component"><Trash2 className="size-4 text-red-500" /></Button>}</div>}
             </div>
+            <BookPdf comp={comp} editionStatus={tree.status} readOnly={readOnly} />
             {!locked && (
               <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (unitTitle.trim()) addUnit.mutate(unitTitle.trim()); }}>
                 <Input value={unitTitle} onChange={(e) => setUnitTitle(e.target.value)} placeholder={`New unit title, e.g. “Letters A–E”`} aria-label="New unit title" />
@@ -214,6 +215,35 @@ function NodePanel({ tree, sel, setSel, onExpand }: { tree: EditionTree; sel: Se
       {editComp && comp && <ComponentDialog editionId={tree.id} comp={comp} locked={locked} onClose={() => setEditComp(false)} />}
       <Confirm open={confirmDel} onOpenChange={setConfirmDel} danger confirmLabel="Remove" loading={delNode.isPending} onConfirm={() => delNode.mutate(undefined)}
         title="Remove this item?" body={<p>Everything inside it (units, lessons) and the resource links attached to it are removed from this draft edition. Uploaded files stay available for other editions.</p>} />
+    </div>
+  );
+}
+
+/** The digital pages of a book part, shown in the reader. Replaceable while the edition is a draft. */
+function BookPdf({ comp, editionStatus, readOnly }: { comp: Component; editionStatus: string; readOnly: boolean }) {
+  const qc = useQueryClient(); const toast = useToast(); const input = useRef<HTMLInputElement>(null);
+  const [pct, setPct] = useState<number | null>(null);
+  const remove = useBuilderMutation(() => api.del(`/publishing/components/${comp.id}/book-pdf`), 'Book PDF removed');
+  const canUpload = !readOnly && (editionStatus === 'DRAFT' || !comp.bookFile);
+  const upload = async (file?: File) => {
+    if (!file) return;
+    const fd = new FormData(); fd.append('file', file); setPct(0);
+    try {
+      const r = await api.upload<any>(`/publishing/components/${comp.id}/book-pdf`, fd, setPct);
+      toast(`Book PDF attached${r.pages ? ` — ${r.pages} pages` : ''}`);
+      ['edition', 'package', 'stats'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+    } catch (e: any) { toast(e.message, 'err'); } finally { setPct(null); }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm">
+      <BookOpen className="size-5 text-slate-400" />
+      <div className="min-w-0 flex-1">{comp.bookFile ? <><b>Digital pages:</b> <span className="text-slate-600">{comp.bookFile.name} · {fmtBytes(comp.bookFile.size)}{comp.pageCount ? ` · ${comp.pageCount} pages` : ''}</span></>
+        : <span className="text-slate-500">No digital pages yet — upload the PDF of this part for the digital reader.</span>}</div>
+      {pct !== null && <span className="text-xs text-slate-500">{pct}%</span>}
+      {comp.bookFile && <Button size="sm" variant="ghost" onClick={() => openAsset(comp.bookFile!.id).catch((e) => toast(e.message, 'err'))}><ExternalLink className="size-4" />Open</Button>}
+      {canUpload && <><input ref={input} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ''; }} />
+        <Button size="sm" variant="secondary" loading={pct !== null} onClick={() => input.current?.click()}><UploadCloud className="size-4" />{comp.bookFile ? 'Replace PDF' : 'Upload PDF'}</Button></>}
+      {comp.bookFile && editionStatus === 'DRAFT' && !readOnly && <Button size="sm" variant="ghost" onClick={() => remove.mutate(undefined)} aria-label="Remove book PDF"><Trash2 className="size-4 text-red-500" /></Button>}
     </div>
   );
 }

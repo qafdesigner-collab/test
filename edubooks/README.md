@@ -3,7 +3,7 @@
 A multi-tenant platform for a children's book publisher. You publish book packages, sell them to schools as digital licences, and give teachers and students an LMS with AI support.
 
 - **Architecture, ERD, API design and milestones:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-- **Status:** ✅ Phase 1 foundation · ✅ Phase 2 Book Package Management · ✅ Phase 2b Products & grade bundles · ✅ Phase 3 Schools, orders & licensing + School Admin portal. Next: Phase 4 (classes, digital reader, assignments).
+- **Status:** ✅ Phase 1 foundation · ✅ Phase 2 Book Package Management · ✅ Phase 2b Products & grade bundles · ✅ Phase 3 Schools, orders & licensing + School Admin portal · ✅ Phase 4 Classes, digital reader, lesson planner, homework & tests, gradebook. Next: Phase 5 (AI assistant grounded in the books).
 
 ## Stack
 NestJS (TypeScript), Drizzle ORM, PostgreSQL 16 (RLS + pgvector), Next.js 15, React 19, Tailwind 4, and S3-compatible private storage.
@@ -35,7 +35,10 @@ npm run dev:web              # http://localhost:3000
 | Student | same | `student1..3` | `Student@123` |
 
 School admins get the **School portal** (`/school`): accounts, CSV import, printable login cards, licence allocation, transfer requests.
-Teachers and students currently see **My Books** — exactly the books their licences unlock. The full teacher and student portals arrive in Phases 4–6.
+**Teachers** get the Teacher portal (`/teacher`): their licensed books in the **digital reader**, the **lesson planner**, **homework / quizzes / tests** (multiple choice, true/false, fill-in-the-blank, short answer — auto-marked except written answers), a shared **question bank**, and per-class **gradebooks**, report cards and skill evaluations.
+**Students** (`/portal`): today's homework (big, colourful, with read-aloud), their books in the reader, results and teacher feedback. The playful games portal arrives in Phase 6.
+
+The seed includes **placeholder 26-page PDFs** for each KG book's Part 1 (clearly marked "sample placeholder", not publisher content), a class **KG Rose** at SUN01 with teacher1 and student1–3, and one sample homework.
 
 Seed licences: **SUN01** bought 30 *KG Complete Bundle* seats (student1, student2 and teacher1 hold seats); **GVS02** bought KG English + KG Maths; **BFA03** has a draft order awaiting payment.
 
@@ -50,9 +53,9 @@ Seed licences: **SUN01** bought 30 *KG Complete Bundle* seats (student1, student
 
 ## Tests
 ```bash
-npm test     # 50 end-to-end tests against the edubooks_test database
+npm test     # 66 tests against the edubooks_test database
 ```
-They cover login, sessions, RBAC, suspension, every licensing rule (capacity, concurrency, bundles, transfers, expiry, adjustments, demo expiry), **PostgreSQL Row-Level Security isolation** (between publishers and between schools), the append-only audit log, package/edition/structure workflows, publish locking, edition cloning without file duplication, upload validation (magic bytes), and signed-URL tampering.
+They cover login, sessions, RBAC, suspension, every licensing rule (capacity, concurrency, bundles, transfers, expiry, adjustments, demo expiry), reader access & privacy, marking rules, answer secrecy, class/teacher permissions, **PostgreSQL Row-Level Security isolation** (between publishers and between schools), the append-only audit log, package/edition/structure workflows, publish locking, edition cloning without file duplication, upload validation (magic bytes), and signed-URL tampering.
 
 ## Configuration (`apps/api/.env`)
 | Variable | Purpose |
