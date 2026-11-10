@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, count, eq, ilike, or, sql, SQL } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
+import { qc } from '../db/qualify';
 import { sessions, userRoles, users } from '../db/schema';
 import { AuditService } from '../audit/audit.service';
 import { hashPassword } from '../auth/password';
@@ -71,12 +72,12 @@ export class SchoolUsersService {
   async list(schoolId: string, f: { role?: SchoolRole; search?: string; page: number; pageSize: number }) {
     const w: SQL[] = [eq(users.schoolId, schoolId)];
     if (f.search) w.push(or(ilike(users.displayName, `%${f.search}%`), ilike(users.username, `%${f.search}%`))!);
-    if (f.role) w.push(sql`EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = ${users.id} AND r.role = ${f.role})`);
+    if (f.role) w.push(sql`EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = ${qc(users.id)} AND r.role = ${f.role})`);
     const where = and(...w);
     const items = await this.q.select({
       id: users.id, username: users.username, displayName: users.displayName, status: users.status, lastLoginAt: users.lastLoginAt, createdAt: users.createdAt,
-      roles: sql<string[]>`(SELECT array_agg(role::text) FROM user_roles r WHERE r.user_id = ${users.id})`,
-      seats: sql<number>`(SELECT count(*)::int FROM license_assignments a WHERE a.user_id = ${users.id} AND a.status = 'ACTIVE')`,
+      roles: sql<string[]>`(SELECT array_agg(role::text) FROM user_roles r WHERE r.user_id = ${qc(users.id)})`,
+      seats: sql<number>`(SELECT count(*)::int FROM license_assignments a WHERE a.user_id = ${qc(users.id)} AND a.status = 'ACTIVE')`,
     }).from(users).where(where).orderBy(asc(users.displayName)).limit(f.pageSize).offset((f.page - 1) * f.pageSize);
     const [{ n }] = await this.q.select({ n: count() }).from(users).where(where);
     return { items, total: n, page: f.page, pageSize: f.pageSize };

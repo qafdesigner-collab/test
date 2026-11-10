@@ -4,6 +4,7 @@ import { IsHexColor, IsInt, IsOptional, IsString, Length, Min } from 'class-vali
 import { PartialType } from '@nestjs/swagger';
 import { asc, eq, sql } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
+import { qc } from '../db/qualify';
 import { bookPackages, grades, subjects } from '../db/schema';
 import { AuditService } from '../audit/audit.service';
 import { PUBLISHER_STAFF, Roles } from '../common/decorators';
@@ -27,7 +28,7 @@ export class CatalogService {
     const t = this.table(kind);
     const col = kind === 'grade' ? bookPackages.gradeId : bookPackages.subjectId;
     return this.db.q.select({ id: t.id, name: t.name, sort: t.sort, ...(kind === 'subject' ? { color: subjects.color } : {}),
-      packageCount: sql<number>`(SELECT count(*)::int FROM ${bookPackages} WHERE ${col} = ${t.id})` })
+      packageCount: sql<number>`(SELECT count(*)::int FROM ${bookPackages} WHERE ${col} = ${qc(t.id)})` })
       .from(t).orderBy(asc(t.sort), asc(t.name));
   }
   async create(kind: 'grade' | 'subject', dto: SubjectDto) {

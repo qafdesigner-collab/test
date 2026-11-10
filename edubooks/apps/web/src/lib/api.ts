@@ -46,3 +46,15 @@ export const qs = (o: Record<string, unknown>) => {
 };
 export const fmtBytes = (b: number) => (b >= 1 << 30 ? `${(b / (1 << 30)).toFixed(1)} GB` : b >= 1 << 20 ? `${(b / (1 << 20)).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 export const fmtDate = (d: string | Date) => new Date(d).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+export const fmtMoney = (minor: number | null | undefined, currency = 'PKR') =>
+  minor === null || minor === undefined ? '—' : `${currency} ${(minor / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+export const fmtDay = (d: string | Date) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+export const daysLeft = (d: string | Date) => Math.ceil((new Date(d).getTime() - Date.now()) / 864e5);
+export function downloadCsv(name: string, rows: Record<string, unknown>[]) {
+  if (!rows.length) return;
+  const cols = Object.keys(rows[0]);
+  const esc = (v: unknown) => { const s = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const csv = [cols.join(','), ...rows.map((r) => cols.map((c) => esc(r[c])).join(','))].join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}

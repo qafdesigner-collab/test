@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, sql, SQL } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
+import { qc } from '../db/qualify';
 import {
   academicYears, accessEntitlements, bookEditions, bookPackages, bundleItems, grades, licenseAdjustments, licenseAssignments, licensePools,
   licenseSeats, licenseTransfers, productVersions, products, schools, subjects, userRoles, users,
@@ -41,16 +42,16 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
       id: licensePools.id, schoolId: licensePools.schoolId, seatType: licensePools.seatType, quantity: licensePools.quantity, status: licensePools.status,
       validFrom: licensePools.validFrom, validUntil: licensePools.validUntil, createdAt: licensePools.createdAt,
       source: sql<string>`CASE WHEN ${licensePools.fulfillmentId} IS NOT NULL THEN 'ORDER' ELSE 'ADJUSTMENT' END`,
-      orderNo: sql<string | null>`(SELECT o.order_no FROM fulfillments f JOIN order_lines l ON l.id = f.order_line_id JOIN orders o ON o.id = l.order_id WHERE f.id = ${licensePools.fulfillmentId})`,
-      adjustment: sql<any>`(SELECT json_build_object('kind', a.kind, 'reason', a.reason) FROM license_adjustments a WHERE a.id = ${licensePools.adjustmentId})`,
+      orderNo: sql<string | null>`(SELECT o.order_no FROM fulfillments f JOIN order_lines l ON l.id = f.order_line_id JOIN orders o ON o.id = l.order_id WHERE f.id = ${qc(licensePools.fulfillmentId)})`,
+      adjustment: sql<any>`(SELECT json_build_object('kind', a.kind, 'reason', a.reason) FROM license_adjustments a WHERE a.id = ${qc(licensePools.adjustmentId)})`,
       productVersionId: licensePools.productVersionId, productName: products.name, sku: products.sku, productKind: products.kind, versionNo: productVersions.versionNo,
       schoolName: schools.name, schoolCode: schools.code, academicYear: academicYears.name,
-      assigned: sql<number>`(SELECT count(*)::int FROM license_assignments a WHERE a.pool_id = ${licensePools.id} AND a.status = 'ACTIVE')`,
-      suspended: sql<number>`(SELECT count(*)::int FROM license_assignments a WHERE a.pool_id = ${licensePools.id} AND a.status = 'SUSPENDED')`,
-      available: sql<number>`(SELECT count(*)::int FROM license_seats s WHERE s.pool_id = ${licensePools.id} AND s.status = 'AVAILABLE')`,
-      revoked: sql<number>`(SELECT count(*)::int FROM license_seats s WHERE s.pool_id = ${licensePools.id} AND s.status = 'REVOKED')`,
+      assigned: sql<number>`(SELECT count(*)::int FROM license_assignments a WHERE a.pool_id = ${qc(licensePools.id)} AND a.status = 'ACTIVE')`,
+      suspended: sql<number>`(SELECT count(*)::int FROM license_assignments a WHERE a.pool_id = ${qc(licensePools.id)} AND a.status = 'SUSPENDED')`,
+      available: sql<number>`(SELECT count(*)::int FROM license_seats s WHERE s.pool_id = ${qc(licensePools.id)} AND s.status = 'AVAILABLE')`,
+      revoked: sql<number>`(SELECT count(*)::int FROM license_seats s WHERE s.pool_id = ${qc(licensePools.id)} AND s.status = 'REVOKED')`,
       books: sql<string[]>`(SELECT array_agg(bp.title ORDER BY bp.title) FROM bundle_items b JOIN book_editions e ON e.id = b.edition_id
-        JOIN book_packages bp ON bp.id = e.package_id WHERE b.product_version_id = ${licensePools.productVersionId})`,
+        JOIN book_packages bp ON bp.id = e.package_id WHERE b.product_version_id = ${qc(licensePools.productVersionId)})`,
     };
   }
 
@@ -74,7 +75,7 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
     const assignments = await this.q.select({
       id: licenseAssignments.id, status: licenseAssignments.status, assignedAt: licenseAssignments.assignedAt, endedAt: licenseAssignments.endedAt,
       endReason: licenseAssignments.endReason, seatNo: licenseSeats.seatNo, userId: users.id, displayName: users.displayName, username: users.username,
-      pendingTransfer: sql<boolean>`EXISTS (SELECT 1 FROM license_transfers t WHERE t.assignment_id = ${licenseAssignments.id} AND t.status = 'PENDING')`,
+      pendingTransfer: sql<boolean>`EXISTS (SELECT 1 FROM license_transfers t WHERE t.assignment_id = ${qc(licenseAssignments.id)} AND t.status = 'PENDING')`,
     }).from(licenseAssignments).innerJoin(licenseSeats, eq(licenseSeats.id, licenseAssignments.seatId)).innerJoin(users, eq(users.id, licenseAssignments.userId))
       .where(eq(licenseAssignments.poolId, id)).orderBy(asc(licenseSeats.seatNo), desc(licenseAssignments.assignedAt));
     return { ...pool, assignments };
@@ -88,7 +89,7 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
     return this.q.select({ id: users.id, displayName: users.displayName, username: users.username }).from(users)
       .innerJoin(userRoles, and(eq(userRoles.userId, users.id), eq(userRoles.role, role)))
       .where(and(eq(users.schoolId, pool.schoolId), eq(users.status, 'ACTIVE'),
-        sql`NOT EXISTS (SELECT 1 FROM license_assignments a WHERE a.pool_id = ${pool.id} AND a.user_id = ${users.id} AND a.status IN ('ACTIVE','SUSPENDED'))`))
+        sql`NOT EXISTS (SELECT 1 FROM license_assignments a WHERE a.pool_id = ${pool.id} AND a.user_id = ${qc(users.id)} AND a.status IN ('ACTIVE','SUSPENDED'))`))
       .orderBy(asc(users.displayName));
   }
 
@@ -116,7 +117,7 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
   private async assertEligible(pool: Pool, userIds: string[]) {
     const role = pool.seatType === 'STUDENT' ? 'STUDENT' : 'TEACHER';
     const rows = await this.q.select({ id: users.id, schoolId: users.schoolId, status: users.status, name: users.displayName,
-      hasRole: sql<boolean>`EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = ${users.id} AND r.role = ${role})` })
+      hasRole: sql<boolean>`EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = ${qc(users.id)} AND r.role = ${role})` })
       .from(users).where(inArray(users.id, userIds));
     for (const id of userIds) {
       const u = rows.find((r) => r.id === id);
@@ -273,11 +274,11 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
       id: licenseTransfers.id, status: licenseTransfers.status, reason: licenseTransfers.reason, requestedAt: licenseTransfers.requestedAt,
       decidedAt: licenseTransfers.decidedAt, decisionNote: licenseTransfers.decisionNote, assignmentId: licenseTransfers.assignmentId,
       schoolName: schools.name, schoolCode: schools.code,
-      fromUser: sql<string>`(SELECT u.display_name FROM license_assignments a JOIN users u ON u.id = a.user_id WHERE a.id = ${licenseTransfers.assignmentId})`,
-      toUser: sql<string>`(SELECT display_name FROM users WHERE id = ${licenseTransfers.toUserId})`,
+      fromUser: sql<string>`(SELECT u.display_name FROM license_assignments a JOIN users u ON u.id = a.user_id WHERE a.id = ${qc(licenseTransfers.assignmentId)})`,
+      toUser: sql<string>`(SELECT display_name FROM users WHERE id = ${qc(licenseTransfers.toUserId)})`,
       product: sql<string>`(SELECT p.name || ' v' || v.version_no FROM license_assignments a JOIN license_pools lp ON lp.id = a.pool_id
-        JOIN product_versions v ON v.id = lp.product_version_id JOIN products p ON p.id = v.product_id WHERE a.id = ${licenseTransfers.assignmentId})`,
-      requestedBy: sql<string>`(SELECT display_name FROM users WHERE id = ${licenseTransfers.requestedBy})`,
+        JOIN product_versions v ON v.id = lp.product_version_id JOIN products p ON p.id = v.product_id WHERE a.id = ${qc(licenseTransfers.assignmentId)})`,
+      requestedBy: sql<string>`(SELECT display_name FROM users WHERE id = ${qc(licenseTransfers.requestedBy)})`,
     }).from(licenseTransfers).innerJoin(schools, eq(schools.id, licenseTransfers.schoolId))
       .where(w.length ? and(...w) : undefined).orderBy(desc(licenseTransfers.requestedAt)).limit(200);
   }
@@ -361,7 +362,7 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
     return this.q.select({
       editionId: bookEditions.id, editionLabel: bookEditions.label, packageId: bookPackages.id, title: bookPackages.title, coverColor: bookPackages.coverColor,
       description: bookPackages.description, grade: grades.name, subject: subjects.name,
-      validUntil: sql<string>`(SELECT max(e.valid_until) FROM access_entitlements e WHERE e.edition_id = ${bookEditions.id} AND e.user_id = ${c.userId})`,
+      validUntil: sql<string>`(SELECT max(e.valid_until) FROM access_entitlements e WHERE e.edition_id = ${qc(bookEditions.id)} AND e.user_id = ${c.userId})`,
     }).from(bookEditions).innerJoin(bookPackages, eq(bookPackages.id, bookEditions.packageId))
       .innerJoin(grades, eq(grades.id, bookPackages.gradeId)).innerJoin(subjects, eq(subjects.id, bookPackages.subjectId))
       .where(inArray(bookEditions.id, editionIds)).orderBy(asc(grades.sort), asc(subjects.sort));

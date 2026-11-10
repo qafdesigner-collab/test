@@ -3,7 +3,7 @@
 A multi-tenant platform for a children's book publisher. You publish book packages, sell them to schools as digital licences, and give teachers and students an LMS with AI support.
 
 - **Architecture, ERD, API design and milestones:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-- **Status:** Phase 1 (foundation) ✅ and Phase 2 *Book Package Management* ✅. Products, bundles and licensing come next.
+- **Status:** ✅ Phase 1 foundation · ✅ Phase 2 Book Package Management · ✅ Phase 2b Products & grade bundles · ✅ Phase 3 Schools, orders & licensing + School Admin portal. Next: Phase 4 (classes, digital reader, assignments).
 
 ## Stack
 NestJS (TypeScript), Drizzle ORM, PostgreSQL 16 (RLS + pgvector), Next.js 15, React 19, Tailwind 4, and S3-compatible private storage.
@@ -34,15 +34,25 @@ npm run dev:web              # http://localhost:3000
 | Teacher | same | `teacher1` | `Teacher@12345` |
 | Student | same | `student1..3` | `Student@123` |
 
-School, teacher and student portals arrive in Phases 3–6. Those accounts already sign in and land on a status page.
+School admins get the **School portal** (`/school`): accounts, CSV import, printable login cards, licence allocation, transfer requests.
+Teachers and students currently see **My Books** — exactly the books their licences unlock. The full teacher and student portals arrive in Phases 4–6.
+
+Seed licences: **SUN01** bought 30 *KG Complete Bundle* seats (student1, student2 and teacher1 hold seats); **GVS02** bought KG English + KG Maths; **BFA03** has a draft order awaiting payment.
+
+### Licensing in one minute
+1. *Products & Bundles*: put published editions into a product (single book or grade bundle) → **activate** (version is frozen forever).
+2. *Schools*: register a school (code + first admin) and add its **academic year**. Sales can also create an **instant demo school**.
+3. *Orders*: record the sale → **confirm** → a publisher admin **issues licences** (student + teacher seats, valid for that academic year).
+4. The **school admin** creates students/teachers and assigns seats. Moving a student seat needs a **transfer request** that the publisher approves.
+5. Seats **expire automatically** when the academic year ends; renewals are new orders.
 
 > The seed's units and lessons are labelled **"(sample)"**. They are placeholders, not real textbook content. Replace them with your real books in the Package Builder.
 
 ## Tests
 ```bash
-npm test     # 26 end-to-end tests against the edubooks_test database
+npm test     # 50 end-to-end tests against the edubooks_test database
 ```
-They cover login, sessions, RBAC, suspension, **PostgreSQL Row-Level Security isolation** (between publishers and between schools), the append-only audit log, package/edition/structure workflows, publish locking, edition cloning without file duplication, upload validation (magic bytes), and signed-URL tampering.
+They cover login, sessions, RBAC, suspension, every licensing rule (capacity, concurrency, bundles, transfers, expiry, adjustments, demo expiry), **PostgreSQL Row-Level Security isolation** (between publishers and between schools), the append-only audit log, package/edition/structure workflows, publish locking, edition cloning without file duplication, upload validation (magic bytes), and signed-URL tampering.
 
 ## Configuration (`apps/api/.env`)
 | Variable | Purpose |

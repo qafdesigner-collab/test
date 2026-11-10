@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, count, desc, eq, ilike, inArray, max, or, sql, SQL } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
+import { qc } from '../db/qualify';
 import {
   bookComponents, bookEditions, bookLessons, bookPackages, bookPages, bookUnits, digitalAssets, grades, subjects, teachingResources,
 } from '../db/schema';
@@ -56,9 +57,9 @@ export class PublishingService {
       id: bookPackages.id, title: bookPackages.title, slug: bookPackages.slug, status: bookPackages.status, coverColor: bookPackages.coverColor,
       description: bookPackages.description, updatedAt: bookPackages.updatedAt,
       grade: { id: grades.id, name: grades.name }, subject: { id: subjects.id, name: subjects.name, color: subjects.color },
-      editionCount: sql<number>`(SELECT count(*)::int FROM ${bookEditions} e WHERE e.package_id = ${bookPackages.id})`,
-      latestEdition: sql<string | null>`(SELECT e.label FROM ${bookEditions} e WHERE e.package_id = ${bookPackages.id} ORDER BY e.edition_year DESC, e.created_at DESC LIMIT 1)`,
-      resourceCount: sql<number>`(SELECT count(*)::int FROM ${teachingResources} r JOIN ${bookEditions} e ON e.id = r.edition_id WHERE e.package_id = ${bookPackages.id})`,
+      editionCount: sql<number>`(SELECT count(*)::int FROM ${bookEditions} e WHERE e.package_id = ${qc(bookPackages.id)})`,
+      latestEdition: sql<string | null>`(SELECT e.label FROM ${bookEditions} e WHERE e.package_id = ${qc(bookPackages.id)} ORDER BY e.edition_year DESC, e.created_at DESC LIMIT 1)`,
+      resourceCount: sql<number>`(SELECT count(*)::int FROM ${teachingResources} r JOIN ${bookEditions} e ON e.id = r.edition_id WHERE e.package_id = ${qc(bookPackages.id)})`,
     }).from(bookPackages)
       .innerJoin(grades, eq(grades.id, bookPackages.gradeId)).innerJoin(subjects, eq(subjects.id, bookPackages.subjectId))
       .where(where).orderBy(asc(grades.sort), asc(subjects.sort), asc(bookPackages.title))
@@ -130,8 +131,8 @@ export class PublishingService {
     return this.q.select({
       id: bookEditions.id, label: bookEditions.label, editionYear: bookEditions.editionYear, status: bookEditions.status,
       notes: bookEditions.notes, publishedAt: bookEditions.publishedAt, clonedFromId: bookEditions.clonedFromId, createdAt: bookEditions.createdAt,
-      componentCount: sql<number>`(SELECT count(*)::int FROM ${bookComponents} c WHERE c.edition_id = ${bookEditions.id})`,
-      resourceCount: sql<number>`(SELECT count(*)::int FROM ${teachingResources} r WHERE r.edition_id = ${bookEditions.id})`,
+      componentCount: sql<number>`(SELECT count(*)::int FROM ${bookComponents} c WHERE c.edition_id = ${qc(bookEditions.id)})`,
+      resourceCount: sql<number>`(SELECT count(*)::int FROM ${teachingResources} r WHERE r.edition_id = ${qc(bookEditions.id)})`,
     }).from(bookEditions).where(eq(bookEditions.packageId, packageId)).orderBy(desc(bookEditions.editionYear), desc(bookEditions.createdAt));
   }
 
@@ -226,7 +227,7 @@ export class PublishingService {
       componentId: teachingResources.componentId, unitId: teachingResources.unitId, lessonId: teachingResources.lessonId, sort: teachingResources.sort,
       createdAt: teachingResources.createdAt,
       asset: { id: digitalAssets.id, originalName: digitalAssets.originalName, ext: digitalAssets.ext, sizeBytes: digitalAssets.sizeBytes, scanStatus: digitalAssets.scanStatus },
-      sharedWith: sql<number>`(SELECT count(*)::int - 1 FROM ${teachingResources} r2 WHERE r2.asset_id = ${teachingResources.assetId})`,
+      sharedWith: sql<number>`(SELECT count(*)::int - 1 FROM ${teachingResources} r2 WHERE r2.asset_id = ${qc(teachingResources.assetId)})`,
     }).from(teachingResources).innerJoin(digitalAssets, eq(digitalAssets.id, teachingResources.assetId))
       .where(eq(teachingResources.editionId, id)).orderBy(asc(teachingResources.sort), asc(teachingResources.createdAt));
     return {

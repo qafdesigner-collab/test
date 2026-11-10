@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { and, asc, count, desc, eq, ilike, inArray, or, sql, SQL } from 'drizzle-orm';
 import { randomInt } from 'crypto';
 import { DbService } from '../db/db.service';
+import { qc } from '../db/qualify';
 import { academicYears, productVersions, products, schools, sessions, users } from '../db/schema';
 import { AuditService } from '../audit/audit.service';
 import { LicensingService } from '../licensing/licensing.service';
@@ -21,11 +22,11 @@ export class SchoolsService {
     const items = await this.q.select({
       id: schools.id, name: schools.name, code: schools.code, city: schools.city, status: schools.status, isDemo: schools.isDemo, demoExpiresAt: schools.demoExpiresAt,
       createdAt: schools.createdAt,
-      students: sql<number>`(SELECT count(*)::int FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role = 'STUDENT' WHERE u.school_id = ${schools.id})`,
-      teachers: sql<number>`(SELECT count(*)::int FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role = 'TEACHER' WHERE u.school_id = ${schools.id})`,
-      seats: sql<number>`(SELECT coalesce(sum(quantity),0)::int FROM license_pools p WHERE p.school_id = ${schools.id} AND p.status = 'ACTIVE' AND p.valid_until > now() AND p.seat_type = 'STUDENT')`,
+      students: sql<number>`(SELECT count(*)::int FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role = 'STUDENT' WHERE u.school_id = ${qc(schools.id)})`,
+      teachers: sql<number>`(SELECT count(*)::int FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role = 'TEACHER' WHERE u.school_id = ${qc(schools.id)})`,
+      seats: sql<number>`(SELECT coalesce(sum(quantity),0)::int FROM license_pools p WHERE p.school_id = ${qc(schools.id)} AND p.status = 'ACTIVE' AND p.valid_until > now() AND p.seat_type = 'STUDENT')`,
       assigned: sql<number>`(SELECT count(*)::int FROM license_assignments a JOIN license_pools p ON p.id = a.pool_id
-        WHERE a.school_id = ${schools.id} AND a.status = 'ACTIVE' AND p.status = 'ACTIVE' AND p.valid_until > now() AND p.seat_type = 'STUDENT')`,
+        WHERE a.school_id = ${qc(schools.id)} AND a.status = 'ACTIVE' AND p.status = 'ACTIVE' AND p.valid_until > now() AND p.seat_type = 'STUDENT')`,
     }).from(schools).where(where).orderBy(asc(schools.name)).limit(f.pageSize).offset((f.page - 1) * f.pageSize);
     const [{ n }] = await this.q.select({ n: count() }).from(schools).where(where);
     return { items, total: n, page: f.page, pageSize: f.pageSize };
@@ -48,7 +49,7 @@ export class SchoolsService {
     if (!s) throw new NotFoundException('School not found');
     const years = await this.q.select().from(academicYears).where(eq(academicYears.schoolId, id)).orderBy(desc(academicYears.startsOn));
     const admins = await this.q.select({ id: users.id, username: users.username, displayName: users.displayName, status: users.status, lastLoginAt: users.lastLoginAt })
-      .from(users).where(and(eq(users.schoolId, id), sql`EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = ${users.id} AND r.role = 'SCHOOL_ADMIN')`));
+      .from(users).where(and(eq(users.schoolId, id), sql`EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = ${qc(users.id)} AND r.role = 'SCHOOL_ADMIN')`));
     const roleCounts = await this.q.execute(sql`SELECT r.role::text AS role, count(*)::int AS n FROM users u JOIN user_roles r ON r.user_id = u.id WHERE u.school_id = ${id} GROUP BY r.role`);
     const licences = await this.licensing.dashboard(id);
     return { ...s, academicYears: years, admins, counts: Object.fromEntries(roleCounts.rows.map((r: any) => [r.role, r.n])), licences };

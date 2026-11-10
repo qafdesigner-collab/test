@@ -3,21 +3,23 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles } from 'lucide-react';
+import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt } from 'lucide-react';
 import { api } from '@/lib/api';
 import { isPublisherStaff, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
 
+const A = 'PUBLISHER_ADMIN', E = 'PUBLISHER_EDITOR', S = 'PUBLISHER_SALES';
 const NAV = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { href: '/admin/books', label: 'Book Packages', icon: Library },
-  { href: '/admin/catalog', label: 'Grades & Subjects', icon: Tags },
-  { href: '/admin/audit', label: 'Audit Log', icon: ScrollText },
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true, roles: [A, E] },
+  { href: '/admin/books', label: 'Book Packages', icon: Library, roles: [A, E] },
+  { href: '/admin/products', label: 'Products & Bundles', icon: Package, roles: [A, E, S] },
+  { href: '/admin/schools', label: 'Schools', icon: Building2, roles: [A, E, S] },
+  { href: '/admin/orders', label: 'Orders', icon: Receipt, roles: [A, S] },
+  { href: '/admin/licences', label: 'Licences', icon: KeyRound, roles: [A, E, S] },
+  { href: '/admin/catalog', label: 'Grades & Subjects', icon: Tags, roles: [A, E] },
+  { href: '/admin/audit', label: 'Audit Log', icon: ScrollText, roles: [A, E, S] },
 ];
-const NEXT = [
-  { label: 'Products & Bundles', icon: Package }, { label: 'Schools & Orders', icon: Building2 },
-  { label: 'Licences', icon: KeyRound }, { label: 'AI Assistant', icon: Sparkles },
-];
+const NEXT = [{ label: 'Digital Reader', icon: BookOpen }, { label: 'AI Assistant', icon: Sparkles }];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { data: me, isLoading, isError } = useMe();
@@ -34,7 +36,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside className={cn('fixed inset-y-0 left-0 z-40 w-64 transform border-r border-slate-200 bg-white transition-transform lg:static lg:translate-x-0', open ? 'translate-x-0' : '-translate-x-full')}>
         <div className="flex h-16 items-center gap-2 border-b border-slate-100 px-5 font-semibold text-slate-900"><BookOpen className="size-5 text-brand-600" /> EduBooks <span className="text-xs font-normal text-slate-400">Publisher</span></div>
         <nav className="space-y-1 p-3" aria-label="Main">
-          {NAV.map(({ href, label, icon: Icon, exact }) => {
+          {NAV.filter((n) => n.roles.some((r) => me.roles.includes(r))).map(({ href, label, icon: Icon, exact }) => {
             const active = exact ? path === href : path.startsWith(href);
             return (
               <Link key={href} href={href} aria-current={active ? 'page' : undefined}

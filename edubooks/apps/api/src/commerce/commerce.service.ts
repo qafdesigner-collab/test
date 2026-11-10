@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, count, desc, eq, ilike, inArray, max, or, sql, SQL } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
+import { qc } from '../db/qualify';
 import {
   academicYears, bookEditions, bookPackages, bundleItems, fulfillments, grades, licensePools, licenseSeats, orderLines, orders,
   productVersions, products, schools,
@@ -26,9 +27,9 @@ export class CommerceService {
       gradeName: grades.name,
       active: sql<any>`(SELECT json_build_object('id', v.id, 'versionNo', v.version_no, 'priceMinor', v.price_minor, 'currency', v.currency,
         'items', (SELECT count(*) FROM bundle_items b WHERE b.product_version_id = v.id))
-        FROM product_versions v WHERE v.product_id = ${products.id} AND v.status = 'ACTIVE')`,
-      hasDraft: sql<boolean>`EXISTS (SELECT 1 FROM product_versions v WHERE v.product_id = ${products.id} AND v.status = 'DRAFT')`,
-      versionCount: sql<number>`(SELECT count(*)::int FROM product_versions v WHERE v.product_id = ${products.id})`,
+        FROM product_versions v WHERE v.product_id = ${qc(products.id)} AND v.status = 'ACTIVE')`,
+      hasDraft: sql<boolean>`EXISTS (SELECT 1 FROM product_versions v WHERE v.product_id = ${qc(products.id)} AND v.status = 'DRAFT')`,
+      versionCount: sql<number>`(SELECT count(*)::int FROM product_versions v WHERE v.product_id = ${qc(products.id)})`,
     }).from(products).leftJoin(grades, eq(grades.id, products.gradeId)).where(where)
       .orderBy(asc(products.kind), asc(products.name)).limit(f.pageSize).offset((f.page - 1) * f.pageSize);
     const [{ n }] = await this.q.select({ n: count() }).from(products).where(where);
@@ -168,9 +169,9 @@ export class CommerceService {
     const items = await this.q.select({
       id: orders.id, orderNo: orders.orderNo, type: orders.type, status: orders.status, createdAt: orders.createdAt, fulfilledAt: orders.fulfilledAt,
       school: { id: schools.id, name: schools.name, code: schools.code }, academicYear: academicYears.name,
-      students: sql<number>`(SELECT coalesce(sum(student_qty),0)::int FROM order_lines l WHERE l.order_id = ${orders.id})`,
-      teachers: sql<number>`(SELECT coalesce(sum(teacher_qty),0)::int FROM order_lines l WHERE l.order_id = ${orders.id})`,
-      totalMinor: sql<number>`(SELECT coalesce(sum(l.student_qty * coalesce(l.unit_price_minor,0)),0)::bigint FROM order_lines l WHERE l.order_id = ${orders.id})`,
+      students: sql<number>`(SELECT coalesce(sum(student_qty),0)::int FROM order_lines l WHERE l.order_id = ${qc(orders.id)})`,
+      teachers: sql<number>`(SELECT coalesce(sum(teacher_qty),0)::int FROM order_lines l WHERE l.order_id = ${qc(orders.id)})`,
+      totalMinor: sql<number>`(SELECT coalesce(sum(l.student_qty * coalesce(l.unit_price_minor,0)),0)::bigint FROM order_lines l WHERE l.order_id = ${qc(orders.id)})`,
     }).from(orders).innerJoin(schools, eq(schools.id, orders.schoolId)).innerJoin(academicYears, eq(academicYears.id, orders.academicYearId))
       .where(where).orderBy(desc(orders.createdAt)).limit(f.pageSize).offset((f.page - 1) * f.pageSize);
     const [{ n }] = await this.q.select({ n: count() }).from(orders).where(where);
@@ -218,7 +219,7 @@ export class CommerceService {
       productVersionId: orderLines.productVersionId, versionNo: productVersions.versionNo, currency: productVersions.currency,
       productName: products.name, sku: products.sku, kind: products.kind,
       books: sql<string[]>`(SELECT array_agg(bp.title ORDER BY bp.title) FROM bundle_items b JOIN book_editions e ON e.id = b.edition_id
-        JOIN book_packages bp ON bp.id = e.package_id WHERE b.product_version_id = ${orderLines.productVersionId})`,
+        JOIN book_packages bp ON bp.id = e.package_id WHERE b.product_version_id = ${qc(orderLines.productVersionId)})`,
     }).from(orderLines).innerJoin(productVersions, eq(productVersions.id, orderLines.productVersionId)).innerJoin(products, eq(products.id, productVersions.productId))
       .where(eq(orderLines.orderId, id));
     const pools = lines.length ? await this.q.select({ id: licensePools.id, seatType: licensePools.seatType, quantity: licensePools.quantity, status: licensePools.status,

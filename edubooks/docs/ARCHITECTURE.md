@@ -1,6 +1,6 @@
 # EduBooks LMS — Architecture
 
-> Status: **Phase 1 (foundation) and Phase 2 module "Book Package Management" are implemented.** Everything else in this document is the agreed design for later phases.
+> Status: **Phases 1, 2, 2b and 3 are implemented** — foundation, Book Package Management, products & bundles, schools, orders and the full licensing system, plus the School Admin portal. Phases 4–7 follow this design.
 > A clickable UX prototype of the whole idea lives in `/lms` (Node + SQLite). It's for demos only and isn't production code.
 
 ---
@@ -136,6 +136,9 @@ erDiagram
 | No duplicate books in library | Library = `SELECT DISTINCT book_edition_id FROM access_entitlements WHERE active`. |
 | Transfers need publisher approval | `license_transfers` (PENDING → APPROVED/REJECTED). On approval, in one transaction, the old assignment becomes `TRANSFERRED` and a new one is created on the **same seat**. History is kept. |
 | Audit | Every licence mutation writes `audit_logs` in the same transaction. |
+| Sold versions never change | DB triggers reject any change to an ACTIVE/RETIRED product version or its bundle items; pools are immutable after creation. |
+| School admins cannot escalate | RLS `WITH CHECK` + table CHECK: school-scoped users can only create SCHOOL_ADMIN/TEACHER/STUDENT roles in their own school. |
+| Correlated subqueries | Always reference outer columns with `qc()` (fully qualified) — drizzle renders single-table columns unqualified. Regression-tested. |
 
 ---
 
@@ -195,9 +198,9 @@ Rule: dependencies only point "down". `licensing` is the single authority on "ca
 | Structure ✅ | `POST /publishing/editions/:id/components` · `PATCH/DELETE /publishing/components/:id` · `POST /publishing/components/:id/units` · `PATCH/DELETE /publishing/units/:id` · `POST /publishing/units/:id/lessons` · `PATCH/DELETE /publishing/lessons/:id` · `POST /publishing/reorder` |
 | Resources ✅ | `POST /publishing/editions/:id/resources` (multipart, multiple files, scope = edition/component/unit/lesson) · `PATCH/DELETE /publishing/resources/:id` · `GET /assets/:id/link` (signed URL) · `GET /files/:token` |
 | Audit ✅ | `GET /audit?entityType&entityId&page` |
-| Commerce (P3) | `/commerce/products`, `/commerce/products/:id/versions` (+ `/activate`), `/commerce/orders` (+ `/confirm`, `/fulfil`) |
-| Licensing (P3) | `/licensing/pools`, `/licensing/pools/:id/assign`, `/licensing/assignments/:id/(suspend\|revoke)`, `/licensing/transfers` (+ `/approve`, `/reject`), `/licensing/dashboard`, `/licensing/reports/usage` |
-| Schools (P3/4) | `/schools`, `/schools/:id/academic-years`, `/school/classes`, `/school/teachers`, `/school/students`, `/school/students/import` |
+| Commerce ✅ | `/commerce/products`, `/commerce/products/:id/versions` (+ `/activate`), `/commerce/orders` (+ `/confirm`, `/fulfil`) |
+| Licensing ✅ | `/licensing/pools`, `/licensing/pools/:id/assign`, `/licensing/assignments/:id/(suspend\|revoke)`, `/licensing/transfers` (+ `/approve`, `/reject`), `/licensing/dashboard`, `/licensing/reports/usage` |
+| Schools ✅ | Publisher: `/schools` (+ `/demo`, `/:id/academic-years`, `/:id/suspend`, `/:id/convert-demo`) · School admin: `/school/overview`, `/school/users` (+ `/import`, `/:id/reset-password`), `/school/pools/:id/assign`, `/school/assignments/:id/release`, `/school/transfers`, `/school/profile` · Any school user: `/library` |
 | LMS (P4) | `/library` (my entitled editions), `/reader/:editionId/progress`, `/bookmarks`, `/lesson-plans`, `/assessments`, `/assessments/:id/submissions`, `/question-bank` |
 | AI (P5) | `/ai/lesson-plan`, `/ai/questions`, `/ai/worksheet`, `/ai/activities` (all take `lessonId` and return text with source refs), `/ai/usage` |
 | Games (P6) | `/games`, `/games/:id/lessons`, `/game-attempts` |
@@ -210,9 +213,9 @@ Rule: dependencies only point "down". `licensing` is the single authority on "ca
 |---|---|---|
 | 1. Foundation | Monorepo, PostgreSQL schema + RLS, auth/sessions/roles, audit, storage, UI kit, seed, tests | ✅ |
 | 2. Publisher portal | Book Package Builder (packages, editions, components, units, lessons, resources), grades/subjects, dashboard, audit viewer | ✅ |
-| 2b. | Products, product versions, grade bundles | next |
-| 3. Commerce & licensing | Schools, academic years, orders, fulfilment → pools & seats, assignment, expiry, transfers + approvals, licence dashboard, **licensing test suite** | |
-| 4. School & teacher LMS | Classes, CSV/Excel import, teacher dashboard, PDF reader (pdf.js, bookmarks, progress), assignments, quizzes, grading, evaluations | |
+| 2b. | Products, product versions, grade bundles | ✅ |
+| 3. Commerce & licensing | Schools, academic years, orders, fulfilment → pools & seats, assignment, expiry, transfers + approvals, licence dashboard, sales demo schools, School Admin portal (accounts, CSV import, allocation), **licensing test suite** | ✅ |
+| 4. School & teacher LMS | Classes & sections, enrolments, teacher assignments, teacher dashboard, PDF reader (pdf.js, bookmarks, progress), assignments, quizzes, grading, evaluations | |
 | 5. AI | PDF text extraction → `book_pages` → embeddings (pgvector), grounded generators with page citations, teacher approval flow, usage tracking | |
 | 6. Student portal | Playful UI, library, homework, games engine (10 types), rewards & achievements | |
 | 7. Production | Load and security tests, accessibility audit, backups (pg_dump/PITR + bucket versioning), Docker/CI, runbooks | |
