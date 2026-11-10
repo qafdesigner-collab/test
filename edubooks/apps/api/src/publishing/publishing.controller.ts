@@ -10,6 +10,7 @@ import { ManualTx, PUBLISHER_STAFF, Roles } from '../common/decorators';
 import { DbService } from '../db/db.service';
 import { config } from '../config';
 import { PublishingService } from './publishing.service';
+import { IndexerService } from '../ai/indexer.service';
 import {
   CreateComponentDto, CreateEditionDto, CreateLessonDto, CreatePackageDto, CreateUnitDto, PackageQuery, ReorderDto, UpdateUnitDto,
   UpdateComponentDto, UpdateEditionDto, UpdateLessonDto, UpdatePackageDto, UpdateResourceDto, UploadResourcesDto,
@@ -27,7 +28,7 @@ const Id = () => new ParseUUIDPipe();
 @Roles(...PUBLISHER_STAFF)
 @Controller('publishing')
 export class PublishingController {
-  constructor(private readonly svc: PublishingService, private readonly db: DbService) {}
+  constructor(private readonly svc: PublishingService, private readonly db: DbService, private readonly indexer: IndexerService) {}
 
   @Get('stats') stats() { return this.svc.stats(); }
 
@@ -74,7 +75,8 @@ export class PublishingController {
   @UseInterceptors(FilesInterceptor('file', 1, uploadOpts))
   bookPdf(@Param('id', Id()) id: string, @UploadedFiles() files: Express.Multer.File[], @Req() req: any) {
     if (!files?.[0]) throw new BadRequestException('Choose a PDF file');
-    return this.db.withContext(req.ctx, () => this.svc.setBookPdf(id, files[0]));
+    // Upload, then (re)build the AI text index of this part in the background.
+    return this.db.withContext(req.ctx, async () => ({ ...(await this.svc.setBookPdf(id, files[0])), indexing: (await this.indexer.start(id)).started }));
   }
   @Delete('components/:id/book-pdf') delBookPdf(@Param('id', Id()) id: string) { return this.svc.removeBookPdf(id); }
   @Patch('resources/:id') updRes(@Param('id', Id()) id: string, @Body() d: UpdateResourceDto) { return this.svc.updateResource(id, d); }

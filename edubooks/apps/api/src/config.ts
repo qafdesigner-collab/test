@@ -33,6 +33,21 @@ export const config = {
   maxUploadMb: Number(env('MAX_UPLOAD_MB', '300')),
   clamav: process.env.CLAMAV_HOST ? { host: process.env.CLAMAV_HOST, port: Number(process.env.CLAMAV_PORT || 3310) } : null,
   requireMalwareScan: process.env.REQUIRE_MALWARE_SCAN === '1',
+  ai: {
+    /** openai-compatible (self-hosted Ollama / vLLM / LM Studio, or any compatible service) | anthropic | offline */
+    provider: (process.env.AI_PROVIDER || (process.env.AI_BASE_URL ? 'openai-compatible' : 'offline')) as 'openai-compatible' | 'anthropic' | 'offline',
+    baseUrl: (process.env.AI_BASE_URL || 'http://localhost:11434/v1').replace(/\/$/, ''),
+    model: process.env.AI_MODEL || (process.env.AI_PROVIDER === 'anthropic' ? 'claude-opus-5-5' : 'qwen2.5:7b-instruct'),
+    apiKey: process.env.AI_API_KEY || '',
+    /** Optional embeddings model on the same OpenAI-compatible server (e.g. nomic-embed-text) — enables semantic search. */
+    embedModel: process.env.AI_EMBED_MODEL || '',
+    timeoutMs: Number(process.env.AI_TIMEOUT_MS || 180_000),
+    monthlyRequestsPerSchool: Number(process.env.AI_MONTHLY_REQUESTS_PER_SCHOOL || 1000),
+    maxSourceChars: Number(process.env.AI_MAX_SOURCE_CHARS || 14_000),
+    /** Optional cost estimate for reports (per 1M tokens, in your currency). Self-hosted: leave 0 and track GPU cost separately. */
+    costInPerM: Number(process.env.AI_COST_INPUT_PER_M || 0),
+    costOutPerM: Number(process.env.AI_COST_OUTPUT_PER_M || 0),
+  },
 };
 if (process.env.NODE_ENV === 'production' && config.fileUrlSecret.startsWith('dev-only')) {
   throw new Error('Set FILE_URL_SECRET in production');

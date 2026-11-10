@@ -50,6 +50,11 @@ export class DbService implements OnModuleDestroy {
     });
   }
 
+  /** Run work in its own transaction, detached from the current request (background jobs). */
+  detached<T>(ctx: TenantCtx, fn: () => Promise<T>): Promise<T> {
+    return als.exit(() => this.withContext(ctx, fn));
+  }
+
   /** Re-apply the session variables after the context object changed (e.g. roles resolved during login). */
   async refreshContext() { const s = als.getStore(); if (s) await this.applyContext(s.tx, s.ctx); }
 

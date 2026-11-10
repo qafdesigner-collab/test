@@ -11,6 +11,7 @@ import * as s from './schema';
 import { config } from '../config';
 import { hashPassword } from '../auth/password';
 import { createDriver } from '../storage/storage.driver';
+import { extractPdfPages } from '../ai/extract';
 
 /** Builds a small valid PDF: one page per entry, each page a list of text lines (placeholder content only). */
 function samplePdf(lines: string[] | string[][], color = '0.95 0.45 0.2') {
@@ -43,7 +44,7 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
         book_packages, book_editions, book_components, book_units, book_lessons, book_pages, teaching_resources,
         academic_years, products, product_versions, bundle_items, orders, order_lines, fulfillments, license_adjustments, license_pools,
         license_seats, license_assignments, license_transfers, access_entitlements, classes, class_teachers, enrolments, reader_progress,
-        bookmarks, lesson_plans, question_bank, assessments, assessment_items, assessment_students, submissions, evaluations CASCADE`);
+        bookmarks, lesson_plans, question_bank, assessments, assessment_items, assessment_students, submissions, evaluations, ai_generations CASCADE`);
     }
     const existing = await db.select().from(s.publishers).where(sql`slug = 'demo'`);
     if (existing.length) { log('Seed data already present (use --reset to recreate).'); return; }
@@ -126,6 +127,8 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
         : [`${p.title} - Part 1`, `Page ${i + 1}`, 'Sample placeholder page', '(not publisher content)']), p.color === '#3b82f6' ? '0.23 0.51 0.96' : p.color === '#10b981' ? '0.06 0.73 0.5' : p.color === '#f59e0b' ? '0.96 0.62 0.04' : '0.94 0.27 0.27');
       const bookAsset = await putAsset(`${p.title} Part 1 (sample).pdf`, pagesPdf, 'pdf', 'application/pdf');
       await db.update(s.bookComponents).set({ bookAssetId: bookAsset.id, pageCount: 26 }).where(sql`id = ${part1.id}`);
+      const pdfTmp = path.join(os.tmpdir(), `seed-index-${part1.id}.pdf`); fs.writeFileSync(pdfTmp, pagesPdf);
+      const extracted = (await extractPdfPages(pdfTmp)).pages; fs.rmSync(pdfTmp);
       let page = 2;
       for (const [ui, unitTitle] of p.units.entries()) {
         const [u] = await db.insert(s.bookUnits).values({ publisherId: P, componentId: part1.id, number: ui + 1, sort: ui, title: `${unitTitle} (sample)` }).returning();
@@ -139,6 +142,11 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
           }
         }
       }
+      // AI text index of Part 1 (pages linked to lessons by page range).
+      const lessonRanges = await db.execute(sql`SELECT l.id, l.page_start AS a, l.page_end AS b FROM book_lessons l JOIN book_units u ON u.id = l.unit_id WHERE u.component_id = ${part1.id}`);
+      await db.insert(s.bookPages).values(extracted.map((text, i) => ({ publisherId: P, componentId: part1.id, pageNumber: i + 1, textContent: text,
+        lessonId: (lessonRanges.rows as any[]).find((r) => i + 1 >= r.a && i + 1 <= r.b)?.id ?? null })));
+      await db.update(s.bookComponents).set({ indexStatus: 'DONE', indexedPages: extracted.length, indexedAt: new Date() }).where(sql`id = ${part1.id}`);
       // The same PDF is linked to all four packages — stored once.
       await db.insert(s.teachingResources).values({ publisherId: P, editionId: ed.id, assetId: guidePdf.id, title: 'Sample teaching guide (placeholder)',
         resourceType: 'PDF', audience: 'TEACHER', createdBy: admin.id });

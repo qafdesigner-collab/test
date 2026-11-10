@@ -187,6 +187,11 @@ export const bookComponents = pgTable('book_components', {
   bookAssetId: uuid('book_asset_id').references(() => digitalAssets.id, { onDelete: 'set null' }),
   pageCount: integer('page_count'),
   sort: integer('sort').notNull().default(0),
+  // AI text index of the book PDF (Phase 5): NONE | RUNNING | DONE | NO_TEXT | ERROR
+  indexStatus: text('index_status').notNull().default('NONE'),
+  indexedPages: integer('indexed_pages').notNull().default(0),
+  indexedAt: timestamp('indexed_at', { withTimezone: true }),
+  indexError: text('index_error'),
 }, (t) => [index('components_edition_idx').on(t.editionId)]);
 
 export const bookUnits = pgTable('book_units', {
@@ -588,3 +593,29 @@ export const evaluations = pgTable('evaluations', {
   remarks: text('remarks').notNull().default(''),
   createdAt: createdAt(),
 }, (t) => [check('eval_rating_ck', sql`${t.rating} BETWEEN 1 AND 5`), index('eval_student_idx').on(t.studentId)]);
+
+// =====================================================================================
+// Phase 5 — AI teaching assistant
+// =====================================================================================
+/** Every AI request is recorded: who, what task, which book pages grounded it, tokens, outcome. Never student data. */
+export const aiGenerations = pgTable('ai_generations', {
+  id: id(), ...schoolCols(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  task: text('task').notNull(),
+  editionId: uuid('edition_id').references(() => bookEditions.id, { onDelete: 'set null' }),
+  lessonId: uuid('lesson_id').references(() => bookLessons.id, { onDelete: 'set null' }),
+  provider: text('provider').notNull(),
+  model: text('model').notNull(),
+  params: jsonb('params').notNull().default({}),
+  sources: jsonb('sources').notNull().default([]),
+  grounded: boolean('grounded').notNull().default(false),
+  output: jsonb('output'),
+  status: text('status').notNull(), // OK | INVALID | ERROR | REFUSED
+  error: text('error'),
+  inputTokens: integer('input_tokens').notNull().default(0),
+  outputTokens: integer('output_tokens').notNull().default(0),
+  latencyMs: integer('latency_ms').notNull().default(0),
+  usedAs: text('used_as'), // LESSON_PLAN | ASSESSMENT | QUESTION_BANK
+  usedId: uuid('used_id'),
+  createdAt: createdAt(),
+}, (t) => [index('ai_school_time_idx').on(t.schoolId, t.createdAt), index('ai_user_idx').on(t.userId)]);
