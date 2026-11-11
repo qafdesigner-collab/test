@@ -4,9 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { PageLoader } from '@/components/ui';
 import { useT } from '@/lib/i18n';
+import { useEffect, useState } from 'react';
+import { savedEditionIds } from '@/lib/offline';
 
 export default function LearnBooks() {
-  const { t } = useT();
+  const { t } = useT(); const [saved, setSaved] = useState<string[]>([]);
+  useEffect(() => { savedEditionIds().then(setSaved).catch(() => undefined); }, []);
   const lib = useQuery({ queryKey: ['library'], queryFn: () => api.get('/library') });
   const ach = useQuery({ queryKey: ['achievements'], queryFn: () => api.get('/student/achievements') });
   if (!lib.data) return <PageLoader />;
@@ -22,7 +25,8 @@ export default function LearnBooks() {
                 {{ English: '🔤', Mathematics: '🔢', Urdu: 'ا', 'General Knowledge': '🌍' }[b.subject as string] ?? '📘'}</div>
               <div className="p-4"><div className="text-xl font-black leading-tight">{b.title}</div>
                 <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100" aria-label={t('{n}% read', { n: pct })}><div className="h-full rounded-full bg-emerald-400" style={{ width: `${pct}%` }} /></div>
-                <div className="mt-1 text-xs font-bold text-slate-500">{t('{n}% read', { n: pct })}</div></div>
+                <div className="mt-1 text-xs font-bold text-slate-500">{t('{n}% read', { n: pct })}</div>
+                {saved.includes(b.editionId) && <div className="mt-1 text-xs font-black text-emerald-700">{t('✅ On this device')}</div>}</div>
             </Link>);
         })}</div>
       )}

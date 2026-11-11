@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { hasRole, useMe } from '@/lib/session';
@@ -47,9 +47,16 @@ function LearnShell({ children }: { children: React.ReactNode }) {
             <span className="text-3xl sm:text-2xl">{n.emoji}</span>{t(n.label)}</Link>;
         })}
       </nav>
+      <OfflineNote />
       <main className="mx-auto max-w-5xl px-4 pt-6 sm:px-6">{children}</main>
     </div>
   );
+}
+
+function OfflineNote() {
+  const { t } = useT(); const [off, setOff] = useState(false);
+  useEffect(() => { const f = () => setOff(!navigator.onLine); f(); window.addEventListener('online', f); window.addEventListener('offline', f); return () => { window.removeEventListener('online', f); window.removeEventListener('offline', f); }; }, []);
+  return off ? <p role="status" className="mx-auto mt-4 max-w-5xl rounded-2xl bg-slate-800 px-4 py-2 text-center font-bold text-white">📶 {t('You are offline. Saved books still open.')}</p> : null;
 }
 
 function KidBrand() { return <>{useBranding().name}</>; }

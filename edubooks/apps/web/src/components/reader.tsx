@@ -10,14 +10,16 @@ import { cn, ErrorBox, PageLoader, Spinner } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 import { HotspotLayer } from '@/components/hotspots';
 import { useMe } from '@/lib/session';
+import { isSaved, offlinePdf, offlineSupported, removeBook, saveBook } from '@/lib/offline';
 
 type PDFDoc = { numPages: number; getPage: (n: number) => Promise<any>; destroy: () => void };
 
 /** Loads pdf.js lazily (client only); the worker is served from /public. */
-async function loadPdf(url: string): Promise<PDFDoc> {
+async function loadPdf(src: string | ArrayBuffer): Promise<PDFDoc> {
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-  return pdfjs.getDocument({ url, withCredentials: true }).promise as unknown as Promise<PDFDoc>;
+  const args = typeof src === 'string' ? { url: src, withCredentials: true } : { data: new Uint8Array(src) };
+  return pdfjs.getDocument(args).promise as unknown as Promise<PDFDoc>;
 }
 
 export function Reader({ editionId, backHref, initial }: { editionId: string; backHref: string; initial?: { componentId?: string; page?: number } }) {
@@ -33,6 +35,16 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   const [full, setFull] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [editHot, setEditHot] = useState(false);
+  const [saved, setSaved] = useState(false); const [saving, setSaving] = useState<string | null>(null);
+  useEffect(() => { isSaved(editionId).then(setSaved).catch(() => undefined); }, [editionId]);
+  const toggleOffline = async () => {
+    if (saving) return;
+    try {
+      if (saved) { await removeBook(editionId); setSaved(false); toast('Removed from this device'); return; }
+      setSaving('0%'); const n = await saveBook(editionId, (d, t) => setSaving(t ? `${Math.round((d / t) * 100)}%` : '…'));
+      setSaved(true); toast(n ? 'Saved — this book now opens without internet' : 'This book has no pages to save yet');
+    } catch (e: any) { toast(e.message || 'Could not save the book', 'err'); } finally { setSaving(null); }
+  };
   const me = useMe().data as any; const canEditHot = !!me?.roles?.some((r: string) => ['PUBLISHER_ADMIN', 'PUBLISHER_EDITOR'].includes(r));
   const canvas = useRef<HTMLCanvasElement>(null); const wrap = useRef<HTMLDivElement>(null); const shell = useRef<HTMLDivElement>(null);
   const b = book.data;
@@ -59,7 +71,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
     setDoc(null); setDocError(null);
     if (!comp?.hasPdf) return;
     setLoadingDoc(true);
-    api.get(`/reader/components/${comp.id}/pdf`).then(({ url }) => loadPdf(url)).then((d) => { loaded = d; if (!cancelled) setDoc(d); })
+    offlinePdf(comp.id).then((saved) => saved ? loadPdf(saved) : api.get(`/reader/components/${comp.id}/pdf`).then(({ url }) => loadPdf(url))).then((d) => { loaded = d; if (!cancelled) setDoc(d); })
       .catch((e) => !cancelled && setDocError(e.message || 'Could not open the book')).finally(() => !cancelled && setLoadingDoc(false));
     return () => { cancelled = true; loaded?.destroy(); };
   }, [comp?.id, comp?.hasPdf]);
@@ -161,6 +173,8 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
         {canEditHot && <button className={cn(btn, 'w-auto px-2 text-sm font-medium', editHot && 'bg-sky-100 text-sky-800')} onClick={() => { setEditHot(!editHot); if (!editHot) toast('Drag on the page to draw a hotspot. Click one to edit it.'); }} aria-pressed={editHot}>✏️ Hotspots</button>}
         <button className={btn} onClick={speak} aria-label={speaking ? 'Stop reading' : 'Read aloud'} disabled={!doc}>{speaking ? <VolumeX className="size-5 text-pink-600" /> : <Volume2 className="size-5" />}</button>
         </>}
+        {offlineSupported() && !canEditHot && <button className={cn(btn, 'w-auto px-2 text-sm font-medium', saved && 'text-emerald-700')} onClick={toggleOffline} aria-pressed={saved}
+          title={saved ? 'Saved on this device. Click to remove.' : 'Save this book to read without internet'}>{saving ? `⬇ ${saving}` : saved ? '✅ Offline' : '⬇ Save offline'}</button>}
         <button className={btn} onClick={toggleFull} aria-label={full ? 'Exit full screen' : 'Full screen'}>{full ? <Minimize className="size-5" /> : <Maximize className="size-5" />}</button>
       </header>
       <div className="flex min-h-0 flex-1">

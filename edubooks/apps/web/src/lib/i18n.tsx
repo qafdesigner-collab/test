@@ -54,6 +54,7 @@ const AR: Record<string, string> = {
   'Finish your first game': 'أنهِ أول لعبة لك', 'Get 3 stars in a game': 'احصل على 3 نجوم في لعبة', 'Play 10 games': 'العب 10 ألعاب', 'Collect 25 stars': 'اجمع 25 نجمة',
   'Collect 100 stars': 'اجمع 100 نجمة', 'Hand in your first homework': 'سلّم أول واجب لك', 'Hand in 5 homework': 'سلّم 5 واجبات', 'Read 20 pages': 'اقرأ 20 صفحة',
   'Read 100 pages': 'اقرأ 100 صفحة', 'Learn 3 days in a row': 'تعلّم 3 أيام متتالية',
+  '✅ On this device': '✅ على هذا الجهاز', "You are offline. Saved books still open.": 'أنت غير متصل. الكتب المحفوظة ما زالت تفتح.',
   // switch
   'العربية': 'العربية', English: 'English',
 };
