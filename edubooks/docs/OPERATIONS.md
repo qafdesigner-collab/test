@@ -111,6 +111,7 @@ Check it with Publisher → **Messages** → *Send a test message*. Sent and fai
 
 ### 5. AI assistant
 `.env`: `AI_PROVIDER=anthropic` and `AI_API_KEY=…` (or `openai-compatible` with `AI_BASE_URL` and `AI_MODEL`). Keep `AI_MONTHLY_REQUESTS_PER_SCHOOL` at a level you are happy to pay for. With `offline`, teachers still get draft templates without any cost.
+The pupils' reading helper (**Ask Owl**) uses the same setting. Each school decides whether to switch it on; `AI_TUTOR=off` turns it off everywhere.
 
 ### 6. Trial with one or two schools first
 Before a wide launch: create the real schools, import pupils from Excel (Students → **Import Excel**), print the QR login cards and run for two to four weeks. Watch Publisher → **Usage Insights** and fix what teachers struggle with.

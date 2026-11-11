@@ -1,4 +1,24 @@
-# What's new in Knowledge Gate 1.1
+# What's new in Knowledge Gate 1.2
+
+Install with the full zip (`edubooks-lms-public_html.zip`) through **Super admin → Updates**. The database is updated automatically.
+
+## Exams and question papers
+- Teachers and school admins: **Exams → New exam**. Build the paper by typing questions (including long answers with writing lines), picking from the question bank, or **Make a paper for me** (picks questions by type and number, e.g. 10 multiple-choice + 5 short).
+- **Print paper**, **Version B** (same questions in a different order) and **Answer key**, with your logo.
+- **Marks & results**: type marks quickly (Enter moves to the next pupil), mark absentees, see the average. **Publish results** puts them on report cards and tells pupils and parents.
+
+## Messages, announcements and live lessons
+- **Parent messages**: parents write to their child's teachers and the school office from the parent portal (💬 Messages). Teachers and admins answer under **Messages**. The school admin can read every conversation (read only) for safeguarding. Pupils have no chat.
+- **Announcements** to one class or the whole school, for pupils, parents or both. Can be pinned.
+- **Live lessons**: paste a Zoom / Google Meet / Teams link and a time. Pupils and parents see a **Join** button from 10 minutes before. Timetable lessons can also carry an online link.
+
+## Ask Owl — AI reading helper for pupils
+- In the book reader, pupils tap **🦉 Ask Owl**: *Explain this page*, *Ask a question* or *Quiz me*.
+- Owl only uses the book's own pages, uses simple words, gives no links, never asks for personal details, and sends unsafe topics to a trusted grown-up.
+- **Off until the school admin turns it on** (School → Ask Owl), with a daily limit per pupil. Teachers see every question; flagged ones are marked for a gentle check-in.
+- Works without an AI key (it shows the matching sentences from the book). With an AI key, answers count towards the school's monthly AI limit. To switch it off for all schools, set `AI_TUTOR=off` in `.env`.
+
+# Knowledge Gate 1.1
 
 Install with the **full** zip (`edubooks-lms-public_html.zip`) through **Super admin → Updates**. The small update zip is refused because new program libraries were added. The database is updated automatically.
 
