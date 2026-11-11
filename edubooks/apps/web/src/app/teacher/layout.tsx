@@ -1,5 +1,5 @@
 'use client';
-import { BookMarked, ClipboardList, Gamepad2, Library, LayoutDashboard, NotebookPen, Sparkles, Users, CalendarDays, UserCheck, Clock, GraduationCap } from 'lucide-react';
+import { BookMarked, ClipboardList, Gamepad2, Library, LayoutDashboard, NotebookPen, Sparkles, Users, CalendarDays, UserCheck, Clock, GraduationCap, LineChart } from 'lucide-react';
 import { Shell } from '@/components/shell';
 
 const NAV = [
@@ -11,6 +11,7 @@ const NAV = [
   { href: '/teacher/questions', label: 'Question bank', icon: BookMarked },
   { href: '/teacher/games', label: 'Games', icon: Gamepad2 },
   { href: '/teacher/classes', label: 'Classes & reports', icon: Users },
+  { href: '/teacher/insights', label: 'Insights', icon: LineChart },
   { href: '/teacher/attendance', label: 'Attendance', icon: UserCheck },
   { href: '/teacher/timetable', label: 'Timetable', icon: Clock },
   { href: '/teacher/training', label: 'Training', icon: GraduationCap },

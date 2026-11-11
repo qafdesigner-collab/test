@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle, Palette, TrendingUp, GraduationCap } from 'lucide-react';
+import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle, Palette, TrendingUp, GraduationCap, LineChart } from 'lucide-react';
 import { api } from '@/lib/api';
 import { isPublisherStaff, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
@@ -18,6 +18,7 @@ const NAV = [
   { href: '/admin/schools', label: 'Schools', icon: Building2, roles: [A, E, S] },
   { href: '/admin/orders', label: 'Orders', icon: Receipt, roles: [A, S] },
   { href: '/admin/sales', label: 'Sales', icon: TrendingUp, roles: [A, S] },
+  { href: '/admin/insights', label: 'Usage Insights', icon: LineChart, roles: [A, E, S] },
   { href: '/admin/licences', label: 'Licences', icon: KeyRound, roles: [A, E, S] },
   { href: '/admin/games', label: 'Game Library', icon: Gamepad2, roles: [A, E] },
   { href: '/admin/training', label: 'Teacher Training', icon: GraduationCap, roles: [A, E, S] },
