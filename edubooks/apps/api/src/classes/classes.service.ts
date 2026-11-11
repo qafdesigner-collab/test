@@ -99,5 +99,13 @@ export class ClassesService {
     return rows;
   }
   subjects() { return this.q.select({ id: subjects.id, name: subjects.name }).from(subjects).orderBy(asc(subjects.sort)); }
-  grades() { return this.q.select({ id: grades.id, name: grades.name }).from(grades).orderBy(asc(grades.sort)); }
+  /** Grades for class forms: the school's curriculum (if set) first, with stage and curriculum for grouping. */
+  async grades() {
+    const { rows } = await this.q.execute(sql`
+      SELECT g.id, g.name, g.stage, c.id AS "curriculumId", c.name AS "curriculumName",
+             (c.id = (SELECT s.curriculum_id FROM schools s WHERE s.id = ${this.db.ctx.schoolId ?? null})) AS "isSchoolCurriculum"
+      FROM grades g JOIN curricula c ON c.id = g.curriculum_id
+      ORDER BY (c.id = (SELECT s.curriculum_id FROM schools s WHERE s.id = ${this.db.ctx.schoolId ?? null})) DESC NULLS LAST, c.sort, g.sort`);
+    return rows;
+  }
 }

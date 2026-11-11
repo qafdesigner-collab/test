@@ -3,7 +3,7 @@
 // PostgreSQL Row-Level Security policies (see drizzle/*_rls.sql) stay simple and indexable.
 import { sql } from 'drizzle-orm';
 import {
-  pgTable, pgEnum, uuid, text, integer, bigint, boolean, timestamp, jsonb, customType, index, uniqueIndex, primaryKey, check,
+  pgTable, pgEnum, date as pgDate, uuid, text, integer, bigint, boolean, timestamp, jsonb, customType, index, uniqueIndex, primaryKey, check,
 } from 'drizzle-orm/pg-core';
 
 const citext = customType<{ data: string }>({ dataType: () => 'citext' });
@@ -45,6 +45,7 @@ export const schools = pgTable('schools', {
   address: text('address'),
   phone: text('phone'),
   isDemo: boolean('is_demo').notNull().default(false),
+  curriculumId: uuid('curriculum_id'), // FK to curricula (declared in SQL; curricula is defined further down)
   demoExpiresAt: timestamp('demo_expires_at', { withTimezone: true }),
   createdBy: uuid('created_by'),
   createdAt: createdAt(),
@@ -111,13 +112,28 @@ export const auditLogs = pgTable('audit_logs', {
 ]);
 
 // ---------- catalog taxonomy ----------
+/** Education systems (American, British, Cambridge, IB, MOE, CBC, Pakistan, Other); filled by seed_reference_data(). */
+export const curricula = pgTable('curricula', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  code: citext('code').notNull(),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  color: text('color').notNull().default('#4f46e5'),
+  sort: integer('sort').notNull().default(0),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex('curricula_code_uq').on(t.publisherId, t.code)]);
+
 export const grades = pgTable('grades', {
   id: id(),
   publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  // NOT NULL in the database; a trigger puts grades created without one into the "Other" curriculum.
+  curriculumId: uuid('curriculum_id').references(() => curricula.id, { onDelete: 'restrict' }),
+  stage: text('stage').notNull().default(''),
   name: citext('name').notNull(),
   sort: integer('sort').notNull().default(0),
   createdAt: createdAt(),
-}, (t) => [uniqueIndex('grades_name_uq').on(t.publisherId, t.name)]);
+}, (t) => [uniqueIndex('grades_name_uq').on(t.publisherId, t.curriculumId, t.name)]);
 
 export const subjects = pgTable('subjects', {
   id: id(),
@@ -266,6 +282,25 @@ export const assignmentStatusEnum = pgEnum('assignment_status', ['ACTIVE', 'SUSP
 export const transferStatusEnum = pgEnum('transfer_status', ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']);
 export const adjustmentKindEnum = pgEnum('adjustment_kind', ['COMPLIMENTARY', 'TRIAL', 'CORRECTION']);
 const date = (n: string) => timestamp(n, { withTimezone: true });
+
+export const calendarKindEnum = pgEnum('calendar_kind', ['TERM', 'HOLIDAY', 'EXAM', 'EVENT', 'MEETING', 'SPORTS', 'OTHER']);
+/** Academic calendar. school_id NULL = publisher event (all schools, or only schools following curriculum_id). */
+export const calendarEvents = pgTable('calendar_events', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }),
+  curriculumId: uuid('curriculum_id').references(() => curricula.id, { onDelete: 'set null' }),
+  title: text('title').notNull(),
+  kind: calendarKindEnum('kind').notNull().default('EVENT'),
+  // Plain calendar dates ('YYYY-MM-DD'), no time zone.
+  startsOn: pgDate('starts_on', { mode: 'string' }).notNull(),
+  endsOn: pgDate('ends_on', { mode: 'string' }).notNull(),
+  description: text('description').notNull().default(''),
+  isTemplate: boolean('is_template').notNull().default(false),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [index('calendar_range_idx').on(t.publisherId, t.startsOn, t.endsOn)]);
 
 export const academicYears = pgTable('academic_years', {
   id: id(),

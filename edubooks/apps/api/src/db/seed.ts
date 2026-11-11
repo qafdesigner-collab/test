@@ -40,7 +40,7 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
   const log = (...a: unknown[]) => !opts.quiet && console.log(...a);
   try {
     if (opts.reset) {
-      await db.execute(sql`TRUNCATE publishers, schools, users, user_roles, sessions, audit_logs, grades, subjects, digital_assets,
+      await db.execute(sql`TRUNCATE publishers, curricula, calendar_events, schools, users, user_roles, sessions, audit_logs, grades, subjects, digital_assets,
         book_packages, book_editions, book_components, book_units, book_lessons, book_pages, teaching_resources,
         academic_years, products, product_versions, bundle_items, orders, order_lines, fulfillments, license_adjustments, license_pools,
         license_seats, license_assignments, license_transfers, access_entitlements, classes, class_teachers, enrolments, reader_progress,
@@ -75,10 +75,12 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
     }
 
     // Taxonomy
-    const gradeRows = await db.insert(s.grades).values(['Nursery', 'KG', 'Grade 1', 'Grade 2'].map((name, sort) => ({ publisherId: P, name, sort }))).returning();
-    const subj = await db.insert(s.subjects).values([
-      ['English', '#ef4444'], ['Mathematics', '#3b82f6'], ['Urdu', '#10b981'], ['General Knowledge', '#f59e0b'],
-    ].map(([name, color], sort) => ({ publisherId: P, name, color, sort }))).returning();
+    // Curricula, grades and subjects come from seed_reference_data() (run by a trigger when the publisher is created).
+    // The demo uses the Pakistan National Curriculum grades.
+    const [pk] = await db.select().from(s.curricula).where(sql`publisher_id = ${P} AND code = 'PAKISTAN'`);
+    const gradeRows = await db.select().from(s.grades).where(sql`curriculum_id = ${pk.id} AND name IN ('Nursery', 'KG', 'Grade 1', 'Grade 2')`);
+    const subj = await db.select().from(s.subjects).where(sql`publisher_id = ${P} AND name IN ('English', 'Mathematics', 'Urdu', 'General Knowledge')`);
+    await db.update(s.schools).set({ curriculumId: pk.id }).where(sql`publisher_id = ${P}`);
     const G = Object.fromEntries(gradeRows.map((g) => [g.name, g.id]));
     const S = Object.fromEntries(subj.map((x) => [x.name, x.id]));
 
@@ -250,7 +252,7 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
     for (const t of ['Picture and word', 'Count the fruit'])
       await db.insert(s.gameAssignments).values({ publisherId: P, schoolId: sun.id, activityId: gameIds[t], classId: kgRose.id, teacherId: sun.users.teacher1 });
 
-    log('✅ Seeded: 1 publisher, 3 staff, 3 schools (15 users), 4 grades, 4 subjects, 5 book packages, 5 products (incl. KG Complete Bundle), 3 orders with licences.');
+    log('✅ Seeded: 1 publisher, 3 staff, 3 schools (15 users), 8 curricula with their grades, 27 subjects, academic calendar templates, 5 book packages, 5 products (incl. KG Complete Bundle), 3 orders with licences.');
   } finally {
     await pool.end();
   }

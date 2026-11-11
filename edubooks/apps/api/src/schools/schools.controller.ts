@@ -17,12 +17,14 @@ class CreateSchoolDto {
   @IsOptional() @IsString() @MaxLength(80) city?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
   @IsOptional() @IsString() @MaxLength(300) address?: string;
+  @IsOptional() @IsUUID() curriculumId?: string;
   @IsString() @Length(2, 120) adminName: string;
   @Matches(/^[a-z0-9._-]{3,40}$/, { message: 'Admin username: 3–40 lowercase letters, digits, dot, dash or underscore' }) adminUsername: string;
   @IsString() @Length(8, 200) adminPassword: string;
 }
 class UpdateSchoolDto {
   @IsOptional() @IsString() @Length(2, 160) name?: string;
+  @IsOptional() @IsUUID() curriculumId?: string | null;
   @IsOptional() @IsString() @MaxLength(80) city?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
   @IsOptional() @IsString() @MaxLength(300) address?: string;

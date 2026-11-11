@@ -21,6 +21,7 @@ export class SchoolsService {
     const where = w.length ? and(...w) : undefined;
     const items = await this.q.select({
       id: schools.id, name: schools.name, code: schools.code, city: schools.city, status: schools.status, isDemo: schools.isDemo, demoExpiresAt: schools.demoExpiresAt,
+      curriculumId: schools.curriculumId, curriculumName: sql<string | null>`(SELECT c.name FROM curricula c WHERE c.id = ${qc(schools.curriculumId)})`,
       createdAt: schools.createdAt,
       students: sql<number>`(SELECT count(*)::int FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role = 'STUDENT' WHERE u.school_id = ${qc(schools.id)})`,
       teachers: sql<number>`(SELECT count(*)::int FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role = 'TEACHER' WHERE u.school_id = ${qc(schools.id)})`,
@@ -32,12 +33,20 @@ export class SchoolsService {
     return { items, total: n, page: f.page, pageSize: f.pageSize };
   }
 
-  async create(d: { name: string; code: string; city?: string; phone?: string; address?: string; adminName: string; adminUsername: string; adminPassword: string }) {
+  /** The curriculum must be visible in this publisher (RLS); a foreign id is rejected. */
+  private async checkCurriculum(id?: string | null) {
+    if (!id) return;
+    const { rows } = await this.q.execute(sql`SELECT 1 FROM curricula WHERE id = ${id}`);
+    if (!rows.length) throw new BadRequestException('Unknown curriculum');
+  }
+
+  async create(d: { name: string; code: string; city?: string; phone?: string; address?: string; curriculumId?: string; adminName: string; adminUsername: string; adminPassword: string }) {
+    await this.checkCurriculum(d.curriculumId);
     const code = d.code.toUpperCase();
     const [dup] = await this.q.execute(sql`SELECT 1 FROM schools WHERE code = ${code}`).then((r) => r.rows);
     if (dup) throw new ConflictException(`School code ${code} is already taken`);
     const [s] = await this.q.insert(schools).values({
-      publisherId: this.db.ctx.publisherId, name: d.name.trim(), code, city: d.city, phone: d.phone, address: d.address, createdBy: this.db.ctx.userId,
+      publisherId: this.db.ctx.publisherId, name: d.name.trim(), code, city: d.city, phone: d.phone, address: d.address, curriculumId: d.curriculumId ?? null, createdBy: this.db.ctx.userId,
     }).returning();
     const [admin] = await this.users.create(s.id, 'SCHOOL_ADMIN', [{ displayName: d.adminName, username: d.adminUsername, password: d.adminPassword }]);
     await this.audit.log('school.create', 'school', s.id, `Registered school ${s.name} (${code})`, undefined, s, s.id);
@@ -52,12 +61,14 @@ export class SchoolsService {
       .from(users).where(and(eq(users.schoolId, id), sql`EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = ${qc(users.id)} AND r.role = 'SCHOOL_ADMIN')`));
     const roleCounts = await this.q.execute(sql`SELECT r.role::text AS role, count(*)::int AS n FROM users u JOIN user_roles r ON r.user_id = u.id WHERE u.school_id = ${id} GROUP BY r.role`);
     const licences = await this.licensing.dashboard(id);
-    return { ...s, academicYears: years, admins, counts: Object.fromEntries(roleCounts.rows.map((r: any) => [r.role, r.n])), licences };
+    const [cur] = s.curriculumId ? (await this.q.execute(sql`SELECT name, code FROM curricula WHERE id = ${s.curriculumId}`)).rows as any[] : [];
+    return { ...s, curriculumName: cur?.name ?? null, academicYears: years, admins, counts: Object.fromEntries(roleCounts.rows.map((r: any) => [r.role, r.n])), licences };
   }
 
-  async update(id: string, d: { name?: string; city?: string; phone?: string; address?: string }) {
+  async update(id: string, d: { name?: string; city?: string; phone?: string; address?: string; curriculumId?: string | null }) {
     const [before] = await this.q.select().from(schools).where(eq(schools.id, id));
     if (!before) throw new NotFoundException('School not found');
+    await this.checkCurriculum(d.curriculumId);
     const [row] = await this.q.update(schools).set({ ...d, updatedAt: new Date() }).where(eq(schools.id, id)).returning();
     await this.audit.log('school.update', 'school', id, `Updated profile of ${row.name}`, before, row, id);
     return row;

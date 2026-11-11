@@ -74,7 +74,7 @@ describe('Phase 1 — auth, roles, tenant isolation', () => {
       pub1 = (await owner.query(`SELECT id FROM publishers WHERE slug='demo'`)).rows[0].id;
       otherPub = (await owner.query(`INSERT INTO publishers(name, slug) VALUES ('Other Publisher','other') RETURNING id`)).rows[0].id;
       const g = (await owner.query(`INSERT INTO grades(publisher_id,name) VALUES ($1,'KG') RETURNING id`, [otherPub])).rows[0].id;
-      const s = (await owner.query(`INSERT INTO subjects(publisher_id,name) VALUES ($1,'Science') RETURNING id`, [otherPub])).rows[0].id;
+      const s = (await owner.query(`INSERT INTO subjects(publisher_id,name) VALUES ($1,'Other Pub Science') RETURNING id`, [otherPub])).rows[0].id;
       otherPkg = (await owner.query(`INSERT INTO book_packages(publisher_id,grade_id,subject_id,title,slug) VALUES ($1,$2,$3,'Secret Book','secret') RETURNING id`, [otherPub, g, s])).rows[0].id;
       sun = (await owner.query(`SELECT id FROM schools WHERE code='SUN01'`)).rows[0].id;
       gvs = (await owner.query(`SELECT id FROM schools WHERE code='GVS02'`)).rows[0].id;
