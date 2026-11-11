@@ -5,5 +5,6 @@ import { AiService } from './ai.service';
 import { IndexerService } from './indexer.service';
 import { AiProviderService } from './provider.service';
 import { RetrievalService } from './retrieval.service';
-@Module({ imports: [LmsModule], controllers: [AiController], providers: [AiService, IndexerService, AiProviderService, RetrievalService], exports: [IndexerService] })
+import { TutorController, TutorService } from './tutor';
+@Module({ imports: [LmsModule], controllers: [AiController, TutorController], providers: [AiService, IndexerService, AiProviderService, RetrievalService, TutorService], exports: [IndexerService] })
 export class AiModule {}

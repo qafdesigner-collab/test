@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { cn, ErrorBox, PageLoader, Spinner } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 import { HotspotLayer } from '@/components/hotspots';
+import { TutorPanel, useTutorStatus } from '@/components/tutor';
 import { useMe } from '@/lib/session';
 import { isSaved, offlinePdf, offlineSupported, removeBook, saveBook } from '@/lib/offline';
 
@@ -35,6 +36,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   const [full, setFull] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [editHot, setEditHot] = useState(false);
+  const [owl, setOwl] = useState(false);
   const [saved, setSaved] = useState(false); const [saving, setSaving] = useState<string | null>(null);
   useEffect(() => { isSaved(editionId).then(setSaved).catch(() => undefined); }, [editionId]);
   const toggleOffline = async () => {
@@ -51,6 +53,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   const kid = !!b?.student;
   const comps: any[] = b?.components ?? [];
   const comp = comps.find((c) => c.id === compId);
+  const tutor = useTutorStatus(kid);
   // Flipbook (HTML / Flash) or PDF view of the selected part.
   const [view, setView] = useState<'flip' | 'pdf'>('pdf');
   useEffect(() => { setView(comp?.flipbook ? 'flip' : 'pdf'); }, [comp?.id, comp?.flipbook]);
@@ -175,6 +178,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
         </>}
         {offlineSupported() && !canEditHot && <button className={cn(btn, 'w-auto px-2 text-sm font-medium', saved && 'text-emerald-700')} onClick={toggleOffline} aria-pressed={saved}
           title={saved ? 'Saved on this device. Click to remove.' : 'Save this book to read without internet'}>{saving ? `⬇ ${saving}` : saved ? '✅ Offline' : '⬇ Save offline'}</button>}
+        {kid && tutor.data?.enabled && !flipMode && comp?.hasPdf && <button className={cn(btn, 'w-auto bg-amber-100 px-3 text-base font-black text-amber-900')} onClick={() => setOwl(!owl)} aria-pressed={owl}>🦉 Ask Owl</button>}
         <button className={btn} onClick={toggleFull} aria-label={full ? 'Exit full screen' : 'Full screen'}>{full ? <Minimize className="size-5" /> : <Maximize className="size-5" />}</button>
       </header>
       <div className="flex min-h-0 flex-1">
@@ -214,7 +218,8 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
             : docError ? <div className="m-auto"><ErrorBox error={new Error(docError)} /></div>
               : <>{loadingDoc && <Spinner className="absolute left-1/2 top-1/2 size-8" />}<div className="relative"><canvas ref={canvas} className={cn('block bg-white shadow-xl', kid ? 'rounded-2xl' : 'rounded')} aria-label={`Page ${page} of ${pages}`} />{doc && comp && <HotspotLayer componentId={comp.id} page={page} editing={editHot} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} />}</div></>}
         </main>
-        {(lessonResources.length > 0 || lessonWork.length > 0 || lessonGames.length > 0 || (!kid && lessonHere)) && (
+        {owl && comp && <TutorPanel editionId={editionId} componentId={comp.id} page={page} onGo={go} onClose={() => setOwl(false)} />}
+        {!owl && (lessonResources.length > 0 || lessonWork.length > 0 || lessonGames.length > 0 || (!kid && lessonHere)) && (
           <aside className="hidden w-64 shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-3 text-sm xl:block">
             {!kid && lessonHere && <Link href={`/teacher/ai?editionId=${editionId}&lessonId=${lessonHere.id}`} className="mb-3 block rounded-lg bg-violet-50 px-3 py-2 font-medium text-violet-800 hover:bg-violet-100">✨ AI assistant for this lesson</Link>}
             {lessonWork.length > 0 && <><p className="pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{kid ? '📝 Homework' : 'Assigned work'}</p>

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftRight, School, BookOpen, GraduationCap, KeyRound, LayoutDashboard, LogOut, Menu, Users, CalendarDays, HeartHandshake, UserCheck, Clock, Award, LineChart, FileText, MessagesSquare } from 'lucide-react';
+import { ArrowLeftRight, School, BookOpen, GraduationCap, KeyRound, LayoutDashboard, LogOut, Menu, Users, CalendarDays, HeartHandshake, UserCheck, Clock, Award, LineChart, FileText, MessagesSquare, Bird } from 'lucide-react';
 import { api } from '@/lib/api';
 import { hasRole, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
@@ -14,6 +14,7 @@ const NAV = [
   { href: '/school', label: 'Overview', icon: LayoutDashboard, exact: true },
   { href: '/school/insights', label: 'Insights', icon: LineChart },
   { href: '/school/messages', label: 'Messages', icon: MessagesSquare },
+  { href: '/school/tutor', label: 'Ask Owl (AI tutor)', icon: Bird },
   { href: '/school/classes', label: 'Classes', icon: School },
   { href: '/school/attendance', label: 'Attendance', icon: UserCheck },
   { href: '/school/timetable', label: 'Timetable', icon: Clock },

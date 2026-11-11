@@ -183,6 +183,13 @@
       "when": 1794510000000,
       "tag": "0025_messaging",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794520000000,
+      "tag": "0026_tutor",
+      "breakpoints": true
     }
   ]
 }

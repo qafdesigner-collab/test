@@ -60,6 +60,10 @@ const AR: Record<string, string> = {
   'Say hello 👋': 'ألقِ التحية 👋', Message: 'الرسالة', 'Write a message…': 'اكتب رسالة…', Send: 'إرسال', 'Your child’s teachers and the school office.': 'معلمو طفلك وإدارة المدرسة.',
   'No teachers found for your child yet.': 'لم يتم العثور على معلمين لطفلك بعد.', Announcements: 'الإعلانات', 'Whole school': 'المدرسة كلها', 'Live lessons': 'الدروس المباشرة',
   Join: 'انضم', 'Opens 10 minutes before': 'يفتح قبل 10 دقائق', Messages: 'الرسائل', '💬 Messages': '💬 الرسائل', 'Online lesson': 'درس عبر الإنترنت',
+  "Hi! I'm Owl 🦉 I can explain this page, answer a question about your book, or give you a little quiz.": 'مرحبًا! أنا البومة 🦉 أستطيع شرح هذه الصفحة، أو الإجابة عن سؤال حول كتابك، أو إعطاؤك اختبارًا صغيرًا.',
+  'Explain this page': 'اشرح هذه الصفحة', 'Quiz me': 'اختبرني', 'Ask Owl': 'اسأل البومة', '{n} left today': 'باقي {n} اليوم', Close: 'إغلاق', 'Read to me': 'اقرأ لي',
+  'Owl is thinking…': 'البومة تفكر…', 'Type your question': 'اكتب سؤالك', 'Your question': 'سؤالك', 'Ask about your book…': 'اسأل عن كتابك…', Ask: 'اسأل',
+  'Owl only knows your book. Your teacher can see your questions.': 'البومة تعرف كتابك فقط. يستطيع معلمك رؤية أسئلتك.', 'Perfect! ⭐⭐⭐': 'ممتاز! ⭐⭐⭐', '{a} of {b} right — well done!': '{a} من {b} صحيحة — أحسنت!',
   // switch
   'العربية': 'العربية', English: 'English',
 };
