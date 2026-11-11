@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { FileUp, KeyRound, Plus, Trash2, UserCheck, UserX } from 'lucide-react';
+import { AlertTriangle, FileUp, KeyRound, Plus, Trash2, UserCheck, UserX } from 'lucide-react';
 import { api, fmtDay, qs } from '@/lib/api';
 import { useAction } from '@/lib/hooks';
 import { useMe } from '@/lib/session';
@@ -15,6 +15,7 @@ export function PeoplePage({ role }: { role: 'TEACHER' | 'STUDENT' }) {
   const [f, setF] = useState({ search: '', page: 1 });
   const q = useQuery({ queryKey: ['people', role, f], queryFn: () => api.get(`/school/users${qs({ role, ...f, pageSize: 50 })}`), placeholderData: keepPreviousData });
   const [dlg, setDlg] = useState<'' | 'add' | 'import'>(''); const [creds, setCreds] = useState<Credential[] | null>(null);
+  const [erase, setErase] = useState<{ id: string; displayName: string; username: string } | null>(null);
   const keys = ['people', 'schoolOverview', 'eligible'];
   const status = useAction((v: { id: string; status: string }) => api.patch(`/school/users/${v.id}`, { status: v.status }), { ok: 'Saved', keys });
   const reset = useAction((id: string) => api.post(`/school/users/${id}/reset-password`), { after: (r) => setCreds([{ displayName: r.username, username: r.username, password: r.password }]) });
@@ -37,6 +38,9 @@ export function PeoplePage({ role }: { role: 'TEACHER' | 'STUDENT' }) {
                   {u.id !== me?.id && (u.status === 'ACTIVE'
                     ? <Button size="sm" variant="ghost" onClick={() => status.mutate({ id: u.id, status: 'SUSPENDED' })} title="Suspend"><UserX className="size-4" /></Button>
                     : <Button size="sm" variant="ghost" onClick={() => status.mutate({ id: u.id, status: 'ACTIVE' })} title="Reactivate"><UserCheck className="size-4" /></Button>)}
+                  {role === 'STUDENT' && (
+                    <Button size="sm" variant="ghost" className="hover:bg-red-50 hover:text-red-700" onClick={() => setErase(u)} title="Erase all data" aria-label={`Erase all data of ${u.displayName}`}><Trash2 className="size-4" /></Button>
+                  )}
                 </Td></tr>
             ))}
           </Table>
@@ -45,6 +49,7 @@ export function PeoplePage({ role }: { role: 'TEACHER' | 'STUDENT' }) {
       )}
       {dlg === 'add' && <AddPeople role={role} onClose={() => setDlg('')} onCreated={setCreds} />}
       {dlg === 'import' && <ImportPeople role={role} onClose={() => setDlg('')} onCreated={setCreds} />}
+      {erase && <EraseStudent student={erase} onClose={() => setErase(null)} />}
       {creds && <CredentialsDialog title={`New ${noun} logins`} schoolCode={me?.school?.code} creds={creds} onClose={() => setCreds(null)} />}
     </div>
   );
@@ -81,6 +86,40 @@ function ImportPeople({ role, onClose, onCreated }: { role: 'TEACHER' | 'STUDENT
         <Field label="CSV file"><Input type="file" accept=".csv,text/csv,.txt" onChange={(e) => readFile(e.target.files?.[0])} /></Field>
         <Field label="…or paste" hint={`${csv.split(/\r?\n/).filter((l) => l.trim()).length} line(s)`}><Textarea rows={8} className="font-mono text-xs" value={csv} onChange={(e) => setCsv(e.target.value)} placeholder={'name,username\nAyesha Khan,ayesha\nBilal Ahmed,'} /></Field>
         <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button loading={m.isPending} disabled={!csv.trim()}>Import</Button></div>
+      </form>
+    </Dialog>
+  );
+}
+
+/** Right to erasure: permanent deletion of one student's personal data, confirmed by typing the username. */
+function EraseStudent({ student, onClose }: { student: { id: string; displayName: string; username: string }; onClose: () => void }) {
+  const [typed, setTyped] = useState('');
+  const matches = typed.trim().toLowerCase() === student.username.toLowerCase();
+  const m = useAction(() => api.post(`/school/users/${student.id}/erase`, { confirmUsername: typed }),
+    { ok: 'The student’s data was erased', keys: ['people', 'schoolOverview', 'eligible', 'schoolPools', 'schoolPool', 'classes'], after: onClose });
+  return (
+    <Dialog open onOpenChange={onClose} title="Erase this student’s data?" description="Use this only for a deletion (right to erasure) request from the child’s parent or guardian.">
+      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (matches) m.mutate(); }}>
+        <div role="alert" className="flex gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden />
+          <div className="space-y-2">
+            <p><strong>This cannot be undone.</strong> The account of <strong>{student.displayName}</strong> and all of their data will be permanently deleted:</p>
+            <ul className="list-disc space-y-0.5 pl-5">
+              <li>their login and class membership,</li>
+              <li>homework, quiz and test answers, marks and teacher evaluations,</li>
+              <li>reading progress, bookmarks, game scores and badges.</li>
+            </ul>
+            <p>Their book licence seat is freed and can be given to another student. Class reports will no longer include them.</p>
+            <p>If you only want to stop them signing in, <strong>suspend</strong> the account instead.</p>
+          </div>
+        </div>
+        <Field label={`Type the username “${student.username}” to confirm`}>
+          <Input autoFocus autoComplete="off" spellCheck={false} className="font-mono" aria-label="Username to confirm" value={typed} onChange={(e) => setTyped(e.target.value)} />
+        </Field>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="danger" loading={m.isPending} disabled={!matches}><Trash2 className="size-4" />Erase permanently</Button>
+        </div>
       </form>
     </Dialog>
   );

@@ -32,6 +32,7 @@ class UpdateUserDto {
   @IsOptional() @IsString() @Length(1, 120) displayName?: string;
   @IsOptional() @IsIn(['ACTIVE', 'SUSPENDED']) status?: 'ACTIVE' | 'SUSPENDED';
 }
+class EraseDto { @IsString() @Length(1, 40) confirmUsername: string; }
 class AssignDto { @IsArray() @ArrayMinSize(1) @ArrayMaxSize(1000) @IsUUID('all', { each: true }) userIds: string[]; }
 class TransferDto { @IsUUID() assignmentId: string; @IsUUID() toUserId: string; @IsString() @Length(3, 500) reason: string; }
 class ReasonDto { @IsOptional() @IsString() @MaxLength(500) reason?: string; }
@@ -71,6 +72,8 @@ export class SchoolAdminController {
   @Post('users') create(@Ctx() c: TenantCtx, @Body() d: CreateUsersDto) { return this.users.create(this.sid(c), d.role, d.users); }
   @Post('users/import') import(@Ctx() c: TenantCtx, @Body() d: ImportDto) { return this.users.create(this.sid(c), d.role, this.users.parseCsv(d.csv)); }
   @Patch('users/:id') update(@Ctx() c: TenantCtx, @Param('id', Id()) id: string, @Body() d: UpdateUserDto) { return this.users.update(this.sid(c), id, d); }
+  /** Right to erasure: permanently deletes a student's personal data. The body must repeat the username. */
+  @Post('users/:id/erase') erase(@Ctx() c: TenantCtx, @Param('id', Id()) id: string, @Body() d: EraseDto) { return this.users.eraseStudent(this.sid(c), id, d.confirmUsername); }
   @Post('users/:id/reset-password') reset(@Ctx() c: TenantCtx, @Param('id', Id()) id: string) { return this.users.resetPassword(this.sid(c), id); }
 
   @Get('pools') pools(@Ctx() c: TenantCtx) { return this.licensing.listPools({ schoolId: this.sid(c) }); }

@@ -85,6 +85,7 @@ export class SchoolsService {
   }
 
   async resetAdminPassword(schoolId: string, userId: string) { return this.users.resetPassword(schoolId, userId); }
+  async eraseStudent(schoolId: string, userId: string, confirmUsername: string) { return this.users.eraseStudent(schoolId, userId, confirmUsername); }
 
   /**
    * Sales demo: a ready-to-use trial school. Trial seats come from a TRIAL adjustment (traceable licence source),

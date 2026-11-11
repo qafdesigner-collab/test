@@ -40,6 +40,7 @@ class DemoDto {
   @Type(() => Number) @IsInt() @Min(1) @Max(60) days: number;
 }
 class ExtendDto { @Type(() => Number) @IsInt() @Min(1) @Max(60) days: number; }
+class EraseDto { @IsString() @Length(1, 40) confirmUsername: string; }
 class ReasonDto { @IsOptional() @IsString() @MaxLength(300) reason?: string; }
 const Id = () => new ParseUUIDPipe();
 const SALES = ['PUBLISHER_ADMIN', 'PUBLISHER_SALES'];
@@ -57,6 +58,7 @@ export class SchoolsController {
   @Roles('PUBLISHER_ADMIN') @Post(':id/reactivate') reactivate(@Param('id', Id()) id: string) { return this.svc.setStatus(id, 'ACTIVE'); }
   @Roles(...SALES) @Post(':id/academic-years') addYear(@Param('id', Id()) id: string, @Body() d: AcademicYearDto) { return this.svc.addAcademicYear(id, d); }
   @Roles('PUBLISHER_ADMIN') @Post(':id/admins/:userId/reset-password') reset(@Param('id', Id()) id: string, @Param('userId', Id()) userId: string) { return this.svc.resetAdminPassword(id, userId); }
+  @Roles('PUBLISHER_ADMIN') @Post(':id/students/:userId/erase') erase(@Param('id', Id()) id: string, @Param('userId', Id()) userId: string, @Body() d: EraseDto) { return this.svc.eraseStudent(id, userId, d.confirmUsername); }
   @Roles('PUBLISHER_ADMIN') @Post(':id/convert-demo') convert(@Param('id', Id()) id: string) { return this.svc.convertDemo(id); }
   @Roles(...SALES) @Post(':id/extend-demo') extend(@Param('id', Id()) id: string, @Body() d: ExtendDto) { return this.svc.extendDemo(id, d.days); }
 }

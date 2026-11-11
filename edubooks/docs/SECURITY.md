@@ -41,7 +41,10 @@ EduBooks holds children's data and paid publisher content. This page lists the p
 ## Children's privacy
 - Students need no email address or phone number: only a name, a username and a class.
 - Audit logs are append-only: the app role has no `UPDATE` or `DELETE` permission on them. They record admin actions, not children's activity.
-- Retention: learning records are kept for the school's use. A school can suspend a student's account at once. **Gap:** there is no in-app "delete this child's data" action yet. An erasure request currently needs a database operation by the publisher's technical team. Add a guided erasure feature before launching in places where the law requires one.
+- Retention: learning records are kept for the school's use. A school can suspend a student's account at once.
+- **Right to erasure:** a school admin (or the publisher admin, for any of its schools) can permanently delete a student's account and personal data from the Students page. They must type the student's username to confirm. In one transaction this deletes the account, sessions, roles, class enrolments, licence assignments and transfer requests, reading progress, bookmarks, submissions, evaluations, assessment targeting, game attempts and badges. The student's licence seat goes back to *available* so it can be given to another child. Nothing is kept under a placeholder name. The work is done by the narrow `erase_student` `SECURITY DEFINER` function, which checks the caller's role and school itself, and only works on accounts whose only role is `STUDENT`. The audit entry (`school.user.erase`) records only that an erasure happened, who did it and how many rows were removed. It has no name, username or id of the child.
+  Audit entries written *before* the erasure (for example "Created account …" or "Reset password of …") are append-only and are not rewritten, so they can still contain the username or name of the child.
+- *Tests:* `erasure.e2e.test.ts` (all data gone, seat freed and reassigned, other school / teacher / sales staff refused through the API and at the function itself, wrong confirmation refused, audit entry free of personal data).
 
 ## Dependencies
 - `npm audit --omit=dev` reports 0 vulnerabilities. CI fails on any *high* or *critical* finding. Next.js's bundled PostCSS is forced to a patched version with an npm `overrides` entry.

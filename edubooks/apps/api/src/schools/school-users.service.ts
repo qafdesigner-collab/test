@@ -98,6 +98,22 @@ export class SchoolUsersService {
     return { ok: true };
   }
 
+  /**
+   * Right to erasure: permanently deletes a student's account and personal data, and frees their licence seat.
+   * The caller must type the student's username to confirm. The work (and the audit entry, which holds no
+   * personal data) is done by the `erase_student` SECURITY DEFINER function, which re-checks who may do it.
+   */
+  async eraseStudent(schoolId: string, id: string, confirmUsername: string) {
+    const u = await this.user(schoolId, id);
+    const [{ roles }] = (await this.q.execute(sql`SELECT coalesce(array_agg(role::text), '{}') AS roles FROM user_roles WHERE user_id = ${id}`)).rows as any[];
+    if (roles.length !== 1 || roles[0] !== 'STUDENT') throw new BadRequestException('Only student accounts can be erased.');
+    if (confirmUsername.trim().toLowerCase() !== String(u.username).toLowerCase()) {
+      throw new BadRequestException('Type the student’s username exactly to confirm.');
+    }
+    const { rows } = await this.q.execute(sql`SELECT erase_student(${schoolId}, ${id}, ${confirmUsername}, ${this.db.ctx.ip ?? null}) AS removed`);
+    return { ok: true, removed: (rows[0] as any).removed as Record<string, number> };
+  }
+
   async resetPassword(schoolId: string, id: string) {
     const u = await this.user(schoolId, id);
     const password = friendlyPassword();
