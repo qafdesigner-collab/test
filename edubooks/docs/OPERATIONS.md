@@ -77,3 +77,50 @@ The API runs these every hour (`EXPIRY_JOB_MINUTES`):
 2. Read the API logs for errors (`"level":"error"`).
 3. Database full or slow? Check disk space and `pg_stat_activity`.
 4. Suspected data exposure? Suspend the affected accounts (sessions are revoked immediately). Check `audit_logs`, which is append-only. Then follow SECURITY.md.
+
+## Things to set up yourself (once)
+These protect the site but cannot be done from inside the app.
+
+### 1. Off-site backups (most important)
+The nightly backup stays on the same server. If the server fails, it is lost too.
+- **Simplest:** once a week, cPanel → **Backup** → *Download a Home Directory Backup* and keep it on a computer or Google Drive.
+- **Automatic:** cPanel → **Backup Wizard** or your host's *JetBackup*, if offered, with a remote destination. Or ask your host to add your account to their off-site backup plan.
+- Test a restore every few months on a staging copy (see *Restore* above). A backup you have never restored is a hope, not a backup.
+
+### 2. Uptime monitor
+Use a free monitor such as UptimeRobot or Better Stack:
+- URL: `https://lms.yourdomain.com/api/health/ready`, checked every 5 minutes.
+- Alert by e-mail and WhatsApp/SMS to the person who looks after the site.
+If it fails: Setup Node.js App → **Restart**, then read `stderr.log` (see *Troubleshooting* in the cPanel README).
+
+### 3. Real academic calendar dates
+The calendar ships with sample term dates. Before schools start: Publisher → **Academic Calendar** → change the templates to this year's real dates for each curriculum. Schools can add their own events on top.
+
+### 4. WhatsApp / SMS messages to parents
+Messages are always shown inside the app. To also send them to phones, add to `.env` and restart:
+
+| Setting | Value |
+|---|---|
+| `NOTIFY_CHANNEL` | `whatsapp`, `twilio` or `webhook` (empty = in-app only) |
+| WhatsApp Cloud API | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, optional `WHATSAPP_TEMPLATE` (+ `WHATSAPP_TEMPLATE_LANG`). Messages outside a 24-hour chat window need an approved template. |
+| Twilio SMS | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` |
+| Your own gateway | `NOTIFY_WEBHOOK_URL`, optional `NOTIFY_WEBHOOK_TOKEN` (receives JSON `{ to, text }`) |
+| `DEFAULT_COUNTRY_CODE` | Added to numbers that start with 0 (default `92`) |
+
+Check it with Publisher → **Messages** → *Send a test message*. Sent and failed messages are listed on the same page.
+
+### 5. AI assistant
+`.env`: `AI_PROVIDER=anthropic` and `AI_API_KEY=…` (or `openai-compatible` with `AI_BASE_URL` and `AI_MODEL`). Keep `AI_MONTHLY_REQUESTS_PER_SCHOOL` at a level you are happy to pay for. With `offline`, teachers still get draft templates without any cost.
+
+### 6. Trial with one or two schools first
+Before a wide launch: create the real schools, import pupils from Excel (Students → **Import Excel**), print the QR login cards and run for two to four weeks. Watch Publisher → **Usage Insights** and fix what teachers struggle with.
+
+### 7. When to move to a VPS
+Shared hosting is fine for a pilot and a few hundred pupils online at once. Move to a small VPS (2 vCPU, 4 GB RAM) with the Docker setup in DEPLOYMENT.md when:
+- pages slow down at school start times, or the app restarts because of memory limits;
+- you want virus scanning of uploads and OCR of scanned books;
+- you have more than about 10 active schools.
+To move: take the newest file from `backups/`; it is a standard PostgreSQL 16 data folder. Copy `storage/` as well.
+
+### 8. A staging copy for updates
+Keep a second subdomain (e.g. `staging.yourdomain.com`) installed from the same zip. Try every update there first, then on the live site.

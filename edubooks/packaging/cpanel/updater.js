@@ -22,7 +22,7 @@ const STATE = path.join(DIR, 'state.json');
 const HISTORY = path.join(DIR, 'history.json');
 const PENDING = path.join(DIR, 'pending-boot.json');
 // Everything that belongs to the program. Data (.env, pgdata, storage, backups, logs) is never touched.
-const PARTS = ['api', 'web', 'node_modules', 'runtime', 'app.js', 'embedded-db.js', 'updater.js', 'package.json', 'package-lock.json', 'README.md', 'BUILD_ID'];
+const PARTS = ['api', 'web', 'node_modules', 'runtime', 'app.js', 'embedded-db.js', 'updater.js', 'package.json', 'package-lock.json', 'README.md', 'WHATS-NEW.md', 'BUILD_ID'];
 const MAX_UNPACKED = 3 * 1024 ** 3;
 
 const readJson = (f, d = null) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
