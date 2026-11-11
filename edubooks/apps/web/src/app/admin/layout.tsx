@@ -3,10 +3,11 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays } from 'lucide-react';
+import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { isPublisherStaff, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
+import { NotificationBell } from '@/components/notifications';
 
 const A = 'PUBLISHER_ADMIN', E = 'PUBLISHER_EDITOR', S = 'PUBLISHER_SALES';
 const NAV = [
@@ -21,6 +22,7 @@ const NAV = [
   { href: '/admin/catalog', label: 'Curricula & Grades', icon: Tags, roles: [A, E] },
   { href: '/admin/calendar', label: 'Academic Calendar', icon: CalendarDays, roles: [A, E, S] },
   { href: '/admin/audit', label: 'Audit Log', icon: ScrollText, roles: [A, E, S] },
+  { href: '/admin/messages', label: 'Messages', icon: MessageCircle, roles: [A] },
   { href: '/admin/updates', label: 'Updates', icon: RefreshCw, roles: [A] },
 ];
 const NEXT: { label: string; icon: typeof BookOpen }[] = [];
@@ -61,6 +63,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <button className="focus-ring rounded-md p-2 lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="size-5" /></button>
           <div className="flex-1" />
           <div className="text-right text-sm leading-tight"><div className="font-medium text-slate-800">{me.displayName}</div><div className="text-xs text-slate-500">{me.roles.map((r) => r.replace('PUBLISHER_', '').toLowerCase()).join(', ')}</div></div>
+          <NotificationBell />
           <button onClick={logout} className="focus-ring rounded-md p-2 text-slate-500 hover:bg-slate-100" aria-label="Sign out" title="Sign out"><LogOut className="size-5" /></button>
         </header>
         <main className="mx-auto max-w-7xl p-4 lg:p-8">{children}</main>

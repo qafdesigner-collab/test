@@ -7,6 +7,7 @@ import { ArrowLeftRight, School, BookOpen, GraduationCap, KeyRound, LayoutDashbo
 import { api } from '@/lib/api';
 import { hasRole, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
+import { NotificationBell } from '@/components/notifications';
 
 const NAV = [
   { href: '/school', label: 'Overview', icon: LayoutDashboard, exact: true },
@@ -43,6 +44,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur lg:px-8">
           <button className="focus-ring rounded-md p-2 lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="size-5" /></button>
           <div className="flex-1" /><div className="text-right text-sm leading-tight"><div className="font-medium">{me.displayName}</div><div className="text-xs text-slate-500">School admin</div></div>
+          <NotificationBell />
           <button onClick={logout} className="focus-ring rounded-md p-2 text-slate-500 hover:bg-slate-100" aria-label="Sign out"><LogOut className="size-5" /></button>
         </header>
         <main className="mx-auto max-w-7xl p-4 lg:p-8">{children}</main>

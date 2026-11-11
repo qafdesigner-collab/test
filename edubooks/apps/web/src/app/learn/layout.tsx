@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { hasRole, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
+import { NotificationBell } from '@/components/notifications';
 
 const NAV = [
   { href: '/learn', label: 'Home', emoji: '🏠', color: 'bg-pink-600', exact: true },
@@ -28,6 +29,7 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
         <div className="flex-1" />
         <Link href="/learn/me" className="flex items-center gap-1 rounded-full bg-white px-4 py-2 text-xl font-black text-amber-600 shadow">⭐ {ach.data?.stars ?? '…'}</Link>
         {ach.data?.streak > 0 && <span className="hidden items-center gap-1 rounded-full bg-white px-4 py-2 text-xl font-black text-orange-600 shadow sm:flex" title="Days in a row">🔥 {ach.data.streak}</span>}
+        <NotificationBell playful />
         <button onClick={async () => { await api.post('/auth/logout'); qc.clear(); router.replace('/login'); }} className="focus-ring rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-500 shadow" aria-label="Sign out">👋 Bye</button>
       </header>
       <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 gap-2 bg-white/90 p-2 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur sm:static sm:mx-auto sm:mt-4 sm:max-w-5xl sm:bg-transparent sm:px-6 sm:shadow-none">

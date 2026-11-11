@@ -6,6 +6,7 @@ import { DbService } from '../db/db.service';
 import { calendarEvents, curricula, schools } from '../db/schema';
 import { AuditService } from '../audit/audit.service';
 import { Roles } from '../common/decorators';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export const CAL_KINDS = ['TERM', 'HOLIDAY', 'EXAM', 'EVENT', 'MEETING', 'SPORTS', 'OTHER'] as const;
 export class EventDto {
@@ -27,7 +28,7 @@ class RangeDto {
 
 @Injectable()
 export class CalendarService {
-  constructor(private readonly db: DbService, private readonly audit: AuditService) {}
+  constructor(private readonly db: DbService, private readonly audit: AuditService, private readonly notifications: NotificationsService) {}
   private get q() { return this.db.q; }
   private get staff() { return !!this.db.ctx.staff; }
 
@@ -74,7 +75,21 @@ export class CalendarService {
       title: d.title.trim(), kind: d.kind, startsOn: d.startsOn, endsOn: d.endsOn, description: d.description ?? '', createdBy: this.db.ctx.userId,
     }).returning();
     await this.audit.log('calendar.create', 'calendar_event', row.id, `Added “${row.title}” (${row.startsOn}) to the calendar`, undefined, row, row.schoolId);
+    if (row.schoolId && row.kind !== 'TERM') await this.announce(row);
     return row;
+  }
+
+  /** School events reach teachers and students in the app, and parents also by WhatsApp/SMS. */
+  private async announce(e: typeof calendarEvents.$inferSelect) {
+    const when = e.startsOn === e.endsOn ? e.startsOn : `${e.startsOn} – ${e.endsOn}`;
+    const msg = { kind: 'CALENDAR', title: `${e.title} (${when})`, body: e.description?.slice(0, 300) || 'Added to the school calendar.' };
+    const { rows: people } = await this.q.execute(sql`
+      SELECT u.id, u.phone, bool_or(r.role::text = 'PARENT') AS parent, bool_or(r.role::text = 'TEACHER') AS teacher FROM users u JOIN user_roles r ON r.user_id = u.id
+      WHERE u.school_id = ${e.schoolId} AND u.status = 'ACTIVE' AND r.role::text IN ('TEACHER', 'STUDENT', 'PARENT') GROUP BY u.id, u.phone`);
+    const all = people as any[];
+    await this.notifications.notify(all.filter((p) => p.teacher), { ...msg, link: '/teacher/calendar' });
+    await this.notifications.notify(all.filter((p) => !p.parent && !p.teacher), { ...msg, link: '/learn' });
+    await this.notifications.notify(all.filter((p) => p.parent), { ...msg, link: '/parent' }, { phone: true });
   }
 
   private async own(id: string) {

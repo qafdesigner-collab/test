@@ -13,7 +13,7 @@ const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull(
 const updatedAt = () => timestamp('updated_at', { withTimezone: true }).notNull().defaultNow();
 
 // ---------- enums ----------
-export const roleEnum = pgEnum('role', ['PUBLISHER_ADMIN', 'PUBLISHER_EDITOR', 'PUBLISHER_SALES', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT']);
+export const roleEnum = pgEnum('role', ['PUBLISHER_ADMIN', 'PUBLISHER_EDITOR', 'PUBLISHER_SALES', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT']);
 export const accountStatusEnum = pgEnum('account_status', ['ACTIVE', 'SUSPENDED', 'DISABLED']);
 export const contentStatusEnum = pgEnum('content_status', ['DRAFT', 'PUBLISHED', 'ARCHIVED']);
 export const componentTypeEnum = pgEnum('component_type', [
@@ -45,6 +45,7 @@ export const schools = pgTable('schools', {
   address: text('address'),
   phone: text('phone'),
   isDemo: boolean('is_demo').notNull().default(false),
+  notifySettings: jsonb('notify_settings').notNull().default({}),
   curriculumId: uuid('curriculum_id'), // FK to curricula (declared in SQL; curricula is defined further down)
   demoExpiresAt: timestamp('demo_expires_at', { withTimezone: true }),
   createdBy: uuid('created_by'),
@@ -60,6 +61,7 @@ export const users = pgTable('users', {
   username: citext('username').notNull(),
   displayName: text('display_name').notNull(),
   email: citext('email'),
+  phone: text('phone'),
   passwordHash: text('password_hash').notNull(),
   status: accountStatusEnum('status').notNull().default('ACTIVE'),
   mustChangePassword: boolean('must_change_password').notNull().default(false),
@@ -731,4 +733,44 @@ export const flipbookFiles = pgTable('flipbook_files', {
   sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
   mimeType: text('mime_type').notNull(),
 }, (t) => [primaryKey({ columns: [t.flipbookId, t.path] })]);
+
+// ---------- notifications ----------
+export const notifications = pgTable('notifications', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  kind: text('kind').notNull(),
+  title: text('title').notNull(),
+  body: text('body').notNull().default(''),
+  link: text('link'),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  createdAt: createdAt(),
+});
+
+export const messageOutbox = pgTable('message_outbox', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  kind: text('kind').notNull(),
+  channel: text('channel').notNull().default('AUTO'),
+  toAddress: text('to_address').notNull(),
+  body: text('body').notNull(),
+  status: text('status').notNull().default('PENDING'),
+  attempts: integer('attempts').notNull().default(0),
+  lastError: text('last_error'),
+  createdAt: createdAt(),
+  sentAt: timestamp('sent_at', { withTimezone: true }),
+});
+
+// ---------- parents ----------
+export const parentStudents = pgTable('parent_students', {
+  parentId: uuid('parent_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  studentId: uuid('student_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+  relation: text('relation').notNull().default('Parent'),
+  createdAt: createdAt(),
+}, (t) => [primaryKey({ columns: [t.parentId, t.studentId] })]);
 

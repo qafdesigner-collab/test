@@ -6,6 +6,7 @@ import {
   assessmentItems, assessmentStudents, assessments, bookComponents, bookLessons, bookUnits, classes, evaluations, lessonPlans, questionBank, submissions, subjects, users,
 } from '../db/schema';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { AccessService } from './access.service';
 import { AssessmentDto, EvaluationDto, GradeDto, ItemDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
 
@@ -49,7 +50,20 @@ export function mark(item: { type: string; answer: any; points: number; options:
 
 @Injectable()
 export class LmsService {
-  constructor(readonly db: DbService, private readonly audit: AuditService, private readonly access: AccessService) {}
+  constructor(readonly db: DbService, private readonly audit: AuditService, private readonly access: AccessService, private readonly notifications: NotificationsService) {}
+
+  /** Students (and, where linked, their parents) to tell about a piece of work. */
+  async notifyStudents(studentIds: string[], m: { kind: string; title: string; body?: string; link?: string; parentLink?: string }) {
+    if (!studentIds.length) return;
+    const arr = `{${studentIds.join(',')}}`; // uuids from the database
+    const kids = await this.q.execute(sql`SELECT id, phone FROM users WHERE id = ANY(${arr}::uuid[]) AND status = 'ACTIVE'`);
+    await this.notifications.notify(kids.rows as any[], m);
+    const parents = await this.q.execute(sql`
+      SELECT DISTINCT u.id, u.phone FROM parent_students ps JOIN users u ON u.id = ps.parent_id
+      WHERE ps.student_id = ANY(${arr}::uuid[]) AND u.status = 'ACTIVE'`);
+    if (parents.rows.length) await this.notifications.notify(parents.rows as any[], { ...m, link: m.parentLink ?? '/parent' }, { phone: true });
+  }
+
   private get q() { return this.db.q; }
   private get ctx() { return this.db.ctx; }
   private base() { return { publisherId: this.ctx.publisherId, schoolId: this.ctx.schoolId! }; }
@@ -219,6 +233,10 @@ export class LmsService {
     if (!items.length) throw new BadRequestException('Add at least one question before publishing.');
     await this.q.update(assessments).set({ status: 'PUBLISHED', publishedAt: new Date() }).where(eq(assessments.id, id));
     await this.audit.log('lms.assessment.publish', 'assessment', id, `Published “${a.title}” to the class`);
+    const targeted = (await this.q.select({ id: assessmentStudents.studentId }).from(assessmentStudents).where(eq(assessmentStudents.assessmentId, id))).map((r) => r.id);
+    const ids = targeted.length ? targeted : ((await this.q.execute(sql`SELECT student_id AS id FROM enrolments WHERE class_id = ${a.classId}`)).rows as any[]).map((r) => r.id);
+    const due = a.dueAt ? ` Due ${new Date(a.dueAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.` : '';
+    await this.notifyStudents(ids, { kind: 'HOMEWORK', title: `New ${String(a.kind).toLowerCase()}: ${a.title}`, body: `Your teacher has set new work.${due}`, link: `/homework/${id}` });
     return { ok: true };
   }
   async close(id: string) {
@@ -280,6 +298,9 @@ export class LmsService {
     await this.q.update(submissions).set({ answers, score: pending ? null : score, status, feedback: d.feedback ?? s.feedback, gradedAt: pending ? null : new Date(), gradedBy: this.ctx.userId })
       .where(eq(submissions.id, submissionId));
     await this.audit.log('lms.submission.grade', 'assessment', a.id, `Marked a submission for “${a.title}” (${pending ? 'partly' : `${score}/${s.maxScore}`})`);
+    if (!pending && (status === 'RETURNED' || !['GRADED', 'RETURNED'].includes(s.status))) {
+      await this.notifyStudents([s.studentId], { kind: 'RESULT', title: `Marked: ${a.title}`, body: `Score ${score} / ${s.maxScore}.${d.feedback ? ` Teacher: ${d.feedback.slice(0, 200)}` : ''}`, link: `/homework/${a.id}` });
+    }
     return { ok: true, score: pending ? null : score, status };
   }
 
