@@ -1,6 +1,8 @@
 # Deploying EduBooks LMS
 
-This guide sets up the complete system on one Linux server with Docker. For more schools, see **Scaling** at the end.
+This guide sets up the complete system on one Linux server with Docker.
+
+> **Shared hosting with cPanel?** Use the cPanel package instead: `npm run build:cpanel`, then follow [packaging/cpanel/README.md](../packaging/cpanel/README.md). It's a good fit for demos and a modest number of schools. OCR and malware scanning are only available if your host provides them. For more schools, see **Scaling** at the end.
 
 ## What you need
 - A Linux server (Ubuntu 24.04 or similar). A good start for a few hundred schools: **4 CPU, 8 GB RAM, 100 GB SSD**.

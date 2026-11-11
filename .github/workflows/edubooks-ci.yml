@@ -109,3 +109,16 @@ jobs:
         run: docker run --rm --entrypoint sh edubooks-api:ci -c "tesseract --list-langs | grep -q urd && pdftoppm -v"
       - run: docker compose -f compose.prod.yml config -q
         env: { DOMAIN: ci.example.com, POSTGRES_SUPERUSER_PASSWORD: x, DB_OWNER_PASSWORD: x, DB_APP_PASSWORD: x, FILE_URL_SECRET: x }
+
+  cpanel:
+    name: cPanel package
+    runs-on: ubuntu-24.04
+    needs: [api, web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: edubooks/package-lock.json }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build:cpanel
+      - uses: actions/upload-artifact@v4
+        with: { name: edubooks-lms-cpanel, path: edubooks/dist-cpanel/edubooks-lms-cpanel.zip }

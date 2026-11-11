@@ -1,7 +1,7 @@
 /* Production first-run setup: creates the publisher and its first admin account (no demo data).
  * Run as the OWNER role after migrations:
  *   PUBLISHER_NAME="Acme Books" ADMIN_USERNAME=admin node dist/db/setup.js
- * Prints a one-time password unless ADMIN_PASSWORD is given; the admin must change it at first sign-in.
+ * Prints a one-time password unless ADMIN_PASSWORD is given; the admin must change a generated password at first sign-in.
  * Safe to re-run: does nothing if a publisher already exists.
  */
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -29,7 +29,7 @@ async function main() {
       const [pub] = await tx.insert(s.publishers).values({ name, slug }).returning();
       const [u] = await tx.insert(s.users).values({
         publisherId: pub.id, username, displayName: process.env.ADMIN_DISPLAY_NAME || 'Publisher Admin',
-        passwordHash: await hashPassword(password), mustChangePassword: true,
+        passwordHash: await hashPassword(password), mustChangePassword: !process.env.ADMIN_PASSWORD,
       }).returning();
       await tx.insert(s.userRoles).values({ userId: u.id, role: 'PUBLISHER_ADMIN', publisherId: pub.id });
     });

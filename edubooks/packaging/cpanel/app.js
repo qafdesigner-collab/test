@@ -1,0 +1,288 @@
+/*
+ * EduBooks LMS — single-process entry for cPanel "Setup Node.js App" (Phusion Passenger).
+ * Serves the API (/api/*) and the website from one Node.js process.
+ * On first start (no install.lock) it runs a browser-based installer instead.
+ */
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const http = require('http');
+const crypto = require('crypto');
+const { execFile } = require('child_process');
+
+const ROOT = __dirname;
+const API = path.join(ROOT, 'api');
+const WEB = path.join(ROOT, 'web');
+const ENV_FILE = path.join(ROOT, '.env');
+const LOCK_FILE = path.join(ROOT, 'install.lock');
+const KEY_FILE = path.join(ROOT, 'install-key.txt');
+const MIN_NODE = 20;
+
+// ---------- .env loading ----------
+function parseEnv(text) {
+  const out = {};
+  for (const line of text.split(/\r?\n/)) {
+    const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
+    if (!m || line.trim().startsWith('#')) continue;
+    let v = m[2];
+    if (/^".*"$/.test(v)) v = JSON.parse(v); else if (/^'.*'$/.test(v)) v = v.slice(1, -1);
+    out[m[1]] = v;
+  }
+  return out;
+}
+function loadEnv() {
+  if (!fs.existsSync(ENV_FILE)) return;
+  const vars = parseEnv(fs.readFileSync(ENV_FILE, 'utf8'));
+  for (const [k, v] of Object.entries(vars)) if (process.env[k] === undefined) process.env[k] = v;
+}
+const q = (v) => JSON.stringify(String(v));
+
+// ---------- request handler (swapped from installer to the app after install) ----------
+let handler = (req, res) => { res.statusCode = 503; res.end('Starting…'); };
+const server = http.createServer((req, res) => handler(req, res));
+
+async function bootApp() {
+  loadEnv();
+  process.env.NODE_ENV = 'production';
+  // Apply any database changes shipped with an update (no-op when up to date).
+  await run(path.join(API, 'dist', 'db', 'migrate.js'), {});
+  const express = require('express');
+  const next = require('next');
+  const { NestFactory } = require('@nestjs/core');
+  const { ExpressAdapter } = require('@nestjs/platform-express');
+  const { AppModule } = require(path.join(API, 'dist', 'app.module'));
+  const { configureApp } = require(path.join(API, 'dist', 'main'));
+  const { JsonLogger } = require(path.join(API, 'dist', 'common', 'json-logger'));
+
+  const nextApp = next({ dev: false, dir: WEB });
+  await nextApp.prepare();
+  const handle = nextApp.getRequestHandler();
+
+  const ex = express();
+  // Website: everything that is not /api goes to Next.js (registered before the API routes).
+  ex.use((req, res, nxt) => (req.path === '/api' || req.path.startsWith('/api/') ? nxt() : handle(req, res)));
+  const app = configureApp(await NestFactory.create(AppModule, new ExpressAdapter(ex), { bodyParser: false, logger: new JsonLogger() }));
+  await app.init();
+  handler = ex;
+  console.log(JSON.stringify({ level: 'info', msg: 'EduBooks LMS started', node: process.version }));
+}
+
+// ---------- installer ----------
+function installKey() {
+  if (!fs.existsSync(KEY_FILE)) fs.writeFileSync(KEY_FILE, crypto.randomBytes(9).toString('base64url') + '\n', { mode: 0o600 });
+  return fs.readFileSync(KEY_FILE, 'utf8').trim();
+}
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function page(title, body) {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
+<style>
+:root{--brand:#4338ca;--ink:#1e293b;--muted:#475569;--bg:#f5f3ff}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:linear-gradient(135deg,#fef3c7,#e0e7ff 45%,#fce7f3);color:var(--ink);min-height:100vh}
+main{max-width:760px;margin:0 auto;padding:32px 16px}
+.card{background:#fff;border-radius:20px;box-shadow:0 10px 30px rgba(67,56,202,.12);padding:28px;margin-bottom:20px}
+h1{margin:0 0 4px;font-size:28px}h2{font-size:18px;margin:24px 0 8px;color:var(--brand)}p{color:var(--muted);line-height:1.5}
+label{display:block;font-weight:600;font-size:14px;margin:12px 0 4px}small{color:var(--muted);font-weight:400}
+input,select{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px}input:focus,select:focus{outline:3px solid #a5b4fc;border-color:var(--brand)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:560px){.row{grid-template-columns:1fr}}
+button{margin-top:24px;background:var(--brand);color:#fff;border:0;border-radius:12px;padding:14px 22px;font-size:16px;font-weight:700;cursor:pointer}
+.check{display:flex;gap:8px;align-items:flex-start;font-weight:400}.check input{width:auto;margin-top:3px}
+ul.res{list-style:none;padding:0}ul.res li{padding:8px 12px;border-radius:10px;margin:6px 0;background:#f8fafc}
+.ok{border-left:5px solid #15803d}.warn{border-left:5px solid #b45309}.err{border-left:5px solid #b91c1c}
+code{background:#eef2ff;padding:2px 6px;border-radius:6px}.logo{font-size:40px}
+</style></head><body><main>${body}</main></body></html>`;
+}
+
+function form(values = {}, errors = []) {
+  const v = (k, d = '') => esc(values[k] ?? d);
+  const host = values.siteUrl || '';
+  return page('Install EduBooks LMS', `
+<div class="card"><div class="logo">📚✨</div><h1>Install EduBooks LMS</h1>
+<p>This one-time setup connects the app to its database and creates your publisher account. It takes about a minute.</p>
+${errors.length ? `<ul class="res">${errors.map((e) => `<li class="err">${esc(e)}</li>`).join('')}</ul>` : ''}
+</div>
+<form method="post" action="/install" class="card">
+<h2>1. Installer key</h2>
+<label for="key">Installer key <small>— open <code>install-key.txt</code> in the app folder with cPanel File Manager</small></label>
+<input id="key" name="key" required autocomplete="off" value="${v('key')}">
+
+<h2>2. Website</h2>
+<label for="siteUrl">Website address</label>
+<input id="siteUrl" name="siteUrl" type="url" required placeholder="https://lms.yourdomain.com" value="${esc(host)}">
+
+<h2>3. PostgreSQL database <small>(cPanel → PostgreSQL Databases)</small></h2>
+<p>Create <strong>one database</strong> and <strong>two users</strong>, and add both users to the database with all privileges. The first user owns the tables. The app connects with the second user, so that row-level security keeps schools apart.</p>
+<div class="row"><div><label for="dbHost">Host</label><input id="dbHost" name="dbHost" required value="${v('dbHost', 'localhost')}"></div>
+<div><label for="dbPort">Port</label><input id="dbPort" name="dbPort" required value="${v('dbPort', '5432')}"></div></div>
+<label for="dbName">Database name</label><input id="dbName" name="dbName" required placeholder="cpuser_edubooks" value="${v('dbName')}">
+<div class="row"><div><label for="ownerUser">Owner user</label><input id="ownerUser" name="ownerUser" required placeholder="cpuser_owner" value="${v('ownerUser')}"></div>
+<div><label for="ownerPass">Owner password</label><input id="ownerPass" name="ownerPass" type="password" required></div></div>
+<div class="row"><div><label for="appUser">App user</label><input id="appUser" name="appUser" required placeholder="cpuser_app" value="${v('appUser')}"></div>
+<div><label for="appPass">App password</label><input id="appPass" name="appPass" type="password" required></div></div>
+
+<h2>4. Your publisher account</h2>
+<label for="publisher">Publisher name</label><input id="publisher" name="publisher" placeholder="Your Publishing House" value="${v('publisher')}">
+<div class="row"><div><label for="adminUser">Admin username</label><input id="adminUser" name="adminUser" pattern="[a-z0-9._-]{3,40}" value="${v('adminUser', 'admin')}"></div>
+<div><label for="adminPass">Admin password <small>(10+ characters)</small></label><input id="adminPass" name="adminPass" type="password" minlength="10"></div></div>
+<label class="check"><input type="checkbox" name="demo" value="1" ${values.demo ? 'checked' : ''}> <span>Instead, load <strong>demo data</strong> for trying the system: sample books, 3 schools, and accounts with well-known passwords. <strong>Do not use this for real schools.</strong></span></label>
+
+<h2>5. AI teaching assistant</h2>
+<label for="ai">AI provider</label>
+<select id="ai" name="ai"><option value="offline">Offline drafts (no AI service, free)</option><option value="anthropic" ${values.ai === 'anthropic' ? 'selected' : ''}>Claude (Anthropic API key)</option><option value="openai-compatible" ${values.ai === 'openai-compatible' ? 'selected' : ''}>Self-hosted model (OpenAI-compatible URL)</option></select>
+<label for="aiUrl">Model server URL <small>(self-hosted only, e.g. http://your-gpu-server:11434/v1)</small></label><input id="aiUrl" name="aiUrl" value="${v('aiUrl')}">
+<label for="aiKey">API key <small>(Claude or self-hosted, if needed)</small></label><input id="aiKey" name="aiKey" type="password" autocomplete="off">
+
+<button type="submit">Check and install 🚀</button>
+</form>`);
+}
+
+function readBody(req, limit = 64 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0; const chunks = [];
+    req.on('data', (c) => { size += c.length; if (size > limit) { reject(new Error('Too large')); req.destroy(); } else chunks.push(c); });
+    req.on('end', () => resolve(Object.fromEntries(new URLSearchParams(Buffer.concat(chunks).toString('utf8')))));
+    req.on('error', reject);
+  });
+}
+
+function run(script, env, args = []) {
+  return new Promise((resolve, reject) => {
+    execFile(process.execPath, [script, ...args], { cwd: path.dirname(script), env: { ...process.env, ...env }, timeout: 15 * 60_000, maxBuffer: 10 * 1024 * 1024 },
+      (err, stdout, stderr) => (err ? reject(new Error((stderr || stdout || err.message).trim().split('\n').slice(-6).join('\n'))) : resolve(stdout.trim())));
+  });
+}
+
+const dbUrl = (user, pass, f) => `postgres://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${f.dbHost}:${Number(f.dbPort) || 5432}/${encodeURIComponent(f.dbName)}`;
+
+/** Checks the server and database before anything is written. Returns [{level, text}]. */
+async function preflight(f) {
+  const out = []; const add = (level, text) => out.push({ level, text });
+  const major = Number(process.versions.node.split('.')[0]);
+  add(major >= MIN_NODE ? 'ok' : 'err', `Node.js ${process.version}${major >= MIN_NODE ? '' : ` — version ${MIN_NODE} or newer is needed (choose it in Setup Node.js App)`}`);
+  try { require.resolve('next'); require.resolve('@nestjs/core'); add('ok', 'Packages installed'); } catch { add('err', 'Packages are missing — click "Run NPM Install" in Setup Node.js App, then restart'); return out; }
+  const storage = path.join(ROOT, 'storage');
+  try { fs.mkdirSync(storage, { recursive: true }); fs.writeFileSync(path.join(storage, '.write-test'), 'ok'); fs.rmSync(path.join(storage, '.write-test')); add('ok', 'File storage folder is writable'); }
+  catch (e) { add('err', `Cannot write to ${storage}: ${e.message}`); }
+  if (f.ownerUser === f.appUser) add('err', 'The owner user and the app user must be two different users');
+  const { Client } = require('pg');
+  const owner = new Client({ connectionString: dbUrl(f.ownerUser, f.ownerPass, f), connectionTimeoutMillis: 8000 });
+  try {
+    await owner.connect();
+    const ver = Number((await owner.query('SHOW server_version_num')).rows[0].server_version_num);
+    add(ver >= 130000 ? 'ok' : 'err', `PostgreSQL ${Math.floor(ver / 10000)}${ver >= 130000 ? '' : ' — version 13 or newer is needed. Ask your host to upgrade.'}`);
+    for (const ext of ['pgcrypto', 'citext']) {
+      try { await owner.query(`CREATE EXTENSION IF NOT EXISTS ${ext}`); add('ok', `Extension ${ext}`); }
+      catch (e) { add('err', `Extension ${ext} could not be enabled (${e.message}). Ask your host to run: CREATE EXTENSION ${ext}; in database ${f.dbName}`); }
+    }
+    try { await owner.query('CREATE EXTENSION IF NOT EXISTS vector'); add('ok', 'Extension vector (semantic AI search)'); }
+    catch { add('warn', 'Extension vector is not available — optional. AI search uses full-text search instead.'); }
+    const canCreate = (await owner.query(`SELECT has_schema_privilege('public', 'CREATE') AS t, has_database_privilege(current_database(), 'CREATE') AS d`)).rows[0];
+    if (!canCreate.t || !canCreate.d) add('err', `The owner user "${f.ownerUser}" cannot create tables in this database. Use your main cPanel account user (it owns the database) as the owner user, or ask your host to run: GRANT CREATE ON SCHEMA public TO ${f.ownerUser};`);
+    const own = (await owner.query('SELECT rolsuper FROM pg_roles WHERE rolname = current_user')).rows[0];
+    if (own.rolsuper) add('warn', 'The owner user is a superuser. That works, but a normal user is safer.');
+    const existing = (await owner.query(`SELECT count(*)::int AS n FROM pg_tables WHERE schemaname = 'public'`)).rows[0].n;
+    const migrated = (await owner.query(`SELECT to_regclass('drizzle.__drizzle_migrations') IS NOT NULL AS m`)).rows[0].m;
+    if (existing && !migrated) add('err', `The database already contains ${existing} other tables. Use a new, empty database.`);
+    else if (migrated) add('warn', 'The database already has EduBooks tables — they will be upgraded, not erased.');
+  } catch (e) { add('err', `Cannot connect as the owner user: ${e.message}`); }
+  finally { await owner.end().catch(() => {}); }
+  const app = new Client({ connectionString: dbUrl(f.appUser, f.appPass, f), connectionTimeoutMillis: 8000 });
+  try {
+    await app.connect();
+    const r = (await app.query('SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user')).rows[0];
+    if (r.rolsuper || r.rolbypassrls) add('err', 'The app user must not be a superuser or bypass row-level security. Create a normal user for the app.');
+    else add('ok', 'App user is restricted (row-level security applies)');
+    if (!/^[a-z_][a-z0-9_]{0,62}$/.test(f.appUser)) add('err', 'The app user name must be lowercase letters, digits and underscores');
+  } catch (e) { add('err', `Cannot connect as the app user: ${e.message}`); }
+  finally { await app.end().catch(() => {}); }
+  for (const tool of ['pdftoppm', 'tesseract']) {
+    const found = (process.env.PATH || '').split(':').some((d) => d && fs.existsSync(path.join(d, tool)));
+    if (!found) { add('warn', 'OCR tools (pdftoppm, tesseract) are not installed. Scanned PDF pages cannot be read. Books with selectable text work normally.'); break; }
+  }
+  return out;
+}
+
+async function install(f) {
+  const https = /^https:/i.test(f.siteUrl);
+  const env = {
+    NODE_ENV: 'production',
+    DATABASE_OWNER_URL: dbUrl(f.ownerUser, f.ownerPass, f),
+    DATABASE_URL: dbUrl(f.appUser, f.appPass, f),
+    DB_APP_ROLE: f.appUser,
+    FILE_URL_SECRET: crypto.randomBytes(32).toString('base64url'),
+    COOKIE_SECURE: https ? '1' : '0',
+    STORAGE_DRIVER: 'local',
+    STORAGE_DIR: path.join(ROOT, 'storage'),
+    MAX_UPLOAD_MB: '100',
+    LOG_FORMAT: 'json',
+    // Shared hosting may hide client IPs behind the web server, so IP limits are generous; account lockout stops password guessing.
+    LOGIN_RATE_LIMIT: '600',
+    RATE_LIMIT_PER_IP_PER_MIN: '30000',
+    AI_PROVIDER: f.ai || 'offline',
+    ...(f.ai === 'openai-compatible' && f.aiUrl ? { AI_BASE_URL: f.aiUrl } : {}),
+    ...(f.aiKey ? { AI_API_KEY: f.aiKey } : {}),
+  };
+  const steps = [];
+  await run(path.join(API, 'dist', 'db', 'migrate.js'), env); steps.push('Database tables, security policies and functions created');
+  if (f.demo) {
+    await run(path.join(API, 'dist', 'db', 'seed.js'), env); steps.push('Demo data loaded (publisher admin: admin / Admin@12345 — change it)');
+  } else {
+    await run(path.join(API, 'dist', 'db', 'setup.js'), { ...env, PUBLISHER_NAME: f.publisher, ADMIN_USERNAME: f.adminUser || 'admin', ADMIN_PASSWORD: f.adminPass });
+    steps.push(`Publisher “${f.publisher}” and admin “${f.adminUser || 'admin'}” created`);
+  }
+  const text = '# Written by the EduBooks installer. Keep this file private.\n' + Object.entries(env).map(([k, v]) => `${k}=${q(v)}`).join('\n') + '\n';
+  fs.writeFileSync(ENV_FILE, text, { mode: 0o600 });
+  fs.writeFileSync(LOCK_FILE, `installed ${new Date().toISOString()}\n`, { mode: 0o600 });
+  fs.rmSync(KEY_FILE, { force: true });
+  return steps;
+}
+
+function installer() {
+  const key = installKey();
+  let busy = false;
+  return async (req, res) => {
+    const send = (code, html) => { res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer' }); res.end(html); };
+    const url = new URL(req.url, 'http://x');
+    if (url.pathname.startsWith('/api/')) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ statusCode: 503, message: 'EduBooks is not installed yet. Open the website to run the installer.' })); }
+    if (req.method !== 'POST' || url.pathname !== '/install') return send(200, form());
+    if (busy) return send(409, page('Installing', '<div class="card"><h1>Installation is already running…</h1><p>Wait a minute, then reload.</p></div>'));
+    let f;
+    try { f = await readBody(req); } catch { return send(413, form({}, ['Request too large'])); }
+    const a = Buffer.from(String(f.key || '').trim()); const b = Buffer.from(key);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return send(403, form(f, ['The installer key is not correct. Copy it from install-key.txt in the app folder.']));
+    const errors = [];
+    if (!f.demo) {
+      if (!f.publisher?.trim()) errors.push('Enter your publisher name (or choose demo data)');
+      if (!f.adminPass || f.adminPass.length < 10) errors.push('The admin password needs at least 10 characters');
+      if (!/^[a-z0-9._-]{3,40}$/.test(f.adminUser || 'admin')) errors.push('Admin username: 3–40 lowercase letters, digits, dot, dash or underscore');
+    }
+    if (f.ai === 'openai-compatible' && !/^https?:\/\//.test(f.aiUrl || '')) errors.push('Enter the model server URL for the self-hosted AI');
+    if (f.ai === 'anthropic' && !f.aiKey) errors.push('Enter the Anthropic API key, or choose Offline drafts');
+    if (errors.length) return send(400, form(f, errors));
+    busy = true;
+    try {
+      const checks = await preflight(f);
+      const list = `<ul class="res">${checks.map((c) => `<li class="${c.level}">${c.level === 'ok' ? '✅' : c.level === 'warn' ? '⚠️' : '❌'} ${esc(c.text)}</li>`).join('')}</ul>`;
+      if (checks.some((c) => c.level === 'err')) return send(400, form(f, ['Please fix the problems below and try again.', ...checks.filter((c) => c.level === 'err').map((c) => c.text)]));
+      const steps = await install(f);
+      send(200, page('EduBooks installed', `<div class="card"><div class="logo">🎉</div><h1>EduBooks is installed!</h1>${list}
+<ul class="res">${steps.map((s) => `<li class="ok">✅ ${esc(s)}</li>`).join('')}</ul>
+<p>The app is starting now. In a few seconds, <a href="/login">open the sign-in page</a> and choose <strong>Publisher staff</strong>.</p>
+<p>Next: set up a daily backup (see the README) and enable the <strong>AutoSSL</strong> certificate for this domain if it is not already active.</p></div>`));
+      bootApp().catch((e) => { console.error('Start failed after install:', e); handler = (rq, rs) => { rs.statusCode = 500; rs.end('EduBooks was installed but could not start. Restart the app in cPanel → Setup Node.js App, and check the log file.'); }; });
+    } catch (e) {
+      send(500, form(f, [`Installation failed: ${e.message}`]));
+    } finally { busy = false; }
+  };
+}
+
+// ---------- start ----------
+server.listen(process.env.PORT || 3000, () => console.log(`EduBooks listening (${fs.existsSync(LOCK_FILE) ? 'app' : 'installer'} mode)`));
+if (fs.existsSync(LOCK_FILE)) {
+  bootApp().catch((e) => {
+    console.error('EduBooks failed to start:', e);
+    handler = (req, res) => { res.statusCode = 500; res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.end('EduBooks could not start. Check the application log in cPanel (stderr.log) and the .env settings, then restart the app.'); };
+  });
+} else {
+  handler = installer();
+}
