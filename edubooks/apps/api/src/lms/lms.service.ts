@@ -6,6 +6,7 @@ import {
   assessmentItems, assessmentStudents, assessments, bookComponents, bookLessons, bookUnits, classes, evaluations, lessonPlans, questionBank, submissions, subjects, users,
 } from '../db/schema';
 import { AuditService } from '../audit/audit.service';
+import { examResultsFor } from '../exams/results';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AccessService } from './access.service';
 import { AssessmentDto, EvaluationDto, GradeDto, ItemDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
@@ -432,7 +433,8 @@ export class LmsService {
     const pages = await one(sql`SELECT coalesce(sum(max_page), 0)::int AS n FROM reader_progress WHERE user_id = ${studentId}`);
     const hasAtt = (await one(sql`SELECT to_regclass('attendance') IS NOT NULL AS ok`)).ok;
     const attendance = hasAtt ? (await this.q.execute(sql`SELECT status, count(*)::int AS n FROM attendance WHERE student_id = ${studentId} AND day > current_date - 365 GROUP BY status`)).rows : null;
-    return { school: school.name ? { name: school.name, code: school.code } : null, class: cls.name ? cls : null,
+    const exams = await examResultsFor(this.db, studentId);
+    return { school: school.name ? { name: school.name, code: school.code } : null, class: cls.name ? cls : null, exams,
       summary: { stars: games.stars ?? 0, badges: badges.n ?? 0, pagesRead: pages.n ?? 0, attendance } };
   }
 

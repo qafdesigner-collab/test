@@ -169,6 +169,13 @@
       "when": 1794490000000,
       "tag": "0023_games_hotspots",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794500000000,
+      "tag": "0024_exams",
+      "breakpoints": true
     }
   ]
 }

@@ -67,6 +67,9 @@ export function printReportCards(reports: any[], brand: Branding, o: ReportOptio
         ${subjects.map((b: any) => { const g = gradeFor(b.percent)!; return `<tr><td><b>${esc(b.subject)}</b></td><td>${b.percent}%</td><td><div class="meter"><i style="width:${Math.min(100, b.percent)}%"></i></div></td><td><span class="grade">${g[1]}</span></td><td>${g[2]}</td></tr>`; }).join('')}
         ${subjects.length ? `<tr><td><b>Overall</b></td><td><b>${overall}%</b></td><td></td><td><span class="grade">${gradeFor(overall)![1]}</span></td><td>${gradeFor(overall)![2]}</td></tr>` : '<tr><td colspan="5" class="muted">No marked work yet.</td></tr>'}</table>
         <p class="legend">Grades: ${GRADE_BANDS.map(([m, g]) => (m ? `${g} ${m}%+` : `${g} below 50%`)).join(' · ')}. Scores come from marked homework and tests.</p></div>
+      ${(() => { const ex = (r.exams ?? []).filter((x: any) => !o.term || !x.term || x.term === o.term); return ex.length ? `<div><h2>Exam results</h2><table><tr><th>Exam</th><th>Subject</th><th>Marks</th><th>%</th><th>Grade</th></tr>
+        ${ex.map((x: any) => { const pc = x.absent || x.marks === null || !x.total ? null : Math.round((x.marks / x.total) * 100); const g = gradeFor(pc);
+          return `<tr><td><b>${esc(x.title)}</b>${x.remarks ? `<br><span class="muted">${esc(x.remarks)}</span>` : ''}</td><td>${esc(x.subject ?? '')}</td><td>${x.absent ? 'Absent' : `${x.marks} / ${x.total}`}</td><td>${pc === null ? '—' : pc + '%'}</td><td>${g ? `<span class="grade">${g[1]}</span>` : '—'}</td></tr>`; }).join('')}</table></div>` : ''; })()}
       <div class="cols">
         <div><h2>Skills</h2><table><tr><th>Skill</th><th>Rating</th><th>Teacher's note</th></tr>
           ${[...latest.values()].map((e) => `<tr><td><b>${esc(e.skill)}</b>${e.subject ? `<br><span class="muted">${esc(e.subject)}</span>` : ''}</td><td class="stars">${'★'.repeat(e.rating)}${'☆'.repeat(5 - e.rating)}</td><td>${esc(e.remarks)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">No skill ratings for this term.</td></tr>'}</table></div>
@@ -116,4 +119,51 @@ export function printCertificates(names: string[], brand: Branding, o: Certifica
       <div class="foot"><div class="sig"><b>${esc(o.signer ?? '')}</b>Teacher</div><div class="seal">★</div><div class="sig"><b>${esc(o.signer2 ?? '')}</b>Principal · ${esc(o.date || today())}</div></div>
     </div></section>`);
   return openDoc(o.title, css, pages.join(''), true);
+}
+
+const ROMAN = 'ABCDEFGH';
+/** Shuffle with a fixed seed so Version B is the same every time it is printed. */
+function seeded<T>(a: T[], seed: number): T[] { const b = [...a]; let s = seed; for (let i = b.length - 1; i > 0; i--) { s = (s * 9301 + 49297) % 233280; const j = Math.floor((s / 233280) * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; }
+
+export interface ExamPrint { title: string; term?: string; examDate?: string | null; durationMin: number; instructions: string; total: number; school?: string; className?: string; classSection?: string; subject?: string | null;
+  items: { id: string; section: string; type: string; prompt: string; options: string[]; answer: any[]; marks: number; lines: number }[] }
+
+/** A4 question paper (or its answer key). Version B shuffles questions within each section and the MCQ choices. */
+export function printExamPaper(e: ExamPrint, brand: Branding, o: { key?: boolean; version?: 'A' | 'B' } = {}) {
+  const p = palette(brand.primaryColor); const B = o.version === 'B';
+  const sections = [...new Set(e.items.map((i) => i.section))].sort();
+  let n = 0;
+  const body = sections.map((sec, si) => {
+    let items = e.items.filter((i) => i.section === sec);
+    if (B) items = seeded(items, 7 + si);
+    const marks = items.reduce((s, i) => s + i.marks, 0);
+    return `<div class="sec"><h2>Section ${esc(sec)} <span>(${marks} mark${marks === 1 ? '' : 's'})</span></h2>${items.map((it) => {
+      n++;
+      let opts = it.options.map((t, k) => ({ t, k })); if (B && it.type === 'MCQ') opts = seeded(opts, n * 31);
+      const right = it.type === 'MCQ' ? opts.findIndex((x) => x.k === it.answer?.[0]) : -1;
+      const ans = it.type === 'MCQ' ? `${ROMAN[right] ?? '?'}) ${esc(opts[right]?.t ?? '')}` : it.type === 'TRUE_FALSE' ? (it.answer?.[0] ? 'True' : 'False') : (it.answer ?? []).map(esc).join(' / ') || '<i>Teacher to mark</i>';
+      return `<div class="q"><div class="qh"><b>${n}.</b> <span class="pr">${esc(it.prompt).replace(/_{3,}/g, '<span class="blank"></span>')}</span><span class="mk">[${it.marks}]</span></div>
+        ${o.key ? `<div class="ans">✔ ${ans}</div>` : it.type === 'MCQ' ? `<div class="opts">${opts.map((x, k) => `<span>${ROMAN[k]}) ${esc(x.t)}</span>`).join('')}</div>`
+          : it.type === 'TRUE_FALSE' ? '<div class="opts"><span>☐ True</span><span>☐ False</span></div>'
+          : it.lines ? `<div class="lines">${'<i></i>'.repeat(it.lines)}</div>` : ''}</div>`;
+    }).join('')}</div>`;
+  }).join('');
+  const css = `.sheet{height:auto;min-height:297mm;padding:14mm 16mm;font-size:13px;line-height:1.45}
+    .top{display:flex;align-items:center;gap:4mm;border-bottom:2.5px solid ${p[600]};padding-bottom:3mm} .logo{height:14mm;max-width:40mm;object-fit:contain} .logo-txt{font-size:30px}
+    .top h1{margin:0;font-size:18px;color:${p[800]}} .top .sub{color:#475569;font-size:12px} .ver{margin-left:auto;text-align:right;font-weight:800;color:${p[700]}}
+    .meta{display:grid;grid-template-columns:repeat(4,1fr);gap:1mm 4mm;margin:3mm 0;font-size:12px} .meta b{display:block;font-size:13px}
+    .who{display:grid;grid-template-columns:2fr 1fr 1fr;gap:6mm;margin:3mm 0 4mm} .who div{border-bottom:1px solid #64748b;padding-top:5mm;font-size:11px;color:#475569}
+    .ins{background:${p[50]};border-radius:2mm;padding:2mm 3mm;margin-bottom:3mm;white-space:pre-wrap}
+    .sec h2{font-size:14px;margin:5mm 0 2mm;color:${p[700]};border-bottom:1px solid #e2e8f0;padding-bottom:1mm} .sec h2 span{font-weight:400;color:#475569;font-size:12px}
+    .q{margin:0 0 3.5mm;break-inside:avoid} .qh{display:flex;gap:2mm} .pr{flex:1;white-space:pre-wrap} .mk{color:#475569;white-space:nowrap}
+    .blank{display:inline-block;width:28mm;border-bottom:1px solid #334155;margin:0 1mm}
+    .opts{display:grid;grid-template-columns:1fr 1fr;gap:1mm 6mm;margin:1.5mm 0 0 6mm} .lines{margin:1mm 0 0 6mm} .lines i{display:block;border-bottom:1px solid #cbd5e1;height:7.5mm}
+    .ans{margin:1mm 0 0 6mm;color:#047857;font-weight:600} .end{text-align:center;margin-top:6mm;color:#475569;font-size:12px}`;
+  const head = `<div class="top">${brandHead(brand)}<div><h1>${esc(e.school ?? brand.name)}</h1><div class="sub">${esc([e.term, e.subject].filter(Boolean).join(' · '))}</div></div>
+    <div class="ver">${o.key ? 'ANSWER KEY' : ''}${o.version ? `<br>Version ${o.version}` : ''}</div></div>
+    <div class="meta"><div>Paper<b>${esc(e.title)}</b></div><div>Class<b>${esc([e.className, e.classSection].filter(Boolean).join(' — '))}</b></div>
+      <div>Time<b>${e.durationMin} minutes</b></div><div>Total marks<b>${e.total}</b></div></div>
+    ${o.key ? '' : `<div class="who"><div>Name</div><div>Roll no.</div><div>Date${e.examDate ? `: ${new Date(e.examDate + 'T12:00:00').toLocaleDateString()}` : ''}</div></div>`}
+    ${e.instructions && !o.key ? `<div class="ins"><b>Instructions:</b> ${esc(e.instructions)}</div>` : ''}`;
+  return openDoc(`${e.title}${o.key ? ' — answer key' : ''}${o.version ? ` (Version ${o.version})` : ''}`, css, `<section class="sheet">${head}${body}<div class="end">— End of paper —</div></section>`);
 }

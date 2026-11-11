@@ -28,6 +28,7 @@ import { SalesModule } from './sales/sales.controller';
 import { AttendanceModule } from './attendance/attendance.controller';
 import { TrainingModule } from './training/training.controller';
 import { AnalyticsModule } from './analytics/analytics.controller';
+import { ExamsModule } from './exams/exams.controller';
 import { AllExceptionsFilter } from './common/pg-exception.filter';
 
 /** Throttle key: the session cookie (hashed) when present, otherwise the client IP. */
@@ -45,7 +46,7 @@ function sessionOrIp(req: any) {
       { name: 'ip', ttl: 60_000, limit: Number(process.env.RATE_LIMIT_PER_IP_PER_MIN || 5000), getTracker: (req: any) => req.ip },
     ]),
     DbModule, AuditModule, AuthModule, StorageModule, CatalogModule, PublishingModule,
-    CommerceModule, LicensingModule, SchoolsModule, SchoolAdminModule, LmsModule, AiModule, GamesModule, SystemModule, CalendarModule, FlipbookModule, NotificationsModule, ParentsModule, BrandingModule, SalesModule, AttendanceModule, TrainingModule, AnalyticsModule,
+    CommerceModule, LicensingModule, SchoolsModule, SchoolAdminModule, LmsModule, AiModule, GamesModule, SystemModule, CalendarModule, FlipbookModule, NotificationsModule, ParentsModule, BrandingModule, SalesModule, AttendanceModule, TrainingModule, AnalyticsModule, ExamsModule,
   ],
   controllers: [HealthController],
   providers: [

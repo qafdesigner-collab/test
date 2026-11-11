@@ -110,7 +110,7 @@ export class ParentsService {
       ? (await this.q.execute(sql`SELECT status, count(*)::int AS n FROM attendance WHERE student_id = ${childId} AND day > current_date - 30 GROUP BY status`)).rows
       : null;
     return {
-      student: report.student, school: report.school, class: report.class, summary: report.summary, work: report.work, evaluations: report.evaluations.map(({ mine, ...e }: any) => e), bySubject: report.bySubject,
+      student: report.student, school: report.school, class: report.class, summary: report.summary, exams: report.exams, work: report.work, evaluations: report.evaluations.map(({ mine, ...e }: any) => e), bySubject: report.bySubject,
       stars: games.stars, gamesPlayed: games.played, badges: badges.map((b: any) => ({ ...b, ...(BADGES[b.badge] ?? { label: b.badge, emoji: '🏅' }) })),
       reading, activeDays: days.map((d: any) => d.day), attendance,
     };
