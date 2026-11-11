@@ -3,6 +3,8 @@ import { Copy, Download, Printer } from 'lucide-react';
 import { downloadCsv } from '@/lib/api';
 import { Badge, Button, Card, Dialog, cn } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
+import { printLoginCards } from '@/lib/login-cards';
+import { useMe } from '@/lib/session';
 
 export function PageHeader({ title, sub, children }: { title: string; sub?: string; children?: React.ReactNode }) {
   return (
@@ -53,18 +55,12 @@ export function Table({ head, children, empty }: { head: React.ReactNode[]; chil
 }
 export const Td = ({ children, className }: { children?: React.ReactNode; className?: string }) => <td className={cn('px-4 py-3 align-middle', className)}>{children}</td>;
 
-export interface Credential { role?: string; displayName: string; username: string; password: string }
+export interface Credential { role?: string; displayName: string; username: string; password: string; className?: string | null }
 /** Shows freshly generated logins ONCE, with print / CSV / copy. */
 export function CredentialsDialog({ title, schoolCode, creds, onClose, note }: { title: string; schoolCode?: string; creds: Credential[]; onClose: () => void; note?: string }) {
   const toast = useToast();
-  const print = () => {
-    const w = window.open('', '_blank'); if (!w) return;
-    const rows = creds.map((c) => `<div class="card"><b>${escapeHtml(c.displayName)}</b>${c.role ? ` <small>(${escapeHtml(c.role)})</small>` : ''}<br>
-      School code: <b>${escapeHtml(schoolCode ?? '')}</b><br>Username: <b>${escapeHtml(c.username)}</b><br>Password: <b>${escapeHtml(c.password)}</b></div>`).join('');
-    w.document.write(`<!doctype html><title>Login cards</title><style>body{font-family:system-ui;padding:16px}.card{display:inline-block;width:44%;margin:1%;padding:14px;border:2px dashed #94a3b8;border-radius:12px;font-size:15px;line-height:1.7;vertical-align:top}</style>
-      <h2>${escapeHtml(title)}</h2><p>Sign in at ${escapeHtml(location.origin)}</p>${rows}<script>print()</script>`);
-    w.document.close();
-  };
+  const { data: me } = useMe();
+  const print = () => printLoginCards(creds, { code: schoolCode, name: me?.school?.name }).catch((e) => toast(e.message, 'err'));
   const text = creds.map((c) => `${c.displayName}${c.role ? ` (${c.role})` : ''} — school code ${schoolCode ?? ''}, username ${c.username}, password ${c.password}`).join('\n');
   return (
     <Dialog open onOpenChange={onClose} title={title} description={note ?? 'Passwords are shown only now. Print or download them before closing.'} wide>

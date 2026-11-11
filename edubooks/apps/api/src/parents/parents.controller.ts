@@ -10,6 +10,7 @@ import { LmsService } from '../lms/lms.service';
 import { LmsModule } from '../lms/lms.module';
 import { SchoolsModule } from '../schools/schools.module';
 import { BADGES } from '../games/engines';
+import { StudentImportController, StudentImportService } from './import';
 
 class AddParentDto {
   /** Link an existing parent account (e.g. a sibling's parent) instead of creating one. */
@@ -129,5 +130,5 @@ export class ParentsController {
   @Roles('PARENT') @Get('parent/children/:id') child(@Param('id', ParseUUIDPipe) id: string) { return this.svc.child(id); }
 }
 
-@Module({ imports: [LmsModule, SchoolsModule], controllers: [ParentsController], providers: [ParentsService] })
+@Module({ imports: [LmsModule, SchoolsModule], controllers: [ParentsController, StudentImportController], providers: [ParentsService, StudentImportService] })
 export class ParentsModule {}

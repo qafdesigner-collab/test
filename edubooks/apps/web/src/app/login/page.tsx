@@ -10,7 +10,8 @@ import { Button, ErrorBox, Field, Input } from '@/components/ui';
 function LoginForm() {
   const router = useRouter(); const params = useSearchParams(); const qc = useQueryClient();
   const [staff, setStaff] = useState(false);
-  const [form, setForm] = useState({ schoolCode: '', username: '', password: '' });
+  // QR login cards open /login?school=CODE&u=username with these filled in
+  const [form, setForm] = useState({ schoolCode: params.get('school') ?? '', username: params.get('u') ?? '', password: '' });
   const [error, setError] = useState<unknown>(null); const [busy, setBusy] = useState(false);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setError(null);

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Eraser, FileUp, KeyRound, Plus, Trash2, UserCheck, UserX, Users } from 'lucide-react';
 import { ParentsDialog } from '@/components/parents';
+import { StudentImport } from '@/components/student-import';
 import { api, fmtDay, qs } from '@/lib/api';
 import { useAction } from '@/lib/hooks';
 import { useMe } from '@/lib/session';
@@ -23,7 +24,7 @@ export function PeoplePage({ role }: { role: 'TEACHER' | 'STUDENT' }) {
   return (
     <div className="space-y-6">
       <PageHeader title={role === 'TEACHER' ? 'Teachers' : 'Students'} sub={`Every ${noun} has their own login. Usernames are unique within your school.`}>
-        <Button variant="secondary" onClick={() => setDlg('import')}><FileUp className="size-4" />Import CSV</Button>
+        <Button variant="secondary" onClick={() => setDlg('import')}><FileUp className="size-4" />{role === 'STUDENT' ? 'Import Excel' : 'Import CSV'}</Button>
         <Button onClick={() => setDlg('add')}><Plus className="size-4" />Add {noun}s</Button>
       </PageHeader>
       <Input className="max-w-xs" placeholder="Search name or username…" aria-label="Search" value={f.search} onChange={(e) => setF({ search: e.target.value, page: 1 })} />
@@ -48,7 +49,7 @@ export function PeoplePage({ role }: { role: 'TEACHER' | 'STUDENT' }) {
         </>
       )}
       {dlg === 'add' && <AddPeople role={role} onClose={() => setDlg('')} onCreated={setCreds} />}
-      {dlg === 'import' && <ImportPeople role={role} onClose={() => setDlg('')} onCreated={setCreds} />}
+      {dlg === 'import' && (role === 'STUDENT' ? <StudentImport onClose={() => setDlg('')} onCreated={setCreds} /> : <ImportPeople role={role} onClose={() => setDlg('')} onCreated={setCreds} />)}
       {eraseFor && <EraseDialog student={eraseFor} onClose={() => setEraseFor(null)} />}
       {parentsFor && <ParentsDialog student={parentsFor} onClose={() => setParentsFor(null)} />}
       {creds && <CredentialsDialog title={`New ${noun} logins`} schoolCode={me?.school?.code} creds={creds} onClose={() => setCreds(null)} />}
