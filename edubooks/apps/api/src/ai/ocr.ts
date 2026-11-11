@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { config } from '../config';
+import { appTmp } from '../common/tmp';
 
 function run(cmd: string, args: string[], timeout: number): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -36,7 +37,7 @@ export async function ocrPages(file: string, pageNumbers: number[], onProgress?:
   const { ok, langs } = await ocrAvailable();
   const out = new Map<number, string>();
   if (!ok) return out;
-  const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ocr-'));
+  const dir = await fs.promises.mkdtemp(path.join(appTmp(), 'ocr-'));
   const queue = pageNumbers.slice(0, config.ocr.maxPages);
   let done = 0;
   try {

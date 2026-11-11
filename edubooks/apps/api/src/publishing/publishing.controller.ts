@@ -7,6 +7,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { randomBytes } from 'crypto';
 import { ManualTx, PUBLISHER_STAFF, Roles } from '../common/decorators';
+import { appTmp } from '../common/tmp';
 import { DbService } from '../db/db.service';
 import { config } from '../config';
 import { PublishingService } from './publishing.service';
@@ -16,8 +17,7 @@ import {
   UpdateComponentDto, UpdateEditionDto, UpdateLessonDto, UpdatePackageDto, UpdateResourceDto, UploadResourcesDto,
 } from './publishing.dto';
 
-const TMP = path.join(os.tmpdir(), 'edubooks-uploads');
-fs.mkdirSync(TMP, { recursive: true });
+const TMP = appTmp('uploads');
 const uploadOpts = {
   storage: diskStorage({ destination: TMP, filename: (_r: any, _f: any, cb: any) => cb(null, randomBytes(16).toString('hex')) }),
   limits: { fileSize: config.maxUploadMb * 1024 * 1024, files: 20 },

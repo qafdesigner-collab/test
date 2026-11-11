@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import { AssetsService } from '../storage/assets.service';
 import { AccessService } from '../lms/access.service';
 import { safeUnzip } from './safe-unzip';
+import { appTmp } from '../common/tmp';
 
 /** File types a flipbook may contain. Anything else (programs, server scripts…) is left out. */
 export const FLIP_MIME: Record<string, string> = {
@@ -33,7 +34,7 @@ export class FlipbookService {
 
   // ---------------------------------------------------------------- upload (publisher staff)
   async upload(componentId: string, file: { path: string; originalname: string; size: number }) {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'flip-'));
+    const tmp = fs.mkdtempSync(path.join(appTmp(), 'flip-'));
     try {
       const [c] = await this.q.select({ id: bookComponents.id, title: bookComponents.title, editionId: bookComponents.editionId, publisherId: bookComponents.publisherId })
         .from(bookComponents).where(eq(bookComponents.id, componentId));

@@ -12,6 +12,7 @@ import { AssetsService } from '../storage/assets.service';
 import { extractPdfPages } from './extract';
 import { ocrAvailable, ocrPages } from './ocr';
 import { AiProviderService } from './provider.service';
+import { appTmp } from '../common/tmp';
 
 /** Builds the searchable text index of a book part (book_pages) from its PDF. */
 @Injectable()
@@ -44,7 +45,7 @@ export class IndexerService {
     const [c] = await this.db.q.select().from(bookComponents).where(eq(bookComponents.id, componentId)).for('update');
     if (!c?.bookAssetId) throw new NotFoundException('This part has no book PDF');
     const [asset] = await this.db.q.select().from(digitalAssets).where(eq(digitalAssets.id, c.bookAssetId));
-    const tmp = path.join(os.tmpdir(), `idx-${randomBytes(8).toString('hex')}.pdf`);
+    const tmp = path.join(appTmp(), `idx-${randomBytes(8).toString('hex')}.pdf`);
     try {
       await pipeline(await this.assets.driver.read(asset.storageKey), fs.createWriteStream(tmp));
       const { pages } = await extractPdfPages(tmp);

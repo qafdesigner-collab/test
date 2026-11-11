@@ -13,9 +13,9 @@ import { DbService } from '../db/db.service';
 import { LmsModule } from '../lms/lms.module';
 import { StorageModule } from '../storage/storage.module';
 import { FlipbookService } from './flipbook.service';
+import { appTmp } from '../common/tmp';
 
-const TMP = path.join(os.tmpdir(), 'edubooks-uploads');
-fs.mkdirSync(TMP, { recursive: true });
+const TMP = appTmp('uploads');
 const MAX_MB = Number(process.env.FLIPBOOK_MAX_MB || 1024);
 
 /** Headers for every flipbook response: framed only by the LMS, scripts sandboxed into an opaque origin. */

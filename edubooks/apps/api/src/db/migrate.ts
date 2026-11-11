@@ -5,6 +5,7 @@ import * as path from 'path';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { config } from '../config';
+import { appTmp } from '../common/tmp';
 
 const FOLDER = path.resolve(__dirname, '..', '..', 'drizzle');
 
@@ -15,7 +16,7 @@ const FOLDER = path.resolve(__dirname, '..', '..', 'drizzle');
 function migrationsFolder(appRole = process.env.DB_APP_ROLE) {
   if (!appRole || appRole === 'edubooks_app') return FOLDER;
   if (!/^[a-z_][a-z0-9_]{0,62}$/.test(appRole)) throw new Error(`DB_APP_ROLE "${appRole}" must be a plain lowercase PostgreSQL role name`);
-  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'edubooks-migrations-'));
+  const out = fs.mkdtempSync(path.join(appTmp(), 'migrations-'));
   fs.cpSync(FOLDER, out, { recursive: true });
   for (const f of fs.readdirSync(out).filter((f) => f.endsWith('.sql'))) {
     const p = path.join(out, f);
