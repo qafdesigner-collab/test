@@ -7,6 +7,7 @@ import { PageLoader } from '@/components/ui';
 import { Mascot } from '@/components/games/mascot';
 import { GameCard } from '@/components/games/cards';
 import { UpcomingEvents } from '@/components/calendar';
+import { Announcements, LiveLessons } from '@/components/messaging';
 import { useT } from '@/lib/i18n';
 
 const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
@@ -23,6 +24,8 @@ export default function LearnHome() {
         <h1 className="sr-only">{t('Home')}</h1>
         <Mascot say={`${t(greet())}, ${first}! ${tip}`} size={110} />
       </section>
+      <LiveLessons playful />
+      <Announcements playful limit={3} />
       <UpcomingEvents playful limit={4} days={60} />
 
       {h.continueReading && (

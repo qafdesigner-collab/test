@@ -9,7 +9,7 @@ import { useT } from '@/lib/i18n';
 
 export const DAYS = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 export interface Period { number: number; label: string; startsAt: string; endsAt: string; isBreak: boolean }
-export interface Slot { weekday: number; period: number; subjectId?: string | null; subject?: string | null; color?: string | null; teacherId?: string | null; teacher?: string | null; room?: string; className?: string; section?: string }
+export interface Slot { onlineUrl?: string | null; weekday: number; period: number; subjectId?: string | null; subject?: string | null; color?: string | null; teacherId?: string | null; teacher?: string | null; room?: string; className?: string; section?: string }
 
 /** Days to show: Monday–Friday plus any other day that has lessons. */
 const daysFor = (slots: Slot[], extra: number[] = []) => [...new Set([1, 2, 3, 4, 5, ...extra, ...slots.map((s) => s.weekday)])].sort();
@@ -34,7 +34,7 @@ export function TimetableGrid({ periods, slots, who = 'teacher' }: { periods: Pe
               : days.map((d) => {
                 const s = slots.find((x) => x.weekday === d && x.period === p.number);
                 return <td key={d} className="h-14 rounded-lg border border-slate-200 px-2 py-1 align-top" style={s?.color ? { borderLeft: `4px solid ${s.color}` } : undefined}>
-                  {s && <><span className="block font-medium text-slate-900">{s.subject ?? '—'}</span>
+                  {s && <><span className="block font-medium text-slate-900">{s.subject ?? '—'}</span>{s.onlineUrl && <a href={s.onlineUrl} target="_blank" rel="noopener noreferrer" className="float-end rounded bg-emerald-600 px-1.5 text-[11px] font-bold text-white print:hidden">▶ {tr('Join')}</a>}
                     <span className="block text-xs text-slate-600">{[who === 'teacher' ? s.teacher : [s.className, s.section].filter(Boolean).join(' '), s.room].filter(Boolean).join(' · ')}</span></>}</td>;
               })}
           </tr>))}</tbody>
@@ -116,7 +116,7 @@ export function ClassTimetableEditor({ classId }: { classId: string }) {
   const save = async () => {
     setBusy(true); setErr(null);
     try {
-      const r = await api.put<any>(`/timetable/classes/${classId}`, { slots: slots.filter((s) => s.subjectId || s.teacherId || s.room).map((s) => ({ weekday: s.weekday, period: s.period, subjectId: s.subjectId || null, teacherId: s.teacherId || null, room: s.room ?? '' })) });
+      const r = await api.put<any>(`/timetable/classes/${classId}`, { slots: slots.filter((s) => s.subjectId || s.teacherId || s.room || s.onlineUrl).map((s) => ({ weekday: s.weekday, period: s.period, subjectId: s.subjectId || null, teacherId: s.teacherId || null, room: s.room ?? '', onlineUrl: s.onlineUrl || null })) });
       qc.setQueryData(['timetable', 'class', classId], r); qc.invalidateQueries({ queryKey: ['timetable', '/timetable/me'] }); toast('Timetable saved');
     } catch (e) { setErr(e); } finally { setBusy(false); }
   };
@@ -143,6 +143,7 @@ export function ClassTimetableEditor({ classId }: { classId: string }) {
                     <Select aria-label={`Teacher, ${lbl}`} className="mt-1 h-8 text-xs" value={s?.teacherId ?? ''} onChange={(e) => put(d, p.number, { teacherId: e.target.value || null })}>
                       <option value="">No teacher</option>{tList.map((t) => <option key={t.id} value={t.id}>{t.displayName}</option>)}</Select>
                     <Input aria-label={`Room, ${lbl}`} placeholder="Room" maxLength={40} className="mt-1 h-8 text-xs" value={s?.room ?? ''} onChange={(e) => put(d, p.number, { room: e.target.value })} />
+                    <Input aria-label={`Online link, ${lbl}`} placeholder="Online link (optional)" maxLength={500} className="mt-1 h-8 text-xs" value={s?.onlineUrl ?? ''} onChange={(e) => put(d, p.number, { onlineUrl: e.target.value })} />
                   </td>); })}
             </tr>))}</tbody>
         </table>

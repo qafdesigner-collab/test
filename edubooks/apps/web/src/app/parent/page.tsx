@@ -5,6 +5,7 @@ import { api, fmtDate } from '@/lib/api';
 import { Badge, Card, EmptyState, ErrorBox, PageLoader, cn } from '@/components/ui';
 import { UpcomingEvents } from '@/components/calendar';
 import { MyTimetable } from '@/components/timetable';
+import { Announcements, LiveLessons } from '@/components/messaging';
 import { useT } from '@/lib/i18n';
 import { Printer } from 'lucide-react';
 import { useBranding } from '@/lib/branding';
@@ -23,6 +24,8 @@ export default function ParentHome() {
   if (!kids.data.children.length) return <EmptyState icon={<span className="text-4xl">👪</span>} title={t('No children linked yet')}>{t('Ask the school office to link your child to your account.')}</EmptyState>;
   return (
     <div className="space-y-6">
+      <LiveLessons />
+      <Announcements limit={5} />
       <div role="tablist" aria-label={t('Children')} className="flex flex-wrap gap-2">
         {kids.data.children.map((k: any) => (
           <button key={k.id} role="tab" aria-selected={sel === k.id} onClick={() => setSel(k.id)}

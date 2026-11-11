@@ -56,6 +56,10 @@ const AR: Record<string, string> = {
   'Read 100 pages': 'اقرأ 100 صفحة', 'Learn 3 days in a row': 'تعلّم 3 أيام متتالية',
   '✅ On this device': '✅ على هذا الجهاز', "You are offline. Saved books still open.": 'أنت غير متصل. الكتب المحفوظة ما زالت تفتح.',
   '📝 Exam results': '📝 نتائج الامتحانات', Absent: 'غائب', 'No exam results yet.': 'لا توجد نتائج امتحانات بعد.',
+  'New message': 'رسالة جديدة', Conversations: 'المحادثات', 'About {name}': 'بخصوص {name}', 'No messages yet.': 'لا توجد رسائل بعد.', 'Choose a conversation.': 'اختر محادثة.',
+  'Say hello 👋': 'ألقِ التحية 👋', Message: 'الرسالة', 'Write a message…': 'اكتب رسالة…', Send: 'إرسال', 'Your child’s teachers and the school office.': 'معلمو طفلك وإدارة المدرسة.',
+  'No teachers found for your child yet.': 'لم يتم العثور على معلمين لطفلك بعد.', Announcements: 'الإعلانات', 'Whole school': 'المدرسة كلها', 'Live lessons': 'الدروس المباشرة',
+  Join: 'انضم', 'Opens 10 minutes before': 'يفتح قبل 10 دقائق', Messages: 'الرسائل', '💬 Messages': '💬 الرسائل', 'Online lesson': 'درس عبر الإنترنت',
   // switch
   'العربية': 'العربية', English: 'English',
 };

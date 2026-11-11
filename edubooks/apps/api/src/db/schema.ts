@@ -805,4 +805,5 @@ export const timetableSlots = pgTable('timetable_slots', {
   subjectId: uuid('subject_id').references(() => subjects.id, { onDelete: 'set null' }),
   teacherId: uuid('teacher_id').references(() => users.id, { onDelete: 'set null' }),
   room: text('room').notNull().default(''),
+  onlineUrl: text('online_url'),
 });

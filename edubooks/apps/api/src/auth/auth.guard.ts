@@ -31,10 +31,10 @@ export class AuthGuard implements CanActivate {
     }
     if (isPublic) return true;
     if (!req.ctx) throw new UnauthorizedException('Please log in');
-    // Parent accounts: default-deny. Only their own portal, notifications, the school calendar and sign-in/out.
+    // Parent accounts: default-deny. Only their own portal, notifications, messages, announcements, live lessons, the school calendar and sign-in/out.
     if (req.ctx.roles.length && req.ctx.roles.every((r: string) => r === 'PARENT')) {
       const p = String(req.path || req.url).replace(/\?.*$/, '');
-      const ok = /^\/api\/(parent|notifications|auth)(\/|$)/.test(p) || (req.method === 'GET' && /^\/api\/calendar\/?$/.test(p));
+      const ok = /^\/api\/(parent|notifications|auth|messages|announcements|live)(\/|$)/.test(p) || (req.method === 'GET' && /^\/api\/calendar\/?$/.test(p));
       if (!ok) throw new ForbiddenException('This area is not available for parent accounts');
     }
     const required = this.reflector.getAllAndOverride<string[]>(ROLES, [context.getHandler(), context.getClass()]);

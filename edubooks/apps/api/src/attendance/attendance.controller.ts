@@ -9,6 +9,7 @@ import { Roles } from '../common/decorators';
 import { AccessService } from '../lms/access.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LmsModule } from '../lms/lms.module';
+import { checkUrl } from '../common/urls';
 
 const STATUSES = ['PRESENT', 'ABSENT', 'LATE', 'EXCUSED'] as const;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -41,6 +42,7 @@ class SlotDto {
   @IsOptional() @IsUUID() subjectId?: string | null;
   @IsOptional() @IsUUID() teacherId?: string | null;
   @IsOptional() @IsString() @MaxLength(40) room?: string;
+  @IsOptional() @IsString() @MaxLength(500) onlineUrl?: string | null;
 }
 class SlotsDto { @IsArray() @ArrayMaxSize(140) @ValidateNested({ each: true }) @Type(() => SlotDto) slots!: SlotDto[]; }
 
@@ -157,7 +159,7 @@ export class AttendanceService {
 
   private slotRows(where: ReturnType<typeof sql>) {
     return this.rows(sql`SELECT t.id, t.class_id AS "classId", t.weekday, t.period, t.subject_id AS "subjectId", s.name AS subject, s.color, t.teacher_id AS "teacherId",
-        u.display_name AS teacher, t.room, c.name AS "className", c.section
+        u.display_name AS teacher, t.room, t.online_url AS "onlineUrl", c.name AS "className", c.section
       FROM timetable_slots t JOIN classes c ON c.id = t.class_id LEFT JOIN subjects s ON s.id = t.subject_id LEFT JOIN users u ON u.id = t.teacher_id
       WHERE ${where} ORDER BY t.weekday, t.period`);
   }
@@ -191,9 +193,10 @@ export class AttendanceService {
       if (clash) throw new ConflictException(`${clash.teacher} already teaches ${clash.name}${clash.section ? ' — ' + clash.section : ''} on ${['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][s.weekday]}, period ${s.period}`);
     }
     await this.q.delete(timetableSlots).where(eq(timetableSlots.classId, classId));
-    const real = d.slots.filter((s) => s.subjectId || s.teacherId || s.room?.trim());
+    for (const s of d.slots) if (s.onlineUrl?.trim()) s.onlineUrl = checkUrl('LINK', s.onlineUrl.trim()); else s.onlineUrl = null;
+    const real = d.slots.filter((s) => s.subjectId || s.teacherId || s.room?.trim() || s.onlineUrl);
     if (real.length) await this.q.insert(timetableSlots).values(real.map((s) => ({ publisherId: this.ctx.publisherId, schoolId: this.ctx.schoolId!, classId,
-      weekday: s.weekday, period: s.period, subjectId: s.subjectId ?? null, teacherId: s.teacherId ?? null, room: s.room?.trim() ?? '' })));
+      weekday: s.weekday, period: s.period, subjectId: s.subjectId ?? null, teacherId: s.teacherId ?? null, room: s.room?.trim() ?? '', onlineUrl: s.onlineUrl ?? null })));
     return this.classTimetable(classId);
   }
 
