@@ -110,6 +110,8 @@ function self_request(string $path): array {
 function checks(string $docroot, string $home, string $payload, string $target): array {
   $c = [];
   $c[] = [version_compare(PHP_VERSION, '7.4', '>=') ? 'ok' : 'err', 'PHP ' . PHP_VERSION . ' (for this setup wizard)'];
+  $stray = array_values(array_filter(['api', 'web', 'node_modules', 'runtime', 'app.js', 'embedded-db.js', 'package.json'], fn($f) => file_exists("$docroot/$f")));
+  if ($stray) $c[] = ['err', 'App files were moved into this folder (' . h(implode(', ', $stray)) . '). They must stay inside <b>' . APP_DIR_NAME . '</b>. Delete them here (and any <b>.htaccess</b> that says "Deny"), keep only <b>index.php</b> and the <b>' . APP_DIR_NAME . '</b> folder, then reload.'];
   $c[] = [is_file("$payload/app.js") ? 'ok' : 'err', is_file("$payload/app.js") ? 'EduBooks files found' : 'The folder "' . APP_DIR_NAME . '" is missing. Extract the whole zip into this folder.'];
   $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
   $c[] = [in_array($path, ['/', '/index.php'], true) ? 'ok' : 'err', in_array($path, ['/', '/index.php'], true) ? 'Installed at the root of ' . h($_SERVER['HTTP_HOST'] ?? '') : 'EduBooks must be installed in the ROOT folder of a domain or subdomain (not in a sub-folder).'];

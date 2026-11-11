@@ -43,7 +43,9 @@ console.log('▶ Adding the setup wizard');
 fs.copyFileSync(path.join(ROOT, 'packaging', 'public_html', 'index.php'), path.join(STAGE, 'index.php'));
 fs.copyFileSync(path.join(ROOT, 'packaging', 'public_html', 'INSTALL.txt'), path.join(STAGE, 'EDUBOOKS-INSTALL.txt'));
 // While the app sits inside public_html (before the wizard moves it out), nothing in it may be downloaded.
-fs.writeFileSync(path.join(APP, '.htaccess'), 'Require all denied\nDeny from all\n');
+// It only matches /edubooks-app/ paths, so even if this file is moved up into the site's main folder it
+// cannot lock the whole website (it would then simply match nothing).
+fs.writeFileSync(path.join(APP, '.htaccess'), '# EduBooks: block downloads from this folder until the setup wizard moves it\nRewriteEngine On\nRewriteCond %{REQUEST_URI} ^/edubooks-app(/|$)\nRewriteRule ^ - [F,L]\n');
 
 console.log('▶ Zipping (symbolic links are stored as normal files so any unzip tool works)');
 const zip = path.join(OUT, 'edubooks-lms-public_html.zip');
