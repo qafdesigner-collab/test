@@ -1,9 +1,9 @@
 'use client';
-/* Ten reusable, data-driven learning games. Each engine receives its content and calls onFinish(score). */
+/* Thirteen reusable, data-driven learning games. Each engine receives its content and calls onFinish(score). */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/components/ui';
 
-export type Engine = 'ALPHABET_MATCH' | 'PICTURE_WORD' | 'COUNTING' | 'SORTING' | 'MEMORY' | 'FILL_BLANK' | 'QUIZ' | 'SHAPES' | 'WORD_BUILD' | 'PUZZLE';
+export type Engine = 'ALPHABET_MATCH' | 'PICTURE_WORD' | 'COUNTING' | 'SORTING' | 'MEMORY' | 'FILL_BLANK' | 'QUIZ' | 'SHAPES' | 'WORD_BUILD' | 'PUZZLE' | 'SPELLING_BEE' | 'SENTENCE_BUILDER' | 'LISTENING';
 export interface EngineProps { content: any; onFinish: (score: number) => void; say: (t: string) => void; onProgress?: (done: number, total: number) => void }
 export const ENGINE_INFO: Record<Engine, { label: string; icon: string; color: string }> = {
   ALPHABET_MATCH: { label: 'Alphabet match', icon: '🔤', color: '#f97316' }, PICTURE_WORD: { label: 'Picture & word', icon: '🖼️', color: '#ec4899' },
@@ -11,6 +11,8 @@ export const ENGINE_INFO: Record<Engine, { label: string; icon: string; color: s
   MEMORY: { label: 'Memory cards', icon: '🃏', color: '#8b5cf6' }, FILL_BLANK: { label: 'Fill the gap', icon: '✏️', color: '#f59e0b' },
   QUIZ: { label: 'Quiz', icon: '❓', color: '#06b6d4' }, SHAPES: { label: 'Shapes', icon: '🔺', color: '#ef4444' },
   WORD_BUILD: { label: 'Word building', icon: '🧩', color: '#14b8a6' }, PUZZLE: { label: 'Picture puzzle', icon: '🧸', color: '#a855f7' },
+  SPELLING_BEE: { label: 'Spelling bee', icon: '🐝', color: '#eab308' }, SENTENCE_BUILDER: { label: 'Sentence builder', icon: '🧱', color: '#f43f5e' },
+  LISTENING: { label: 'Listen & choose', icon: '👂', color: '#0ea5e9' },
 };
 
 // ---------- helpers ----------
@@ -252,8 +254,84 @@ function Puzzle({ content, onFinish, say }: EngineProps) {
   </>);
 }
 
+// ---------- 11: spelling bee (hear the word, type it) ----------
+function SpellingBee({ content, onFinish, say, onProgress }: EngineProps) {
+  const words: { word: string; sentence: string; hint: string }[] = content.words;
+  const [i, setI] = useState(0); const [typed, setTyped] = useState(''); const [tries, setTries] = useState(0); const [score, setScore] = useState(0);
+  const [reveal, setReveal] = useState(false); const [ok, setOk] = useState(false);
+  const { shaking, shake } = useShake(); const input = useRef<HTMLInputElement>(null);
+  const w = words[i];
+  const hear = () => say(w.word);
+  useEffect(() => { onProgress?.(i, words.length); setTimeout(hear, 300); input.current?.focus(); }, [i]); // eslint-disable-line
+  const next = (s: number) => setTimeout(() => { setTyped(''); setTries(0); setReveal(false); setOk(false); if (i + 1 >= words.length) onFinish(s); else setI(i + 1); }, 1300);
+  const check = () => {
+    if (ok || reveal || !typed.trim()) return;
+    if (typed.trim().toLowerCase() === w.word.toLowerCase()) { const s = score + (tries === 0 ? 1 : 0); setScore(s); setOk(true); say('Correct! ' + w.word); next(s); return; }
+    shake('in'); const t = tries + 1; setTries(t);
+    if (t >= 3) { setReveal(true); say(`It is spelled ${[...w.word].join(' ')}`); next(score); } else say('Try again');
+  };
+  return (<>
+    <Big>Listen, then spell the word</Big>
+    <div className="mb-6 flex flex-wrap justify-center gap-3">
+      <button onClick={hear} className={cn(TILE, 'flex items-center gap-2 bg-amber-300 px-6 py-4 text-2xl')}>🔊 Hear the word</button>
+      {w.sentence && <button onClick={() => say(w.sentence)} className={cn(TILE, 'bg-white px-6 py-4 text-xl')}>💬 In a sentence</button>}
+    </div>
+    {w.hint && <div className="mb-4 text-center text-6xl">{w.hint}</div>}
+    <form className="flex flex-col items-center gap-4" onSubmit={(e) => { e.preventDefault(); check(); }}>
+      <input ref={input} value={reveal ? w.word : typed} readOnly={ok || reveal} onChange={(e) => setTyped(e.target.value)} aria-label="Spell the word" autoComplete="off" autoCapitalize="off" spellCheck={false}
+        className={cn('w-72 rounded-3xl border-4 px-5 py-4 text-center text-4xl font-extrabold tracking-widest', ok ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : reveal ? 'border-sky-400 bg-sky-50 text-sky-800' : 'border-amber-300', shaking === 'in' && 'animate-[shake_.4s]')} />
+      {!ok && !reveal && <button className={cn(TILE, 'bg-emerald-700 px-10 py-4 text-2xl text-white')}>Check ✓</button>}
+      {tries > 0 && !ok && !reveal && <p className="text-lg font-bold text-amber-700">Try again! {3 - tries} more {3 - tries === 1 ? 'try' : 'tries'}.</p>}
+    </form>
+  </>);
+}
+
+// ---------- 12: sentence builder (tap the words in order) ----------
+function SentenceBuilder({ content, onFinish, say, onProgress }: EngineProps) {
+  const sentences: { text: string; hint: string }[] = content.sentences;
+  const [i, setI] = useState(0); const [built, setBuilt] = useState<number[]>([]); const [mistake, setMistake] = useState(false); const [score, setScore] = useState(0); const [done, setDone] = useState(false);
+  const s = sentences[i]; const words = useMemo(() => s.text.split(' '), [s]);
+  const tiles = useMemo(() => { let t = shuffle(words.map((w, k) => ({ w, k }))); if (t.every((x, k) => x.k === k) && t.length > 1) t = [...t.slice(1), t[0]]; return t; }, [words]);
+  const { shaking, shake } = useShake();
+  useEffect(() => { onProgress?.(i, sentences.length); }, [i]); // eslint-disable-line
+  const tap = (k: number) => {
+    if (done) return;
+    // Equal words are interchangeable: accept any tile whose word matches the next word.
+    if (words[k].toLowerCase() !== words[built.length].toLowerCase()) { shake(String(k)); setMistake(true); return; }
+    const b = [...built, k]; setBuilt(b); say(words[k]);
+    if (b.length === words.length) {
+      setDone(true); const sc = score + (mistake ? 0 : 1); setScore(sc); setTimeout(() => say(s.text), 400);
+      setTimeout(() => { setBuilt([]); setMistake(false); setDone(false); if (i + 1 >= sentences.length) onFinish(sc); else setI(i + 1); }, 1800);
+    }
+  };
+  return (<>
+    <Big>Tap the words to make the sentence</Big>
+    {s.hint && <div className="mb-3 text-center text-6xl">{s.hint}</div>}
+    <div className={cn('mx-auto mb-8 flex min-h-20 max-w-3xl flex-wrap items-center justify-center gap-2 rounded-3xl border-4 border-dashed p-3', done ? 'border-emerald-400 bg-emerald-50' : 'border-slate-300 bg-white')}>
+      {built.length ? built.map((k, n) => <span key={n} className="rounded-2xl bg-rose-100 px-4 py-2 text-3xl font-extrabold text-rose-900">{words[k]}</span>) : <span className="text-xl text-slate-500">…</span>}
+      {done && <span className="text-3xl">✅</span>}
+    </div>
+    <div className="flex flex-wrap justify-center gap-3">{tiles.map(({ w, k }) => (
+      <button key={k} disabled={built.includes(k)} onClick={() => tap(k)} className={cn(TILE, 'h-20 min-w-20 bg-rose-600 px-5 text-3xl text-white disabled:invisible', shaking === String(k) && 'animate-[shake_.4s]')}>{w}</button>))}</div>
+  </>);
+}
+
+// ---------- 13: listen & choose ----------
+function Listening({ content, onFinish, say, onProgress }: EngineProps) {
+  const rounds = useMemo(() => content.rounds.map((r: any) => { const opts = shuffle(r.options.map((o: string, k: number) => ({ o, ok: k === r.answer }))); return { ...r, opts }; }), [content]);
+  return <Rounds rounds={rounds} onFinish={onFinish} onProgress={onProgress} render={(r: any, answer, shaking) => (<>
+    <SayOnce text={r.say} say={say} />
+    <Big>Listen and choose</Big>
+    <div className="mb-8 flex justify-center"><button onClick={() => say(r.say)} aria-label="Listen again" className={cn(TILE, 'flex size-28 items-center justify-center bg-sky-600 text-6xl text-white')}>🔊</button></div>
+    <div className="mx-auto grid max-w-2xl grid-cols-2 gap-4">{r.opts.map((x: any, k: number) => (
+      <button key={k} onClick={() => answer(x.ok, String(k))} className={cn(TILE, 'flex min-h-28 items-center justify-center bg-white px-4', isPic(x.o) ? 'text-6xl' : 'text-3xl', shaking === String(k) && 'animate-[shake_.4s]')}>{x.o}</button>))}</div>
+  </>)} />;
+}
+
 export const ENGINES: Record<Engine, (p: EngineProps) => React.JSX.Element> = {
   ALPHABET_MATCH: Match, PICTURE_WORD: Match, MEMORY: Memory, COUNTING: Counting, SORTING: Sorting, FILL_BLANK: FillBlank, QUIZ: Quiz, SHAPES: Shapes, WORD_BUILD: WordBuild, PUZZLE: Puzzle,
+  SPELLING_BEE: SpellingBee, SENTENCE_BUILDER: SentenceBuilder, LISTENING: Listening,
 };
 export const maxScore = (engine: Engine, c: any) => ({ ALPHABET_MATCH: c.pairs?.length, PICTURE_WORD: c.pairs?.length, MEMORY: c.pairs?.length, COUNTING: c.rounds,
-  SORTING: c.categories?.reduce((n: number, k: any) => n + k.items.length, 0), FILL_BLANK: c.sentences?.length, QUIZ: c.questions?.length, SHAPES: c.rounds, WORD_BUILD: c.words?.length, PUZZLE: 3 }[engine] ?? 1);
+  SORTING: c.categories?.reduce((n: number, k: any) => n + k.items.length, 0), FILL_BLANK: c.sentences?.length, QUIZ: c.questions?.length, SHAPES: c.rounds, WORD_BUILD: c.words?.length, PUZZLE: 3,
+  SPELLING_BEE: c.words?.length, SENTENCE_BUILDER: c.sentences?.length, LISTENING: c.rounds?.length }[engine] ?? 1);

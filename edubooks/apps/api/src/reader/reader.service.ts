@@ -7,6 +7,7 @@ import {
 } from '../db/schema';
 import { AccessService } from '../lms/access.service';
 import { AssetsService } from '../storage/assets.service';
+import { checkUrl } from '../common/urls';
 
 @Injectable()
 export class ReaderService {
@@ -57,6 +58,49 @@ export class ReaderService {
     if (!c) throw new NotFoundException('Book part not found');
     await this.access.assertEdition(c.editionId);
     return c;
+  }
+
+  // ---------- interactive page hotspots ----------
+  async hotspots(componentId: string) {
+    await this.component(componentId);
+    const { rows } = await this.q.execute(sql`SELECT h.id, h.page, h.x, h.y, h.w, h.h, h.kind, h.title, h.body, h.url, h.game_id AS "gameId", g.title AS "gameTitle", g.engine AS "gameEngine"
+      FROM page_hotspots h LEFT JOIN game_activities g ON g.id = h.game_id WHERE h.component_id = ${componentId} ORDER BY h.page, h.y, h.x`);
+    return rows;
+  }
+  private async hotspotValues(d: { kind?: string; url?: string | null; gameId?: string | null; x?: number; y?: number; w?: number; h?: number }, editionId: string) {
+    if (d.x !== undefined && d.w !== undefined && d.x + d.w > 1.0001) throw new BadRequestException('The area goes past the right edge of the page');
+    if (d.y !== undefined && d.h !== undefined && d.y + d.h > 1.0001) throw new BadRequestException('The area goes past the bottom of the page');
+    const url = d.kind ? checkUrl(d.kind, d.url) : undefined;
+    if (d.kind === 'GAME') {
+      if (!d.gameId) throw new BadRequestException('Choose a game');
+      const { rows } = await this.q.execute(sql`SELECT 1 FROM game_activities WHERE id = ${d.gameId} AND school_id IS NULL AND (edition_id = ${editionId} OR edition_id IS NULL)`);
+      if (!rows.length) throw new BadRequestException('Choose one of the publisher games for this book');
+    }
+    return { url, gameId: d.kind === 'GAME' ? d.gameId! : d.kind ? null : undefined };
+  }
+  async addHotspot(componentId: string, d: any) {
+    const c = await this.component(componentId);
+    if (c.pageCount && d.page > c.pageCount) throw new BadRequestException('Page out of range');
+    const v = await this.hotspotValues(d, c.editionId);
+    if ((d.kind === 'NOTE' || d.kind === 'AUDIO') && !d.body?.trim()) throw new BadRequestException(d.kind === 'AUDIO' ? 'Type the words to read aloud' : 'Type the note');
+    const { rows: [h] } = await this.q.execute(sql`INSERT INTO page_hotspots (publisher_id, component_id, page, x, y, w, h, kind, title, body, url, game_id, created_by)
+      VALUES (${this.db.ctx.publisherId}, ${componentId}, ${d.page}, ${d.x}, ${d.y}, ${d.w}, ${d.h}, ${d.kind}, ${d.title?.trim() ?? ''}, ${d.body ?? ''}, ${v.url ?? null}, ${v.gameId ?? null}, ${this.db.ctx.userId})
+      RETURNING id`);
+    return h;
+  }
+  async updateHotspot(id: string, d: any) {
+    const { rows: [cur] } = await this.q.execute(sql`SELECT h.*, c.edition_id FROM page_hotspots h JOIN book_components c ON c.id = h.component_id WHERE h.id = ${id}`) as any;
+    if (!cur) throw new NotFoundException('Hotspot not found');
+    const m = { ...cur, ...Object.fromEntries(Object.entries(d).filter(([, x]) => x !== undefined)), gameId: d.gameId !== undefined ? d.gameId : cur.game_id };
+    const v = await this.hotspotValues({ ...m, url: m.url }, cur.edition_id);
+    await this.q.execute(sql`UPDATE page_hotspots SET page = ${m.page}, x = ${m.x}, y = ${m.y}, w = ${m.w}, h = ${m.h}, kind = ${m.kind}, title = ${(m.title ?? '').trim()},
+      body = ${m.body ?? ''}, url = ${v.url ?? null}, game_id = ${v.gameId ?? null} WHERE id = ${id}`);
+    return { ok: true };
+  }
+  async removeHotspot(id: string) {
+    const { rows } = await this.q.execute(sql`DELETE FROM page_hotspots WHERE id = ${id} RETURNING id`);
+    if (!rows.length) throw new NotFoundException('Hotspot not found');
+    return { ok: true };
   }
 
   async pdfLink(componentId: string) {

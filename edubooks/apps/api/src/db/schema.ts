@@ -662,7 +662,7 @@ export const aiGenerations = pgTable('ai_generations', {
 // =====================================================================================
 // Phase 6 — games, rewards & progress
 // =====================================================================================
-export const gameEngineEnum = pgEnum('game_engine', ['ALPHABET_MATCH', 'PICTURE_WORD', 'COUNTING', 'SORTING', 'MEMORY', 'FILL_BLANK', 'QUIZ', 'SHAPES', 'WORD_BUILD', 'PUZZLE']);
+export const gameEngineEnum = pgEnum('game_engine', ['ALPHABET_MATCH', 'PICTURE_WORD', 'COUNTING', 'SORTING', 'MEMORY', 'FILL_BLANK', 'QUIZ', 'SHAPES', 'WORD_BUILD', 'PUZZLE', 'SPELLING_BEE', 'SENTENCE_BUILDER', 'LISTENING']);
 
 /** A playable game = engine + content. school_id NULL = publisher library (shared by every licensed school). */
 export const gameActivities = pgTable('game_activities', {

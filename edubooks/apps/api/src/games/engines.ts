@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 
-/** The 10 reusable game engines. Content is plain data, so one engine serves any book or lesson. */
-export const ENGINES = ['ALPHABET_MATCH', 'PICTURE_WORD', 'COUNTING', 'SORTING', 'MEMORY', 'FILL_BLANK', 'QUIZ', 'SHAPES', 'WORD_BUILD', 'PUZZLE'] as const;
+/** The 13 reusable game engines. Content is plain data, so one engine serves any book or lesson. */
+export const ENGINES = ['ALPHABET_MATCH', 'PICTURE_WORD', 'COUNTING', 'SORTING', 'MEMORY', 'FILL_BLANK', 'QUIZ', 'SHAPES', 'WORD_BUILD', 'PUZZLE', 'SPELLING_BEE', 'SENTENCE_BUILDER', 'LISTENING'] as const;
 export type Engine = (typeof ENGINES)[number];
 export const SHAPES = ['circle', 'square', 'triangle', 'rectangle', 'star', 'heart', 'oval', 'diamond'] as const;
 
@@ -60,6 +60,23 @@ export function validateContent(engine: Engine, c: any): { content: any; maxScor
       const picture = s(c?.picture, 8); const word = s(c?.word, 24); const size = Number(c?.size) === 2 ? 2 : 3;
       if (!picture) bad('Choose a picture (emoji) for the puzzle');
       return { content: { picture, word, size }, maxScore: 3 };
+    }
+    case 'SPELLING_BEE': {
+      const words = arr(c?.words).map((w: any) => ({ word: s(w?.word, 20).replace(/\s+/g, ''), sentence: s(w?.sentence, 160), hint: s(w?.hint, 8) })).filter((w) => w.word.length >= 2);
+      if (!words.length || words.length > 15) bad('Add 1–15 words to spell (2–20 letters each)');
+      return { content: { words }, maxScore: words.length };
+    }
+    case 'SENTENCE_BUILDER': {
+      const sentences = arr(c?.sentences).map((x: any) => ({ text: s(typeof x === 'string' ? x : x?.text, 160).replace(/\s+/g, ' '), hint: s(x?.hint, 8) }))
+        .filter((x) => x.text.split(' ').length >= 2 && x.text.split(' ').length <= 12);
+      if (!sentences.length || sentences.length > 12) bad('Add 1–12 sentences of 2–12 words');
+      return { content: { sentences }, maxScore: sentences.length };
+    }
+    case 'LISTENING': {
+      const rounds = arr(c?.rounds).map((r: any) => ({ say: s(r?.say, 160), options: arr(r?.options).map((o) => s(o, 40)).filter(Boolean).slice(0, 4), answer: Math.round(Number(r?.answer)) }))
+        .filter((r) => r.say && r.options.length >= 2 && r.answer >= 0 && r.answer < r.options.length);
+      if (!rounds.length || rounds.length > 15) bad('Add 1–15 rounds: what is said, 2–4 choices and the right one');
+      return { content: { rounds }, maxScore: rounds.length };
     }
   }
   return bad('Unknown game type');

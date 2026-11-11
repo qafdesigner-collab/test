@@ -6,6 +6,7 @@ import { sql } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
 import { AuditService } from '../audit/audit.service';
 import { Roles } from '../common/decorators';
+import { checkUrl } from '../common/urls';
 
 const Id = () => new ParseUUIDPipe();
 const PASS = 70;
@@ -37,16 +38,6 @@ class LessonDto {
 class UpdateLessonDto extends PartialType(LessonDto) {}
 class ReorderDto { @IsArray() @ArrayMaxSize(200) @IsString({ each: true }) ids!: string[]; }
 class AnswersDto { @IsOptional() @IsArray() @ArrayMaxSize(30) @IsInt({ each: true }) answers?: number[]; }
-
-/** Accept YouTube / Vimeo for videos (shown embedded) and any https link otherwise. */
-export function checkUrl(kind: string, url?: string | null) {
-  if (kind !== 'VIDEO' && kind !== 'LINK') return null;
-  if (!url) throw new BadRequestException(kind === 'VIDEO' ? 'Paste a YouTube or Vimeo link' : 'Paste a link');
-  let u: URL; try { u = new URL(url); } catch { throw new BadRequestException('That link is not valid'); }
-  if (u.protocol !== 'https:') throw new BadRequestException('Links must start with https://');
-  if (kind === 'VIDEO' && !/(^|\.)(youtube\.com|youtu\.be|vimeo\.com)$/.test(u.hostname)) throw new BadRequestException('Videos must be on YouTube or Vimeo. For other sites, use a “Link” lesson.');
-  return u.toString();
-}
 
 @Injectable()
 export class TrainingService {

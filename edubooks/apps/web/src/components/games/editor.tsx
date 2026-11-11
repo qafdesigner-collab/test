@@ -18,6 +18,9 @@ export const EMPTY_CONTENT: Record<Engine, any> = {
   SHAPES: { shapes: ['circle', 'square', 'triangle'], rounds: 6 },
   WORD_BUILD: { words: [{ word: 'cat', hint: '🐱' }] },
   PUZZLE: { picture: '🍎', word: 'apple', size: 3 },
+  SPELLING_BEE: { words: [{ word: 'apple', sentence: 'I eat a red apple.', hint: '🍎' }, { word: 'school', sentence: 'I go to school.', hint: '🏫' }] },
+  SENTENCE_BUILDER: { sentences: [{ text: 'The cat is on the mat', hint: '🐱' }, { text: 'I like to read books', hint: '📚' }] },
+  LISTENING: { rounds: [{ say: 'dog', options: ['🐶', '🐱', '🐮'], answer: 0 }, { say: 'Find the apple', options: ['🍌', '🍎', '🍇'], answer: 1 }] },
 };
 const list = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
 
@@ -75,6 +78,20 @@ export function ContentForm({ engine, value, onChange }: { engine: Engine; value
         <Field label="Picture (emoji)"><Input value={v.picture} onChange={(e) => onChange({ ...v, picture: e.target.value })} /></Field>
         <Field label="Word (optional)"><Input value={v.word} onChange={(e) => onChange({ ...v, word: e.target.value })} /></Field>
         <Field label="Pieces"><Select value={v.size} onChange={(e) => onChange({ ...v, size: Number(e.target.value) })}><option value={2}>2 × 2 (easy)</option><option value={3}>3 × 3</option></Select></Field></div>;
+    case 'SPELLING_BEE':
+      return <Rows label="Add word" rows={v.words} blank={{ word: '', sentence: '', hint: '' }} onChange={(words) => onChange({ words })} render={(r, set) => <>
+        <Input aria-label="Word to spell" className="w-36" placeholder="apple" value={r.word} onChange={(e) => set({ word: e.target.value })} />
+        <Input aria-label="Example sentence" className="min-w-48 flex-1" placeholder="Sentence read aloud (optional)" value={r.sentence} onChange={(e) => set({ sentence: e.target.value })} />
+        <Input aria-label="Picture hint" className="w-24" placeholder="🍎" value={r.hint} onChange={(e) => set({ hint: e.target.value })} /></>} />;
+    case 'SENTENCE_BUILDER':
+      return <Rows label="Add sentence" rows={v.sentences} blank={{ text: '', hint: '' }} onChange={(sentences) => onChange({ sentences })} render={(r, set) => <>
+        <Input aria-label="Sentence" className="min-w-56 flex-1" placeholder="The cat is on the mat" value={r.text} onChange={(e) => set({ text: e.target.value })} />
+        <Input aria-label="Picture hint" className="w-24" placeholder="🐱" value={r.hint} onChange={(e) => set({ hint: e.target.value })} /></>} />;
+    case 'LISTENING':
+      return <Rows label="Add round" rows={v.rounds} blank={{ say: '', options: ['', ''], answer: 0 }} onChange={(rounds) => onChange({ rounds })} render={(r, set) => <>
+        <Input aria-label="What is said" className="min-w-44 flex-1" placeholder="Words read aloud, e.g. dog" value={r.say} onChange={(e) => set({ say: e.target.value })} />
+        <Input aria-label="Choices" className="w-48" placeholder="🐶, 🐱, 🐮 (commas)" value={r.options.join(', ')} onChange={(e) => set({ options: list(e.target.value) })} />
+        <Select aria-label="Correct choice" className="w-32" value={r.answer} onChange={(e) => set({ answer: Number(e.target.value) })}>{r.options.map((o, i) => <option key={i} value={i}>✓ {o || `choice ${i + 1}`}</option>)}</Select></>} />;
   }
 }
 
