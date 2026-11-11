@@ -52,6 +52,15 @@ async function bootApp() {
     await edb.ensureRunning(process.env.PG_SUPER_PASSWORD);
     edb.scheduleBackups(process.env.PG_SUPER_PASSWORD, log);
     edb.watchdog(process.env.PG_SUPER_PASSWORD, log);
+    // New version uploaded? Take a safety backup before applying database changes.
+    const build = fs.existsSync(path.join(ROOT, 'BUILD_ID')) ? fs.readFileSync(path.join(ROOT, 'BUILD_ID'), 'utf8').trim() : '';
+    const lastFile = path.join(ROOT, '.last-build');
+    const last = fs.existsSync(lastFile) ? fs.readFileSync(lastFile, 'utf8').trim() : '';
+    if (build && last && build !== last) {
+      try { const f = await edb.backup(process.env.PG_SUPER_PASSWORD, Number(process.env.BACKUP_KEEP || 7) + 1); if (f) log('info', `Safety backup before update: backups/${path.basename(f)}`); }
+      catch (e) { log('error', `Safety backup before update failed: ${e.message}`); }
+    }
+    if (build) fs.writeFileSync(lastFile, build);
   }
   // Apply any database changes shipped with an update (no-op when up to date).
   await run(path.join(API, 'dist', 'db', 'migrate.js'), {});
@@ -72,7 +81,7 @@ async function bootApp() {
   ex.use((req, res, nxt) => (req.path === '/api' || req.path.startsWith('/api/') ? nxt() : handle(req, res)));
   const app = configureApp(await NestFactory.create(AppModule, new ExpressAdapter(ex), { bodyParser: false, logger: new JsonLogger() }));
   await app.init();
-  handler = ex;
+  handler = withStatus(ex);
   console.log(JSON.stringify({ level: 'info', msg: 'EduBooks LMS started', node: process.version }));
 }
 
@@ -222,8 +231,8 @@ async function install(f) {
   let dbEnv;
   if (f.dbMode !== 'external') {
     const edb = require('./embedded-db');
-    const p = await edb.create();
-    dbEnv = { DB_MODE: 'embedded', PG_SUPER_PASSWORD: p.superPass, DATABASE_OWNER_URL: edb.url('edubooks', p.ownerPass), DATABASE_URL: edb.url('edubooks_app', p.appPass), DB_POOL_MAX: '10', BACKUP_HOUR: '2', BACKUP_KEEP: '7' };
+    const p = await edb.create(f.dbUser ? { superUser: f.dbUser, superPass: f.dbPass } : {});
+    dbEnv = { DB_MODE: 'embedded', PG_SUPER_USER: p.superUser, PG_SUPER_PASSWORD: p.superPass, DATABASE_OWNER_URL: edb.url('edubooks', p.ownerPass), DATABASE_URL: edb.url('edubooks_app', p.appPass), DB_POOL_MAX: '10', BACKUP_HOUR: '2', BACKUP_KEEP: '7' };
   } else {
     dbEnv = { DB_MODE: 'external', DATABASE_OWNER_URL: dbUrl(f.ownerUser, f.ownerPass, f), DATABASE_URL: dbUrl(f.appUser, f.appPass, f), DB_APP_ROLE: f.appUser };
   }
@@ -297,6 +306,53 @@ function installer() {
   };
 }
 
+// ---------- automatic install (answers written by the public_html setup wizard) ----------
+const AUTO_FILE = path.join(ROOT, 'autoinstall.json');
+const STATUS_FILE = path.join(ROOT, 'install-status.json');
+const writeStatus = (st) => fs.writeFileSync(STATUS_FILE, JSON.stringify({ ...st, at: new Date().toISOString() }), { mode: 0o600 });
+const readStatus = () => { try { return JSON.parse(fs.readFileSync(STATUS_FILE, 'utf8')); } catch { return null; } };
+
+async function autoInstall() {
+  let fd;
+  try { fd = fs.openSync(path.join(ROOT, 'install.running'), 'wx'); } catch { return false; } // another app process is installing
+  let f;
+  try {
+    f = JSON.parse(fs.readFileSync(AUTO_FILE, 'utf8'));
+    fs.rmSync(AUTO_FILE, { force: true }); // passwords do not stay on disk
+    writeStatus({ state: 'installing', message: 'Checking the server…' });
+    const checks = await preflight({ ...f, dbMode: 'embedded' });
+    const bad = checks.filter((c) => c.level === 'err');
+    if (bad.length) throw new Error(bad.map((c) => c.text).join(' • '));
+    writeStatus({ state: 'installing', message: 'Creating the database and your account…' });
+    const steps = await install({ ...f, dbMode: 'embedded' });
+    writeStatus({ state: 'installing', message: 'Starting EduBooks…', steps });
+    await bootApp();
+    writeStatus({ state: 'done', steps });
+  } catch (e) {
+    console.error('Automatic install failed:', e);
+    writeStatus({ state: 'error', message: String(e.message || e) });
+    if (!fs.existsSync(LOCK_FILE)) handler = installer();
+  } finally { fs.closeSync(fd); fs.rmSync(path.join(ROOT, 'install.running'), { force: true }); }
+  return true;
+}
+
+/** Wraps a handler so the wizard's progress page can poll /install-status while installing. */
+function withStatus(h) {
+  return (req, res) => {
+    if (req.url.split('?')[0] === '/install-status') {
+      const st = fs.existsSync(LOCK_FILE) && handler !== null && readStatus()?.state !== 'installing' ? { state: 'done' } : readStatus() || { state: 'waiting' };
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(JSON.stringify(st));
+    }
+    return h(req, res);
+  };
+}
+const busyPage = (req, res) => {
+  if (req.url.startsWith('/api/')) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '5' }); return res.end('{"statusCode":503,"message":"EduBooks is being installed"}'); }
+  res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8', 'Retry-After': '5' });
+  res.end(page('Installing EduBooks', '<div class="card"><div class="logo">⏳</div><h1>EduBooks is being installed…</h1><p>This takes about a minute. This page reloads by itself.</p><script>setTimeout(()=>location.reload(),4000)</script></div>'));
+};
+
 // ---------- start ----------
 server.listen(process.env.PORT || 3000, () => console.log(`EduBooks listening (${fs.existsSync(LOCK_FILE) ? 'app' : 'installer'} mode)`));
 if (fs.existsSync(LOCK_FILE)) {
@@ -304,6 +360,17 @@ if (fs.existsSync(LOCK_FILE)) {
     console.error('EduBooks failed to start:', e);
     handler = (req, res) => { res.statusCode = 500; res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.end('EduBooks could not start. Check the application log in cPanel (stderr.log) and the .env settings, then restart the app.'); };
   });
+} else if (fs.existsSync(AUTO_FILE) || fs.existsSync(path.join(ROOT, 'install.running'))) {
+  handler = withStatus(busyPage);
+  const original = bootApp;
+  autoInstall().then((mine) => {
+    if (!mine) { // another process is installing: wait for it, then start normally
+      const t = setInterval(() => {
+        if (fs.existsSync(LOCK_FILE)) { clearInterval(t); original().catch((e) => console.error(e)); }
+        else if (readStatus()?.state === 'error') { clearInterval(t); handler = withStatus(installer()); }
+      }, 2000);
+    }
+  });
 } else {
-  handler = installer();
+  handler = withStatus(installer());
 }

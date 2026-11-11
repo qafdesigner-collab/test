@@ -28,6 +28,7 @@ copy('apps/api/scripts/extract-pdf-text.mjs', 'api/scripts/extract-pdf-text.mjs'
 copy('apps/web/.next', 'web/.next', (src) => !/[\\/]\.next[\\/](cache|standalone|trace)/.test(src) && !src.endsWith('.nft.json'));
 copy('apps/web/public', 'web/public');
 fs.writeFileSync(path.join(STAGE, 'web', 'next.config.js'), "module.exports = { poweredByHeader: false };\n");
+fs.writeFileSync(path.join(STAGE, 'BUILD_ID'), `${new Date().toISOString()} ${(() => { try { return execSync('git rev-parse --short HEAD', { cwd: ROOT }).toString().trim(); } catch { return 'local'; } })()}\n`);
 fs.mkdirSync(path.join(STAGE, 'storage'));
 fs.writeFileSync(path.join(STAGE, 'storage', '.keep'), '');
 

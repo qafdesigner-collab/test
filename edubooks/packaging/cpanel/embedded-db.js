@@ -18,7 +18,8 @@ const LOGS = path.join(ROOT, 'logs');
 const BACKUPS = path.join(ROOT, 'backups');
 const RESTORE = path.join(ROOT, 'restore');
 const PORT = 5432;                              // only names the socket file; no TCP listener
-const SUPER = 'edubooks_super';
+/** Admin (superuser) of the built-in database; chosen in the install wizard. */
+const superUser = () => process.env.PG_SUPER_USER || 'edubooks_super';
 
 function binDir() {
   const dir = path.join(ROOT, 'node_modules', '@embedded-postgres', `${os.platform()}-${os.arch()}`, 'native', 'bin');
@@ -61,7 +62,7 @@ function clearStaleLocks() {
 
 async function canConnect(superPass) {
   const { Client } = require('pg');
-  const c = new Client({ connectionString: url(SUPER, superPass, 'postgres'), connectionTimeoutMillis: 3000 });
+  const c = new Client({ connectionString: url(superUser(), superPass, 'postgres'), connectionTimeoutMillis: 3000 });
   try { await c.connect(); await c.query('SELECT 1'); return true; } catch { return false; } finally { await c.end().catch(() => {}); }
 }
 
@@ -103,32 +104,36 @@ async function check() {
 }
 
 /** Creates the database cluster, the owner and app roles, the database and extensions. Returns the passwords. */
-async function create() {
+async function create(opts = {}) {
+  if (opts.superUser) {
+    if (!/^[a-z_][a-z0-9_]{2,40}$/.test(opts.superUser) || ['edubooks', 'edubooks_app', 'postgres'].includes(opts.superUser)) throw new Error('Database username: 3–40 lowercase letters, digits or underscores (not edubooks, edubooks_app or postgres)');
+    process.env.PG_SUPER_USER = opts.superUser;
+  }
   if (fs.existsSync(DATA)) { await stop(); fs.renameSync(DATA, `${DATA}-unfinished-${Date.now()}`); }
   const pw = () => crypto.randomBytes(24).toString('base64url');
-  const superPass = pw(), ownerPass = pw(), appPass = pw();
+  const superPass = opts.superPass || pw(), ownerPass = pw(), appPass = pw();
   const pwFile = path.join(os.tmpdir(), `eb-${crypto.randomBytes(6).toString('hex')}`);
   fs.writeFileSync(pwFile, superPass + '\n', { mode: 0o600 });
   try {
-    await bin('initdb', ['-D', DATA, '-U', SUPER, `--pwfile=${pwFile}`, '--auth-local=scram-sha-256', '--auth-host=reject', '-E', 'UTF8', '--locale=C', '--no-instructions'], { timeout: 300_000 });
+    await bin('initdb', ['-D', DATA, '-U', superUser(), `--pwfile=${pwFile}`, '--auth-local=scram-sha-256', '--auth-host=reject', '-E', 'UTF8', '--locale=C', '--no-instructions'], { timeout: 300_000 });
   } finally { fs.rmSync(pwFile, { force: true }); }
   fs.chmodSync(DATA, 0o700);
   await ensureRunning(superPass);
   const { Client } = require('pg');
-  const admin = new Client({ connectionString: url(SUPER, superPass, 'postgres') });
+  const admin = new Client({ connectionString: url(superUser(), superPass, 'postgres') });
   await admin.connect();
   try {
     await admin.query(`CREATE ROLE edubooks LOGIN PASSWORD '${ownerPass}'`);
     await admin.query(`CREATE ROLE edubooks_app LOGIN PASSWORD '${appPass}' NOBYPASSRLS`);
     await admin.query('CREATE DATABASE edubooks OWNER edubooks');
   } finally { await admin.end(); }
-  const db = new Client({ connectionString: url(SUPER, superPass, 'edubooks') });
+  const db = new Client({ connectionString: url(superUser(), superPass, 'edubooks') });
   await db.connect();
   try {
     await db.query('CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS citext');
     await db.query('REVOKE CREATE ON SCHEMA public FROM PUBLIC');
   } finally { await db.end(); }
-  return { superPass, ownerPass, appPass };
+  return { superUser: superUser(), superPass, ownerPass, appPass };
 }
 
 /**
@@ -214,4 +219,4 @@ function watchdog(superPass, log) {
   }, 30_000).unref();
 }
 
-module.exports = { watchdog, url, check, create, ensureRunning, stop, backup, restoreIfRequested, scheduleBackups, DATA, BACKUPS, RESTORE, SUPER };
+module.exports = { watchdog, url, check, create, ensureRunning, stop, backup, restoreIfRequested, scheduleBackups, DATA, BACKUPS, RESTORE, superUser };
