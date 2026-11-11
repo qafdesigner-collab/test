@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { useT } from '@/lib/i18n';
 import { api, qs } from '@/lib/api';
 import { useAction } from '@/lib/hooks';
 import { Badge, Button, Card, Confirm, Dialog, ErrorBox, Field, Input, Select, Textarea, cn } from '@/components/ui';
@@ -153,12 +154,12 @@ function EventDialog({ ev, canEdit, publisher, onClose }: { ev: Partial<CalEvent
 
 /** Small "coming up" list for dashboards (teachers, school admins, children). */
 export function UpcomingEvents({ days = 45, limit = 5, playful }: { days?: number; limit?: number; playful?: boolean }) {
-  const t = today();
+  const { t: tr } = useT(); const t = today();
   const q = useCalendar(t, addDays(t, days));
   const list = (q.data ?? []).filter((e) => isUpcoming(e, t)).slice(0, limit);
   if (!list.length) return null;
   if (playful) return (
-    <section className="rounded-[2rem] bg-white p-5 shadow-sm"><h2 className="mb-3 text-2xl font-black text-slate-800">📅 Coming up</h2>
+    <section className="rounded-[2rem] bg-white p-5 shadow-sm"><h2 className="mb-3 text-2xl font-black text-slate-800">📅 {tr('Coming up')}</h2>
       <ul className="grid gap-2 sm:grid-cols-2">{list.map((e) => (
         <li key={e.id} className={cn('flex items-center gap-3 rounded-2xl border-2 px-4 py-3', KINDS[e.kind]?.cls)}>
           <span className="text-3xl" aria-hidden>{KINDS[e.kind]?.emoji}</span>
@@ -166,7 +167,7 @@ export function UpcomingEvents({ days = 45, limit = 5, playful }: { days?: numbe
     </section>);
   return (
     <Card>
-      <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-3 font-semibold"><CalendarDays className="size-4" />Coming up</div>
+      <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-3 font-semibold"><CalendarDays className="size-4" />{tr('Coming up')}</div>
       <ul className="divide-y divide-slate-100">{list.map((e) => (
         <li key={e.id} className="flex items-center gap-3 px-5 py-2.5 text-sm"><span aria-hidden>{KINDS[e.kind]?.emoji}</span>
           <span className="flex-1 font-medium text-slate-800">{e.title}</span><span className="text-xs text-slate-600">{fmtRange(e.startsOn, e.endsOn)}</span></li>))}</ul>

@@ -2,6 +2,7 @@
 /* Thirteen reusable, data-driven learning games. Each engine receives its content and calls onFinish(score). */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
 export type Engine = 'ALPHABET_MATCH' | 'PICTURE_WORD' | 'COUNTING' | 'SORTING' | 'MEMORY' | 'FILL_BLANK' | 'QUIZ' | 'SHAPES' | 'WORD_BUILD' | 'PUZZLE' | 'SPELLING_BEE' | 'SENTENCE_BUILDER' | 'LISTENING';
 export interface EngineProps { content: any; onFinish: (score: number) => void; say: (t: string) => void; onProgress?: (done: number, total: number) => void }
@@ -16,12 +17,13 @@ export const ENGINE_INFO: Record<Engine, { label: string; icon: string; color: s
 };
 
 // ---------- helpers ----------
+function T({ s, v }: { s: string; v?: Record<string, string | number> }) { return <>{useT().t(s, v)}</>; }
 export const shuffle = <T,>(a: T[]): T[] => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
 const rand = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
 const isPic = (s: string) => /\p{Extended_Pictographic}/u.test(s) && s.length <= 4;
 const TILE = 'focus-ring select-none rounded-3xl font-extrabold shadow-[0_6px_0_rgba(0,0,0,0.12)] transition active:translate-y-1 active:shadow-none motion-reduce:transition-none';
 function useShake() { const [k, setK] = useState<string | null>(null); return { shaking: k, shake: (id: string) => { setK(id); setTimeout(() => setK(null), 450); } }; }
-const Big = ({ children }: { children: React.ReactNode }) => <p className="mb-6 text-center text-2xl font-extrabold text-slate-800 sm:text-3xl">{children}</p>;
+function Big({ children }: { children: React.ReactNode }) { const { t } = useT(); return <p className="mb-6 text-center text-2xl font-extrabold text-slate-800 sm:text-3xl">{typeof children === 'string' ? t(children) : children}</p>; }
 
 // ---------- 1 & 2: matching (alphabet / picture-word) ----------
 function Match({ content, onFinish, say, onProgress }: EngineProps) {
@@ -82,7 +84,7 @@ function Counting({ content, onFinish, say, onProgress }: EngineProps) {
   }), [content]);
   return <Rounds rounds={rounds} onFinish={onFinish} onProgress={onProgress} render={(r, answer, shaking) => (
     <>
-      <Big>How many {r.thing} can you count?</Big>
+      <Big><T s="How many {thing} can you count?" v={{ thing: r.thing }} /></Big>
       <div className="mx-auto mb-8 flex max-w-xl flex-wrap justify-center gap-3 rounded-3xl bg-white p-6 text-5xl shadow-inner" onClick={() => say('How many can you count?')}>{Array.from({ length: r.n }, (_, i) => <span key={i}>{r.thing}</span>)}</div>
       <div className="flex justify-center gap-4">{r.opts.map((o: number) => <button key={o} onClick={() => answer(o === r.n, String(o))}
         className={cn(TILE, 'size-24 bg-sky-700 text-4xl text-white', shaking === String(o) && 'animate-[shake_.4s]')}>{o}</button>)}</div>
@@ -190,7 +192,7 @@ function Shapes({ content, onFinish, say, onProgress }: EngineProps) {
     return { target: opts[rand(0, opts.length - 1)], opts, colors: shuffle(SHAPE_COLORS) };
   }), [content]);
   return <Rounds rounds={rounds} onFinish={onFinish} onProgress={onProgress} render={(r, answer, shaking) => (<>
-    <Big><button onClick={() => say(`Find the ${r.target}`)}>🔊</button> Find the <span className="text-pink-600">{r.target}</span></Big>
+    <Big><button onClick={() => say(`Find the ${r.target}`)}>🔊</button> <T s="Find the" /> <span className="text-pink-600">{r.target}</span></Big>
     <SayOnce text={`Find the ${r.target}`} say={say} />
     <div className="mx-auto grid max-w-xl grid-cols-2 gap-5">{r.opts.map((sh, k) => (
       <button key={sh + k} onClick={() => answer(sh === r.target, sh)} aria-label={sh} className={cn(TILE, 'flex aspect-square items-center justify-center bg-white p-6', shaking === sh && 'animate-[shake_.4s]')}>
@@ -250,7 +252,7 @@ function Puzzle({ content, onFinish, say }: EngineProps) {
         <button key={k} onClick={() => tap(k)} aria-label={`Piece ${k + 1}`} className={cn('aspect-square rounded-lg transition', sel === k && 'ring-4 ring-amber-400 scale-95', done && 'rounded-none')}
           style={img ? { backgroundImage: `url(${img})`, backgroundSize: `${n * 100}% ${n * 100}%`, backgroundPosition: `${((piece % n) / (n - 1)) * 100}% ${(Math.floor(piece / n) / (n - 1)) * 100}%` } : undefined} />))}
     </div>
-    <p className="mt-4 text-center text-lg text-slate-500">Moves: {moves}</p>
+    <p className="mt-4 text-center text-lg text-slate-500"><T s="Moves: {n}" v={{ n: moves }} /></p>
   </>);
 }
 
@@ -273,15 +275,15 @@ function SpellingBee({ content, onFinish, say, onProgress }: EngineProps) {
   return (<>
     <Big>Listen, then spell the word</Big>
     <div className="mb-6 flex flex-wrap justify-center gap-3">
-      <button onClick={hear} className={cn(TILE, 'flex items-center gap-2 bg-amber-300 px-6 py-4 text-2xl')}>🔊 Hear the word</button>
-      {w.sentence && <button onClick={() => say(w.sentence)} className={cn(TILE, 'bg-white px-6 py-4 text-xl')}>💬 In a sentence</button>}
+      <button onClick={hear} className={cn(TILE, 'flex items-center gap-2 bg-amber-300 px-6 py-4 text-2xl')}><T s="🔊 Hear the word" /></button>
+      {w.sentence && <button onClick={() => say(w.sentence)} className={cn(TILE, 'bg-white px-6 py-4 text-xl')}><T s="💬 In a sentence" /></button>}
     </div>
     {w.hint && <div className="mb-4 text-center text-6xl">{w.hint}</div>}
     <form className="flex flex-col items-center gap-4" onSubmit={(e) => { e.preventDefault(); check(); }}>
       <input ref={input} value={reveal ? w.word : typed} readOnly={ok || reveal} onChange={(e) => setTyped(e.target.value)} aria-label="Spell the word" autoComplete="off" autoCapitalize="off" spellCheck={false}
         className={cn('w-72 rounded-3xl border-4 px-5 py-4 text-center text-4xl font-extrabold tracking-widest', ok ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : reveal ? 'border-sky-400 bg-sky-50 text-sky-800' : 'border-amber-300', shaking === 'in' && 'animate-[shake_.4s]')} />
-      {!ok && !reveal && <button className={cn(TILE, 'bg-emerald-700 px-10 py-4 text-2xl text-white')}>Check ✓</button>}
-      {tries > 0 && !ok && !reveal && <p className="text-lg font-bold text-amber-700">Try again! {3 - tries} more {3 - tries === 1 ? 'try' : 'tries'}.</p>}
+      {!ok && !reveal && <button className={cn(TILE, 'bg-emerald-700 px-10 py-4 text-2xl text-white')}><T s="Check ✓" /></button>}
+      {tries > 0 && !ok && !reveal && <p className="text-lg font-bold text-amber-700"><T s="Try again! {n} more tries." v={{ n: 3 - tries }} /></p>}
     </form>
   </>);
 }
@@ -318,11 +320,12 @@ function SentenceBuilder({ content, onFinish, say, onProgress }: EngineProps) {
 
 // ---------- 13: listen & choose ----------
 function Listening({ content, onFinish, say, onProgress }: EngineProps) {
+  const { t: tr } = useT();
   const rounds = useMemo(() => content.rounds.map((r: any) => { const opts = shuffle(r.options.map((o: string, k: number) => ({ o, ok: k === r.answer }))); return { ...r, opts }; }), [content]);
   return <Rounds rounds={rounds} onFinish={onFinish} onProgress={onProgress} render={(r: any, answer, shaking) => (<>
     <SayOnce text={r.say} say={say} />
     <Big>Listen and choose</Big>
-    <div className="mb-8 flex justify-center"><button onClick={() => say(r.say)} aria-label="Listen again" className={cn(TILE, 'flex size-28 items-center justify-center bg-sky-600 text-6xl text-white')}>🔊</button></div>
+    <div className="mb-8 flex justify-center"><button onClick={() => say(r.say)} aria-label={tr('Listen again')} className={cn(TILE, 'flex size-28 items-center justify-center bg-sky-600 text-6xl text-white')}>🔊</button></div>
     <div className="mx-auto grid max-w-2xl grid-cols-2 gap-4">{r.opts.map((x: any, k: number) => (
       <button key={k} onClick={() => answer(x.ok, String(k))} className={cn(TILE, 'flex min-h-28 items-center justify-center bg-white px-4', isPic(x.o) ? 'text-6xl' : 'text-3xl', shaking === String(k) && 'animate-[shake_.4s]')}>{x.o}</button>))}</div>
   </>)} />;

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { use, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Volume2, XCircle } from 'lucide-react';
+import { LangScope, useT } from '@/lib/i18n';
 import { api, fmtDay } from '@/lib/api';
 import { cn, ErrorBox, PageLoader } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
@@ -10,8 +11,10 @@ import { useToast } from '@/components/ui/toast';
 const COLORS = ['bg-sky-700', 'bg-pink-600', 'bg-emerald-700', 'bg-amber-700', 'bg-violet-600', 'bg-orange-700'];
 const say = (t: string) => { try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.rate = 0.85; window.speechSynthesis.speak(u); } catch { /* not available */ } };
 
-export default function Homework({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params); const qc = useQueryClient(); const toast = useToast();
+export default function Homework(props: { params: Promise<{ id: string }> }) { return <LangScope><HomeworkPage {...props} /></LangScope>; }
+
+function HomeworkPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params); const qc = useQueryClient(); const toast = useToast(); const { t } = useT();
   const q = useQuery({ queryKey: ['homework', id], queryFn: () => api.get(`/student/homework/${id}`) });
   const [i, setI] = useState(0); const [answers, setAnswers] = useState<Record<string, any>>({}); const [busy, setBusy] = useState(false);
   if (q.isLoading) return <PageLoader />;
@@ -20,37 +23,37 @@ export default function Homework({ params }: { params: Promise<{ id: string }> }
 
   const shell = (children: React.ReactNode) => (
     <main className="min-h-screen bg-gradient-to-b from-sky-50 to-amber-50 p-4 sm:p-8"><div className="mx-auto max-w-2xl">
-      <Link href="/learn" className="mb-4 inline-flex items-center gap-1 rounded-xl px-2 py-1 font-semibold text-slate-600 hover:bg-white"><ArrowLeft className="size-5" />Home</Link>
+      <Link href="/learn" className="mb-4 inline-flex items-center gap-1 rounded-xl px-2 py-1 font-semibold text-slate-600 hover:bg-white"><ArrowLeft className="size-5 rtl:rotate-180" />{t('Home')}</Link>
       <h1 className="text-2xl font-extrabold text-slate-800 sm:text-3xl">{h.title}</h1>{children}</div></main>);
 
   if (sub) {
-    const shown = (it: any, r: any) => (it.type === 'MCQ' ? it.options[r] : it.type === 'TRUE_FALSE' ? (r ? 'True' : 'False') : r) ?? '—';
+    const shown = (it: any, r: any) => (it.type === 'MCQ' ? it.options[r] : it.type === 'TRUE_FALSE' ? (r ? t('True') : t('False')) : r) ?? '—';
     return shell(<>
       <div className="my-6 rounded-3xl bg-white p-6 text-center shadow-sm">
         {sub.score !== null ? <><div className="text-6xl">{sub.score === sub.maxScore ? '🏆' : sub.score / sub.maxScore >= 0.5 ? '🌟' : '💪'}</div>
           <div className="mt-2 text-3xl font-extrabold text-amber-600">{sub.score} / {sub.maxScore}</div>
           {sub.feedback && <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-lg text-slate-700">💬 {sub.feedback}</p>}</>
-          : <><div className="text-6xl">⏳</div><p className="mt-2 text-xl font-bold">Handed in! Your teacher is checking it.</p></>}
+          : <><div className="text-6xl">⏳</div><p className="mt-2 text-xl font-bold">{t('Handed in! Your teacher is checking it.')}</p></>}
       </div>
       {sub.score !== null && <div className="space-y-3">{h.items.map((it: any, n: number) => {
         const a = sub.answers.find((x: any) => x.itemId === it.id);
         return <div key={it.id} className="rounded-3xl bg-white p-4 shadow-sm"><div className="flex items-start gap-2"><span className="font-bold">{n + 1}.</span><span className="flex-1 font-semibold">{it.prompt}</span>
           {a?.correct === true ? <CheckCircle2 className="size-6 text-emerald-500" /> : a?.correct === false ? <XCircle className="size-6 text-red-400" /> : null}</div>
-          <p className="ml-6 mt-1 text-slate-600">You said: <b>{String(shown(it, a?.response))}</b>{a?.correct === false && it.answer && <> · Answer: <b className="text-emerald-700">{String(it.type === 'MCQ' ? it.options[it.answer[0]] : it.type === 'TRUE_FALSE' ? (it.answer[0] ? 'True' : 'False') : it.answer[0])}</b></>}</p></div>;
+          <p className="ml-6 mt-1 text-slate-600">{t('You said:')} <b>{String(shown(it, a?.response))}</b>{a?.correct === false && it.answer && <> · {t('Answer:')} <b className="text-emerald-700">{String(it.type === 'MCQ' ? it.options[it.answer[0]] : it.type === 'TRUE_FALSE' ? (it.answer[0] ? t('True') : t('False')) : it.answer[0])}</b></>}</p></div>;
       })}</div>}
     </>);
   }
-  if (h.status !== 'PUBLISHED') return shell(<p className="mt-6 rounded-3xl bg-white p-6 text-center text-lg shadow-sm">This homework is closed.</p>);
+  if (h.status !== 'PUBLISHED') return shell(<p className="mt-6 rounded-3xl bg-white p-6 text-center text-lg shadow-sm">{t('This homework is closed.')}</p>);
 
   const it = h.items[i]; const last = i === h.items.length - 1; const val = answers[it.id];
   const set = (v: any) => setAnswers({ ...answers, [it.id]: v });
   const submit = async () => {
     const missing = h.items.filter((x: any) => answers[x.id] === undefined || answers[x.id] === '').length;
-    if (missing && !confirm(`You skipped ${missing} question(s). Hand in anyway?`)) return;
+    if (missing && !confirm(t('You skipped {n} question(s). Hand in anyway?', { n: missing }))) return;
     setBusy(true);
     try {
       const r = await api.post(`/student/homework/${id}/submit`, { answers: Object.entries(answers).map(([itemId, response]) => ({ itemId, response })) });
-      toast(r.status === 'GRADED' ? `You got ${r.score} out of ${r.maxScore}! 🎉` : 'Handed in! 🎉');
+      toast(r.status === 'GRADED' ? t('You got {a} out of {b}! 🎉', { a: r.score, b: r.maxScore }) : t('Handed in! 🎉'));
       qc.invalidateQueries({ queryKey: ['homework'] }); qc.invalidateQueries({ queryKey: ['myReport'] });
     } catch (e: any) { toast(e.message, 'err'); } finally { setBusy(false); }
   };
@@ -72,9 +75,9 @@ export default function Homework({ params }: { params: Promise<{ id: string }> }
       </div>
     </div>
     <div className="mt-6 flex justify-between">
-      <button disabled={i === 0} onClick={() => setI(i - 1)} className="flex items-center gap-1 rounded-2xl bg-white px-5 py-3 text-lg font-bold text-slate-600 shadow disabled:opacity-30"><ChevronLeft className="size-6" />Back</button>
-      {!last ? <button onClick={() => setI(i + 1)} className="flex items-center gap-1 rounded-2xl bg-sky-700 px-6 py-3 text-lg font-bold text-white shadow">Next<ChevronRight className="size-6" /></button>
-        : <button onClick={submit} disabled={busy} className="rounded-2xl bg-emerald-700 px-6 py-3 text-lg font-bold text-white shadow disabled:opacity-50">{busy ? '…' : '🚀 Hand in'}</button>}
+      <button disabled={i === 0} onClick={() => setI(i - 1)} className="flex items-center gap-1 rounded-2xl bg-white px-5 py-3 text-lg font-bold text-slate-600 shadow disabled:opacity-30"><ChevronLeft className="size-6 rtl:rotate-180" />{t('Back')}</button>
+      {!last ? <button onClick={() => setI(i + 1)} className="flex items-center gap-1 rounded-2xl bg-sky-700 px-6 py-3 text-lg font-bold text-white shadow">{t('Next')}<ChevronRight className="size-6 rtl:rotate-180" /></button>
+        : <button onClick={submit} disabled={busy} className="rounded-2xl bg-emerald-700 px-6 py-3 text-lg font-bold text-white shadow disabled:opacity-50">{busy ? '…' : `🚀 ${t('Hand in')}`}</button>}
     </div>
   </>);
 }

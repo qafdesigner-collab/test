@@ -5,6 +5,7 @@ import { Plus, Printer, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button, Card, ErrorBox, Input, PageLoader, Select, cn } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
+import { useT } from '@/lib/i18n';
 
 export const DAYS = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 export interface Period { number: number; label: string; startsAt: string; endsAt: string; isBreak: boolean }
@@ -17,18 +18,19 @@ const todayNo = () => ((new Date().getDay() + 6) % 7) + 1;
 
 /** Read-only weekly grid. `who` picks the second line: the teacher (class view) or the class (teacher view). */
 export function TimetableGrid({ periods, slots, who = 'teacher' }: { periods: Period[]; slots: Slot[]; who?: 'teacher' | 'class' }) {
+  const { t: tr } = useT();
   const days = daysFor(slots);
   const rows = periods.length ? periods : [...new Set(slots.map((s) => s.period))].sort((a, b) => a - b).map((n) => ({ number: n, label: '', startsAt: '', endsAt: '', isBreak: false }));
-  if (!rows.length) return <p className="p-6 text-center text-sm text-slate-600">No timetable yet.</p>;
+  if (!rows.length) return <p className="p-6 text-center text-sm text-slate-600">{tr('No timetable yet.')}</p>;
   const t = todayNo();
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[640px] table-fixed border-separate border-spacing-1 text-sm">
-        <thead><tr><th className="w-24" />{days.map((d) => <th key={d} className={cn('rounded-lg px-2 py-2 text-xs font-semibold', d === t ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700')}>{DAYS[d]}</th>)}</tr></thead>
+        <thead><tr><th className="w-24" />{days.map((d) => <th key={d} className={cn('rounded-lg px-2 py-2 text-xs font-semibold', d === t ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700')}>{tr(DAYS[d])}</th>)}</tr></thead>
         <tbody>{rows.map((p) => (
           <tr key={p.number}>
-            <th className="px-2 text-left align-middle text-xs font-medium text-slate-600"><span className="block text-slate-900">{p.label || `Period ${p.number}`}</span>{p.startsAt && `${p.startsAt}–${p.endsAt}`}</th>
-            {p.isBreak ? <td colSpan={days.length} className="rounded-lg bg-slate-50 py-2 text-center text-xs font-medium uppercase tracking-wide text-slate-600">{p.label || 'Break'}</td>
+            <th className="px-2 text-left align-middle text-xs font-medium text-slate-600"><span className="block text-slate-900">{p.label || tr('Period {n}', { n: p.number })}</span><span dir="ltr">{p.startsAt && `${p.startsAt}–${p.endsAt}`}</span></th>
+            {p.isBreak ? <td colSpan={days.length} className="rounded-lg bg-slate-50 py-2 text-center text-xs font-medium uppercase tracking-wide text-slate-600">{p.label || tr('Break')}</td>
               : days.map((d) => {
                 const s = slots.find((x) => x.weekday === d && x.period === p.number);
                 return <td key={d} className="h-14 rounded-lg border border-slate-200 px-2 py-1 align-top" style={s?.color ? { borderLeft: `4px solid ${s.color}` } : undefined}>
@@ -43,13 +45,14 @@ export function TimetableGrid({ periods, slots, who = 'teacher' }: { periods: Pe
 
 /** The signed-in teacher's or student's week. */
 export function MyTimetable({ path = '/timetable/me', title = 'My timetable' }: { path?: string; title?: string }) {
+  const { t } = useT();
   const q = useQuery({ queryKey: ['timetable', path], queryFn: () => api.get<any>(path) });
   if (q.error) return <ErrorBox error={q.error} />;
   if (!q.data) return <PageLoader />;
   return (
     <Card className="overflow-hidden">
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3"><h2 className="font-semibold text-slate-900">{title}</h2>
-        <button onClick={() => window.print()} className="inline-flex items-center gap-1 text-sm text-brand-700 hover:underline print:hidden"><Printer className="size-4" />Print</button></div>
+        <button onClick={() => window.print()} className="inline-flex items-center gap-1 text-sm text-brand-700 hover:underline print:hidden"><Printer className="size-4" />{t('Print')}</button></div>
       <div className="p-3"><TimetableGrid periods={q.data.periods} slots={q.data.slots} who={q.data.view === 'teacher' ? 'class' : 'teacher'} /></div>
     </Card>
   );
