@@ -128,4 +128,21 @@ describe('Phase 5 — AI assistant (offline provider)', () => {
     expect(st).toMatchObject({ indexStatus: 'DONE', indexedPages: 26 });
     expect((await teacher.post('/api/ai/index/components/' + part2.id)).status).toBe(403);
   });
+
+  it('reads scanned (image-only) pages with OCR and makes them searchable', async () => {
+    const { ocrAvailable } = require('../src/ai/ocr');
+    if (!(await ocrAvailable()).ok) return console.warn('OCR test skipped: tesseract/pdftoppm not installed');
+    const tree = (await admin.get(`/api/publishing/editions/${english}`)).body;
+    const part3 = tree.components[2];
+    const buf = require('fs').readFileSync(require('path').join(__dirname, 'fixtures', 'scanned-sample.pdf'));
+    expect((await admin.post(`/api/publishing/components/${part3.id}/book-pdf`).attach('file', buf, 'scanned.pdf')).body).toMatchObject({ ok: true, pages: 2 });
+    let st: any;
+    for (let i = 0; i < 120; i++) { st = (await admin.get(`/api/ai/index/editions/${english}`)).body.find((c: any) => c.id === part3.id); if (st.indexStatus !== 'RUNNING') break; await sleep(250); }
+    expect(st).toMatchObject({ indexStatus: 'DONE', indexedPages: 2 });
+    const { rows } = await owner.query(`SELECT page_number, text_content FROM book_pages WHERE component_id = $1 ORDER BY page_number`, [part3.id]);
+    expect(rows[1].text_content).toMatch(/purple kites/i);
+    const hit = await owner.query(`SELECT page_number FROM book_pages WHERE component_id = $1 AND tsv @@ plainto_tsquery('english', 'zebra umbrella')`, [part3.id]);
+    expect(hit.rows.map((r: any) => r.page_number)).toEqual([1]);
+    expect((await admin.get('/api/ai/status')).body.ocr).toBe(true);
+  });
 });

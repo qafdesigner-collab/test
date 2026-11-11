@@ -1,3 +1,4 @@
+import { ocrAvailable } from './ocr';
 import { BadRequestException, HttpException, HttpStatus, Injectable, Logger, NotFoundException, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
@@ -36,7 +37,7 @@ export class AiService {
   async status() {
     const p = this.providers.provider;
     return {
-      provider: p.name, model: p.model, live: p.live, embeddings: this.providers.embeddingsEnabled, health: await this.providers.health(),
+      provider: p.name, model: p.model, live: p.live, embeddings: this.providers.embeddingsEnabled, ocr: (await ocrAvailable()).ok, health: await this.providers.health(),
       tasks: Object.entries(TASKS).map(([id, t]) => ({ id, label: t.label, kind: t.kind })),
       ...(this.ctx.schoolId ? { usedThisMonth: await this.usedThisMonth(), monthlyLimit: config.ai.monthlyRequestsPerSchool } : {}),
     };

@@ -38,6 +38,15 @@ export const config = {
   maxUploadMb: Number(env('MAX_UPLOAD_MB', '300')),
   clamav: process.env.CLAMAV_HOST ? { host: process.env.CLAMAV_HOST, port: Number(process.env.CLAMAV_PORT || 3310) } : null,
   requireMalwareScan: process.env.REQUIRE_MALWARE_SCAN === '1',
+  ocr: {
+    /** OCR for scanned book pages (needs `pdftoppm` + `tesseract` on the server). auto = use it when installed. */
+    mode: (process.env.OCR_ENABLED || 'auto') as 'auto' | '1' | '0',
+    langs: process.env.OCR_LANGS || 'eng+urd',
+    dpi: Number(process.env.OCR_DPI || 200),
+    maxPages: Number(process.env.OCR_MAX_PAGES || 400),
+    pageTimeoutMs: Number(process.env.OCR_PAGE_TIMEOUT_MS || 60_000),
+    concurrency: Number(process.env.OCR_CONCURRENCY || 2),
+  },
   ai: {
     /** openai-compatible (self-hosted Ollama / vLLM / LM Studio, or any compatible service) | anthropic | offline */
     provider: (process.env.AI_PROVIDER || (process.env.AI_BASE_URL ? 'openai-compatible' : 'offline')) as 'openai-compatible' | 'anthropic' | 'offline',

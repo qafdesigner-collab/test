@@ -10,6 +10,7 @@ import { bookComponents, bookLessons, bookPages, bookUnits, digitalAssets } from
 import { AuditService } from '../audit/audit.service';
 import { AssetsService } from '../storage/assets.service';
 import { extractPdfPages } from './extract';
+import { ocrAvailable, ocrPages } from './ocr';
 import { AiProviderService } from './provider.service';
 
 /** Builds the searchable text index of a book part (book_pages) from its PDF. */
@@ -47,11 +48,20 @@ export class IndexerService {
     try {
       await pipeline(await this.assets.driver.read(asset.storageKey), fs.createWriteStream(tmp));
       const { pages } = await extractPdfPages(tmp);
+      // Scanned pages have no text layer: read them with OCR when the server has it installed.
+      const blank = pages.map((p, i) => (p.trim().length > 20 ? 0 : i + 1)).filter(Boolean);
+      const ocr = await ocrAvailable();
+      let ocrCount = 0;
+      if (blank.length && ocr.ok) {
+        const found = await ocrPages(tmp, blank);
+        for (const [n, text] of found) if (text.length > 20) { pages[n - 1] = text; ocrCount++; }
+      }
       const n = await this.store(c.id, c.publisherId, pages);
       const withText = pages.filter((p) => p.trim().length > 20).length;
       await this.db.q.update(bookComponents).set({ indexStatus: withText ? 'DONE' : 'NO_TEXT', indexedPages: withText, indexedAt: new Date(),
-        indexError: withText ? null : 'No selectable text found — the PDF may be scanned images (OCR is not available yet).' }).where(eq(bookComponents.id, c.id));
-      await this.audit.log('ai.index', 'book_component', c.id, `Indexed “${c.title}” for the AI assistant: ${withText} of ${n} pages with text`);
+        indexError: withText ? null : ocr.ok ? 'No readable text found, even with OCR — check the scan quality.' : 'No selectable text found — the PDF may be scanned images and OCR is not installed on the server.' })
+        .where(eq(bookComponents.id, c.id));
+      await this.audit.log('ai.index', 'book_component', c.id, `Indexed “${c.title}” for the AI assistant: ${withText} of ${n} pages with text${ocrCount ? ` (${ocrCount} read with OCR)` : ''}`);
       if (withText && this.ai.embeddingsEnabled) await this.embed(c.id).catch((e) => this.log.warn(`embeddings skipped: ${e.message}`));
     } finally {
       fs.promises.rm(tmp, { force: true }).catch(() => undefined);
