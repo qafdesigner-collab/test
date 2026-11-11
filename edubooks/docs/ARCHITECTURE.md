@@ -1,6 +1,6 @@
 # EduBooks LMS — Architecture
 
-> Status: **Phases 1–6 are implemented** — foundation, Book Package Management, products & bundles, schools, orders, the full licensing system, School Admin portal, classes, the digital reader, lesson planner, homework/quizzes/tests with marking, question bank, gradebook and report cards, the AI teaching assistant grounded in indexed book pages, and the playful student portal with 10 game engines, stars and badges. Phase 7 follows this design.
+> Status: **All 7 phases are implemented** — foundation, Book Package Management, products & bundles, schools, orders, the full licensing system, School Admin portal, classes, the digital reader, lesson planner, homework/quizzes/tests with marking, question bank, gradebook and report cards, the AI teaching assistant grounded in indexed book pages, the playful student portal with 10 game engines, stars and badges, and production hardening (lockout, idle sessions, CSP and headers, health checks, OCR, backups with a verified restore, a WCAG 2.1 AA audit, a load test, Docker, CI). See DEPLOYMENT.md, OPERATIONS.md and SECURITY.md.
 > A clickable UX prototype of the whole idea lives in `/lms` (Node + SQLite). It's for demos only and isn't production code.
 
 ---
@@ -219,13 +219,13 @@ Rule: dependencies only point "down". `licensing` is the single authority on "ca
 | 4. School & teacher LMS ✅ | Classes & sections, enrolments, teacher assignments, teacher dashboard, PDF reader (pdf.js, bookmarks, progress), assignments, quizzes, grading, evaluations | |
 | 5. AI ✅ | PDF text extraction (sandboxed child process) → `book_pages` (full-text + optional pgvector), 11 grounded generators with page citations, JSON validation, teacher approval flow, quotas, usage tracking | ✅ |
 | 6. Student portal ✅ | Playful UI, library, homework, games engine (10 types, React + SVG + pointer events instead of Phaser: lighter, touch-friendly, accessible), rewards & achievements | ✅ |
-| 7. Production | Load and security tests, accessibility audit, backups (pg_dump/PITR + bucket versioning), Docker/CI, runbooks | |
+| 7. Production ✅ | Security suite (lockout, idle expiry, headers, tenant sweep), OCR (Tesseract eng+urd), backup/restore scripts + drill, axe-core audit (44 pages clean), autocannon load test, Dockerfiles, `compose.prod.yml` + Caddy, CI, runbooks | ✅ |
 
 ---
 
 ## 7. Security & privacy notes
 - Children's data: we store the minimum (name, username, class). No email or phone is needed for students. AI prompts never include student personal data, only book or lesson content and teacher-entered text.
 - Sessions are revoked on password change, user suspension and school suspension.
-- Rate limiting covers login (per IP + username) and globally.
+- Rate limiting per session and per IP (generous, since a school lab shares one IP); account lockout after 5 wrong passwords stops password guessing.
 - Uploaded HTML/SVG never runs on the app origin (CSP sandbox, served as attachment-like opaque origin).
-- Backups: daily `pg_dump` + WAL archiving (PITR), object storage versioning. Restore drills are documented in Phase 7.
+- Backups: daily `pg_dump` + WAL archiving (PITR), object storage versioning. Scripts and the restore drill: OPERATIONS.md.

@@ -1,10 +1,14 @@
 import type { NextConfig } from 'next';
+import path from 'path';
 
 // In development (and simple deployments) Next proxies /api/* to the NestJS API so the session cookie
 // stays same-origin. In production, a reverse proxy (nginx/Caddy) can route /api directly to the API.
 const API = process.env.API_URL || 'http://localhost:4000';
 const config: NextConfig = {
   poweredByHeader: false,
+  // Self-contained server bundle for the Docker image (monorepo root for dependency tracing).
+  output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname, '..', '..'),
   async rewrites() { return [{ source: '/api/:path*', destination: `${API}/api/:path*` }]; },
   experimental: { proxyTimeout: 300_000 },
   async headers() {

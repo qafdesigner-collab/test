@@ -1,0 +1,111 @@
+name: EduBooks CI
+on:
+  push:
+    paths: ["edubooks/**", ".github/workflows/edubooks-ci.yml"]
+  pull_request:
+    paths: ["edubooks/**", ".github/workflows/edubooks-ci.yml"]
+permissions:
+  contents: read
+concurrency:
+  group: edubooks-${{ github.ref }}
+  cancel-in-progress: true
+defaults:
+  run:
+    working-directory: edubooks
+env:
+  DATABASE_OWNER_URL: postgres://edubooks:edubooks@localhost:5432/edubooks
+  DATABASE_URL: postgres://edubooks_app:edubooks_app@localhost:5432/edubooks
+
+jobs:
+  api:
+    name: API tests (PostgreSQL + RLS)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: edubooks/package-lock.json }
+      - name: OCR tools
+        run: sudo apt-get update -q && sudo apt-get install -y -q poppler-utils tesseract-ocr tesseract-ocr-urd postgresql-client
+      - name: Create roles and databases
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f infra/bootstrap.sql
+      - run: npm ci --no-audit --no-fund
+      - name: Typecheck and build
+        run: npm run build -w apps/api
+      - name: Tests
+        run: npm test
+      - name: Migrations apply cleanly to an empty database
+        run: npm run db:migrate
+      - name: Backup and verified restore
+        run: |
+          STORAGE_DIR=apps/api/storage BACKUP_DIR=/tmp/backups infra/backup/backup.sh
+          PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE restore_check OWNER edubooks"
+          PGPASSWORD=postgres psql -h localhost -U postgres -d restore_check -c "CREATE EXTENSION pgcrypto; CREATE EXTENSION citext; CREATE EXTENSION vector"
+          infra/backup/restore.sh "$(ls -d /tmp/backups/edubooks-* | tail -1)" postgres://edubooks:edubooks@localhost:5432/restore_check
+
+  web:
+    name: Web typecheck, build, accessibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: edubooks/package-lock.json }
+      - run: sudo apt-get update -q && sudo apt-get install -y -q postgresql-client
+      - run: PGPASSWORD=postgres psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f infra/bootstrap.sql
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck -w apps/web
+      - run: npm run build
+      - name: Start API and web with demo data
+        run: |
+          npm run db:migrate && npm run db:seed
+          (cd apps/api && node dist/main.js > /tmp/api.log 2>&1 &)
+          (cd apps/web && API_URL=http://localhost:4000 npx next start -p 3000 > /tmp/web.log 2>&1 &)
+          npx --yes wait-on@8.0.3 -t 60000 http://localhost:4000/api/health http://localhost:3000/login
+      - name: Accessibility audit (WCAG 2.1 AA)
+        run: |
+          npm i --no-save playwright@1.56.1 && npx playwright install --with-deps chromium
+          npm run a11y -w apps/web
+      - name: Load test (smoke)
+        run: |
+          pkill -f "dist/main.js"; (cd apps/api && RATE_LIMIT_PER_MIN=1000000 RATE_LIMIT_PER_IP_PER_MIN=1000000 node dist/main.js > /tmp/api.log 2>&1 &)
+          npx --yes wait-on@8.0.3 -t 60000 http://localhost:4000/api/health
+          P97_TARGET_MS=1500 node apps/api/scripts/load-test.mjs http://localhost:4000 15 20
+      - if: failure()
+        run: tail -n 100 /tmp/api.log /tmp/web.log || true
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm audit --omit=dev --audit-level=high
+
+  images:
+    name: Docker images
+    runs-on: ubuntu-24.04
+    needs: [api, web]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f apps/api/Dockerfile -t edubooks-api:ci .
+      - run: docker build -f apps/web/Dockerfile -t edubooks-web:ci .
+      - name: OCR tools present in API image
+        run: docker run --rm --entrypoint sh edubooks-api:ci -c "tesseract --list-langs | grep -q urd && pdftoppm -v"
+      - run: docker compose -f compose.prod.yml config -q
+        env: { DOMAIN: ci.example.com, POSTGRES_SUPERUSER_PASSWORD: x, DB_OWNER_PASSWORD: x, DB_APP_PASSWORD: x, FILE_URL_SECRET: x }

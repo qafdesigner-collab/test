@@ -77,9 +77,15 @@ need OCR first (not built in yet). Publisher usage: **Admin → AI Assistant**.
 
 ## Tests
 ```bash
-npm test     # 88 tests against the edubooks_test database
+npm test     # 96 tests against the edubooks_test database
 ```
-They cover login, sessions, RBAC, suspension, every licensing rule (capacity, concurrency, bundles, transfers, expiry, adjustments, demo expiry), reader access & privacy, marking rules, answer secrecy, class/teacher permissions, AI grounding, citation validation, approval flow, quotas and logging (with a fake OpenAI-compatible server), **PostgreSQL Row-Level Security isolation** (between publishers and between schools), the append-only audit log, package/edition/structure workflows, publish locking, edition cloning without file duplication, upload validation (magic bytes), and signed-URL tampering.
+They cover login, sessions, RBAC, suspension, every licensing rule (capacity, concurrency, bundles, transfers, expiry, adjustments, demo expiry), reader access & privacy, marking rules, answer secrecy, class/teacher permissions, AI grounding, citation validation, approval flow, quotas and logging (with a fake OpenAI-compatible server), **PostgreSQL Row-Level Security isolation** (between publishers and between schools), the append-only audit log, package/edition/structure workflows, publish locking, edition cloning without file duplication, upload validation (magic bytes), and signed-URL tampering. The **security suite** adds account lockout, idle-session expiry, security headers, anonymous/cross-role denial on every area, and a tenant sweep that checks no response leaks another school's ids. OCR of scanned pages is tested with an image-only PDF.
+
+Quality checks against a running app (with demo data):
+```bash
+npm run a11y -w apps/web                          # axe-core WCAG 2.1 AA audit of 44 pages, all roles
+node apps/api/scripts/load-test.mjs http://localhost:4000 30 50   # start the API with RATE_LIMIT_PER_MIN=1000000
+```
 
 ## Configuration (`apps/api/.env`)
 | Variable | Purpose |
@@ -90,8 +96,16 @@ They cover login, sessions, RBAC, suspension, every licensing rule (capacity, co
 | `CLAMAV_HOST`, `REQUIRE_MALWARE_SCAN=1` | Malware scanning of uploads |
 | `COOKIE_SECURE=1` | Set when served over HTTPS |
 | `MAX_UPLOAD_MB` | Upload size limit (default 300) |
+| `SESSION_IDLE_MINUTES` | Sign out after this much inactivity (default 720) |
+| `RATE_LIMIT_PER_MIN`, `RATE_LIMIT_PER_IP_PER_MIN`, `LOGIN_RATE_LIMIT` | Requests per session per minute (300), per IP (5000, since a school lab shares one IP), sign-ins per IP (60) |
+| `OCR_ENABLED`, `OCR_LANGS` | OCR of scanned book pages: `auto` uses it when Tesseract is installed; languages default to `eng+urd` |
+| `LOG_FORMAT`, `ENABLE_API_DOCS` | `json` logs and Swagger off by default when `NODE_ENV=production` |
 
-## Production notes
-- Put the web and API behind one HTTPS domain (e.g. nginx: `/api` → API:4000, everything else → web:3000).
-- Back up with daily `pg_dump` + WAL archiving, and turn on bucket versioning.
-- The app's database user must stay **non-owner** and `NOBYPASSRLS`. That's what makes tenant isolation hold even if code has a bug.
+## Production
+Everything needed to run it for real is included:
+- **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**: one-server setup with Docker Compose (`compose.prod.yml`). It includes PostgreSQL, the API, the web app, Caddy with automatic HTTPS, optional ClamAV, and first-run setup of your publisher (no demo data).
+- **[docs/OPERATIONS.md](docs/OPERATIONS.md)**: health checks, JSON logs, daily backups and the verified restore (with the drill results), and routine tasks.
+- **[docs/SECURITY.md](docs/SECURITY.md)**: every protection, how it is tested, and a go-live checklist.
+- CI (`.github/workflows/edubooks-ci.yml`) runs API tests, a backup and restore, the web build, the accessibility audit, a load smoke test, `npm audit`, and Docker image builds.
+
+The app's database user must stay **non-owner** and `NOBYPASSRLS`. That is what keeps schools isolated even if the code has a bug.
