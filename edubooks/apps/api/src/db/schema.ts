@@ -3,7 +3,7 @@
 // PostgreSQL Row-Level Security policies (see drizzle/*_rls.sql) stay simple and indexable.
 import { sql } from 'drizzle-orm';
 import {
-  pgTable, pgEnum, date as pgDate, uuid, text, integer, bigint, boolean, timestamp, jsonb, customType, index, uniqueIndex, primaryKey, check,
+  pgTable, pgEnum, date as pgDate, uuid, text, integer, bigint, boolean, timestamp, jsonb, customType, time, smallint, index, uniqueIndex, primaryKey, check,
 } from 'drizzle-orm/pg-core';
 
 const citext = customType<{ data: string }>({ dataType: () => 'citext' });
@@ -774,3 +774,35 @@ export const parentStudents = pgTable('parent_students', {
   createdAt: createdAt(),
 }, (t) => [primaryKey({ columns: [t.parentId, t.studentId] })]);
 
+
+// ---------------------------------------------------------------- attendance & timetable (0020)
+export const attendanceStatusEnum = pgEnum('attendance_status', ['PRESENT', 'ABSENT', 'LATE', 'EXCUSED']);
+export const attendance = pgTable('attendance', {
+  id: id(), ...schoolCols(),
+  classId: uuid('class_id').notNull().references(() => classes.id, { onDelete: 'cascade' }),
+  studentId: uuid('student_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  day: pgDate('day', { mode: 'string' }).notNull(),
+  status: attendanceStatusEnum('status').notNull(),
+  note: text('note').notNull().default(''),
+  markedBy: uuid('marked_by').references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex('attendance_uq').on(t.classId, t.studentId, t.day)]);
+
+export const timetablePeriods = pgTable('timetable_periods', {
+  id: id(), ...schoolCols(),
+  number: integer('number').notNull(),
+  label: text('label').notNull().default(''),
+  startsAt: time('starts_at').notNull(),
+  endsAt: time('ends_at').notNull(),
+  isBreak: boolean('is_break').notNull().default(false),
+});
+
+export const timetableSlots = pgTable('timetable_slots', {
+  id: id(), ...schoolCols(),
+  classId: uuid('class_id').notNull().references(() => classes.id, { onDelete: 'cascade' }),
+  weekday: smallint('weekday').notNull(),
+  period: integer('period').notNull(),
+  subjectId: uuid('subject_id').references(() => subjects.id, { onDelete: 'set null' }),
+  teacherId: uuid('teacher_id').references(() => users.id, { onDelete: 'set null' }),
+  room: text('room').notNull().default(''),
+});

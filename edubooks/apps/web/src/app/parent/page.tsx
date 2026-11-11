@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api, fmtDate } from '@/lib/api';
 import { Badge, Card, EmptyState, ErrorBox, PageLoader, cn } from '@/components/ui';
 import { UpcomingEvents } from '@/components/calendar';
+import { MyTimetable } from '@/components/timetable';
 import { Printer } from 'lucide-react';
 import { useBranding } from '@/lib/branding';
 import { printReportCards } from '@/lib/print-docs';
@@ -93,6 +94,7 @@ function Child({ id }: { id: string }) {
               <li key={i} className="text-sm"><div className="flex justify-between"><span className="font-medium">{r.book} · {r.part}</span><span className="text-slate-600">{p !== null ? `${p}%` : `${r.pagesRead} pages`}</span></div>
                 {p !== null && <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-sky-600" style={{ width: `${p}%` }} /></div>}</li>); })}</ul>)}</Card>
       </div>
+      <MyTimetable path={`/parent/children/${id}/timetable`} title="🗓️ Timetable" />
     </div>
   );
 }

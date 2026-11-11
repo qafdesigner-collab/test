@@ -13,6 +13,7 @@ const NAV = [
   { href: '/learn', label: 'Home', emoji: '🏠', color: 'bg-pink-600', exact: true },
   { href: '/learn/books', label: 'My Books', emoji: '📚', color: 'bg-sky-700' },
   { href: '/learn/games', label: 'Play', emoji: '🎮', color: 'bg-emerald-700' },
+  { href: '/learn/timetable', label: 'Timetable', emoji: '🗓️', color: 'bg-violet-700' },
   { href: '/learn/me', label: 'My Stars', emoji: '⭐', color: 'bg-amber-700' },
 ];
 
@@ -33,7 +34,7 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
         <NotificationBell playful />
         <button onClick={async () => { await api.post('/auth/logout'); qc.clear(); router.replace('/login'); }} className="focus-ring rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-500 shadow" aria-label="Sign out">👋 Bye</button>
       </header>
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 gap-2 bg-white/90 p-2 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur sm:static sm:mx-auto sm:mt-4 sm:max-w-5xl sm:bg-transparent sm:px-6 sm:shadow-none">
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 gap-2 bg-white/90 p-2 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur sm:static sm:mx-auto sm:mt-4 sm:max-w-5xl sm:bg-transparent sm:px-6 sm:shadow-none">
         {NAV.map((n) => {
           const on = n.exact ? path === n.href : path.startsWith(n.href);
           return <Link key={n.href} href={n.href} aria-current={on ? 'page' : undefined}
