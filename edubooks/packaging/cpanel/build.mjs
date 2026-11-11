@@ -20,6 +20,7 @@ console.log('▶ Staging files');
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(STAGE, { recursive: true });
 copy('packaging/cpanel/app.js', 'app.js');
+copy('packaging/cpanel/embedded-db.js', 'embedded-db.js');
 copy('packaging/cpanel/README.md', 'README.md');
 copy('apps/api/dist', 'api/dist', (src) => !src.endsWith('.tsbuildinfo'));
 copy('apps/api/drizzle', 'api/drizzle');
@@ -48,7 +49,10 @@ const version = require(path.join(ROOT, 'apps', 'api', 'package.json')).version 
 fs.writeFileSync(path.join(STAGE, 'package.json'), JSON.stringify({
   name: 'edubooks-lms', version, private: true, description: 'EduBooks LMS — cPanel package', main: 'app.js',
   scripts: { start: 'node app.js' }, engines: { node: '>=20' },
-  dependencies: Object.fromEntries(Object.entries(deps).sort()), overrides: rootPkg.overrides ?? {},
+  dependencies: Object.fromEntries(Object.entries(deps).sort()),
+  // Built-in PostgreSQL 16 for hosting without PostgreSQL (Linux x64 servers, which is what cPanel runs on).
+  optionalDependencies: { '@embedded-postgres/linux-x64': '16.14.0-beta.17' },
+  overrides: rootPkg.overrides ?? {},
 }, null, 2) + '\n');
 
 console.log('▶ Resolving the lockfile (and checking that a clean install works)');

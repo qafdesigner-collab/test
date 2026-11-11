@@ -36,6 +36,7 @@ function loadEnv() {
   for (const [k, v] of Object.entries(vars)) if (process.env[k] === undefined) process.env[k] = v;
 }
 const q = (v) => JSON.stringify(String(v));
+const log = (level, msg) => console.log(JSON.stringify({ time: new Date().toISOString(), level, msg }));
 
 // ---------- request handler (swapped from installer to the app after install) ----------
 let handler = (req, res) => { res.statusCode = 503; res.end('Starting…'); };
@@ -44,6 +45,14 @@ const server = http.createServer((req, res) => handler(req, res));
 async function bootApp() {
   loadEnv();
   process.env.NODE_ENV = 'production';
+  if (process.env.DB_MODE === 'embedded') {
+    const edb = require('./embedded-db');
+    const restored = await edb.restoreIfRequested(process.env.PG_SUPER_PASSWORD);
+    if (restored) log('info', `Database restored from ${restored.restored}; the previous database was kept as ${restored.previous}`);
+    await edb.ensureRunning(process.env.PG_SUPER_PASSWORD);
+    edb.scheduleBackups(process.env.PG_SUPER_PASSWORD, log);
+    edb.watchdog(process.env.PG_SUPER_PASSWORD, log);
+  }
   // Apply any database changes shipped with an update (no-op when up to date).
   await run(path.join(API, 'dist', 'db', 'migrate.js'), {});
   const express = require('express');
@@ -110,15 +119,19 @@ ${errors.length ? `<ul class="res">${errors.map((e) => `<li class="err">${esc(e)
 <label for="siteUrl">Website address</label>
 <input id="siteUrl" name="siteUrl" type="url" required placeholder="https://lms.yourdomain.com" value="${esc(host)}">
 
-<h2>3. PostgreSQL database <small>(cPanel → PostgreSQL Databases)</small></h2>
-<p>Create <strong>one database</strong> and <strong>two users</strong>, and add both users to the database with all privileges. The first user owns the tables. The app connects with the second user, so that row-level security keeps schools apart.</p>
-<div class="row"><div><label for="dbHost">Host</label><input id="dbHost" name="dbHost" required value="${v('dbHost', 'localhost')}"></div>
-<div><label for="dbPort">Port</label><input id="dbPort" name="dbPort" required value="${v('dbPort', '5432')}"></div></div>
-<label for="dbName">Database name</label><input id="dbName" name="dbName" required placeholder="cpuser_edubooks" value="${v('dbName')}">
-<div class="row"><div><label for="ownerUser">Owner user</label><input id="ownerUser" name="ownerUser" required placeholder="cpuser_owner" value="${v('ownerUser')}"></div>
-<div><label for="ownerPass">Owner password</label><input id="ownerPass" name="ownerPass" type="password" required></div></div>
-<div class="row"><div><label for="appUser">App user</label><input id="appUser" name="appUser" required placeholder="cpuser_app" value="${v('appUser')}"></div>
-<div><label for="appPass">App password</label><input id="appPass" name="appPass" type="password" required></div></div>
+<h2>3. Database</h2>
+<label class="check"><input type="radio" name="dbMode" value="embedded" ${values.dbMode !== 'external' ? 'checked' : ''}> <span><strong>Built-in database (recommended)</strong>. Use this if your hosting has only MySQL. EduBooks runs its own private PostgreSQL inside the app folder. It needs no setup and is reachable only by this app.</span></label>
+<label class="check"><input type="radio" name="dbMode" value="external" ${values.dbMode === 'external' ? 'checked' : ''}> <span><strong>My hosting's PostgreSQL</strong> (cPanel → PostgreSQL Databases), if you have it.</span></label>
+<details ${values.dbMode === 'external' ? 'open' : ''}><summary style="cursor:pointer;margin-top:10px;font-weight:600">PostgreSQL details (only for the second option)</summary>
+<p>Create one database and one extra user. Enter your <strong>main cPanel username</strong> as the owner user and the extra user as the app user.</p>
+<div class="row"><div><label for="dbHost">Host</label><input id="dbHost" name="dbHost" value="${v('dbHost', 'localhost')}"></div>
+<div><label for="dbPort">Port</label><input id="dbPort" name="dbPort" value="${v('dbPort', '5432')}"></div></div>
+<label for="dbName">Database name</label><input id="dbName" name="dbName" placeholder="cpuser_edubooks" value="${v('dbName')}">
+<div class="row"><div><label for="ownerUser">Owner user</label><input id="ownerUser" name="ownerUser" placeholder="cpuser" value="${v('ownerUser')}"></div>
+<div><label for="ownerPass">Owner password</label><input id="ownerPass" name="ownerPass" type="password"></div></div>
+<div class="row"><div><label for="appUser">App user</label><input id="appUser" name="appUser" placeholder="cpuser_app" value="${v('appUser')}"></div>
+<div><label for="appPass">App password</label><input id="appPass" name="appPass" type="password"></div></div>
+</details>
 
 <h2>4. Your publisher account</h2>
 <label for="publisher">Publisher name</label><input id="publisher" name="publisher" placeholder="Your Publishing House" value="${v('publisher')}">
@@ -163,6 +176,8 @@ async function preflight(f) {
   const storage = path.join(ROOT, 'storage');
   try { fs.mkdirSync(storage, { recursive: true }); fs.writeFileSync(path.join(storage, '.write-test'), 'ok'); fs.rmSync(path.join(storage, '.write-test')); add('ok', 'File storage folder is writable'); }
   catch (e) { add('err', `Cannot write to ${storage}: ${e.message}`); }
+  if (f.dbMode !== 'external') { out.push(...(await require('./embedded-db').check())); return out; }
+  if (!f.dbName || !f.ownerUser || !f.appUser) { add('err', 'Fill in the database name and both users, or choose the built-in database'); return out; }
   if (f.ownerUser === f.appUser) add('err', 'The owner user and the app user must be two different users');
   const { Client } = require('pg');
   const owner = new Client({ connectionString: dbUrl(f.ownerUser, f.ownerPass, f), connectionTimeoutMillis: 8000 });
@@ -204,11 +219,17 @@ async function preflight(f) {
 
 async function install(f) {
   const https = /^https:/i.test(f.siteUrl);
+  let dbEnv;
+  if (f.dbMode !== 'external') {
+    const edb = require('./embedded-db');
+    const p = await edb.create();
+    dbEnv = { DB_MODE: 'embedded', PG_SUPER_PASSWORD: p.superPass, DATABASE_OWNER_URL: edb.url('edubooks', p.ownerPass), DATABASE_URL: edb.url('edubooks_app', p.appPass), DB_POOL_MAX: '10', BACKUP_HOUR: '2', BACKUP_KEEP: '7' };
+  } else {
+    dbEnv = { DB_MODE: 'external', DATABASE_OWNER_URL: dbUrl(f.ownerUser, f.ownerPass, f), DATABASE_URL: dbUrl(f.appUser, f.appPass, f), DB_APP_ROLE: f.appUser };
+  }
   const env = {
     NODE_ENV: 'production',
-    DATABASE_OWNER_URL: dbUrl(f.ownerUser, f.ownerPass, f),
-    DATABASE_URL: dbUrl(f.appUser, f.appPass, f),
-    DB_APP_ROLE: f.appUser,
+    ...dbEnv,
     FILE_URL_SECRET: crypto.randomBytes(32).toString('base64url'),
     COOKIE_SECURE: https ? '1' : '0',
     STORAGE_DRIVER: 'local',
@@ -222,7 +243,9 @@ async function install(f) {
     ...(f.ai === 'openai-compatible' && f.aiUrl ? { AI_BASE_URL: f.aiUrl } : {}),
     ...(f.aiKey ? { AI_API_KEY: f.aiKey } : {}),
   };
-  const steps = [];
+  const text = '# Written by the EduBooks installer. Keep this file private.\n' + Object.entries(env).map(([k, v]) => `${k}=${q(v)}`).join('\n') + '\n';
+  fs.writeFileSync(ENV_FILE, text, { mode: 0o600 });
+  const steps = f.dbMode !== 'external' ? ['Built-in database created (private socket, no network access)'] : [];
   await run(path.join(API, 'dist', 'db', 'migrate.js'), env); steps.push('Database tables, security policies and functions created');
   if (f.demo) {
     await run(path.join(API, 'dist', 'db', 'seed.js'), env); steps.push('Demo data loaded (publisher admin: admin / Admin@12345 — change it)');
@@ -230,8 +253,6 @@ async function install(f) {
     await run(path.join(API, 'dist', 'db', 'setup.js'), { ...env, PUBLISHER_NAME: f.publisher, ADMIN_USERNAME: f.adminUser || 'admin', ADMIN_PASSWORD: f.adminPass });
     steps.push(`Publisher “${f.publisher}” and admin “${f.adminUser || 'admin'}” created`);
   }
-  const text = '# Written by the EduBooks installer. Keep this file private.\n' + Object.entries(env).map(([k, v]) => `${k}=${q(v)}`).join('\n') + '\n';
-  fs.writeFileSync(ENV_FILE, text, { mode: 0o600 });
   fs.writeFileSync(LOCK_FILE, `installed ${new Date().toISOString()}\n`, { mode: 0o600 });
   fs.rmSync(KEY_FILE, { force: true });
   return steps;

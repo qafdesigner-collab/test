@@ -106,7 +106,7 @@ Everything needed to run it for real is included:
 - **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**: one-server setup with Docker Compose (`compose.prod.yml`). It includes PostgreSQL, the API, the web app, Caddy with automatic HTTPS, optional ClamAV, and first-run setup of your publisher (no demo data).
 - **[docs/OPERATIONS.md](docs/OPERATIONS.md)**: health checks, JSON logs, daily backups and the verified restore (with the drill results), and routine tasks.
 - **[docs/SECURITY.md](docs/SECURITY.md)**: every protection, how it is tested, and a go-live checklist.
-- **cPanel hosting:** `npm run build:cpanel` creates `dist-cpanel/edubooks-lms-cpanel.zip`. You upload it, click *Run NPM Install*, and finish setup in the browser installer. See [packaging/cpanel/README.md](packaging/cpanel/README.md). It needs cPanel with *Setup Node.js App* (Node 20+) and PostgreSQL 13+.
+- **cPanel hosting:** `npm run build:cpanel` creates `dist-cpanel/edubooks-lms-cpanel.zip`. You upload it, click *Run NPM Install*, and finish setup in the browser installer. See [packaging/cpanel/README.md](packaging/cpanel/README.md). It needs only cPanel's *Setup Node.js App* (Node 20+). It works on **MySQL-only hosting**, because it includes a private, socket-only PostgreSQL 16 with automatic nightly backups and one-step restore. The host's own PostgreSQL can be used instead, if there is one.
 - CI (`.github/workflows/edubooks-ci.yml`) runs API tests, a backup and restore, the web build, the accessibility audit, a load smoke test, `npm audit`, and Docker image builds.
 
 The app's database user must stay **non-owner** and `NOBYPASSRLS`. That is what keeps schools isolated even if the code has a bug.

@@ -1,41 +1,25 @@
 # EduBooks LMS — install on cPanel
 
-You'll need about 15 minutes. You do everything in your browser; no command line is needed.
+**Works on hosting that has only MySQL.** EduBooks comes with its own **built-in database** (PostgreSQL 16). It runs privately inside the app folder, so your host doesn't need to provide PostgreSQL. It has no network port: only the app can reach it, through a private file socket.
+
+You'll need about 10 minutes. You do everything in your browser; no command line is needed.
 
 ## Before you start: check your hosting
-Your cPanel must have:
-
 | Needed | Where to see it in cPanel |
 |---|---|
 | **Setup Node.js App** with Node.js **20 or newer** | *Software* section |
-| **PostgreSQL Databases**, version **13 or newer** | *Databases* section |
-| About **1 GB of memory** for the app and **2 GB of disk** + space for your book PDFs | Ask your host |
+| About **512 MB–1 GB of memory** for the app (the app plus the built-in database use about 400 MB) | Ask your host, or see *Resource Usage* |
+| **2 GB of disk** + space for your book PDFs | *Disk Usage* |
 
-Most hosts only offer MySQL. **EduBooks needs PostgreSQL**: it uses PostgreSQL's row-level security to keep every school's data separate. If you don't see *PostgreSQL Databases*, ask your host to enable it, or use a VPS (see `DEPLOYMENT.md` in the source code for the Docker setup).
+MySQL is **not** used. You don't need to create any database in cPanel.
 
-Optional, if your host offers them (ask support):
-- the PostgreSQL **pgvector** extension, which gives smarter AI search,
-- the **tesseract-ocr** and **poppler-utils** programs, which read scanned (image-only) PDF pages.
+> **Ask your host first:** "May I run a Node.js app that starts its own small PostgreSQL process inside my account?" Most hosts with Node.js support allow this. A few shared hosts forbid background processes in their terms; if yours does, use a small VPS instead.
 
-Everything else works without them.
-
-## Step 1 — Create the database
-cPanel → **PostgreSQL Databases**:
-1. **Create New Database**, e.g. `edubooks` (cPanel shows it as `youruser_edubooks`).
-2. **Add New User** twice, each with its own strong password:
-   - `owner` → `youruser_owner` (owns the tables)
-   - `app` → `youruser_app` (what the website uses day to day)
-3. **Add User to Database** for **both** users, with **ALL PRIVILEGES**.
-
-On newer PostgreSQL versions (15+), an added user may not be allowed to create tables. The installer checks this. If it reports the problem, enter your **main cPanel username and password** as the *owner user* instead: the main account owns the database. Keep `youruser_app` as the *app user*.
-
-Why two users? The app user is not the owner of the tables, so PostgreSQL's row-level security always applies to it. Even if there were a bug in the code, one school could not see another school's data.
-
-## Step 2 — Upload the files
+## Step 1 — Upload the files
 1. cPanel → **File Manager**. Go to your home folder (**not** `public_html`).
 2. **Upload** `edubooks-lms-cpanel.zip`, select it, then click **Extract**. You get a folder named `edubooks-lms`.
 
-## Step 3 — Create the Node.js app
+## Step 2 — Create the Node.js app
 cPanel → **Setup Node.js App** → **Create Application**:
 
 | Field | Value |
@@ -46,56 +30,67 @@ cPanel → **Setup Node.js App** → **Create Application**:
 | Application URL | your domain or subdomain, e.g. `lms.yourdomain.com` |
 | Application startup file | `app.js` |
 
-Click **Create**. Then click **Run NPM Install** and wait until it finishes (2–5 minutes). Finally click **Restart**.
+Click **Create**. Then click **Run NPM Install** and wait until it finishes (2–5 minutes; it also downloads the built-in database). Finally click **Restart**.
 
-## Step 4 — Run the installer
+## Step 3 — Run the installer
 1. Open your site, e.g. `https://lms.yourdomain.com`. The **Install EduBooks LMS** page appears.
 2. You need the **installer key**: in File Manager, open `edubooks-lms/install-key.txt` and copy the text. The key stops anyone else from installing on your site before you do.
 3. Fill in the form:
-   - **Database:** host `localhost`, port `5432`, the database name and both users from Step 1.
+   - **Database:** leave **Built-in database (recommended)** selected.
    - **Publisher name, admin username and password:** these are your own account.
-   - **Demo data:** tick this only for a test or demo site.
+   - **Demo data:** tick this only for a test or sales-demo site. It creates sample schools with well-known passwords.
    - **AI:** start with *Offline drafts* if you're not sure. You can change it later.
-4. Click **Check and install**. The installer checks everything first and tells you exactly what to fix if something is missing. Then it creates the tables and your account.
+4. Click **Check and install**. The installer checks the server first and tells you exactly what to fix if something is missing. Installation takes a few seconds.
 5. Sign in at `/login` → **Publisher staff**.
 
 The installer locks itself afterwards (`install.lock`), and `install-key.txt` is deleted.
 
-## Step 5 — HTTPS
-cPanel → **SSL/TLS Status** → make sure your domain has an **AutoSSL** certificate. Always use `https://`. Sign-in cookies are only sent over HTTPS when you installed with an `https://` address.
+## Step 4 — HTTPS
+cPanel → **SSL/TLS Status** → make sure your domain has an **AutoSSL** certificate, and always use `https://`. Sign-in cookies are only sent over HTTPS when you installed with an `https://` address.
 
-## Backups
-- cPanel → **Backup** → download a **PostgreSQL database backup** of your database, and a **Home Directory** backup (this includes `edubooks-lms/storage`, where the book PDFs and uploads are kept).
-- Do this at least weekly, and before every update. Keep a copy off the server.
-- If your host offers **JetBackup** or automatic backups, make sure they include PostgreSQL databases.
+## Backups (automatic)
+- **Every night at 2:00** (server time), the app saves a complete copy of the database to `edubooks-lms/backups/edubooks-db-<date>.tar.gz`. It keeps the last 7. The database pauses for a few seconds while the copy is made.
+- **Book PDFs and uploads** are kept in `edubooks-lms/storage`. Files there are never changed once saved, so cPanel's normal backup copies them safely.
+- **Download a copy off the server regularly.** Use cPanel → **Backup** → *Download a Home Directory Backup*, or download the newest file from `backups/` with File Manager. This is your protection if the server itself fails.
+- Settings in `.env`: `BACKUP_HOUR` (0–23, or `off`), `BACKUP_KEEP` (how many to keep).
+
+## Restore a backup
+1. In File Manager, create a folder `edubooks-lms/restore` (if it doesn't exist).
+2. Copy **one** backup file (`edubooks-db-….tar.gz`) into it.
+3. Setup Node.js App → **Restart**.
+
+The app restores that backup while it starts. It keeps your current database as `pgdata-before-restore-…`, in case you need it, and renames the file in `restore/` to `restored-….done`. If anything goes wrong, the previous database is put back automatically. Once you're happy, you can delete the `pgdata-before-restore-…` folder.
 
 ## Updating to a new version
-1. Back up first (see above).
-2. In Setup Node.js App, click **Stop App**.
-3. Upload the new zip and extract it **over** the existing folder. Your `.env`, `install.lock` and `storage` folder are kept, because the zip does not contain them.
-4. Click **Run NPM Install**, then **Restart**. New database changes are applied automatically when the app starts.
+1. Make sure there is a fresh backup (or wait for the nightly one).
+2. Setup Node.js App → **Stop App**.
+3. Upload the new zip and extract it **over** the existing folder. Your `.env`, `install.lock`, `pgdata`, `storage` and `backups` are kept, because the zip does not contain them.
+4. Click **Run NPM Install**, then **Restart**. Database changes are applied automatically when the app starts.
 
 ## Settings
-After installation, all settings are in `edubooks-lms/.env` (open it with File Manager → Edit). Restart the app after any change. Useful ones:
+After installation, all settings are in `edubooks-lms/.env` (File Manager → Edit). Restart the app after any change.
 
 | Setting | Meaning |
 |---|---|
 | `AI_PROVIDER` | `offline`, `anthropic` (with `AI_API_KEY`) or `openai-compatible` (with `AI_BASE_URL`, `AI_MODEL`) |
 | `AI_MONTHLY_REQUESTS_PER_SCHOOL` | AI limit per school per month (default 1000) |
-| `MAX_UPLOAD_MB` | Largest file upload (100). Your host's web server may also limit uploads; if large PDFs fail, ask support to raise *LimitRequestBody*. |
+| `MAX_UPLOAD_MB` | Largest file upload (100). If large PDFs fail, your host's web server may have a lower limit; ask support to raise *LimitRequestBody*. |
 | `SESSION_IDLE_MINUTES` | Sign out after this much inactivity (720 = 12 hours) |
 
-Keep `.env` private. It contains your database passwords.
+Keep `.env` private. It contains the database passwords. **Never delete or edit the `pgdata` folder**: it is the live database.
 
 ## Troubleshooting
 | Problem | Fix |
 |---|---|
-| "Packages are missing" in the installer | Setup Node.js App → **Run NPM Install** → **Restart** |
-| Page says "could not start" | Check the log: Setup Node.js App shows the path (often `edubooks-lms/stderr.log`). Fix the setting it mentions in `.env`, then Restart. |
-| "Extension citext / pgcrypto could not be enabled" | Ask your host: *"Please run `CREATE EXTENSION citext; CREATE EXTENSION pgcrypto;` in my database youruser_edubooks."* Then run the installer again. |
-| "PostgreSQL 13 or newer is needed" | Ask your host to upgrade, or use a VPS. |
-| Large PDF uploads fail | Lower the file size, or ask your host to raise the upload limit. |
+| "Packages are missing", or "Built-in PostgreSQL is not installed" | Setup Node.js App → **Run NPM Install** → **Restart** |
+| "The app runs as root" | Only on a self-managed server: run the app as a normal user. cPanel never runs apps as root. |
+| "Built-in database cannot run on this server" | Your host blocks running programs from your home folder. Ask support, or use a VPS. |
+| Page says "could not start" | Check `edubooks-lms/stderr.log` (the path is shown in Setup Node.js App) and `edubooks-lms/logs/postgres.log`. Then Restart. |
 | Very slow, or the app keeps restarting | Your plan is short of memory. Ask for at least 1 GB for the Node.js app. |
+| The host stopped the database process | Nothing to do: the app notices within 30 seconds and starts it again. |
+
+## Already have PostgreSQL?
+If your hosting *does* offer PostgreSQL 13+, you can choose **My hosting's PostgreSQL** in the installer instead. Create a database and one extra user in cPanel → PostgreSQL Databases. Enter your **main cPanel username** as the *owner user* and the extra user as the *app user*. With this option, use cPanel → Backup to back up the database.
 
 ## Limits of shared hosting
-cPanel is fine for getting started, demos and a modest number of schools. For many schools at once, a VPS with the Docker setup is faster and supports automatic daily backups, ClamAV virus scanning and OCR. Your data moves over with a normal PostgreSQL backup and restore.
+This is fine for getting started, demos and a modest number of schools (a few hundred pupils online at the same time). For many schools at once, a VPS with the Docker setup is faster and adds virus scanning of uploads and OCR for scanned books. To move, take a backup file from `backups/`. It contains a standard PostgreSQL 16 data folder that any PostgreSQL 16 server can start from.
