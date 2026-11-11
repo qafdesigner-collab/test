@@ -1,5 +1,5 @@
 /*
- * EduBooks self-updater (cPanel / single-folder installs).
+ * Knowledge Gate self-updater (cPanel / single-folder installs).
  *
  *  stage(zip)  – unpacks an update package into updates/staging and checks it
  *  apply()     – safety backup of the database, swaps the code, restarts the app
@@ -86,7 +86,7 @@ async function stage(zipFile) {
     await unzip(zipFile, STAGING);
   } finally { rm(zipFile); }
   const base = [STAGING, path.join(STAGING, 'edubooks-app')].find((d) => fs.existsSync(path.join(d, 'app.js')) && fs.existsSync(path.join(d, 'BUILD_ID')));
-  if (!base) { rm(STAGING); throw new Error('This is not an EduBooks update package (app.js / BUILD_ID not found).'); }
+  if (!base) { rm(STAGING); throw new Error('This is not an Knowledge Gate update package (app.js / BUILD_ID not found).'); }
   for (const must of ['api/dist/main.js', 'api/drizzle/meta/_journal.json', 'web/.next/BUILD_ID']) {
     if (!fs.existsSync(path.join(base, must))) { rm(STAGING); throw new Error(`The package is incomplete (${must} is missing).`); }
   }

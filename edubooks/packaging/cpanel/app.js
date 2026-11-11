@@ -1,5 +1,5 @@
 /*
- * EduBooks LMS — single-process entry for cPanel "Setup Node.js App" (Phusion Passenger).
+ * Knowledge Gate — single-process entry for cPanel "Setup Node.js App" (Phusion Passenger).
  * Serves the API (/api/*) and the website from one Node.js process.
  * On first start (no install.lock) it runs a browser-based installer instead.
  */
@@ -39,7 +39,13 @@ const q = (v) => JSON.stringify(String(v));
 const log = (level, msg) => console.log(JSON.stringify({ time: new Date().toISOString(), level, msg }));
 
 // ---------- request handler (swapped from installer to the app after install) ----------
-let handler = (req, res) => { res.statusCode = 503; res.end('Starting…'); };
+const startingPage = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="3"><title>Starting…</title></head>'
+  + '<body style="margin:0;display:grid;place-items:center;min-height:100vh;font-family:system-ui,sans-serif;background:linear-gradient(135deg,#fef3c7,#e0e7ff 45%,#fce7f3);color:#1e293b">'
+  + '<div style="text-align:center"><div style="font-size:48px">📚</div><h1 style="margin:8px 0">Knowledge Gate is starting…</h1><p style="color:#475569">This page reloads by itself in a few seconds.</p></div></body></html>';
+let handler = (req, res) => {
+  if (req.url.startsWith('/api/')) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '3' }); return res.end('{"statusCode":503,"message":"Starting"}'); }
+  res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8', 'Retry-After': '3', 'Cache-Control': 'no-store' }); res.end(startingPage);
+};
 const server = http.createServer((req, res) => handler(req, res));
 
 async function bootApp() {
@@ -84,7 +90,7 @@ async function bootApp() {
   await app.init();
   handler = withStatus(ex);
   try { require('./updater').onBootSuccess(log); } catch (e) { log('error', `Update bookkeeping failed: ${e.message}`); }
-  console.log(JSON.stringify({ level: 'info', msg: 'EduBooks LMS started', node: process.version }));
+  console.log(JSON.stringify({ level: 'info', msg: 'Knowledge Gate started', node: process.version }));
 }
 
 // ---------- installer ----------
@@ -116,8 +122,8 @@ code{background:#eef2ff;padding:2px 6px;border-radius:6px}.logo{font-size:40px}
 function form(values = {}, errors = []) {
   const v = (k, d = '') => esc(values[k] ?? d);
   const host = values.siteUrl || '';
-  return page('Install EduBooks LMS', `
-<div class="card"><div class="logo">📚✨</div><h1>Install EduBooks LMS</h1>
+  return page('Install Knowledge Gate', `
+<div class="card"><div class="logo">📚✨</div><h1>Install Knowledge Gate</h1>
 <p>This one-time setup connects the app to its database and creates your publisher account. It takes about a minute.</p>
 ${errors.length ? `<ul class="res">${errors.map((e) => `<li class="err">${esc(e)}</li>`).join('')}</ul>` : ''}
 </div>
@@ -131,7 +137,7 @@ ${errors.length ? `<ul class="res">${errors.map((e) => `<li class="err">${esc(e)
 <input id="siteUrl" name="siteUrl" type="url" required placeholder="https://lms.yourdomain.com" value="${esc(host)}">
 
 <h2>3. Database</h2>
-<label class="check"><input type="radio" name="dbMode" value="embedded" ${values.dbMode !== 'external' ? 'checked' : ''}> <span><strong>Built-in database (recommended)</strong>. Use this if your hosting has only MySQL. EduBooks runs its own private PostgreSQL inside the app folder. It needs no setup and is reachable only by this app.</span></label>
+<label class="check"><input type="radio" name="dbMode" value="embedded" ${values.dbMode !== 'external' ? 'checked' : ''}> <span><strong>Built-in database (recommended)</strong>. Use this if your hosting has only MySQL. Knowledge Gate runs its own private PostgreSQL inside the app folder. It needs no setup and is reachable only by this app.</span></label>
 <label class="check"><input type="radio" name="dbMode" value="external" ${values.dbMode === 'external' ? 'checked' : ''}> <span><strong>My hosting's PostgreSQL</strong> (cPanel → PostgreSQL Databases), if you have it.</span></label>
 <details ${values.dbMode === 'external' ? 'open' : ''}><summary style="cursor:pointer;margin-top:10px;font-weight:600">PostgreSQL details (only for the second option)</summary>
 <p>Create one database and one extra user. Enter your <strong>main cPanel username</strong> as the owner user and the extra user as the app user.</p>
@@ -209,7 +215,7 @@ async function preflight(f) {
     const existing = (await owner.query(`SELECT count(*)::int AS n FROM pg_tables WHERE schemaname = 'public'`)).rows[0].n;
     const migrated = (await owner.query(`SELECT to_regclass('drizzle.__drizzle_migrations') IS NOT NULL AS m`)).rows[0].m;
     if (existing && !migrated) add('err', `The database already contains ${existing} other tables. Use a new, empty database.`);
-    else if (migrated) add('warn', 'The database already has EduBooks tables — they will be upgraded, not erased.');
+    else if (migrated) add('warn', 'The database already has Knowledge Gate tables — they will be upgraded, not erased.');
   } catch (e) { add('err', `Cannot connect as the owner user: ${e.message}`); }
   finally { await owner.end().catch(() => {}); }
   const app = new Client({ connectionString: dbUrl(f.appUser, f.appPass, f), connectionTimeoutMillis: 8000 });
@@ -254,7 +260,7 @@ async function install(f) {
     ...(f.ai === 'openai-compatible' && f.aiUrl ? { AI_BASE_URL: f.aiUrl } : {}),
     ...(f.aiKey ? { AI_API_KEY: f.aiKey } : {}),
   };
-  const text = '# Written by the EduBooks installer. Keep this file private.\n' + Object.entries(env).map(([k, v]) => `${k}=${q(v)}`).join('\n') + '\n';
+  const text = '# Written by the Knowledge Gate installer. Keep this file private.\n' + Object.entries(env).map(([k, v]) => `${k}=${q(v)}`).join('\n') + '\n';
   fs.writeFileSync(ENV_FILE, text, { mode: 0o600 });
   const steps = f.dbMode !== 'external' ? ['Built-in database created (private socket, no network access)'] : [];
   await run(path.join(API, 'dist', 'db', 'migrate.js'), env); steps.push('Database tables, security policies and functions created');
@@ -275,7 +281,7 @@ function installer() {
   return async (req, res) => {
     const send = (code, html) => { res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer' }); res.end(html); };
     const url = new URL(req.url, 'http://x');
-    if (url.pathname.startsWith('/api/')) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ statusCode: 503, message: 'EduBooks is not installed yet. Open the website to run the installer.' })); }
+    if (url.pathname.startsWith('/api/')) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ statusCode: 503, message: 'Knowledge Gate is not installed yet. Open the website to run the installer.' })); }
     if (req.method !== 'POST' || url.pathname !== '/install') return send(200, form());
     if (busy) return send(409, page('Installing', '<div class="card"><h1>Installation is already running…</h1><p>Wait a minute, then reload.</p></div>'));
     let f;
@@ -297,11 +303,11 @@ function installer() {
       const list = `<ul class="res">${checks.map((c) => `<li class="${c.level}">${c.level === 'ok' ? '✅' : c.level === 'warn' ? '⚠️' : '❌'} ${esc(c.text)}</li>`).join('')}</ul>`;
       if (checks.some((c) => c.level === 'err')) return send(400, form(f, ['Please fix the problems below and try again.', ...checks.filter((c) => c.level === 'err').map((c) => c.text)]));
       const steps = await install(f);
-      send(200, page('EduBooks installed', `<div class="card"><div class="logo">🎉</div><h1>EduBooks is installed!</h1>${list}
+      send(200, page('Knowledge Gate installed', `<div class="card"><div class="logo">🎉</div><h1>Knowledge Gate is installed!</h1>${list}
 <ul class="res">${steps.map((s) => `<li class="ok">✅ ${esc(s)}</li>`).join('')}</ul>
 <p>The app is starting now. In a few seconds, <a href="/login">open the sign-in page</a> and choose <strong>Publisher staff</strong>.</p>
 <p>Next: set up a daily backup (see the README) and enable the <strong>AutoSSL</strong> certificate for this domain if it is not already active.</p></div>`));
-      bootApp().catch((e) => { console.error('Start failed after install:', e); handler = (rq, rs) => { rs.statusCode = 500; rs.end('EduBooks was installed but could not start. Restart the app in cPanel → Setup Node.js App, and check the log file.'); }; });
+      bootApp().catch((e) => { console.error('Start failed after install:', e); handler = (rq, rs) => { rs.statusCode = 500; rs.end('Knowledge Gate was installed but could not start. Restart the app in cPanel → Setup Node.js App, and check the log file.'); }; });
     } catch (e) {
       send(500, form(f, [`Installation failed: ${e.message}`]));
     } finally { busy = false; }
@@ -327,7 +333,7 @@ async function autoInstall() {
     if (bad.length) throw new Error(bad.map((c) => c.text).join(' • '));
     writeStatus({ state: 'installing', message: 'Creating the database and your account…' });
     const steps = await install({ ...f, dbMode: 'embedded' });
-    writeStatus({ state: 'installing', message: 'Starting EduBooks…', steps });
+    writeStatus({ state: 'installing', message: 'Starting Knowledge Gate…', steps });
     await bootApp();
     writeStatus({ state: 'done', steps });
   } catch (e) {
@@ -350,18 +356,18 @@ function withStatus(h) {
   };
 }
 const busyPage = (req, res) => {
-  if (req.url.startsWith('/api/')) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '5' }); return res.end('{"statusCode":503,"message":"EduBooks is being installed"}'); }
+  if (req.url.startsWith('/api/')) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '5' }); return res.end('{"statusCode":503,"message":"Knowledge Gate is being installed"}'); }
   res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8', 'Retry-After': '5' });
-  res.end(page('Installing EduBooks', '<div class="card"><div class="logo">⏳</div><h1>EduBooks is being installed…</h1><p>This takes about a minute. This page reloads by itself.</p><script>setTimeout(()=>location.reload(),4000)</script></div>'));
+  res.end(page('Installing Knowledge Gate', '<div class="card"><div class="logo">⏳</div><h1>Knowledge Gate is being installed…</h1><p>This takes about a minute. This page reloads by itself.</p><script>setTimeout(()=>location.reload(),4000)</script></div>'));
 };
 
 // ---------- start ----------
-server.listen(process.env.PORT || 3000, () => console.log(`EduBooks listening (${fs.existsSync(LOCK_FILE) ? 'app' : 'installer'} mode)`));
+server.listen(process.env.PORT || 3000, () => console.log(`Knowledge Gate listening (${fs.existsSync(LOCK_FILE) ? 'app' : 'installer'} mode)`));
 if (fs.existsSync(LOCK_FILE)) {
   bootApp().catch((e) => {
-    console.error('EduBooks failed to start:', e);
+    console.error('Knowledge Gate failed to start:', e);
     try { if (require('./updater').onBootFailure(e, log)) { handler = busyPage; return; } } catch (e2) { console.error('Automatic rollback failed:', e2); }
-    handler = (req, res) => { res.statusCode = 500; res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.end('EduBooks could not start. Check the application log in cPanel (stderr.log) and the .env settings, then restart the app.'); };
+    handler = (req, res) => { res.statusCode = 500; res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.end('Knowledge Gate could not start. Check the application log in cPanel (stderr.log) and the .env settings, then restart the app.'); };
   });
 } else if (fs.existsSync(AUTO_FILE) || fs.existsSync(path.join(ROOT, 'install.running'))) {
   handler = withStatus(busyPage);

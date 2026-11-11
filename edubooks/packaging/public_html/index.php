@@ -1,6 +1,6 @@
 <?php
 /*
- * EduBooks LMS — setup wizard for cPanel.
+ * Knowledge Gate — setup wizard for cPanel.
  * Upload the zip into your domain's root folder (public_html), extract it, and open your domain.
  * The wizard checks the server, asks for the super admin and database login, moves the app
  * OUT of public_html (so no app file can ever be downloaded), connects the domain to it and installs it.
@@ -68,7 +68,7 @@ function make_executable(string $appDir): void {
 }
 
 /**
- * Real test: runs a tiny Node.js app through the web server (Phusion Passenger), exactly like EduBooks will run.
+ * Real test: runs a tiny Node.js app through the web server (Phusion Passenger), exactly like Knowledge Gate will run.
  * Returns [ok(bool), node(string), detail(string)].
  */
 function passenger_test(string $docroot, string $home, string $payload): array {
@@ -112,14 +112,14 @@ function checks(string $docroot, string $home, string $payload, string $target):
   $c[] = [version_compare(PHP_VERSION, '7.4', '>=') ? 'ok' : 'err', 'PHP ' . PHP_VERSION . ' (for this setup wizard)'];
   $stray = array_values(array_filter(['api', 'web', 'node_modules', 'runtime', 'app.js', 'embedded-db.js', 'package.json'], fn($f) => file_exists("$docroot/$f")));
   if ($stray) $c[] = ['err', 'App files were moved into this folder (' . h(implode(', ', $stray)) . '). They must stay inside <b>' . APP_DIR_NAME . '</b>. Delete them here (and any <b>.htaccess</b> that says "Deny"), keep only <b>index.php</b> and the <b>' . APP_DIR_NAME . '</b> folder, then reload.'];
-  $c[] = [is_file("$payload/app.js") ? 'ok' : 'err', is_file("$payload/app.js") ? 'EduBooks files found' : 'The folder "' . APP_DIR_NAME . '" is missing. Extract the whole zip into this folder.'];
+  $c[] = [is_file("$payload/app.js") ? 'ok' : 'err', is_file("$payload/app.js") ? 'Knowledge Gate files found' : 'The folder "' . APP_DIR_NAME . '" is missing. Extract the whole zip into this folder.'];
   $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-  $c[] = [in_array($path, ['/', '/index.php'], true) ? 'ok' : 'err', in_array($path, ['/', '/index.php'], true) ? 'Installed at the root of ' . h($_SERVER['HTTP_HOST'] ?? '') : 'EduBooks must be installed in the ROOT folder of a domain or subdomain (not in a sub-folder).'];
+  $c[] = [in_array($path, ['/', '/index.php'], true) ? 'ok' : 'err', in_array($path, ['/', '/index.php'], true) ? 'Installed at the root of ' . h($_SERVER['HTTP_HOST'] ?? '') : 'Knowledge Gate must be installed in the ROOT folder of a domain or subdomain (not in a sub-folder).'];
   $c[] = [is_writable($home) ? 'ok' : 'err', is_writable($home) ? 'Home folder is writable' : "Cannot write to your home folder ($home)"];
   $c[] = [is_writable($docroot) ? 'ok' : 'err', is_writable($docroot) ? 'Website folder is writable' : 'Cannot write to this folder'];
   $free = @disk_free_space($home);
   if ($free !== false) $c[] = [$free > 1.5e9 ? 'ok' : 'warn', 'Free disk space: ' . round($free / 1e9, 1) . ' GB' . ($free > 1.5e9 ? '' : ' (at least 1.5 GB is recommended)')];
-  if (is_file("$target/install.lock")) $c[] = ['err', 'EduBooks is already installed in ' . $target . '. To reinstall, delete or rename that folder first.'];
+  if (is_file("$target/install.lock")) $c[] = ['err', 'Knowledge Gate is already installed in ' . $target . '. To reinstall, delete or rename that folder first.'];
   return $c;
 }
 
@@ -128,7 +128,7 @@ function layout(string $title, int $step, string $body): void {
   $steps = ['Check', 'Super admin', 'Database', 'Install'];
   $nav = '';
   foreach ($steps as $i => $s) $nav .= '<li class="' . ($i + 1 < $step ? 'done' : ($i + 1 === $step ? 'now' : '')) . '"><b>' . ($i + 1 < $step ? '✓' : $i + 1) . '</b>' . h($s) . '</li>';
-  echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . h($title) . ' · EduBooks setup</title><style>
+  echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . h($title) . ' · Knowledge Gate setup</title><style>
 :root{--brand:#4338ca;--ink:#1e293b;--muted:#475569}*{box-sizing:border-box}
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:linear-gradient(135deg,#fef3c7,#e0e7ff 45%,#fce7f3);color:var(--ink);min-height:100vh}
 main{max-width:680px;margin:0 auto;padding:28px 16px}.top{display:flex;align-items:center;gap:10px;font-weight:800;font-size:22px;color:#6d28d9;margin-bottom:18px}
@@ -147,7 +147,7 @@ ul.res{list-style:none;padding:0;margin:14px 0}ul.res li{padding:9px 12px;border
 .check{display:flex;gap:8px;align-items:flex-start;font-weight:400}.check input{width:auto;margin-top:4px}
 code{background:#eef2ff;padding:2px 6px;border-radius:6px}.bar{height:12px;border-radius:99px;background:#e2e8f0;overflow:hidden;margin:18px 0}.bar i{display:block;height:100%;width:30%;background:linear-gradient(90deg,#6366f1,#ec4899);border-radius:99px;animation:mv 1.4s ease-in-out infinite}
 @keyframes mv{0%{margin-left:-30%}100%{margin-left:100%}}
-</style></head><body><main><div class="top">📚 EduBooks LMS setup</div><ol class="steps">' . $nav . '</ol>' . $body . '</main></body></html>';
+</style></head><body><main><div class="top">📚 Knowledge Gate setup</div><ol class="steps">' . $nav . '</ol>' . $body . '</main></body></html>';
   exit;
 }
 function hidden(): string { return '<input type="hidden" name="csrf" value="' . h($_SESSION['csrf']) . '">'; }
@@ -159,7 +159,7 @@ function list_html(array $rows): string {
 
 // ---------------------------------------------------------------- already installed?
 if (is_file("$target/install.lock") && !is_dir($payload)) {
-  layout('Installed', 4, '<div class="card"><h1>EduBooks is installed 🎉</h1><p>If you still see this page, your web server is not passing requests to the app yet. Wait a minute and reload. If it stays, open cPanel → <b>Setup Node.js App</b> and make sure the app is running.</p><p><a class="btn" href="/login">Open EduBooks</a></p></div>');
+  layout('Installed', 4, '<div class="card"><h1>Knowledge Gate is installed 🎉</h1><p>If you still see this page, your web server is not passing requests to the app yet. Wait a minute and reload. If it stays, open cPanel → <b>Setup Node.js App</b> and make sure the app is running.</p><p><a class="btn" href="/login">Open Knowledge Gate</a></p></div>');
 }
 
 // ---------------------------------------------------------------- update an existing installation
@@ -183,11 +183,11 @@ if (is_file("$target/install.lock") && is_dir($payload)) {
     } catch (Throwable $e) {
       layout('Update', 4, '<div class="card"><h1>Update failed</h1>' . list_html([['err', h($e->getMessage())]]) . '<p>Your installed version was not changed.</p></div>');
     }
-    layout('Updated', 4, '<div class="card"><h1 id="t">Updating EduBooks…</h1><p id="m">The app restarts and applies database changes. A safety backup of the database is made first.</p><div class="bar" id="bar"><i></i></div><p id="go" hidden><a class="btn" href="/login">Open EduBooks →</a></p></div>
-<script>let n=0;async function poll(){n++;try{const r=await fetch("/api/health/ready?"+Date.now(),{cache:"no-store"});if(r.ok){document.getElementById("t").textContent="EduBooks is updated 🎉";document.getElementById("m").textContent="Everything is ready.";document.getElementById("bar").hidden=true;document.getElementById("go").hidden=false;return}}catch(e){}
+    layout('Updated', 4, '<div class="card"><h1 id="t">Updating Knowledge Gate…</h1><p id="m">The app restarts and applies database changes. A safety backup of the database is made first.</p><div class="bar" id="bar"><i></i></div><p id="go" hidden><a class="btn" href="/login">Open Knowledge Gate →</a></p></div>
+<script>let n=0;async function poll(){n++;try{const r=await fetch("/api/health/ready?"+Date.now(),{cache:"no-store"});if(r.ok){document.getElementById("t").textContent="Knowledge Gate is updated 🎉";document.getElementById("m").textContent="Everything is ready.";document.getElementById("bar").hidden=true;document.getElementById("go").hidden=false;return}}catch(e){}
 if(n>90){document.getElementById("m").textContent="Still restarting. If this stays, open cPanel → Setup Node.js App and click Restart.";return}setTimeout(poll,2000)}setTimeout(poll,3000);</script>');
   }
-  layout('Update', 4, '<form method="post" class="card">' . hidden() . '<h1>Update EduBooks? 🔄</h1><p>EduBooks is already installed in <code>' . h($target) . '</code>. You uploaded a new version.</p>'
+  layout('Update', 4, '<form method="post" class="card">' . hidden() . '<h1>Update Knowledge Gate? 🔄</h1><p>Knowledge Gate is already installed in <code>' . h($target) . '</code>. You uploaded a new version.</p>'
     . list_html([['ok', 'Kept: your database, settings (.env), uploaded books and files, and backups'], ['ok', 'A safety backup of the database is made before the update'], ['ok', 'The app restarts by itself (a few seconds of downtime)']])
     . '<div class="btns"><span></span><button class="btn" name="step" value="update">Update now</button></div></form>');
 }
@@ -216,7 +216,7 @@ if ($step === 'check' || $step === 'retest') {
   }
   $help = $passengerOk || $hardFail ? '' : '<div class="note">Before you continue, check that cPanel has <b>Setup Node.js App</b> (or <i>Application Manager</i>) under <i>Software</i>. If it is missing, ask your host: <i>"Please enable Node.js applications for my account."</i></div>';
   $can = !$hardFail;
-  layout('Server check', 1, '<form method="post" class="card">' . hidden() . '<h1>Welcome! 👋</h1><p>This wizard installs EduBooks LMS on <b>' . h($_SERVER['HTTP_HOST'] ?? '') . '</b>. First, a quick check of your server:</p>' . list_html($rows) . $help
+  layout('Server check', 1, '<form method="post" class="card">' . hidden() . '<h1>Welcome! 👋</h1><p>This wizard installs Knowledge Gate on <b>' . h($_SERVER['HTTP_HOST'] ?? '') . '</b>. First, a quick check of your server:</p>' . list_html($rows) . $help
     . '<div class="btns"><button class="btn ghost" name="step" value="retest">Test again</button>' . ($can ? '<button class="btn" name="step" value="admin">Next →</button>' : '') . '</div></form>');
 }
 
@@ -257,7 +257,7 @@ if ($step === 'database') {
   if (empty($_SESSION['admin'])) { header('Location: ./'); exit; }
   $d = $_SESSION['db'] ?? ['dbUser' => 'eb_admin'];
   layout('Database', 3, '<form method="post" class="card" autocomplete="off">' . hidden() . '<h1>Database login</h1>'
-    . '<div class="note">EduBooks brings its <b>own private database</b> (PostgreSQL), so <b>your MySQL is not used</b> and you don\'t need to create anything in cPanel. Choose a new username and password for it. Keep them safe: you only need them for maintenance.</div>'
+    . '<div class="note">Knowledge Gate brings its <b>own private database</b> (PostgreSQL), so <b>your MySQL is not used</b> and you don\'t need to create anything in cPanel. Choose a new username and password for it. Keep them safe: you only need them for maintenance.</div>'
     . ($errors ? list_html(array_map(fn($e) => ['err', h($e)], $errors)) : '')
     . '<label for="dbUser">Database username</label><input id="dbUser" name="dbUser" value="' . h($d['dbUser']) . '" autocapitalize="none">'
     . '<div class="row"><div><label for="dbPass">Database password <small>(10+ characters)</small></label><input id="dbPass" name="dbPass" type="password" minlength="10"></div>'
@@ -288,7 +288,7 @@ if ($step === 'install') {
     if (!is_dir($payload)) throw new RuntimeException('The folder "' . APP_DIR_NAME . '" is missing. Extract the zip again.');
     // 1. Move the app out of public_html.
     if (is_dir($target)) {
-      if (is_file("$target/install.lock")) throw new RuntimeException("EduBooks is already installed in $target.");
+      if (is_file("$target/install.lock")) throw new RuntimeException("Knowledge Gate is already installed in $target.");
       if (!@rename($target, $target . '-old-' . date('YmdHis'))) throw new RuntimeException("Could not rename the old folder $target.");
     }
     if (!@rename($payload, $target)) throw new RuntimeException("Could not move the app to $target.");
@@ -324,7 +324,7 @@ if ($step === 'install') {
     . '<li>Application startup file: <code>app.js</code></li>'
     . '<li>Click <b>Create</b>. <b>Do not</b> click “Run NPM Install”: everything is already included.</li></ol>'
     . '<p style="margin:8px 0 0">This page continues by itself as soon as the app starts.</p></div>';
-  layout('Installing', 4, '<div class="card"><h1 id="t">' . ($manual ? 'Almost done!' : 'Installing EduBooks…') . '</h1>' . $manualBox . '<p id="m">' . ($manual ? 'Waiting for the app to start…' : 'Starting the app. This takes about a minute — please keep this page open.') . '</p><div class="bar" id="bar"><i></i></div><ul class="res" id="steps"></ul><p id="go" hidden><a class="btn" href="/login">Open EduBooks →</a></p></div>
+  layout('Installing', 4, '<div class="card"><h1 id="t">' . ($manual ? 'Almost done!' : 'Installing Knowledge Gate…') . '</h1>' . $manualBox . '<p id="m">' . ($manual ? 'Waiting for the app to start…' : 'Starting the app. This takes about a minute — please keep this page open.') . '</p><div class="bar" id="bar"><i></i></div><ul class="res" id="steps"></ul><p id="go" hidden><a class="btn" href="/login">Open Knowledge Gate →</a></p></div>
 <script>
 const $=(id)=>document.getElementById(id);let tries=0;
 async function poll(){tries++;
@@ -333,7 +333,7 @@ async function poll(){tries++;
    if(s.message)$("m").textContent=s.message;
    if(s.steps)$("steps").innerHTML=s.steps.map(x=>"<li class=ok>✅ "+x.replace(/[<>&]/g,"")+"</li>").join("");
    if($("manual"))$("manual").hidden=true;
-   if(s.state==="done"){$("t").textContent="EduBooks is ready! 🎉";$("m").textContent="Sign in with the super admin account you just created (choose Publisher staff).";$("bar").hidden=true;$("go").hidden=false;return}
+   if(s.state==="done"){$("t").textContent="Knowledge Gate is ready! 🎉";$("m").textContent="Sign in with the super admin account you just created (choose Publisher staff).";$("bar").hidden=true;$("go").hidden=false;return}
    if(s.state==="error"){$("t").textContent="Installation stopped";$("m").innerHTML="";$("bar").hidden=true;$("steps").innerHTML="<li class=err>❌ "+(s.message||"").replace(/[<>&]/g,"")+"</li><li class=warn>Fix the problem, then open your website: the installer form will let you try again (its key is in edubooks-app/install-key.txt).</li>";return}
   }}catch(e){}
  if(tries>150&&!document.getElementById("manual")){$("m").textContent="This is taking longer than expected. Reload this page in a minute, or check edubooks-app/stderr.log.";return}

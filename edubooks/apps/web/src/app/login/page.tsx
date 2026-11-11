@@ -41,7 +41,7 @@ export default function LoginPage() {
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
       <div className="hidden lg:flex flex-col justify-between bg-gradient-to-br from-brand-700 via-brand-600 to-fuchsia-600 p-12 text-white">
-        <div className="flex items-center gap-2 text-lg font-semibold"><BookOpen className="size-6" /> EduBooks LMS</div>
+        <div className="flex items-center gap-2 text-lg font-semibold"><BookOpen className="size-6" /> Knowledge Gate</div>
         <div>
           <h1 className="text-4xl font-bold leading-tight">Books, licences and learning — in one place.</h1>
           <p className="mt-4 max-w-md text-brand-100">Publish complete book packages, issue school licences, and give teachers and children a joyful digital classroom.</p>

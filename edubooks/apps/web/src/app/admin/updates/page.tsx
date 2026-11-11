@@ -35,7 +35,7 @@ export default function UpdatesPage() {
   const start = () => { atBefore.current = st?.at ?? null; setWaiting(true); };
   return (
     <div className="space-y-6">
-      <PageHeader title="Updates" sub="Install a new version of EduBooks. Your data is kept, a safety backup of the database is made first, and database changes are applied automatically." />
+      <PageHeader title="Updates" sub="Install a new version of Knowledge Gate. Your data is kept, a safety backup of the database is made first, and database changes are applied automatically." />
 
       <Card className="flex flex-wrap items-center gap-4 p-5">
         <CheckCircle2 className="size-8 text-emerald-600" />
@@ -144,7 +144,7 @@ function Progress({ state, offline }: { state: any; offline: boolean }) {
   return (
     <Card className="flex items-center gap-4 p-6">
       <Loader2 className="size-8 animate-spin text-brand-600" />
-      <div><div className="font-semibold">{offline ? 'Restarting EduBooks…' : state?.step || 'Working…'}</div>
+      <div><div className="font-semibold">{offline ? 'Restarting Knowledge Gate…' : state?.step || 'Working…'}</div>
         <div className="text-sm text-slate-600">Please keep this page open. It updates by itself, usually within a minute or two.</div></div>
     </Card>
   );

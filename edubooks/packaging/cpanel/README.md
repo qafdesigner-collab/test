@@ -1,6 +1,6 @@
-# EduBooks LMS — install on cPanel
+# Knowledge Gate — install on cPanel
 
-**Works on hosting that has only MySQL.** EduBooks comes with its own **built-in database** (PostgreSQL 16). It runs privately inside the app folder, so your host doesn't need to provide PostgreSQL. It has no network port: only the app can reach it, through a private file socket.
+**Works on hosting that has only MySQL.** Knowledge Gate comes with its own **built-in database** (PostgreSQL 16). It runs privately inside the app folder, so your host doesn't need to provide PostgreSQL. It has no network port: only the app can reach it, through a private file socket.
 
 You'll need about 10 minutes. You do everything in your browser; no command line is needed.
 
@@ -33,7 +33,7 @@ cPanel → **Setup Node.js App** → **Create Application**:
 Click **Create**. Then click **Run NPM Install** and wait until it finishes (2–5 minutes; it also downloads the built-in database). Finally click **Restart**.
 
 ## Step 3 — Run the installer
-1. Open your site, e.g. `https://lms.yourdomain.com`. The **Install EduBooks LMS** page appears.
+1. Open your site, e.g. `https://lms.yourdomain.com`. The **Install Knowledge Gate** page appears.
 2. You need the **installer key**: in File Manager, open `edubooks-lms/install-key.txt` and copy the text. The key stops anyone else from installing on your site before you do.
 3. Fill in the form:
    - **Database:** leave **Built-in database (recommended)** selected.

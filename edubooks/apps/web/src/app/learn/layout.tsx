@@ -24,7 +24,7 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
     <div className="min-h-screen bg-[radial-gradient(circle_at_10%_10%,#fef3c7,transparent_40%),radial-gradient(circle_at_90%_20%,#fce7f3,transparent_40%),radial-gradient(circle_at_50%_100%,#e0f2fe,transparent_50%)] bg-amber-50 pb-28 sm:pb-8"
       style={{ fontFamily: '"Nunito", "Baloo 2", system-ui, sans-serif' }}>
       <header className="mx-auto flex max-w-5xl items-center gap-3 px-4 pt-4 sm:px-6">
-        <Link href="/learn" className="flex items-center gap-2 text-2xl font-black text-violet-600">🦉 <span className="hidden sm:inline">EduBooks</span></Link>
+        <Link href="/learn" className="flex items-center gap-2 text-2xl font-black text-violet-600">🦉 <span className="hidden sm:inline">Knowledge Gate</span></Link>
         <div className="flex-1" />
         <Link href="/learn/me" className="flex items-center gap-1 rounded-full bg-white px-4 py-2 text-xl font-black text-amber-600 shadow">⭐ {ach.data?.stars ?? '…'}</Link>
         {ach.data?.streak > 0 && <span className="hidden items-center gap-1 rounded-full bg-white px-4 py-2 text-xl font-black text-orange-600 shadow sm:flex" title="Days in a row">🔥 {ach.data.streak}</span>}

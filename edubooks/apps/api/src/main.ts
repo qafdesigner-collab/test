@@ -50,7 +50,7 @@ export function configureApp(app: INestApplication) {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   app.enableShutdownHooks();
   if (config.apiDocs) {
-    const doc = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle('EduBooks LMS API').setVersion('1.0').addCookieAuth('eb_session').build());
+    const doc = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle('Knowledge Gate API').setVersion('1.0').addCookieAuth('eb_session').build());
     SwaggerModule.setup('api/docs', app, doc);
   }
   return app;
@@ -59,6 +59,6 @@ export function configureApp(app: INestApplication) {
 async function bootstrap() {
   const app = configureApp(await NestFactory.create(AppModule, { bodyParser: false, logger: config.logFormat === 'json' ? new JsonLogger() : undefined }));
   await app.listen(config.port);
-  Logger.log(`EduBooks API listening on :${config.port}${config.apiDocs ? ' (docs: /api/docs)' : ''}`, 'Bootstrap');
+  Logger.log(`Knowledge Gate API listening on :${config.port}${config.apiDocs ? ' (docs: /api/docs)' : ''}`, 'Bootstrap');
 }
 if (require.main === module) bootstrap();

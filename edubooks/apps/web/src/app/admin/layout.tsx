@@ -38,7 +38,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="min-h-screen lg:flex">
       <aside className={cn('fixed inset-y-0 left-0 z-40 w-64 transform border-r border-slate-200 bg-white transition-transform lg:static lg:translate-x-0', open ? 'translate-x-0' : '-translate-x-full')}>
-        <div className="flex h-16 items-center gap-2 border-b border-slate-100 px-5 font-semibold text-slate-900"><BookOpen className="size-5 text-brand-600" /> EduBooks <span className="text-xs font-normal text-slate-500">Publisher</span></div>
+        <div className="flex h-16 items-center gap-2 border-b border-slate-100 px-5 font-semibold text-slate-900"><BookOpen className="size-5 text-brand-600" /> Knowledge Gate <span className="text-xs font-normal text-slate-500">Publisher</span></div>
         <nav className="space-y-1 p-3" aria-label="Main">
           {NAV.filter((n) => n.roles.some((r) => me.roles.includes(r))).map(({ href, label, icon: Icon, exact }) => {
             const active = exact ? path === href : path.startsWith(href);
