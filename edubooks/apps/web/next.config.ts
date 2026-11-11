@@ -17,7 +17,7 @@ const config: NextConfig = {
     const csp = [
       "default-src 'self'", `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${prod ? '' : " 'unsafe-eval'"}`, "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:", "font-src 'self' data:", "connect-src 'self'", "worker-src 'self' blob:", "media-src 'self' blob:",
-      "frame-src 'self'", "frame-ancestors 'self'", "object-src 'none'", "base-uri 'self'", "form-action 'self'",
+      "frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com", "frame-ancestors 'self'", "object-src 'none'", "base-uri 'self'", "form-action 'self'",
     ].join('; ');
     // Not for /api: the API sets its own headers (e.g. sandboxed flipbooks).
     return [{ source: '/((?!api/).*)', headers: [
