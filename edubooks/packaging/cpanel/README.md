@@ -62,10 +62,16 @@ cPanel → **SSL/TLS Status** → make sure your domain has an **AutoSSL** certi
 The app restores that backup while it starts. It keeps your current database as `pgdata-before-restore-…`, in case you need it, and renames the file in `restore/` to `restored-….done`. If anything goes wrong, the previous database is put back automatically. Once you're happy, you can delete the `pgdata-before-restore-…` folder.
 
 ## Updating to a new version
-1. Make sure there is a fresh backup (or wait for the nightly one).
-2. Setup Node.js App → **Stop App**.
-3. Upload the new zip and extract it **over** the existing folder. Your `.env`, `install.lock`, `pgdata`, `storage` and `backups` are kept, because the zip does not contain them.
-4. Click **Run NPM Install**, then **Restart**. Database changes are applied automatically when the app starts.
+**Super admin → Updates** (in the left menu):
+1. Upload the update file (`edubooks-lms-update.zip`, a few MB) or paste a download link. The package is unpacked and checked; nothing changes yet.
+2. Check the summary (new version, number of database changes) and click **Install update**. Confirm with your password.
+3. The app makes a **safety backup** of the database, installs the new program, restarts and **applies the database changes automatically**. This takes about a minute. The page shows the result.
+
+If the new version cannot start, for example because a database change fails, the **previous version is restored automatically**. Database changes are all-or-nothing, so a failed change leaves the database exactly as it was.
+**Roll back** returns to the previous version and restores the database from the backup made just before that update. Changes made after that update are lost, and everyone has to sign in again.
+If the small update file is refused with "needs new program libraries", upload the full `edubooks-lms-public_html.zip` instead.
+
+If the site itself does not open, you can still update the old way: extract the full zip into `public_html` and open `/index.php`.
 
 ## Settings
 After installation, all settings are in `edubooks-lms/.env` (File Manager → Edit). Restart the app after any change.

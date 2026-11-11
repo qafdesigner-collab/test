@@ -7,11 +7,16 @@ INSTALL
      Check  ->  Super admin  ->  Database  ->  Install
 3. Sign in at /login (choose "Publisher staff").
 
-UPDATE TO A NEW VERSION
-1. Upload the new zip into the same folder (public_html) and extract it.
+UPDATE TO A NEW VERSION (recommended way)
+1. Sign in as super admin -> Updates (left menu).
+2. Upload edubooks-lms-update.zip (small) or the full zip, check, and click
+   "Install update". A safety backup is made first, the database is updated
+   automatically, and if the new version cannot start the previous one comes
+   back by itself. "Roll back" returns to the previous version.
+
+UPDATE WITHOUT THE ADMIN PANEL (only if the site does not open)
+1. Upload the full zip into the same folder (public_html) and extract it.
 2. Open https://lms.yourdomain.com/index.php and click "Update now".
-   Your database, settings, books and backups are kept; a safety backup
-   of the database is made first.
 
 NOTES
 - Install into the ROOT folder of a domain or subdomain (public_html, or the

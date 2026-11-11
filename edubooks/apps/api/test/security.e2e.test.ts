@@ -89,4 +89,17 @@ describe('Phase 7 — security hardening', () => {
       for (const s of secrets) expect([r, body.includes(s)]).toEqual([r, false]);
     }
   });
+
+  it('Updates (self-update) are super-admin only and refused where the program cannot replace itself', async () => {
+    const admin = await login(app, 'admin', 'Admin@12345');
+    const editor = await login(app, 'editor', 'Admin@12345');
+    const principal = await login(app, 'principal', 'School@12345', 'SUN01');
+    expect((await editor.get('/api/system/updates')).status).toBe(403);
+    expect((await principal.get('/api/system/updates')).status).toBe(403);
+    expect((await http().get('/api/system/updates')).status).toBe(401);
+    expect((await admin.get('/api/system/updates')).body).toEqual({ supported: false });
+    const apply = await admin.post('/api/system/updates/apply').send({ password: 'Admin@12345' });
+    expect(apply.status).toBe(403);
+    expect(apply.body.message).toMatch(/cPanel/);
+  });
 });

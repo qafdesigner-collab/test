@@ -163,7 +163,7 @@ if (is_file("$target/install.lock") && !is_dir($payload)) {
 }
 
 // ---------------------------------------------------------------- update an existing installation
-const CODE_PARTS = ['api', 'web', 'node_modules', 'runtime', 'app.js', 'embedded-db.js', 'package.json', 'package-lock.json', 'README.md', 'BUILD_ID'];
+const CODE_PARTS = ['api', 'web', 'node_modules', 'runtime', 'app.js', 'embedded-db.js', 'updater.js', 'package.json', 'package-lock.json', 'README.md', 'BUILD_ID'];
 if (is_file("$target/install.lock") && is_dir($payload)) {
   if (($_POST['step'] ?? '') === 'update' && hash_equals($_SESSION['csrf'], (string)($_POST['csrf'] ?? ''))) {
     try {

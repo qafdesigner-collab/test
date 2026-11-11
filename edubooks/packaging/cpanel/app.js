@@ -45,6 +45,7 @@ const server = http.createServer((req, res) => handler(req, res));
 async function bootApp() {
   loadEnv();
   process.env.NODE_ENV = 'production';
+  process.env.EDUBOOKS_APP_ROOT = ROOT; // enables Super admin → Updates
   if (process.env.DB_MODE === 'embedded') {
     const edb = require('./embedded-db');
     const restored = await edb.restoreIfRequested(process.env.PG_SUPER_PASSWORD);
@@ -82,6 +83,7 @@ async function bootApp() {
   const app = configureApp(await NestFactory.create(AppModule, new ExpressAdapter(ex), { bodyParser: false, logger: new JsonLogger() }));
   await app.init();
   handler = withStatus(ex);
+  try { require('./updater').onBootSuccess(log); } catch (e) { log('error', `Update bookkeeping failed: ${e.message}`); }
   console.log(JSON.stringify({ level: 'info', msg: 'EduBooks LMS started', node: process.version }));
 }
 
@@ -170,7 +172,7 @@ function readBody(req, limit = 64 * 1024) {
 function run(script, env, args = []) {
   return new Promise((resolve, reject) => {
     execFile(process.execPath, [script, ...args], { cwd: path.dirname(script), env: { ...process.env, ...env }, timeout: 15 * 60_000, maxBuffer: 10 * 1024 * 1024 },
-      (err, stdout, stderr) => (err ? reject(new Error((stderr || stdout || err.message).trim().split('\n').slice(-6).join('\n'))) : resolve(stdout.trim())));
+      (err, stdout, stderr) => (err ? reject(new Error((stderr || stdout || err.message).trim().split('\n').slice(-40).join('\n'))) : resolve(stdout.trim())));
   });
 }
 
@@ -358,6 +360,7 @@ server.listen(process.env.PORT || 3000, () => console.log(`EduBooks listening ($
 if (fs.existsSync(LOCK_FILE)) {
   bootApp().catch((e) => {
     console.error('EduBooks failed to start:', e);
+    try { if (require('./updater').onBootFailure(e, log)) { handler = busyPage; return; } } catch (e2) { console.error('Automatic rollback failed:', e2); }
     handler = (req, res) => { res.statusCode = 500; res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.end('EduBooks could not start. Check the application log in cPanel (stderr.log) and the .env settings, then restart the app.'); };
   });
 } else if (fs.existsSync(AUTO_FILE) || fs.existsSync(path.join(ROOT, 'install.running'))) {

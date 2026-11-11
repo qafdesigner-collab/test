@@ -52,3 +52,12 @@ const zip = path.join(OUT, 'edubooks-lms-public_html.zip');
 fs.rmSync(zip, { force: true });
 sh(`zip -qr -9 ${JSON.stringify(zip)} index.php EDUBOOKS-INSTALL.txt edubooks-app`, STAGE);
 console.log(`✅ ${path.relative(ROOT, zip)} (${(fs.statSync(zip).size / 1048576).toFixed(0)} MB)`);
+
+// Small update package for Super admin → Updates: the program without the large parts that rarely change
+// (libraries, Node.js, database engine). The updater refuses it if the libraries changed and asks for the full zip.
+console.log('▶ Small update package');
+const upd = path.join(OUT, 'edubooks-lms-update.zip');
+fs.rmSync(upd, { force: true });
+sh(`zip -qr -9 ${JSON.stringify(upd)} edubooks-app -x 'edubooks-app/node_modules/*' 'edubooks-app/runtime/*' 'edubooks-app/.htaccess' 'edubooks-app/storage/*'`, STAGE);
+console.log(`✅ ${path.relative(ROOT, upd)} (${(fs.statSync(upd).size / 1048576).toFixed(1)} MB)`);
+
