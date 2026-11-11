@@ -120,6 +120,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   const lessonHere = useMemo(() => comp?.units.flatMap((u: any) => u.lessons.map((l: any) => ({ ...l, unit: u })))
     .find((l: any) => l.pageStart && page >= l.pageStart && page <= (l.pageEnd ?? l.pageStart)), [comp, page]);
   const lessonResources = (b?.resources ?? []).filter((r: any) => (lessonHere && r.lessonId === lessonHere.id) || (!r.componentId) || (r.componentId === comp?.id && !r.unitId));
+  const lessonGames = (b?.games ?? []).filter((g: any) => lessonHere && g.lessonId === lessonHere.id);
   const lessonWork = (b?.assessments ?? []).filter((a: any) => lessonHere && (a.lessonId === lessonHere.id || (!a.lessonId && a.unitId === lessonHere.unit.id)));
 
   if (book.isLoading) return <PageLoader />;
@@ -178,11 +179,13 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
             : docError ? <div className="m-auto"><ErrorBox error={new Error(docError)} /></div>
               : <>{loadingDoc && <Spinner className="absolute left-1/2 top-1/2 size-8" />}<canvas ref={canvas} className={cn('bg-white shadow-xl', kid ? 'rounded-2xl' : 'rounded')} aria-label={`Page ${page} of ${pages}`} /></>}
         </main>
-        {(lessonResources.length > 0 || lessonWork.length > 0 || (!kid && lessonHere)) && (
+        {(lessonResources.length > 0 || lessonWork.length > 0 || lessonGames.length > 0 || (!kid && lessonHere)) && (
           <aside className="hidden w-64 shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-3 text-sm xl:block">
             {!kid && lessonHere && <Link href={`/teacher/ai?editionId=${editionId}&lessonId=${lessonHere.id}`} className="mb-3 block rounded-lg bg-violet-50 px-3 py-2 font-medium text-violet-800 hover:bg-violet-100">✨ AI assistant for this lesson</Link>}
             {lessonWork.length > 0 && <><p className="pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{kid ? '📝 Homework' : 'Assigned work'}</p>
               {lessonWork.map((a: any) => <Link key={a.id} href={kid ? `/homework/${a.id}` : `/teacher/assessments/${a.id}`} className="mb-1 block rounded-lg bg-amber-50 px-3 py-2 font-medium text-amber-900 hover:bg-amber-100">{a.title}</Link>)}</>}
+            {lessonGames.length > 0 && <><p className="pb-2 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{kid ? '🎮 Play' : 'Games'}</p>
+              {lessonGames.map((g: any) => <Link key={g.id} href={kid ? `/learn/games/${g.id}` : `/teacher/games/${g.id}`} className="mb-1 block rounded-lg bg-emerald-50 px-3 py-2 font-medium text-emerald-900 hover:bg-emerald-100">{g.title}</Link>)}</>}
             {lessonResources.length > 0 && <><p className="pb-2 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Resources</p>
               {lessonResources.map((r: any) => (
                 <button key={r.id} onClick={async () => { const w = window.open('', '_blank'); const { url } = await api.get(`/assets/${r.assetId}/link`); if (w) { w.opener = null; w.location.href = url; } }}

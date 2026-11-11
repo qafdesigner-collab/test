@@ -1,6 +1,6 @@
 # EduBooks LMS — Architecture
 
-> Status: **Phases 1–5 are implemented** — foundation, Book Package Management, products & bundles, schools, orders, the full licensing system, School Admin portal, classes, the digital reader, lesson planner, homework/quizzes/tests with marking, question bank, gradebook and report cards, and the AI teaching assistant grounded in indexed book pages. Phases 6–7 follow this design.
+> Status: **Phases 1–6 are implemented** — foundation, Book Package Management, products & bundles, schools, orders, the full licensing system, School Admin portal, classes, the digital reader, lesson planner, homework/quizzes/tests with marking, question bank, gradebook and report cards, the AI teaching assistant grounded in indexed book pages, and the playful student portal with 10 game engines, stars and badges. Phase 7 follows this design.
 > A clickable UX prototype of the whole idea lives in `/lms` (Node + SQLite). It's for demos only and isn't production code.
 
 ---
@@ -204,7 +204,7 @@ Rule: dependencies only point "down". `licensing` is the single authority on "ca
 | Schools ✅ | Publisher: `/schools` (+ `/demo`, `/:id/academic-years`, `/:id/suspend`, `/:id/convert-demo`) · School admin: `/school/overview`, `/school/users` (+ `/import`, `/:id/reset-password`), `/school/pools/:id/assign`, `/school/assignments/:id/release`, `/school/transfers`, `/school/profile` · Any school user: `/library` |
 | LMS ✅ | `/library` · `/classes` (+ `/:id/teachers`, `/:id/students`) · `/reader/editions/:id`, `/reader/components/:id/pdf`, `/reader/progress`, `/reader/bookmarks` · `/teacher/lesson-plans`, `/teacher/question-bank`, `/teacher/assessments` (+ `/publish`, `/close`, `/from-bank`), `/teacher/submissions/:id`, `/teacher/classes/:id/gradebook`, `/teacher/students/:id/report`, `/teacher/evaluations` · `/student/homework` (+ `/:id/submit`), `/student/report` |
 | AI ✅ | `GET /ai/status` · `POST /ai/generate` (task, editionId, lessonId, …) · `GET /ai/generations` · `POST /ai/generations/:id/use` (LESSON_PLAN / ASSESSMENT / QUESTION_BANK) · `GET /ai/usage` · `GET /ai/index/editions/:id` · `POST /ai/index/components/:id` |
-| Games (P6) | `/games`, `/games/:id/lessons`, `/game-attempts` |
+| Games ✅ | `/publishing/games` (library) · `/teacher/games` (+ `/:id/assign`), `/teacher/classes/:id/games` · `/student/games`, `/student/games/:id/attempts`, `/student/achievements`, `/student/home` |
 
 ---
 
@@ -218,7 +218,7 @@ Rule: dependencies only point "down". `licensing` is the single authority on "ca
 | 3. Commerce & licensing | Schools, academic years, orders, fulfilment → pools & seats, assignment, expiry, transfers + approvals, licence dashboard, sales demo schools, School Admin portal (accounts, CSV import, allocation), **licensing test suite** | ✅ |
 | 4. School & teacher LMS ✅ | Classes & sections, enrolments, teacher assignments, teacher dashboard, PDF reader (pdf.js, bookmarks, progress), assignments, quizzes, grading, evaluations | |
 | 5. AI ✅ | PDF text extraction (sandboxed child process) → `book_pages` (full-text + optional pgvector), 11 grounded generators with page citations, JSON validation, teacher approval flow, quotas, usage tracking | ✅ |
-| 6. Student portal | Playful UI, library, homework, games engine (10 types), rewards & achievements | |
+| 6. Student portal ✅ | Playful UI, library, homework, games engine (10 types, React + SVG + pointer events instead of Phaser: lighter, touch-friendly, accessible), rewards & achievements | ✅ |
 | 7. Production | Load and security tests, accessibility audit, backups (pg_dump/PITR + bucket versioning), Docker/CI, runbooks | |
 
 ---

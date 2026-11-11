@@ -36,8 +36,11 @@ export class ReaderService {
     const classIds = student ? await this.access.studentClassIds() : this.access.is('TEACHER') ? await this.access.teacherClassIds() : [];
     const linked = classIds.length ? await this.q.select({ id: assessments.id, title: assessments.title, kind: assessments.kind, lessonId: assessments.lessonId, unitId: assessments.unitId, dueAt: assessments.dueAt })
       .from(assessments).where(and(eq(assessments.editionId, editionId), eq(assessments.status, 'PUBLISHED'), inArray(assessments.classId, classIds))) : [];
+    // Published games for this book (publisher library + this school's own).
+    const { rows: games } = await this.q.execute(sql`SELECT id, title, engine, lesson_id AS "lessonId" FROM game_activities
+      WHERE edition_id = ${editionId} AND ((school_id IS NULL AND published) OR school_id = ${this.db.ctx.schoolId ?? '00000000-0000-0000-0000-000000000000'}) ORDER BY title`);
     return {
-      ...ed, student,
+      ...ed, student, games,
       components: comps.map((c) => ({
         ...c, progress: progress.find((p) => p.componentId === c.id) ?? null, bookmarks: marks.filter((b) => b.componentId === c.id),
         units: units.filter((u) => u.componentId === c.id).map((u) => ({ id: u.id, number: u.number, title: u.title,

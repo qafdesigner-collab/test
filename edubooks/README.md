@@ -3,7 +3,7 @@
 A multi-tenant platform for a children's book publisher. You publish book packages, sell them to schools as digital licences, and give teachers and students an LMS with AI support.
 
 - **Architecture, ERD, API design and milestones:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-- **Status:** ✅ Phase 1 foundation · ✅ Phase 2 Book Package Management · ✅ Phase 2b Products & grade bundles · ✅ Phase 3 Schools, orders & licensing + School Admin portal · ✅ Phase 4 Classes, digital reader, lesson planner, homework & tests, gradebook · ✅ Phase 5 AI teaching assistant grounded in the books. Next: Phase 6 (playful student portal & games).
+- **Status:** ✅ Phase 1 foundation · ✅ Phase 2 Book Package Management · ✅ Phase 2b Products & grade bundles · ✅ Phase 3 Schools, orders & licensing + School Admin portal · ✅ Phase 4 Classes, digital reader, lesson planner, homework & tests, gradebook · ✅ Phase 5 AI teaching assistant grounded in the books · ✅ Phase 6 Playful student portal, 10 learning games, stars & badges. Next: Phase 7 (production readiness).
 
 ## Stack
 NestJS (TypeScript), Drizzle ORM, PostgreSQL 16 (RLS + pgvector), Next.js 15, React 19, Tailwind 4, and S3-compatible private storage.
@@ -36,7 +36,13 @@ npm run dev:web              # http://localhost:3000
 
 School admins get the **School portal** (`/school`): accounts, CSV import, printable login cards, licence allocation, transfer requests.
 **Teachers** get the Teacher portal (`/teacher`): their licensed books in the **digital reader**, the **lesson planner**, **homework / quizzes / tests** (multiple choice, true/false, fill-in-the-blank, short answer — auto-marked except written answers), a shared **question bank**, and per-class **gradebooks**, report cards and skill evaluations.
-**Students** (`/portal`): today's homework (big, colourful, with read-aloud), their books in the reader, results and teacher feedback. The playful games portal arrives in Phase 6.
+**Students** (`/learn`): a colourful portal with Ollie the owl — continue reading, today's homework, **Play & learn**, **My Stars** (stars, badges, 7-day streak, progress per book).
+
+### Games (Phase 6)
+10 reusable, data-driven engines — alphabet match, picture-word match, counting, drag-and-drop sorting, memory cards, fill-in-the-blank, quiz, shapes, word building and picture puzzle.
+Publishers build a **Game library** (Admin → Game Library) linked to books/lessons; teachers preview and **assign** games to classes or make their own (Teacher → Games) and see a games report in each class gradebook.
+The server validates game content, recomputes the maximum and the stars (children only report a score), and licensing applies to publisher games.
+Stars: best stars per game + stars for marked homework. Badges: first game, superstar, game champion, star collector/hero, homework helper, busy bee, bookworm, super reader, 3-day streak.
 
 The seed includes **placeholder 26-page PDFs** for each KG book's Part 1 (clearly marked "sample placeholder", not publisher content), a class **KG Rose** at SUN01 with teacher1 and student1–3, and one sample homework.
 
@@ -71,7 +77,7 @@ need OCR first (not built in yet). Publisher usage: **Admin → AI Assistant**.
 
 ## Tests
 ```bash
-npm test     # 80 tests against the edubooks_test database
+npm test     # 88 tests against the edubooks_test database
 ```
 They cover login, sessions, RBAC, suspension, every licensing rule (capacity, concurrency, bundles, transfers, expiry, adjustments, demo expiry), reader access & privacy, marking rules, answer secrecy, class/teacher permissions, AI grounding, citation validation, approval flow, quotas and logging (with a fake OpenAI-compatible server), **PostgreSQL Row-Level Security isolation** (between publishers and between schools), the append-only audit log, package/edition/structure workflows, publish locking, edition cloning without file duplication, upload validation (magic bytes), and signed-URL tampering.
 
