@@ -132,7 +132,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
       <header className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white/90 px-3 py-2 backdrop-blur">
         <Link href={backHref} className={btn} aria-label="Back"><ArrowLeft className="size-5" /></Link>
         <button className={btn} onClick={() => setToc(!toc)} aria-label="Contents" aria-pressed={toc}><PanelLeft className="size-5" /></button>
-        <div className="min-w-0 flex-1"><div className={cn('truncate font-semibold', kid && 'text-lg')}>{b.title}</div><div className="truncate text-xs text-slate-500">{comp?.title}{lessonHere && ` · Unit ${lessonHere.unit.number} · Lesson ${lessonHere.number}: ${lessonHere.title}`}</div></div>
+        <div className="min-w-0 flex-1"><div className={cn('truncate font-semibold', kid && 'text-lg')}>{b.title}</div><div className="truncate text-xs text-slate-600">{comp?.title}{lessonHere && ` · Unit ${lessonHere.unit.number} · Lesson ${lessonHere.number}: ${lessonHere.title}`}</div></div>
         <button className={btn} onClick={() => go(page - 1)} disabled={page <= 1} aria-label="Previous page"><ChevronLeft className="size-6" /></button>
         <label className="flex items-center gap-1 text-sm"><span className="sr-only">Page</span>
           <input type="number" min={1} max={pages} value={page} onChange={(e) => go(Number(e.target.value) || 1)} className="w-14 rounded-lg border border-slate-300 px-2 py-1 text-center" />
@@ -153,8 +153,8 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
             {comps.map((c) => (
               <div key={c.id} className="mb-2">
                 <button onClick={() => { setCompId(c.id); setPage(c.progress?.lastPage ?? 1); }} disabled={!c.hasPdf}
-                  className={cn('flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left font-medium', c.id === compId ? 'bg-brand-50 text-brand-800' : 'hover:bg-slate-50', !c.hasPdf && 'text-slate-400')}>
-                  <span className="truncate">{c.title}</span>{c.progress && c.pageCount ? <span className="text-xs text-slate-400">{Math.round((c.progress.maxPage / c.pageCount) * 100)}%</span> : !c.hasPdf ? <span className="text-xs">no pages</span> : null}
+                  className={cn('flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left font-medium', c.id === compId ? 'bg-brand-50 text-brand-800' : 'hover:bg-slate-50', !c.hasPdf && 'text-slate-500')}>
+                  <span className="truncate">{c.title}</span>{c.progress && c.pageCount ? <span className="text-xs text-slate-600">{Math.round((c.progress.maxPage / c.pageCount) * 100)}%</span> : !c.hasPdf ? <span className="text-xs">no pages</span> : null}
                 </button>
                 {c.id === compId && c.units.map((u: any) => (
                   <div key={u.id} className="ml-2 mt-1">
@@ -162,13 +162,13 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
                     {u.lessons.map((l: any) => (
                       <button key={l.id} disabled={!l.pageStart} onClick={() => l.pageStart && go(l.pageStart)}
                         className={cn('flex w-full justify-between rounded-md px-2 py-1 text-left', lessonHere?.id === l.id ? 'bg-amber-50 font-medium text-amber-900' : 'hover:bg-slate-50')}>
-                        <span className="truncate">{l.number}. {l.title}</span>{l.pageStart && <span className="text-xs text-slate-400">p.{l.pageStart}</span>}</button>
+                        <span className="truncate">{l.number}. {l.title}</span>{l.pageStart && <span className="text-xs text-slate-600">p.{l.pageStart}</span>}</button>
                     ))}
                   </div>
                 ))}
                 {c.id === compId && c.bookmarks?.length > 0 && (
                   <div className="ml-2 mt-2"><p className="px-2 text-xs font-semibold text-slate-500">Bookmarks</p>
-                    {c.bookmarks.map((m: any) => <button key={m.id} onClick={() => go(m.page)} className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-slate-50"><Bookmark className="size-3 text-amber-500" />Page {m.page}{m.note && <span className="truncate text-xs text-slate-400">{m.note}</span>}</button>)}</div>
+                    {c.bookmarks.map((m: any) => <button key={m.id} onClick={() => go(m.page)} className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-slate-50"><Bookmark className="size-3 text-amber-500" />Page {m.page}{m.note && <span className="truncate text-xs text-slate-600">{m.note}</span>}</button>)}</div>
                 )}
               </div>
             ))}
@@ -190,7 +190,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
               {lessonResources.map((r: any) => (
                 <button key={r.id} onClick={async () => { const w = window.open('', '_blank'); const { url } = await api.get(`/assets/${r.assetId}/link`); if (w) { w.opener = null; w.location.href = url; } }}
                   className="mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-slate-50">
-                  <span className="grid size-7 shrink-0 place-items-center rounded bg-slate-100 text-[9px] font-bold uppercase">{r.ext}</span><span className="flex-1 truncate">{r.title}</span><ExternalLink className="size-3 text-slate-400" /></button>
+                  <span className="grid size-7 shrink-0 place-items-center rounded bg-slate-100 text-[9px] font-bold uppercase">{r.ext}</span><span className="flex-1 truncate">{r.title}</span><ExternalLink className="size-3 text-slate-500" /></button>
               ))}</>}
           </aside>
         )}

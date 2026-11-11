@@ -25,9 +25,9 @@ export default function Assessments() {
         <Table head={['Title', 'Class', 'Book', 'Due', 'Handed in', 'Status']}>
           {q.data.map((a: any) => (
             <tr key={a.id} className="hover:bg-slate-50">
-              <Td><Link href={`/teacher/assessments/${a.id}`} className="font-medium hover:text-brand-700">{a.title}</Link><div className="text-xs text-slate-400">{KIND_LABEL[a.kind]} · {a.items} questions · {a.maxScore} pts</div></Td>
+              <Td><Link href={`/teacher/assessments/${a.id}`} className="font-medium hover:text-brand-700">{a.title}</Link><div className="text-xs text-slate-500">{KIND_LABEL[a.kind]} · {a.items} questions · {a.maxScore} pts</div></Td>
               <Td>{a.className}</Td><Td className="text-slate-600">{a.bookTitle ?? '—'}</Td><Td className="text-slate-500">{a.dueAt ? fmtDay(a.dueAt) : '—'}</Td>
-              <Td className="min-w-40">{a.status === 'DRAFT' ? <span className="text-xs text-slate-400">not published</span> : <><SeatBar assigned={a.submitted} total={a.assigned} />{a.toGrade > 0 && <Badge tone="DRAFT" className="mt-1">{a.toGrade} to mark</Badge>}</>}</Td>
+              <Td className="min-w-40">{a.status === 'DRAFT' ? <span className="text-xs text-slate-500">not published</span> : <><SeatBar assigned={a.submitted} total={a.assigned} />{a.toGrade > 0 && <Badge tone="DRAFT" className="mt-1">{a.toGrade} to mark</Badge>}</>}</Td>
               <Td><Status s={a.status} /></Td>
             </tr>))}
         </Table>

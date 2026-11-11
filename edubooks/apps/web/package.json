@@ -8,13 +8,15 @@
     "start": "next start -p 3000",
     "typecheck": "tsc --noEmit",
     "predev": "node scripts/copy-pdf-worker.mjs",
-    "prebuild": "node scripts/copy-pdf-worker.mjs"
+    "prebuild": "node scripts/copy-pdf-worker.mjs",
+    "a11y": "node scripts/a11y-audit.mjs"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.5",
     "@types/node": "^22.20.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "axe-core": "^4.10.3",
     "postcss": "^8.5.32",
     "tailwindcss": "^4.3.5",
     "typescript": "^5.9.3"

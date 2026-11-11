@@ -47,7 +47,7 @@ export function Table({ head, children, empty }: { head: React.ReactNode[]; chil
         <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr>{head.map((h, i) => <th key={i} className="whitespace-nowrap px-4 py-3 font-medium">{h}</th>)}</tr></thead>
         <tbody className="divide-y divide-slate-100">{children}</tbody>
       </table>
-      {empty && <p className="px-4 py-10 text-center text-sm text-slate-400">Nothing here yet.</p>}
+      {empty && <p className="px-4 py-10 text-center text-sm text-slate-500">Nothing here yet.</p>}
     </Card>
   );
 }
@@ -70,7 +70,7 @@ export function CredentialsDialog({ title, schoolCode, creds, onClose, note }: {
     <Dialog open onOpenChange={onClose} title={title} description={note ?? 'Passwords are shown only now. Print or download them before closing.'} wide>
       <div className="max-h-80 overflow-y-auto rounded-lg border border-slate-200">
         <table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Username</th><th className="px-3 py-2">Password</th></tr></thead>
-          <tbody className="divide-y divide-slate-100">{creds.map((c) => <tr key={c.username}><td className="px-3 py-2">{c.displayName}{c.role && <span className="text-slate-400"> · {c.role}</span>}</td>
+          <tbody className="divide-y divide-slate-100">{creds.map((c) => <tr key={c.username}><td className="px-3 py-2">{c.displayName}{c.role && <span className="text-slate-500"> · {c.role}</span>}</td>
             <td className="px-3 py-2 font-mono">{c.username}</td><td className="px-3 py-2 font-mono">{c.password}</td></tr>)}</tbody></table>
       </div>
       {schoolCode && <p className="mt-3 text-sm text-slate-600">School code: <b className="font-mono">{schoolCode}</b></p>}

@@ -74,7 +74,7 @@ function BankPicker({ assessmentId, editionId, onClose, beforeAdd }: { assessmen
       {!q.data ? <PageLoader /> : !q.data.length ? <p className="text-sm text-slate-500">No questions in the bank yet.</p> : (
         <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">{q.data.map((x: any) => (
           <li key={x.id}><label className="flex items-start gap-3 p-3 text-sm"><input type="checkbox" className="mt-1" checked={ids.includes(x.id)} onChange={(e) => setIds(e.target.checked ? [...ids, x.id] : ids.filter((y) => y !== x.id))} />
-            <span><span className="font-medium">{x.prompt}</span><span className="block text-xs text-slate-400">{QTYPE_LABEL[x.type]} · by {x.owner}</span></span></label></li>))}</ul>
+            <span><span className="font-medium">{x.prompt}</span><span className="block text-xs text-slate-500">{QTYPE_LABEL[x.type]} · by {x.owner}</span></span></label></li>))}</ul>
       )}
       <div className="mt-4 flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button disabled={!ids.length} loading={add.isPending} onClick={() => add.mutate()}>Add {ids.length || ''}</Button></div>
     </Dialog>
@@ -96,10 +96,10 @@ function MarkDialog({ a, student, onClose }: { a: any; student: any; onClose: ()
           const ans = (s.answers as any[]).find((x) => x.itemId === it.id) ?? {};
           return (
             <div key={it.id} className="rounded-lg border border-slate-200 p-3 text-sm">
-              <div className="flex justify-between gap-2"><span className="font-medium">{i + 1}. {it.prompt}</span><span className="text-xs text-slate-400">{QTYPE_LABEL[it.type]}</span></div>
+              <div className="flex justify-between gap-2"><span className="font-medium">{i + 1}. {it.prompt}</span><span className="text-xs text-slate-500">{QTYPE_LABEL[it.type]}</span></div>
               <div className="mt-1 flex flex-wrap items-center gap-2"><span className="text-slate-500">Answer:</span><b>{String(shown(it, ans.response))}</b>
                 {ans.correct === true && <CheckCircle2 className="size-4 text-emerald-600" />}{ans.correct === false && <XCircle className="size-4 text-red-500" />}
-                {it.type === 'SHORT' && it.answer[0] && <span className="text-xs text-slate-400">Model: {it.answer[0]}</span>}
+                {it.type === 'SHORT' && it.answer[0] && <span className="text-xs text-slate-500">Model: {it.answer[0]}</span>}
                 <span className="flex-1" /><label className="flex items-center gap-1">Points<Input type="number" min={0} max={it.points} className="h-8 w-16" value={scores[it.id] ?? ''}
                   onChange={(e) => setScores({ ...scores, [it.id]: Math.min(it.points, Math.max(0, Number(e.target.value))) })} />/ {it.points}</label></div>
             </div>);
@@ -133,7 +133,7 @@ function Results({ a }: { a: any }) {
         <Table head={['Student', 'Status', 'Score', 'Handed in', '']}>
           {a.students.map((s: any) => (
             <tr key={s.id}><Td className="font-medium">{s.displayName}</Td>
-              <Td>{s.submission ? <><Status s={s.submission.status} />{s.submission.late && <Badge tone="danger" className="ml-1">late</Badge>}</> : <span className="text-xs text-slate-400">not handed in</span>}</Td>
+              <Td>{s.submission ? <><Status s={s.submission.status} />{s.submission.late && <Badge tone="danger" className="ml-1">late</Badge>}</> : <span className="text-xs text-slate-500">not handed in</span>}</Td>
               <Td className="tabular-nums">{s.submission?.score ?? (s.submission ? '…' : '')}{s.submission && ` / ${a.maxScore}`}</Td>
               <Td className="text-slate-500">{s.submission ? fmtDate(s.submission.submittedAt) : ''}</Td>
               <Td className="text-right">{s.submission && <Button size="sm" variant={s.submission.status === 'SUBMITTED' ? 'primary' : 'ghost'} onClick={() => setMark(s)}>{s.submission.status === 'SUBMITTED' ? 'Mark' : 'View'}</Button>}</Td></tr>))}
@@ -141,7 +141,7 @@ function Results({ a }: { a: any }) {
       ) : (
         <div className="space-y-2">{a.items.map((it: any, i: number) => {
           const st = a.itemStats.find((x: any) => x.itemId === it.id);
-          return <Card key={it.id} className="flex items-center gap-3 p-4 text-sm"><span className="font-semibold text-slate-400">{i + 1}</span><span className="flex-1">{it.prompt}<span className="block text-xs text-slate-400">{QTYPE_LABEL[it.type]} · {it.points} pt</span></span>
+          return <Card key={it.id} className="flex items-center gap-3 p-4 text-sm"><span className="font-semibold text-slate-500">{i + 1}</span><span className="flex-1">{it.prompt}<span className="block text-xs text-slate-500">{QTYPE_LABEL[it.type]} · {it.points} pt</span></span>
             {st?.correctRate !== null && st?.correctRate !== undefined && <span className={`font-semibold ${st.correctRate < 0.5 ? 'text-red-600' : 'text-emerald-600'}`}>{Math.round(st.correctRate * 100)}% correct</span>}</Card>;
         })}</div>
       )}

@@ -73,7 +73,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
               {v.status === 'DRAFT' && canEdit ? <DraftEditor p={p} v={v} /> : (
                 <div className="flex flex-wrap gap-2">{v.items.map((i: any) => (
                   <span key={i.editionId} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm">
-                    <span className="size-3 rounded-sm" style={{ background: i.coverColor }} />{i.packageTitle}<span className="text-xs text-slate-400">{i.editionLabel}</span></span>))}</div>
+                    <span className="size-3 rounded-sm" style={{ background: i.coverColor }} />{i.packageTitle}<span className="text-xs text-slate-500">{i.editionLabel}</span></span>))}</div>
               )}
             </div>
           </Card>

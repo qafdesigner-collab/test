@@ -8,10 +8,10 @@ import { hasRole, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
 
 const NAV = [
-  { href: '/learn', label: 'Home', emoji: '🏠', color: 'bg-pink-400', exact: true },
-  { href: '/learn/books', label: 'My Books', emoji: '📚', color: 'bg-sky-400' },
-  { href: '/learn/games', label: 'Play', emoji: '🎮', color: 'bg-emerald-400' },
-  { href: '/learn/me', label: 'My Stars', emoji: '⭐', color: 'bg-amber-400' },
+  { href: '/learn', label: 'Home', emoji: '🏠', color: 'bg-pink-600', exact: true },
+  { href: '/learn/books', label: 'My Books', emoji: '📚', color: 'bg-sky-700' },
+  { href: '/learn/games', label: 'Play', emoji: '🎮', color: 'bg-emerald-700' },
+  { href: '/learn/me', label: 'My Stars', emoji: '⭐', color: 'bg-amber-700' },
 ];
 
 /** Playful student shell: big tiles, bright colours, minimal reading. */
@@ -34,7 +34,7 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
         {NAV.map((n) => {
           const on = n.exact ? path === n.href : path.startsWith(n.href);
           return <Link key={n.href} href={n.href} aria-current={on ? 'page' : undefined}
-            className={cn('focus-ring flex flex-col items-center rounded-3xl py-2 text-sm font-black text-white shadow-[0_5px_0_rgba(0,0,0,0.12)] transition sm:flex-row sm:justify-center sm:gap-2 sm:py-3 sm:text-lg', n.color, on ? 'ring-4 ring-white sm:scale-105' : 'opacity-90 hover:opacity-100')}>
+            className={cn('focus-ring flex flex-col items-center rounded-3xl py-2 text-sm font-black text-white shadow-[0_5px_0_rgba(0,0,0,0.12)] transition sm:flex-row sm:justify-center sm:gap-2 sm:py-3 sm:text-lg', n.color, on ? 'ring-4 ring-white sm:scale-105' : '')}>
             <span className="text-3xl sm:text-2xl">{n.emoji}</span>{n.label}</Link>;
         })}
       </nav>

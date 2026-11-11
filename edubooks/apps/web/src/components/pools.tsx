@@ -20,12 +20,12 @@ export function PoolsTable({ pools, showSchool, onOpen, action }: { pools: PoolR
         const d = daysLeft(p.validUntil); const live = poolLive(p);
         return (
           <tr key={p.id} className="hover:bg-slate-50">
-            {showSchool && <Td><div className="font-medium">{p.schoolName}</div><div className="font-mono text-xs text-slate-400">{p.schoolCode}</div></Td>}
-            <Td><button onClick={() => onOpen?.(p)} className="text-left font-medium text-slate-900 hover:text-brand-700">{p.productName} <span className="text-xs text-slate-400">v{p.versionNo}</span></button>
+            {showSchool && <Td><div className="font-medium">{p.schoolName}</div><div className="font-mono text-xs text-slate-500">{p.schoolCode}</div></Td>}
+            <Td><button onClick={() => onOpen?.(p)} className="text-left font-medium text-slate-900 hover:text-brand-700">{p.productName} <span className="text-xs text-slate-500">v{p.versionNo}</span></button>
               <div className="max-w-xs truncate text-xs text-slate-500" title={p.books?.join(', ')}>{p.books?.join(' · ')}</div></Td>
             <Td><Badge tone={p.seatType === 'TEACHER' ? 'info' : 'neutral'}>{p.seatType === 'TEACHER' ? 'Teacher' : 'Student'}</Badge></Td>
             <Td className="min-w-40"><SeatBar assigned={p.assigned + p.suspended} total={p.quantity - p.revoked} /></Td>
-            <Td><div className="whitespace-nowrap">{fmtDay(p.validUntil)}</div><div className={`text-xs ${!live ? 'text-slate-400' : d <= 45 ? 'text-amber-600' : 'text-slate-400'}`}>{p.academicYear}{live && d <= 45 ? ` · ${d} days left` : ''}</div></Td>
+            <Td><div className="whitespace-nowrap">{fmtDay(p.validUntil)}</div><div className={`text-xs ${!live ? 'text-slate-500' : d <= 45 ? 'text-amber-600' : 'text-slate-500'}`}>{p.academicYear}{live && d <= 45 ? ` · ${d} days left` : ''}</div></Td>
             <Td className="text-xs">{p.source === 'ORDER' ? <span className="font-mono">{p.orderNo}</span> : <span title={p.adjustment?.reason}>{p.adjustment?.kind.toLowerCase()} adjustment</span>}</Td>
             <Td><Status s={p.status === 'ACTIVE' && !live ? 'EXPIRED' : p.status} /></Td>
             <Td className="text-right">{action?.(p)}</Td>
@@ -57,15 +57,15 @@ export function PublisherPoolDialog({ poolId, onClose, canManage }: { poolId: st
             <table className="w-full text-sm"><thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Seat</th><th className="px-3 py-2">Holder</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Since</th><th /></tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {p.assignments.map((a: any) => (
-                  <tr key={a.id}><td className="px-3 py-2 tabular-nums">#{a.seatNo}</td><td className="px-3 py-2">{a.displayName} <span className="font-mono text-xs text-slate-400">{a.username}</span></td>
-                    <td className="px-3 py-2"><Status s={a.status} />{a.pendingTransfer && <Badge tone="DRAFT" className="ml-1">transfer pending</Badge>}{a.endReason && <div className="text-xs text-slate-400">{a.endReason}</div>}</td>
+                  <tr key={a.id}><td className="px-3 py-2 tabular-nums">#{a.seatNo}</td><td className="px-3 py-2">{a.displayName} <span className="font-mono text-xs text-slate-500">{a.username}</span></td>
+                    <td className="px-3 py-2"><Status s={a.status} />{a.pendingTransfer && <Badge tone="DRAFT" className="ml-1">transfer pending</Badge>}{a.endReason && <div className="text-xs text-slate-500">{a.endReason}</div>}</td>
                     <td className="px-3 py-2 text-xs text-slate-500">{fmtDate(a.assignedAt)}</td>
                     <td className="px-3 py-2 text-right">{canManage && a.status === 'ACTIVE' && <>
                       <Button size="sm" variant="ghost" onClick={() => act.mutate({ path: `/licensing/assignments/${a.id}/suspend` })}>Suspend</Button>
                       <Button size="sm" variant="ghost" onClick={() => setRevoke(a)}>Revoke</Button></>}
                       {canManage && a.status === 'SUSPENDED' && <Button size="sm" variant="ghost" onClick={() => act.mutate({ path: `/licensing/assignments/${a.id}/reactivate` })}>Reactivate</Button>}</td></tr>
                 ))}
-                {!p.assignments.length && <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-400">No seats assigned yet.</td></tr>}
+                {!p.assignments.length && <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">No seats assigned yet.</td></tr>}
               </tbody></table>
           </div>
           {revoke && (

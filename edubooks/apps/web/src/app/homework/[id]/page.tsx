@@ -7,7 +7,7 @@ import { api, fmtDay } from '@/lib/api';
 import { cn, ErrorBox, PageLoader } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 
-const COLORS = ['bg-sky-400', 'bg-pink-400', 'bg-emerald-400', 'bg-amber-400', 'bg-violet-400', 'bg-orange-400'];
+const COLORS = ['bg-sky-700', 'bg-pink-600', 'bg-emerald-700', 'bg-amber-700', 'bg-violet-600', 'bg-orange-700'];
 const say = (t: string) => { try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.rate = 0.85; window.speechSynthesis.speak(u); } catch { /* not available */ } };
 
 export default function Homework({ params }: { params: Promise<{ id: string }> }) {
@@ -64,17 +64,17 @@ export default function Homework({ params }: { params: Promise<{ id: string }> }
         <button onClick={() => say(it.prompt)} aria-label="Read the question aloud" className="rounded-2xl bg-sky-100 p-3 text-sky-700 hover:bg-sky-200"><Volume2 className="size-6" /></button></div>
       <div className="mt-6">
         {it.type === 'MCQ' && <div className="grid gap-3 sm:grid-cols-2">{it.options.map((o: string, n: number) => (
-          <button key={n} onClick={() => set(n)} aria-pressed={val === n} className={cn('rounded-2xl px-5 py-4 text-left text-xl font-bold text-white shadow transition', COLORS[n % COLORS.length], val === n ? 'scale-105 ring-4 ring-slate-800' : 'opacity-90 hover:opacity-100')}>{o}</button>))}</div>}
+          <button key={n} onClick={() => set(n)} aria-pressed={val === n} className={cn('rounded-2xl px-5 py-4 text-left text-xl font-bold text-white shadow transition', COLORS[n % COLORS.length], val === n ? 'scale-105 ring-4 ring-slate-800' : '')}>{o}</button>))}</div>}
         {it.type === 'TRUE_FALSE' && <div className="grid grid-cols-2 gap-3">{[true, false].map((v) => (
-          <button key={String(v)} onClick={() => set(v)} aria-pressed={val === v} className={cn('rounded-2xl py-6 text-2xl font-extrabold text-white shadow', v ? 'bg-emerald-400' : 'bg-red-400', val === v ? 'scale-105 ring-4 ring-slate-800' : 'opacity-90')}>{v ? '👍 True' : '👎 False'}</button>))}</div>}
+          <button key={String(v)} onClick={() => set(v)} aria-pressed={val === v} className={cn('rounded-2xl py-6 text-2xl font-extrabold text-white shadow', v ? 'bg-emerald-700' : 'bg-red-600', val === v ? 'scale-105 ring-4 ring-slate-800' : '')}>{v ? '👍 True' : '👎 False'}</button>))}</div>}
         {(it.type === 'FILL_BLANK' || it.type === 'SHORT') && <input autoFocus aria-label="Your answer" value={val ?? ''} onChange={(e) => set(e.target.value)} placeholder="Type your answer ✏️"
           className="w-full rounded-2xl border-4 border-sky-200 px-5 py-4 text-2xl outline-none focus:border-sky-400" />}
       </div>
     </div>
     <div className="mt-6 flex justify-between">
       <button disabled={i === 0} onClick={() => setI(i - 1)} className="flex items-center gap-1 rounded-2xl bg-white px-5 py-3 text-lg font-bold text-slate-600 shadow disabled:opacity-30"><ChevronLeft className="size-6" />Back</button>
-      {!last ? <button onClick={() => setI(i + 1)} className="flex items-center gap-1 rounded-2xl bg-sky-500 px-6 py-3 text-lg font-bold text-white shadow">Next<ChevronRight className="size-6" /></button>
-        : <button onClick={submit} disabled={busy} className="rounded-2xl bg-emerald-500 px-6 py-3 text-lg font-bold text-white shadow disabled:opacity-50">{busy ? '…' : '🚀 Hand in'}</button>}
+      {!last ? <button onClick={() => setI(i + 1)} className="flex items-center gap-1 rounded-2xl bg-sky-700 px-6 py-3 text-lg font-bold text-white shadow">Next<ChevronRight className="size-6" /></button>
+        : <button onClick={submit} disabled={busy} className="rounded-2xl bg-emerald-700 px-6 py-3 text-lg font-bold text-white shadow disabled:opacity-50">{busy ? '…' : '🚀 Hand in'}</button>}
     </div>
   </>);
 }

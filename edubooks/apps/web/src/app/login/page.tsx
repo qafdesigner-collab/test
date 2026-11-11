@@ -25,8 +25,8 @@ function LoginForm() {
   return (
     <form onSubmit={submit} className="space-y-4">
       <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-sm font-medium" role="tablist">
-        <button type="button" role="tab" aria-selected={!staff} onClick={() => setStaff(false)} className={`rounded-md py-2 ${!staff ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}>School</button>
-        <button type="button" role="tab" aria-selected={staff} onClick={() => setStaff(true)} className={`rounded-md py-2 ${staff ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}>Publisher staff</button>
+        <button type="button" role="tab" aria-selected={!staff} onClick={() => setStaff(false)} className={`rounded-md py-2 ${!staff ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600'}`}>School</button>
+        <button type="button" role="tab" aria-selected={staff} onClick={() => setStaff(true)} className={`rounded-md py-2 ${staff ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600'}`}>Publisher staff</button>
       </div>
       {!staff && <Field label="School code"><Input required value={form.schoolCode} onChange={set('schoolCode')} placeholder="e.g. SUN01" autoComplete="organization" /></Field>}
       <Field label="Username"><Input required value={form.username} onChange={set('username')} autoComplete="username" /></Field>

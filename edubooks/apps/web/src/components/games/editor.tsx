@@ -25,9 +25,9 @@ function Rows<T>({ rows, onChange, blank, render, label }: { rows: T[]; onChange
   return (
     <div className="space-y-2">
       {rows.map((r, i) => (
-        <div key={i} className="flex items-start gap-2"><span className="mt-2 w-6 text-right text-xs text-slate-400">{i + 1}</span>
+        <div key={i} className="flex items-start gap-2"><span className="mt-2 w-6 text-right text-xs text-slate-500">{i + 1}</span>
           <div className="flex flex-1 flex-wrap gap-2">{render(r, (v) => onChange(rows.map((x, j) => (j === i ? { ...x, ...v } : x))), i)}</div>
-          <button type="button" aria-label="Remove row" onClick={() => onChange(rows.filter((_, j) => j !== i))} className="mt-2 text-slate-300 hover:text-red-500"><Trash2 className="size-4" /></button></div>))}
+          <button type="button" aria-label="Remove row" onClick={() => onChange(rows.filter((_, j) => j !== i))} className="mt-2 text-slate-500 hover:text-red-500"><Trash2 className="size-4" /></button></div>))}
       <Button type="button" size="sm" variant="ghost" onClick={() => onChange([...rows, blank])}><Plus className="size-4" />{label}</Button>
     </div>
   );

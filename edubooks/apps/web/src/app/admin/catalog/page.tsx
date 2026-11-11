@@ -35,9 +35,9 @@ function Section({ kind, title, hint }: { kind: Kind; title: string; hint: strin
           <li key={x.id} className="flex items-center gap-3 px-5 py-3 text-sm">
             {kind === 'subjects' && <span className="size-3 rounded-full" style={{ background: x.color }} aria-hidden />}
             <span className="flex-1 font-medium text-slate-800">{x.name}</span>
-            <span className="text-xs text-slate-400">{x.packageCount} package{x.packageCount === 1 ? '' : 's'}</span>
-            <button className="focus-ring rounded p-1.5 text-slate-400 hover:bg-slate-100" aria-label={`Edit ${x.name}`} onClick={() => setEdit(x)}><Pencil className="size-4" /></button>
-            <button className="focus-ring rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30" aria-label={`Delete ${x.name}`} disabled={x.packageCount > 0}
+            <span className="text-xs text-slate-500">{x.packageCount} package{x.packageCount === 1 ? '' : 's'}</span>
+            <button className="focus-ring rounded p-1.5 text-slate-500 hover:bg-slate-100" aria-label={`Edit ${x.name}`} onClick={() => setEdit(x)}><Pencil className="size-4" /></button>
+            <button className="focus-ring rounded p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30" aria-label={`Delete ${x.name}`} disabled={x.packageCount > 0}
               title={x.packageCount ? 'In use by packages' : 'Delete'} onClick={() => setDel(x)}><Trash2 className="size-4" /></button>
           </li>
         ))}

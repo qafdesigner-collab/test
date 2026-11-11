@@ -17,7 +17,7 @@ export default function Plans() {
         <Table head={['Plan', 'Book / lesson', 'Class', 'Date', 'Status']}>
           {q.data.map((p: any) => (
             <tr key={p.id} className="hover:bg-slate-50"><Td><Link href={`/teacher/plans/${p.id}`} className="font-medium hover:text-brand-700">{p.title}</Link>{p.aiGenerated && <Badge tone="info" className="ml-2">AI</Badge>}</Td>
-              <Td className="text-slate-600">{p.bookTitle ?? '—'}{p.lessonTitle && <div className="text-xs text-slate-400">{p.lessonTitle}</div>}</Td><Td>{p.className ?? '—'}</Td>
+              <Td className="text-slate-600">{p.bookTitle ?? '—'}{p.lessonTitle && <div className="text-xs text-slate-500">{p.lessonTitle}</div>}</Td><Td>{p.className ?? '—'}</Td>
               <Td className="text-slate-500">{p.planDate ? fmtDay(p.planDate) : '—'} · {p.durationMin} min</Td><Td><Badge tone={p.status === 'READY' ? 'PUBLISHED' : 'DRAFT'}>{p.status === 'READY' ? 'Ready' : 'Draft'}</Badge></Td></tr>
           ))}
         </Table>

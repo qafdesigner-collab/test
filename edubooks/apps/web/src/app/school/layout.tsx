@@ -29,7 +29,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
     <div className="min-h-screen lg:flex">
       <aside className={cn('fixed inset-y-0 left-0 z-40 w-64 transform border-r border-slate-200 bg-white transition-transform lg:static lg:translate-x-0', open ? 'translate-x-0' : '-translate-x-full')}>
         <div className="border-b border-slate-100 px-5 py-4"><div className="flex items-center gap-2 font-semibold text-slate-900"><BookOpen className="size-5 text-emerald-600" />EduBooks</div>
-          <div className="mt-1 truncate text-sm text-slate-600">{me.school?.name}</div><div className="font-mono text-xs text-slate-400">{me.school?.code}</div></div>
+          <div className="mt-1 truncate text-sm text-slate-600">{me.school?.name}</div><div className="font-mono text-xs text-slate-500">{me.school?.code}</div></div>
         <nav className="space-y-1 p-3" aria-label="School">
           {NAV.map(({ href, label, icon: Icon, exact }) => {
             const active = exact ? path === href : path.startsWith(href);

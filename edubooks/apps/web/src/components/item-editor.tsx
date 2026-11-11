@@ -16,19 +16,19 @@ export function ItemEditor({ item, index, onChange, onRemove, onMove, count }: {
           {Object.entries(QTYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
         <label className="flex items-center gap-1 text-sm text-slate-600">Points<Input aria-label="Points" type="number" min={0} max={100} className="h-9 w-16" value={item.points} onChange={(e) => set({ points: Number(e.target.value) })} /></label>
         <div className="flex-1" />
-        {onMove && <><button aria-label="Move up" disabled={index === 0} onClick={() => onMove(-1)} className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowUp className="size-4" /></button>
-          <button aria-label="Move down" disabled={index === (count ?? 1) - 1} onClick={() => onMove(1)} className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowDown className="size-4" /></button></>}
-        {onRemove && <button aria-label="Remove question" onClick={onRemove} className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="size-4" /></button>}
+        {onMove && <><button aria-label="Move up" disabled={index === 0} onClick={() => onMove(-1)} className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-30"><ArrowUp className="size-4" /></button>
+          <button aria-label="Move down" disabled={index === (count ?? 1) - 1} onClick={() => onMove(1)} className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-30"><ArrowDown className="size-4" /></button></>}
+        {onRemove && <button aria-label="Remove question" onClick={onRemove} className="rounded p-1 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 className="size-4" /></button>}
       </div>
       <Textarea aria-label="Question" rows={2} placeholder={item.type === 'FILL_BLANK' ? 'Use ___ for the blank, e.g. “A is for ___”' : 'Write the question'} value={item.prompt} onChange={(e) => set({ prompt: e.target.value })} />
       {item.type === 'MCQ' && (
         <div className="space-y-2">
           {item.options.map((o, i) => (
             <div key={i} className="flex items-center gap-2">
-              <button type="button" aria-label={`Mark choice ${i + 1} correct`} aria-pressed={item.answer[0] === i} onClick={() => set({ answer: [i] })} className={item.answer[0] === i ? 'text-emerald-600' : 'text-slate-300 hover:text-slate-500'}>
+              <button type="button" aria-label={`Mark choice ${i + 1} correct`} aria-pressed={item.answer[0] === i} onClick={() => set({ answer: [i] })} className={item.answer[0] === i ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-500'}>
                 {item.answer[0] === i ? <CheckCircle2 className="size-5" /> : <Circle className="size-5" />}</button>
               <Input aria-label={`Choice ${i + 1}`} value={o} placeholder={`Choice ${i + 1}`} onChange={(e) => set({ options: item.options.map((x, j) => (j === i ? e.target.value : x)) })} />
-              <button type="button" aria-label="Remove choice" disabled={item.options.length <= 2} onClick={() => set({ options: item.options.filter((_, j) => j !== i), answer: [Math.min(item.answer[0], item.options.length - 2)] })} className="text-slate-300 hover:text-red-500 disabled:opacity-30"><Trash2 className="size-4" /></button>
+              <button type="button" aria-label="Remove choice" disabled={item.options.length <= 2} onClick={() => set({ options: item.options.filter((_, j) => j !== i), answer: [Math.min(item.answer[0], item.options.length - 2)] })} className="text-slate-500 hover:text-red-500 disabled:opacity-30"><Trash2 className="size-4" /></button>
             </div>))}
           {item.options.length < 6 && <Button type="button" size="sm" variant="ghost" onClick={() => set({ options: [...item.options, ''] })}><Plus className="size-4" />Choice</Button>}
           <p className="text-xs text-slate-500">Tick the correct choice.</p>

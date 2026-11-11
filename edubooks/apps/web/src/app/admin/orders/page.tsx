@@ -39,7 +39,7 @@ function NewOrder({ schoolId: initialSchool, onClose }: { schoolId?: string; onC
                 <option value="">Select product…</option>{sellable.map((p: any) => <option key={p.id} value={p.active.id} disabled={lines.some((x, j) => j !== i && x.productVersionId === p.active.id)}>{p.name} · v{p.active.versionNo} · {fmtMoney(p.active.priceMinor, p.active.currency)}</option>)}</Select>
               <Input aria-label="Student seats" type="number" min={0} value={l.studentQty} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, studentQty: Number(e.target.value) } : x)))} />
               <Input aria-label="Teacher seats" type="number" min={0} value={l.teacherQty} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, teacherQty: Number(e.target.value) } : x)))} />
-              <button type="button" aria-label="Remove line" disabled={lines.length === 1} onClick={() => setLines(lines.filter((_, j) => j !== i))} className="rounded p-1.5 text-slate-400 hover:text-red-600 disabled:opacity-30"><Trash2 className="size-4" /></button>
+              <button type="button" aria-label="Remove line" disabled={lines.length === 1} onClick={() => setLines(lines.filter((_, j) => j !== i))} className="rounded p-1.5 text-slate-500 hover:text-red-600 disabled:opacity-30"><Trash2 className="size-4" /></button>
             </div>
           ))}
           <Button type="button" size="sm" variant="ghost" onClick={() => setLines([...lines, { productVersionId: '', studentQty: 0, teacherQty: 0 }])}><Plus className="size-4" />Add product</Button>
@@ -69,7 +69,7 @@ function OrdersPage() {
             {q.data.items.map((o: any) => (
               <tr key={o.id} className="hover:bg-slate-50">
                 <Td><Link className="font-mono font-medium text-brand-700 hover:underline" href={`/admin/orders/${o.id}`}>{o.orderNo}</Link></Td>
-                <Td>{o.school.name} <span className="font-mono text-xs text-slate-400">{o.school.code}</span></Td><Td>{o.type.toLowerCase()}</Td><Td>{o.academicYear}</Td>
+                <Td>{o.school.name} <span className="font-mono text-xs text-slate-500">{o.school.code}</span></Td><Td>{o.type.toLowerCase()}</Td><Td>{o.academicYear}</Td>
                 <Td className="whitespace-nowrap">{o.students} / {o.teachers}</Td><Td className="tabular-nums">{fmtMoney(o.totalMinor)}</Td><Td className="text-slate-500">{fmtDay(o.createdAt)}</Td><Td><Status s={o.status} /></Td>
               </tr>
             ))}

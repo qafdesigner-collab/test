@@ -18,7 +18,7 @@ export function GameReport({ classId, teacher }: { classId: string; teacher?: bo
           {r.games.map((g: any) => <th key={g.assignmentId} className="px-3 py-2 font-medium">{ENGINE_INFO[g.engine as Engine].icon} {g.title}</th>)}</tr></thead>
           <tbody className="divide-y divide-slate-100">{r.students.map((s: any) => (
             <tr key={s.id}><td className="px-4 py-2 font-medium">{s.displayName}</td>{s.cells.map((c: any, i: number) => (
-              <td key={i} className="px-3 py-2">{c ? <span title={`${c.plays} play(s)`}>{'⭐'.repeat(c.best)}<span className="opacity-20">{'⭐'.repeat(3 - c.best)}</span> <span className="text-xs text-slate-400">×{c.plays}</span></span> : <span className="text-slate-300">not played</span>}</td>))}</tr>))}</tbody></table>
+              <td key={i} className="px-3 py-2">{c ? <span title={`${c.plays} play(s)`}>{'⭐'.repeat(c.best)}<span className="opacity-20">{'⭐'.repeat(3 - c.best)}</span> <span className="text-xs text-slate-500">×{c.plays}</span></span> : <span className="text-slate-500">not played</span>}</td>))}</tr>))}</tbody></table>
       )}
     </Card>
   );

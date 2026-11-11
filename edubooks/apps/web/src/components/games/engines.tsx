@@ -83,7 +83,7 @@ function Counting({ content, onFinish, say, onProgress }: EngineProps) {
       <Big>How many {r.thing} can you count?</Big>
       <div className="mx-auto mb-8 flex max-w-xl flex-wrap justify-center gap-3 rounded-3xl bg-white p-6 text-5xl shadow-inner" onClick={() => say('How many can you count?')}>{Array.from({ length: r.n }, (_, i) => <span key={i}>{r.thing}</span>)}</div>
       <div className="flex justify-center gap-4">{r.opts.map((o: number) => <button key={o} onClick={() => answer(o === r.n, String(o))}
-        className={cn(TILE, 'size-24 bg-sky-400 text-4xl text-white', shaking === String(o) && 'animate-[shake_.4s]')}>{o}</button>)}</div>
+        className={cn(TILE, 'size-24 bg-sky-700 text-4xl text-white', shaking === String(o) && 'animate-[shake_.4s]')}>{o}</button>)}</div>
     </>)} />;
 }
 
@@ -151,7 +151,7 @@ function FillBlank({ content, onFinish, say, onProgress }: EngineProps) {
         <button key={o} onClick={() => answer(o.toLowerCase() === r.answer.toLowerCase(), o)} className={cn(TILE, 'h-20 min-w-24 bg-amber-300 px-5 text-3xl', shaking === o && 'animate-[shake_.4s]')}>{o}</button>))}</div>
         : <form className="flex justify-center gap-3" onSubmit={(e) => { e.preventDefault(); answer(typed.trim().toLowerCase() === r.answer.toLowerCase(), 'typed'); setTyped(''); }}>
           <input autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Your answer" className={cn('w-56 rounded-2xl border-4 border-amber-300 px-4 py-3 text-3xl', shaking === 'typed' && 'animate-[shake_.4s]')} />
-          <button className={cn(TILE, 'bg-emerald-400 px-6 text-2xl text-white')}>OK</button></form>}
+          <button className={cn(TILE, 'bg-emerald-700 px-6 text-2xl text-white')}>OK</button></form>}
     </>);
   }} />;
 }
@@ -166,7 +166,7 @@ function Quiz({ content, onFinish, say, onProgress }: EngineProps) {
     setPicked(k); const s = score + (k === q.answer ? 1 : 0); setScore(s);
     setTimeout(() => { setPicked(null); if (i + 1 >= qs.length) onFinish(s); else setI(i + 1); }, 1100);
   };
-  const colors = ['bg-sky-400', 'bg-pink-400', 'bg-emerald-400', 'bg-amber-400'];
+  const colors = ['bg-sky-700', 'bg-pink-600', 'bg-emerald-700', 'bg-amber-700'];
   return (<>
     <Big>{q.prompt}</Big>
     <div className="mx-auto grid max-w-2xl gap-4 sm:grid-cols-2">{q.options.map((o: string, k: number) => (
@@ -218,7 +218,7 @@ function WordBuild({ content, onFinish, say, onProgress }: EngineProps) {
     <div className="mb-4 text-center text-7xl">{w.hint}</div>
     <div className="mb-8 flex justify-center gap-2">{[...w.word].map((_, k) => <span key={k} className="flex h-16 w-14 items-center justify-center rounded-xl border-b-4 border-slate-300 bg-white text-4xl font-extrabold text-emerald-600">{built[k] ?? ''}</span>)}</div>
     <div className="flex flex-wrap justify-center gap-3">{letters.map((ch, k) => (
-      <button key={k} disabled={used.includes(k)} onClick={() => tap(k)} className={cn(TILE, 'size-20 bg-teal-400 text-4xl text-white disabled:invisible', shaking === String(k) && 'animate-[shake_.4s]')}>{ch}</button>))}</div>
+      <button key={k} disabled={used.includes(k)} onClick={() => tap(k)} className={cn(TILE, 'size-20 bg-teal-700 text-4xl text-white disabled:invisible', shaking === String(k) && 'animate-[shake_.4s]')}>{ch}</button>))}</div>
   </>);
 }
 

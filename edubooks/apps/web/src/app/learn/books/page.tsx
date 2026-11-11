@@ -20,7 +20,7 @@ export default function LearnBooks() {
                 {{ English: '🔤', Mathematics: '🔢', Urdu: 'ا', 'General Knowledge': '🌍' }[b.subject as string] ?? '📘'}</div>
               <div className="p-4"><div className="text-xl font-black leading-tight">{b.title}</div>
                 <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100" aria-label={`${pct}% read`}><div className="h-full rounded-full bg-emerald-400" style={{ width: `${pct}%` }} /></div>
-                <div className="mt-1 text-xs font-bold text-slate-400">{pct}% read</div></div>
+                <div className="mt-1 text-xs font-bold text-slate-500">{pct}% read</div></div>
             </Link>);
         })}</div>
       )}

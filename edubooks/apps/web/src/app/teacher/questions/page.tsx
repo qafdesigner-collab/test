@@ -30,9 +30,9 @@ export default function QuestionBank() {
               {x.type === 'MCQ' && <div className="mt-1 text-xs text-slate-500">{x.options.map((o: string, i: number) => <span key={i} className={i === x.answer[0] ? 'font-semibold text-emerald-700' : ''}>{i ? ' · ' : ''}{o}</span>)}</div>}
               {x.type === 'TRUE_FALSE' && <div className="mt-1 text-xs text-emerald-700">Answer: {x.answer[0] ? 'True' : 'False'}</div>}
               {x.type === 'FILL_BLANK' && <div className="mt-1 text-xs text-emerald-700">Accepts: {x.answer.join(', ')}</div>}
-              <div className="mt-1 text-xs text-slate-400">by {x.owner}</div></div>
+              <div className="mt-1 text-xs text-slate-500">by {x.owner}</div></div>
             <Badge>{QTYPE_LABEL[x.type]}</Badge>
-            {x.mine && <button aria-label="Delete question" onClick={() => del.mutate(x.id)} className="text-slate-400 hover:text-red-600"><Trash2 className="size-4" /></button>}
+            {x.mine && <button aria-label="Delete question" onClick={() => del.mutate(x.id)} className="text-slate-500 hover:text-red-600"><Trash2 className="size-4" /></button>}
           </Card>))}</div>
       )}
       {add && <AddQuestion onClose={() => setAdd(false)} />}

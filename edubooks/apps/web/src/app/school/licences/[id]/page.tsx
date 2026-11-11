@@ -35,16 +35,16 @@ export default function PoolPage({ params }: { params: Promise<{ id: string }> }
             <p className="text-xs text-slate-500">{isStudent ? 'Students' : 'Teachers'} without a seat in this licence. Select up to {free}.</p></div>
           {!live ? <p className="p-5 text-sm text-slate-500">This licence is not active, so no seats can be assigned. A renewal order is needed.</p> : (
             <div className="space-y-3 p-5">
-              <div className="relative"><Search className="pointer-events-none absolute left-3 top-3 size-4 text-slate-400" /><Input className="pl-9" placeholder="Search…" aria-label="Search people" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+              <div className="relative"><Search className="pointer-events-none absolute left-3 top-3 size-4 text-slate-500" /><Input className="pl-9" placeholder="Search…" aria-label="Search people" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
               <div className="flex justify-between text-xs"><button className="text-emerald-700 hover:underline" onClick={() => setPicked(filtered.slice(0, free).map((u: any) => u.id))}>Select first {Math.min(free, filtered.length)}</button>
                 <span className={picked.length > free ? 'font-medium text-red-600' : 'text-slate-500'}>{picked.length} selected · {free} free</span></div>
               <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
                 {filtered.map((u: any) => (
                   <li key={u.id}><label className="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-slate-50">
                     <input type="checkbox" className="size-4" checked={picked.includes(u.id)} onChange={(e) => setPicked(e.target.checked ? [...picked, u.id] : picked.filter((x) => x !== u.id))} />
-                    <span className="flex-1">{u.displayName}</span><span className="font-mono text-xs text-slate-400">{u.username}</span></label></li>
+                    <span className="flex-1">{u.displayName}</span><span className="font-mono text-xs text-slate-500">{u.username}</span></label></li>
                 ))}
-                {!filtered.length && <li className="px-3 py-6 text-center text-sm text-slate-400">Everyone already has a seat — or add {isStudent ? 'students' : 'teachers'} first.</li>}
+                {!filtered.length && <li className="px-3 py-6 text-center text-sm text-slate-500">Everyone already has a seat — or add {isStudent ? 'students' : 'teachers'} first.</li>}
               </ul>
               <Button className="w-full" disabled={!picked.length || picked.length > free} loading={assign.isPending} onClick={() => assign.mutate()}><UserPlus className="size-4" />Assign {picked.length || ''} seat{picked.length === 1 ? '' : 's'}</Button>
             </div>
@@ -57,16 +57,16 @@ export default function PoolPage({ params }: { params: Promise<{ id: string }> }
           <ul className="max-h-[28rem] divide-y divide-slate-100 overflow-y-auto">
             {[...holders, ...(showEnded ? history : [])].map((a: any) => (
               <li key={a.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
-                <span className="w-10 text-xs tabular-nums text-slate-400">#{a.seatNo}</span>
-                <span className="flex-1"><span className="font-medium">{a.displayName}</span> <span className="font-mono text-xs text-slate-400">{a.username}</span>
-                  {a.endReason && <span className="block text-xs text-slate-400">{a.endReason}{a.endedAt && ` · ${fmtDate(a.endedAt)}`}</span>}</span>
+                <span className="w-10 text-xs tabular-nums text-slate-500">#{a.seatNo}</span>
+                <span className="flex-1"><span className="font-medium">{a.displayName}</span> <span className="font-mono text-xs text-slate-500">{a.username}</span>
+                  {a.endReason && <span className="block text-xs text-slate-500">{a.endReason}{a.endedAt && ` · ${fmtDate(a.endedAt)}`}</span>}</span>
                 <Status s={a.status} />{a.pendingTransfer && <Badge tone="DRAFT">transfer pending</Badge>}
                 {a.status === 'ACTIVE' && live && (isStudent
                   ? !a.pendingTransfer && <Button size="sm" variant="ghost" onClick={() => setTransfer(a)}><ArrowLeftRight className="size-4" />Transfer</Button>
                   : <Button size="sm" variant="ghost" onClick={() => setRelease(a)}>Release</Button>)}
               </li>
             ))}
-            {!holders.length && !showEnded && <li className="px-5 py-8 text-center text-sm text-slate-400">No seats assigned yet.</li>}
+            {!holders.length && !showEnded && <li className="px-5 py-8 text-center text-sm text-slate-500">No seats assigned yet.</li>}
           </ul>
         </Card>
       </div>

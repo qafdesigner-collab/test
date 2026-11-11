@@ -14,7 +14,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Public()
-  @Throttle({ default: { limit: Number(process.env.LOGIN_RATE_LIMIT || 10), ttl: 60_000 } })
+  @Throttle({ default: { limit: Number(process.env.LOGIN_RATE_LIMIT || 60), ttl: 60_000 } })
   @Post('login') @HttpCode(200)
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const { token, expiresAt } = await this.auth.login(dto.schoolCode, dto.username, dto.password, req.ip, req.headers['user-agent']);

@@ -109,7 +109,7 @@ export default function SchoolPage({ params }: { params: Promise<{ id: string }>
           <ul className="divide-y divide-slate-100 text-sm">{s.academicYears.map((y: any) => {
             const now = Date.now(); const cur = new Date(y.startsOn).getTime() <= now && new Date(y.endsOn).getTime() > now;
             return <li key={y.id} className="flex justify-between px-5 py-3"><span className="font-medium">{y.name} {cur && <Badge tone="PUBLISHED">current</Badge>}</span><span className="text-slate-500">{fmtDay(y.startsOn)} – {fmtDay(y.endsOn)}</span></li>;
-          })}{!s.academicYears.length && <li className="px-5 py-6 text-center text-slate-400">Add an academic year before creating orders.</li>}</ul>
+          })}{!s.academicYears.length && <li className="px-5 py-6 text-center text-slate-500">Add an academic year before creating orders.</li>}</ul>
         </Card>
       )}
       {tab === 'admins' && (

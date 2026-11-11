@@ -39,7 +39,7 @@ export default function LearnHome() {
             <Link key={w.id} href={`/homework/${w.id}`} className="flex items-center gap-4 rounded-[2rem] bg-white p-5 shadow-sm ring-4 ring-white transition hover:scale-[1.02] motion-reduce:transform-none">
               <span className="grid size-16 shrink-0 place-items-center rounded-3xl text-3xl" style={{ background: w.coverColor ?? '#f472b6' }}>✏️</span>
               <span className="flex-1"><span className="block text-xl font-black">{w.title}</span><span className="text-sm font-bold text-slate-500">{w.items} questions{w.dueAt && ` · ${daysLeft(w.dueAt) <= 0 ? 'due today!' : `${daysLeft(w.dueAt)} days left`}`}</span></span>
-              <span className="rounded-full bg-pink-500 px-5 py-3 text-lg font-black text-white">Start</span></Link>))}</div>
+              <span className="rounded-full bg-pink-600 px-5 py-3 text-lg font-black text-white">Start</span></Link>))}</div>
         )}</section>
 
       {h.games.length > 0 && <section><div className="mb-4 flex items-end justify-between"><h2 className="text-3xl font-black text-slate-800">🎮 Play & learn</h2><Link href="/learn/games" className="text-lg font-black text-emerald-600">See all ▶</Link></div>

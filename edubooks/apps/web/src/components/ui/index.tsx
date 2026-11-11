@@ -34,7 +34,7 @@ export const StatusBadge = ({ status }: { status: string }) => <Badge tone={stat
 
 /** Full width unless the caller sets its own width class. */
 const width = (c?: string) => (/(^|\s)(w-|max-w-|min-w-)/.test(c ?? '') ? '' : 'w-full');
-const fieldCls = 'focus-ring block rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 disabled:bg-slate-50';
+const fieldCls = 'focus-ring block rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-500 disabled:bg-slate-50';
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...p }, ref) {
   return <input ref={ref} className={cn(fieldCls, 'h-10', width(className), className)} {...p} />;
 });
@@ -64,7 +64,7 @@ export function Dialog({ open, onOpenChange, title, description, children, wide 
           <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4">
             <div><RD.Title className="text-lg font-semibold text-slate-900">{title}</RD.Title>
               {description ? <RD.Description className="mt-1 text-sm text-slate-500">{description}</RD.Description> : <RD.Description className="sr-only">{title}</RD.Description>}</div>
-            <RD.Close className="focus-ring rounded-md p-1 text-slate-400 hover:bg-slate-100" aria-label="Close"><X className="size-5" /></RD.Close>
+            <RD.Close className="focus-ring rounded-md p-1 text-slate-500 hover:bg-slate-100" aria-label="Close"><X className="size-5" /></RD.Close>
           </div>
           <div className="px-6 py-5">{children}</div>
         </RD.Content>
@@ -87,13 +87,13 @@ export function Confirm({ open, onOpenChange, title, body, confirmLabel = 'Confi
   );
 }
 
-export const Spinner = ({ className }: { className?: string }) => <Loader2 className={cn('size-5 animate-spin text-slate-400', className)} />;
+export const Spinner = ({ className }: { className?: string }) => <Loader2 className={cn('size-5 animate-spin text-slate-500', className)} />;
 export const PageLoader = () => <div className="flex h-64 items-center justify-center"><Spinner className="size-7" /></div>;
 
 export function EmptyState({ icon, title, children }: { icon?: React.ReactNode; title: string; children?: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-white px-6 py-12 text-center">
-      {icon && <div className="mb-3 text-slate-400">{icon}</div>}
+      {icon && <div className="mb-3 text-slate-500">{icon}</div>}
       <p className="font-medium text-slate-700">{title}</p>
       {children && <div className="mt-1 text-sm text-slate-500">{children}</div>}
     </div>

@@ -36,7 +36,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="min-h-screen lg:flex">
       <aside className={cn('fixed inset-y-0 left-0 z-40 w-64 transform border-r border-slate-200 bg-white transition-transform lg:static lg:translate-x-0', open ? 'translate-x-0' : '-translate-x-full')}>
-        <div className="flex h-16 items-center gap-2 border-b border-slate-100 px-5 font-semibold text-slate-900"><BookOpen className="size-5 text-brand-600" /> EduBooks <span className="text-xs font-normal text-slate-400">Publisher</span></div>
+        <div className="flex h-16 items-center gap-2 border-b border-slate-100 px-5 font-semibold text-slate-900"><BookOpen className="size-5 text-brand-600" /> EduBooks <span className="text-xs font-normal text-slate-500">Publisher</span></div>
         <nav className="space-y-1 p-3" aria-label="Main">
           {NAV.filter((n) => n.roles.some((r) => me.roles.includes(r))).map(({ href, label, icon: Icon, exact }) => {
             const active = exact ? path === href : path.startsWith(href);
@@ -47,9 +47,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </Link>
             );
           })}
-          {NEXT.length > 0 && <p className="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wide text-slate-400">Coming next</p>}
+          {NEXT.length > 0 && <p className="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wide text-slate-500">Coming next</p>}
           {NEXT.map(({ label, icon: Icon }) => (
-            <span key={label} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-400" title="Planned in a later phase"><Icon className="size-4" />{label}</span>
+            <span key={label} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-500" title="Planned in a later phase"><Icon className="size-4" />{label}</span>
           ))}
         </nav>
       </aside>

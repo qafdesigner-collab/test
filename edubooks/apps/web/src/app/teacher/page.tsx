@@ -29,13 +29,13 @@ export default function TeacherHome() {
         <Card><div className="border-b border-slate-100 px-5 py-3 font-semibold">My classes</div>
           <ul className="divide-y divide-slate-100">{classes.data.map((c) => (
             <li key={c.id}><Link href={`/teacher/classes/${c.id}`} className="flex items-center justify-between px-5 py-3 hover:bg-slate-50"><span className="font-medium">{className(c)}</span><span className="text-sm text-slate-500">{c.students} students · {c.academicYear}</span></Link></li>))}
-            {!classes.data.length && <li className="px-5 py-6 text-center text-sm text-slate-400">No classes yet — your school admin assigns teachers to classes.</li>}</ul></Card>
+            {!classes.data.length && <li className="px-5 py-6 text-center text-sm text-slate-500">No classes yet — your school admin assigns teachers to classes.</li>}</ul></Card>
         <Card><div className="border-b border-slate-100 px-5 py-3 font-semibold">Recent homework & tests</div>
           <ul className="divide-y divide-slate-100">{(work.data ?? []).slice(0, 6).map((a: any) => (
             <li key={a.id}><Link href={`/teacher/assessments/${a.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50"><span className="flex-1"><span className="font-medium">{a.title}</span>
               <span className="block text-xs text-slate-500">{KIND_LABEL[a.kind]} · {a.className}{a.dueAt && ` · due ${fmtDay(a.dueAt)}`}</span></span>
               {a.toGrade > 0 && <Badge tone="DRAFT"><ClipboardCheck className="size-3" />{a.toGrade} to mark</Badge>}<Status s={a.status} /></Link></li>))}
-            {!work.data?.length && <li className="px-5 py-6 text-center text-sm text-slate-400">Nothing yet.</li>}</ul></Card>
+            {!work.data?.length && <li className="px-5 py-6 text-center text-sm text-slate-500">Nothing yet.</li>}</ul></Card>
       </div>
       <Card className="p-5"><h2 className="mb-3 font-semibold">My books</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{books.data.map((b) => (

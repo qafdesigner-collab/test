@@ -88,7 +88,7 @@ function Assistant() {
                 {r.output.sections && out.sections.map((sec: any, i: number) => (
                   <div key={i} className="rounded-lg border border-slate-200 p-3">
                     <div className="flex gap-2"><Input aria-label="Heading" value={sec.heading} onChange={(e) => setOut({ ...out, sections: out.sections.map((x: any, j: number) => (j === i ? { ...x, heading: e.target.value } : x)) })} />
-                      <button aria-label="Remove" onClick={() => setOut({ ...out, sections: out.sections.filter((_: any, j: number) => j !== i) })} className="text-slate-400 hover:text-red-600"><Trash2 className="size-4" /></button></div>
+                      <button aria-label="Remove" onClick={() => setOut({ ...out, sections: out.sections.filter((_: any, j: number) => j !== i) })} className="text-slate-500 hover:text-red-600"><Trash2 className="size-4" /></button></div>
                     <Textarea rows={3} className="mt-2" value={sec.body} onChange={(e) => setOut({ ...out, sections: out.sections.map((x: any, j: number) => (j === i ? { ...x, body: e.target.value } : x)) })} />
                     <div className="mt-1"><SourceChips editionId={f.editionId!} sources={r.sources} ids={sec.sources} /></div>
                   </div>))}
@@ -103,9 +103,9 @@ function Assistant() {
               <Card className="p-4">
                 <p className="mb-2 text-sm font-semibold">Book pages used ({r.sources.length})</p>
                 {r.sources.length ? <ul className="space-y-2 text-sm">{r.sources.map((x: any) => (
-                  <li key={x.n} className="flex gap-2"><span className="w-6 shrink-0 text-right font-mono text-xs text-slate-400">[{x.n}]</span>
+                  <li key={x.n} className="flex gap-2"><span className="w-6 shrink-0 text-right font-mono text-xs text-slate-500">[{x.n}]</span>
                     <span className="min-w-0"><SourceChips editionId={f.editionId!} sources={[x]} /> <span className="text-xs text-slate-500">{x.component}{x.lesson ? ` · ${x.lesson}` : ''}</span>
-                      <span className="block truncate text-xs text-slate-400">{x.snippet}</span></span></li>))}</ul>
+                      <span className="block truncate text-xs text-slate-500">{x.snippet}</span></span></li>))}</ul>
                   : <p className="text-sm text-slate-500">No digitised pages were available for this lesson.</p>}
               </Card>
             </>
@@ -114,7 +114,7 @@ function Assistant() {
             <Card className="p-5"><p className="mb-3 text-sm font-semibold">Recent drafts</p>
               {!history.data ? <PageLoader /> : !history.data.length ? <p className="text-sm text-slate-500">Choose a book and lesson, pick what you need, and press “Generate draft”.</p> : (
                 <ul className="divide-y divide-slate-100 text-sm">{history.data.map((h: any) => (
-                  <li key={h.id} className="flex items-center gap-3 py-2"><span className="flex-1"><b>{h.title ?? h.task}</b><span className="block text-xs text-slate-400">{h.lesson ?? ''} · {fmtDate(h.createdAt)}</span></span>
+                  <li key={h.id} className="flex items-center gap-3 py-2"><span className="flex-1"><b>{h.title ?? h.task}</b><span className="block text-xs text-slate-500">{h.lesson ?? ''} · {fmtDate(h.createdAt)}</span></span>
                     {h.usedAs ? <Badge tone="PUBLISHED">used</Badge> : <Badge tone={h.status === 'OK' ? 'neutral' : 'danger'}>{h.status === 'OK' ? 'draft' : h.status.toLowerCase()}</Badge>}</li>))}</ul>
               )}</Card>
           )}

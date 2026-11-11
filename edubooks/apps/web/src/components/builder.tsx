@@ -77,11 +77,11 @@ export function StructureTab({ tree }: { tree: EditionTree }) {
     const n = count(s);
     return (
       <div className={cn('group flex items-center gap-1 rounded-lg pr-1 text-sm', active ? 'bg-brand-50 text-brand-800' : 'hover:bg-slate-50')} style={{ paddingLeft: depth * 18 }}>
-        <button onClick={toggle} className={cn('rounded p-1 text-slate-400', !toggle && 'invisible')} aria-label={isOpen ? 'Collapse' : 'Expand'}>
+        <button onClick={toggle} className={cn('rounded p-1 text-slate-500', !toggle && 'invisible')} aria-label={isOpen ? 'Collapse' : 'Expand'}>
           <ChevronRight className={cn('size-4 transition-transform', isOpen && 'rotate-90')} />
         </button>
         <button onClick={() => setSel(s)} className="focus-ring flex min-w-0 flex-1 items-center gap-2 rounded py-2 text-left">
-          {icon}<span className="truncate font-medium">{label}</span>{sub && <span className="truncate text-xs text-slate-400">{sub}</span>}
+          {icon}<span className="truncate font-medium">{label}</span>{sub && <span className="truncate text-xs text-slate-600">{sub}</span>}
           {n > 0 && <Badge className="ml-auto">{n}</Badge>}
         </button>
         {!locked && <div className="flex opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">{actions}</div>}
@@ -90,8 +90,8 @@ export function StructureTab({ tree }: { tree: EditionTree }) {
   };
   const MoveBtns = ({ kind, list, i }: { kind: string; list: { id: string }[]; i: number }) => (
     <>
-      <button className="rounded p-1 text-slate-400 hover:bg-white disabled:opacity-30" disabled={i === 0} onClick={() => move(kind, list, i, -1)} aria-label="Move up"><ArrowUp className="size-3.5" /></button>
-      <button className="rounded p-1 text-slate-400 hover:bg-white disabled:opacity-30" disabled={i === list.length - 1} onClick={() => move(kind, list, i, 1)} aria-label="Move down"><ArrowDown className="size-3.5" /></button>
+      <button className="rounded p-1 text-slate-500 hover:bg-white disabled:opacity-30" disabled={i === 0} onClick={() => move(kind, list, i, -1)} aria-label="Move up"><ArrowUp className="size-3.5" /></button>
+      <button className="rounded p-1 text-slate-500 hover:bg-white disabled:opacity-30" disabled={i === list.length - 1} onClick={() => move(kind, list, i, 1)} aria-label="Move down"><ArrowDown className="size-3.5" /></button>
     </>
   );
 
@@ -116,10 +116,10 @@ export function StructureTab({ tree }: { tree: EditionTree }) {
                 ))}
               </div>
             ))}
-            {open[c.id] && c.units.length === 0 && <p className="py-1 pl-12 text-xs text-slate-400">No units yet</p>}
+            {open[c.id] && c.units.length === 0 && <p className="py-1 pl-12 text-xs text-slate-600">No units yet</p>}
           </div>
         ))}
-        {tree.components.length === 0 && <p className="p-4 text-center text-sm text-slate-400">Add the first component, e.g. “Student Book Part 1”.</p>}
+        {tree.components.length === 0 && <p className="p-4 text-center text-sm text-slate-500">Add the first component, e.g. “Student Book Part 1”.</p>}
       </Card>
       <NodePanel tree={tree} sel={sel} setSel={setSel} onExpand={(id) => setOpen((o) => ({ ...o, [id]: true }))} />
       {addComp && <ComponentDialog editionId={tree.id} onClose={() => setAddComp(false)} />}
@@ -206,7 +206,7 @@ function NodePanel({ tree, sel, setSel, onExpand }: { tree: EditionTree; sel: Se
 
       <Card>
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-          <h4 className="font-semibold text-slate-900">Resources here <span className="text-sm font-normal text-slate-400">({resources.length})</span></h4>
+          <h4 className="font-semibold text-slate-900">Resources here <span className="text-sm font-normal text-slate-500">({resources.length})</span></h4>
           {!readOnly && <Button size="sm" onClick={() => setUpload(true)}><FileUp className="size-4" />Upload</Button>}
         </div>
         <ResourceList tree={tree} items={resources} showScope={false} />
@@ -236,10 +236,10 @@ function BookPdf({ comp, editionStatus, readOnly }: { comp: Component; editionSt
   };
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm">
-      <BookOpen className="size-5 text-slate-400" />
+      <BookOpen className="size-5 text-slate-500" />
       <div className="min-w-0 flex-1">{comp.bookFile ? <><b>Digital pages:</b> <span className="text-slate-600">{comp.bookFile.name} · {fmtBytes(comp.bookFile.size)}{comp.pageCount ? ` · ${comp.pageCount} pages` : ''}</span></>
         : <span className="text-slate-500">No digital pages yet — upload the PDF of this part for the digital reader.</span>}</div>
-      {pct !== null && <span className="text-xs text-slate-500">{pct}%</span>}
+      {pct !== null && <span className="text-xs text-slate-600">{pct}%</span>}
       {comp.bookFile && <Button size="sm" variant="ghost" onClick={() => openAsset(comp.bookFile!.id).catch((e) => toast(e.message, 'err'))}><ExternalLink className="size-4" />Open</Button>}
       {canUpload && <><input ref={input} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ''; }} />
         <Button size="sm" variant="secondary" loading={pct !== null} onClick={() => input.current?.click()}><UploadCloud className="size-4" />{comp.bookFile ? 'Replace PDF' : 'Upload PDF'}</Button></>}
@@ -323,7 +323,7 @@ export function ResourceList({ tree, items, showScope = true }: { tree: EditionT
   const toast = useToast(); const readOnly = tree.locked.all;
   const [edit, setEdit] = useState<Resource | null>(null); const [del, setDel] = useState<Resource | null>(null);
   const remove = useBuilderMutation((id: string) => api.del(`/publishing/resources/${id}`), 'Resource removed', () => setDel(null));
-  if (!items.length) return <p className="px-5 py-8 text-center text-sm text-slate-400">No resources attached here yet.</p>;
+  if (!items.length) return <p className="px-5 py-8 text-center text-sm text-slate-500">No resources attached here yet.</p>;
   return (
     <>
       <ul className="divide-y divide-slate-100">
@@ -332,7 +332,7 @@ export function ResourceList({ tree, items, showScope = true }: { tree: EditionT
             <span className="grid size-9 place-items-center rounded-lg bg-slate-100 text-[10px] font-bold uppercase text-slate-600">{r.asset.ext}</span>
             <div className="min-w-0 flex-1">
               <div className="truncate font-medium text-slate-800">{r.title}</div>
-              <div className="flex flex-wrap gap-x-2 text-xs text-slate-500">
+              <div className="flex flex-wrap gap-x-2 text-xs text-slate-600">
                 <span>{RESOURCE_TYPES[r.resourceType]}</span><span>· {fmtBytes(r.asset.sizeBytes)}</span>
                 {showScope && <span>· {scopeLabel(tree, r)}</span>}
                 {r.sharedWith > 0 && <span className="text-brand-600" title="This file is stored once and reused">· <Recycle className="inline size-3" /> shared ×{r.sharedWith + 1}</span>}
@@ -426,7 +426,7 @@ export function UploadDialog({ tree, initial, onClose }: { tree: EditionTree; in
       <div className="space-y-4">
         <div onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)} onDrop={(e) => { e.preventDefault(); setDrag(false); add(e.dataTransfer.files); }}
           className={cn('flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-8 text-center', drag ? 'border-brand-500 bg-brand-50' : 'border-slate-300')}>
-          <UploadCloud className="size-8 text-slate-400" />
+          <UploadCloud className="size-8 text-slate-500" />
           <p className="mt-2 text-sm text-slate-600">Drag files here or <button type="button" className="font-medium text-brand-600 underline" onClick={() => input.current?.click()}>browse</button></p>
           <input ref={input} type="file" multiple hidden onChange={(e) => { add(e.target.files); e.target.value = ''; }}
             accept=".pdf,.ppt,.pptx,.ppsx,.doc,.docx,.xls,.xlsx,.html,.htm,.zip,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp3,.wav,.m4a,.mp4,.webm,.txt" />
@@ -435,7 +435,7 @@ export function UploadDialog({ tree, initial, onClose }: { tree: EditionTree; in
           <ul className="max-h-40 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200 text-sm">
             {files.map((file, i) => (
               <li key={i} className="flex items-center justify-between px-3 py-2"><span className="truncate">{file.name}</span>
-                <span className="flex items-center gap-2 text-xs text-slate-400">{fmtBytes(file.size)}
+                <span className="flex items-center gap-2 text-xs text-slate-600">{fmtBytes(file.size)}
                   <button aria-label={`Remove ${file.name}`} onClick={() => setFiles(files.filter((_, j) => j !== i))}><Trash2 className="size-3.5" /></button></span></li>
             ))}
           </ul>
@@ -483,10 +483,10 @@ export function HistoryTab({ packageId, editionId }: { packageId: string; editio
   return (
     <Card>
       <ul className="divide-y divide-slate-100 text-sm">
-        {items.map((a) => <li key={a.id} className="flex flex-wrap justify-between gap-2 px-5 py-3"><span className="text-slate-800">{a.summary}</span><span className="text-xs text-slate-400">{a.actor} · {fmtDate(a.createdAt)}</span></li>)}
-        {!items.length && <li className="px-5 py-8 text-center text-slate-400">No history yet.</li>}
+        {items.map((a) => <li key={a.id} className="flex flex-wrap justify-between gap-2 px-5 py-3"><span className="text-slate-800">{a.summary}</span><span className="text-xs text-slate-600">{a.actor} · {fmtDate(a.createdAt)}</span></li>)}
+        {!items.length && <li className="px-5 py-8 text-center text-slate-500">No history yet.</li>}
       </ul>
-      <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">Changes to individual parts, units, lessons and resources are listed in the full <a className="text-brand-600 underline" href="/admin/audit">Audit Log</a>.</p>
+      <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-600">Changes to individual parts, units, lessons and resources are listed in the full <a className="text-brand-600 underline" href="/admin/audit">Audit Log</a>.</p>
     </Card>
   );
 }

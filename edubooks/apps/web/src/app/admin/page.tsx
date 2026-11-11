@@ -55,7 +55,7 @@ export default function Dashboard() {
               <li key={p.id}><Link href={`/admin/books/${p.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
                 <span className="size-8 rounded-md" style={{ background: p.coverColor }} aria-hidden />
                 <span className="flex-1 font-medium text-slate-800">{p.title}</span><StatusBadge status={p.status} />
-                <span className="hidden text-xs text-slate-400 sm:inline">{fmtDate(p.updatedAt)}</span></Link></li>
+                <span className="hidden text-xs text-slate-500 sm:inline">{fmtDate(p.updatedAt)}</span></Link></li>
             ))}
           </ul>
         </Card>
@@ -63,9 +63,9 @@ export default function Dashboard() {
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><span className="font-semibold">Recent activity</span><Link href="/admin/audit" className="text-sm text-brand-600 hover:underline">View all</Link></div>
           <ul className="divide-y divide-slate-100 text-sm">
             {audit.data?.items.map((a: any) => (
-              <li key={a.id} className="px-5 py-3"><div className="text-slate-800">{a.summary}</div><div className="text-xs text-slate-400">{a.actor ?? 'System'} · {fmtDate(a.createdAt)}</div></li>
+              <li key={a.id} className="px-5 py-3"><div className="text-slate-800">{a.summary}</div><div className="text-xs text-slate-500">{a.actor ?? 'System'} · {fmtDate(a.createdAt)}</div></li>
             ))}
-            {audit.data?.items.length === 0 && <li className="px-5 py-6 text-center text-slate-400">No activity yet</li>}
+            {audit.data?.items.length === 0 && <li className="px-5 py-6 text-center text-slate-500">No activity yet</li>}
           </ul>
         </Card>
       </div>

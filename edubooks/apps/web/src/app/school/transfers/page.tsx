@@ -15,7 +15,7 @@ export default function SchoolTransfers() {
         <Table head={['Requested', 'Licence', 'From → To', 'Reason', 'Status', '']} empty={!q.data.length}>
           {q.data.map((t: any) => (
             <tr key={t.id}><Td className="whitespace-nowrap text-slate-500">{fmtDate(t.requestedAt)}</Td><Td className="text-xs">{t.product}</Td>
-              <Td><b>{t.fromUser}</b> → <b>{t.toUser}</b></Td><Td className="max-w-sm text-slate-600">{t.reason}{t.decisionNote && <div className="text-xs text-slate-400">Publisher: {t.decisionNote}</div>}</Td>
+              <Td><b>{t.fromUser}</b> → <b>{t.toUser}</b></Td><Td className="max-w-sm text-slate-600">{t.reason}{t.decisionNote && <div className="text-xs text-slate-500">Publisher: {t.decisionNote}</div>}</Td>
               <Td><Status s={t.status} /></Td><Td className="text-right">{t.status === 'PENDING' && <Button size="sm" variant="ghost" onClick={() => cancel.mutate(t.id)}>Withdraw</Button>}</Td></tr>
           ))}
         </Table>

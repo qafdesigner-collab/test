@@ -30,7 +30,7 @@ export function PeoplePage({ role }: { role: 'TEACHER' | 'STUDENT' }) {
           <Table head={['Name', 'Username', 'Book licences', 'Last sign-in', 'Status', '']} empty={!q.data.items.length}>
             {q.data.items.map((u: any) => (
               <tr key={u.id}><Td className="font-medium">{u.displayName}</Td><Td className="font-mono">{u.username}</Td>
-                <Td>{u.seats ? <Badge tone="PUBLISHED">{u.seats} active</Badge> : <span className="text-xs text-slate-400">none</span>}</Td>
+                <Td>{u.seats ? <Badge tone="PUBLISHED">{u.seats} active</Badge> : <span className="text-xs text-slate-500">none</span>}</Td>
                 <Td className="text-slate-500">{u.lastLoginAt ? fmtDay(u.lastLoginAt) : 'never'}</Td><Td><Status s={u.status} /></Td>
                 <Td className="whitespace-nowrap text-right">
                   <Button size="sm" variant="ghost" onClick={() => reset.mutate(u.id)} title="New password"><KeyRound className="size-4" /></Button>
@@ -61,7 +61,7 @@ function AddPeople({ role, onClose, onCreated }: { role: 'TEACHER' | 'STUDENT'; 
           <div key={i} className="grid grid-cols-[1fr_160px_32px] gap-2">
             <Input aria-label="Full name" placeholder="Full name" value={r.displayName} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, displayName: e.target.value } : x)))} autoFocus={i === rows.length - 1} />
             <Input aria-label="Username" placeholder="username (optional)" value={r.username} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, username: e.target.value.toLowerCase() } : x)))} />
-            <button type="button" aria-label="Remove row" disabled={rows.length === 1} onClick={() => setRows(rows.filter((_, j) => j !== i))} className="rounded p-1.5 text-slate-400 hover:text-red-600 disabled:opacity-30"><Trash2 className="size-4" /></button>
+            <button type="button" aria-label="Remove row" disabled={rows.length === 1} onClick={() => setRows(rows.filter((_, j) => j !== i))} className="rounded p-1.5 text-slate-500 hover:text-red-600 disabled:opacity-30"><Trash2 className="size-4" /></button>
           </div>
         ))}
         <Button type="button" size="sm" variant="ghost" onClick={() => setRows([...rows, { displayName: '', username: '' }])}><Plus className="size-4" />Another</Button>

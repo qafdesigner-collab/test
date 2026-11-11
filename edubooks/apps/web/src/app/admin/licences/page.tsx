@@ -22,8 +22,8 @@ function Transfers({ canDecide }: { canDecide: boolean }) {
         <Table head={['Requested', 'School', 'Licence', 'From → To', 'Reason', 'Status', '']} empty={!q.data.length}>
           {q.data.map((t: any) => (
             <tr key={t.id}><Td className="whitespace-nowrap text-slate-500">{fmtDate(t.requestedAt)}<div className="text-xs">by {t.requestedBy}</div></Td>
-              <Td>{t.schoolName} <span className="font-mono text-xs text-slate-400">{t.schoolCode}</span></Td><Td className="text-xs">{t.product}</Td>
-              <Td><b>{t.fromUser}</b> → <b>{t.toUser}</b></Td><Td className="max-w-xs text-slate-600">{t.reason}{t.decisionNote && <div className="text-xs text-slate-400">Note: {t.decisionNote}</div>}</Td>
+              <Td>{t.schoolName} <span className="font-mono text-xs text-slate-500">{t.schoolCode}</span></Td><Td className="text-xs">{t.product}</Td>
+              <Td><b>{t.fromUser}</b> → <b>{t.toUser}</b></Td><Td className="max-w-xs text-slate-600">{t.reason}{t.decisionNote && <div className="text-xs text-slate-500">Note: {t.decisionNote}</div>}</Td>
               <Td><Status s={t.status} /></Td>
               <Td className="min-w-64 text-right">{t.status === 'PENDING' && canDecide && (
                 <div className="flex items-center gap-1"><Input className="h-8 min-w-28" placeholder="Note (optional)" aria-label="Decision note" value={note[t.id] ?? ''} onChange={(e) => setNote({ ...note, [t.id]: e.target.value })} />

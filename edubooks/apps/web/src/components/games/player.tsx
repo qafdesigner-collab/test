@@ -51,7 +51,7 @@ export function GamePlayer({ game, onDone, preview }: { game: { engine: Engine; 
           <p className="mt-1 text-lg text-slate-500">{result.score} of {result.max} right{result.starsGained ? ` · +${result.starsGained} ⭐` : ''}{result.totalStars !== undefined ? ` · ${result.totalStars} stars in total` : ''}</p>
           {!!result.newBadges?.length && <div className="mt-6 flex flex-wrap justify-center gap-4">{result.newBadges.map((b) => (
             <div key={b.key} className="rounded-3xl bg-amber-100 px-6 py-4 motion-safe:animate-[pop-in_.6s_.8s_both]"><div className="text-5xl">{b.emoji}</div><div className="font-extrabold text-amber-800">New badge: {b.label}</div></div>))}</div>}
-          <button onClick={start} className="focus-ring mt-8 inline-flex items-center gap-2 rounded-full bg-sky-500 px-8 py-4 text-2xl font-extrabold text-white shadow-[0_6px_0_#0369a1] active:translate-y-1 active:shadow-none"><RotateCcw className="size-6" />Play again</button>
+          <button onClick={start} className="focus-ring mt-8 inline-flex items-center gap-2 rounded-full bg-sky-700 px-8 py-4 text-2xl font-extrabold text-white shadow-[0_6px_0_#0369a1] active:translate-y-1 active:shadow-none"><RotateCcw className="size-6" />Play again</button>
         </div>
       )}
     </div>

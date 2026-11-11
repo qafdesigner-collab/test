@@ -71,7 +71,8 @@ export class GamesController {
     const { rows } = await this.db.q.execute(sql`SELECT rp.last_page AS page, rp.component_id AS "componentId", c.title AS part, e.id AS "editionId", p.title, p.cover_color AS "coverColor", c.page_count AS "pageCount"
       FROM reader_progress rp JOIN book_components c ON c.id = rp.component_id JOIN book_editions e ON e.id = c.edition_id JOIN book_packages p ON p.id = e.package_id
       WHERE rp.user_id = ${c.userId} ORDER BY rp.updated_at DESC LIMIT 1`);
-    const [homework, games, ach] = await Promise.all([this.lms.studentList(), this.games.studentAvailable(), this.games.achievements()]);
+    // Sequential: all queries share the request's single transaction connection.
+    const homework = await this.lms.studentList(); const games = await this.games.studentAvailable(); const ach = await this.games.achievements();
     return {
       continueReading: rows[0] ?? null,
       homework: homework.filter((h: any) => !h.submission && h.status === 'PUBLISHED'),

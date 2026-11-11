@@ -101,7 +101,7 @@ function Editor({ id }: { id: string }) {
                   <div className="grid grid-cols-[1fr_90px_32px] gap-2">
                     <Input aria-label={`Step ${i + 1} title`} value={s.title} onChange={(e) => setC({ steps: c.steps.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)) })} />
                     <Input aria-label={`Step ${i + 1} minutes`} type="number" min={0} value={s.minutes} onChange={(e) => setC({ steps: c.steps.map((x, j) => (j === i ? { ...x, minutes: Number(e.target.value) } : x)) })} />
-                    <button aria-label="Remove step" onClick={() => setC({ steps: c.steps.filter((_, j) => j !== i) })} className="text-slate-400 hover:text-red-600"><Trash2 className="size-4" /></button>
+                    <button aria-label="Remove step" onClick={() => setC({ steps: c.steps.filter((_, j) => j !== i) })} className="text-slate-500 hover:text-red-600"><Trash2 className="size-4" /></button>
                   </div>
                   <Textarea rows={2} className="mt-2" placeholder="What you and the children do" value={s.detail} onChange={(e) => setC({ steps: c.steps.map((x, j) => (j === i ? { ...x, detail: e.target.value } : x)) })} />
                 </div>))}</div>
@@ -120,7 +120,7 @@ function Editor({ id }: { id: string }) {
               {resources.length ? resources.map((r: any) => (
                 <button key={r.id} onClick={async () => { const w = window.open('', '_blank'); try { const { url } = await api.get(`/assets/${r.assetId}/link`); if (w) { w.opener = null; w.location.href = url; } } catch (e: any) { w?.close(); toast(e.message, 'err'); } }}
                   className="flex w-full items-center gap-2 rounded px-1 py-1 text-left hover:bg-slate-50"><span className="rounded bg-slate-100 px-1 text-[9px] font-bold uppercase">{r.ext}</span><span className="truncate">{r.title}</span></button>
-              )) : <p className="text-slate-400">No resources for this lesson yet.</p>}
+              )) : <p className="text-slate-500">No resources for this lesson yet.</p>}
               <Button size="sm" variant="secondary" className="mt-3 w-full" onClick={() => setC({ materials: [c.materials, ...resources.map((r: any) => `• ${r.title}`), lesson.pageStart ? `• Student book pages ${lesson.pageStart}–${lesson.pageEnd ?? lesson.pageStart}` : ''].filter(Boolean).join('\n') })}>Add to materials</Button>
             </>}
           </Card>

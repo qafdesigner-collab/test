@@ -22,7 +22,7 @@ export default function AdminGames() {
         <Table head={['Game', 'Type', 'Book / lesson', 'Status', 'Updated']}>
           {q.data.map((g: any) => <tr key={g.id} className="hover:bg-slate-50">
             <Td><Link href={`/admin/games/${g.id}`} className="font-medium hover:text-brand-700">{g.title}</Link></Td><Td>{ENGINE_INFO[g.engine as Engine].icon} {ENGINE_INFO[g.engine as Engine].label}</Td>
-            <Td className="text-slate-600">{g.bookTitle ?? '—'}{g.lesson && <div className="text-xs text-slate-400">{g.lesson}</div>}</Td>
+            <Td className="text-slate-600">{g.bookTitle ?? '—'}{g.lesson && <div className="text-xs text-slate-500">{g.lesson}</div>}</Td>
             <Td>{g.published ? <Badge tone="PUBLISHED">Published</Badge> : <Badge tone="DRAFT">Draft</Badge>}</Td><Td className="text-slate-500">{fmtDate(g.updatedAt)}</Td></tr>)}
         </Table>
       )}

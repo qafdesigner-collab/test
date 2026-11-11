@@ -54,9 +54,9 @@ export class SchoolAdminController {
   async overview(@Ctx() c: TenantCtx) {
     const [school] = await this.db.q.select().from(schools).where(eq(schools.id, this.sid(c)));
     const years = await this.db.q.select().from(academicYears).where(eq(academicYears.schoolId, this.sid(c))).orderBy(desc(academicYears.startsOn));
-    const [t, s] = await Promise.all([
-      this.users.list(this.sid(c), { role: 'TEACHER', page: 1, pageSize: 1 }), this.users.list(this.sid(c), { role: 'STUDENT', page: 1, pageSize: 1 }),
-    ]);
+    // Sequential: all queries share the request's single transaction connection.
+    const t = await this.users.list(this.sid(c), { role: 'TEACHER', page: 1, pageSize: 1 });
+    const s = await this.users.list(this.sid(c), { role: 'STUDENT', page: 1, pageSize: 1 });
     return { school, academicYears: years, teachers: t.total, students: s.total, licences: await this.licensing.dashboard(this.sid(c)) };
   }
   @Patch('profile')

@@ -65,7 +65,7 @@ function BooksPage() {
         <Button onClick={() => setNewOpen(true)}><Plus className="size-4" />New book package</Button>
       </div>
       <Card className="flex flex-wrap gap-3 p-4">
-        <div className="relative min-w-56 flex-1"><Search className="pointer-events-none absolute left-3 top-3 size-4 text-slate-400" />
+        <div className="relative min-w-56 flex-1"><Search className="pointer-events-none absolute left-3 top-3 size-4 text-slate-500" />
           <Input aria-label="Search" placeholder="Search title or description…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
         <Select aria-label="Grade" className="w-40" value={filters.gradeId} onChange={setF('gradeId')}><option value="">All grades</option>{grades.data?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</Select>
         <Select aria-label="Subject" className="w-48" value={filters.subjectId} onChange={setF('subjectId')}><option value="">All subjects</option>{subjects.data?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select>
@@ -85,7 +85,7 @@ function BooksPage() {
                 <div className="space-y-2 p-4">
                   <div className="flex flex-wrap gap-1.5"><Badge>{p.grade.name}</Badge><Badge tone="info">{p.subject.name}</Badge></div>
                   <p className="line-clamp-2 min-h-10 text-sm text-slate-500">{p.description || 'No description'}</p>
-                  <div className="flex justify-between text-xs text-slate-400">
+                  <div className="flex justify-between text-xs text-slate-500">
                     <span>{p.latestEdition} · {p.editionCount} edition{p.editionCount === 1 ? '' : 's'} · {p.resourceCount} resources</span><span>{fmtDate(p.updatedAt).split(',')[0]}</span>
                   </div>
                 </div>

@@ -62,7 +62,7 @@ export default function ProductsPage() {
         <Table head={['Product', 'SKU', 'Type', 'Active version', 'Price / seat', '']}>
           {q.data.items.map((p: any) => (
             <tr key={p.id} className="hover:bg-slate-50">
-              <Td><Link href={`/admin/products/${p.id}`} className="font-medium text-slate-900 hover:text-brand-700">{p.name}</Link>{p.gradeName && <span className="ml-2 text-xs text-slate-400">{p.gradeName}</span>}</Td>
+              <Td><Link href={`/admin/products/${p.id}`} className="font-medium text-slate-900 hover:text-brand-700">{p.name}</Link>{p.gradeName && <span className="ml-2 text-xs text-slate-500">{p.gradeName}</span>}</Td>
               <Td className="font-mono text-xs">{p.sku}</Td>
               <Td>{p.kind === 'BUNDLE' ? <Badge tone="info"><Boxes className="size-3" />Bundle</Badge> : <Badge>Single</Badge>}</Td>
               <Td>{p.active ? <span>v{p.active.versionNo} · {p.active.items} book{p.active.items === 1 ? '' : 's'}</span> : <span className="text-amber-600">Not on sale</span>}{p.hasDraft && <Badge tone="DRAFT" className="ml-2">draft</Badge>}{p.archived && <Badge tone="ARCHIVED" className="ml-2">archived</Badge>}</Td>

@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -19,9 +20,20 @@ import { HealthController } from './health/health.controller';
 import { TenantInterceptor } from './common/tenant.interceptor';
 import { AllExceptionsFilter } from './common/pg-exception.filter';
 
+/** Throttle key: the session cookie (hashed) when present, otherwise the client IP. */
+function sessionOrIp(req: any) {
+  const m = /(?:^|;\s*)eb_session=([^;]+)/.exec(req.headers?.cookie ?? '');
+  return m ? `s:${createHash('sha256').update(m[1]).digest('base64url').slice(0, 22)}` : `ip:${req.ip}`;
+}
+
 @Module({
   imports: [
-    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: Number(process.env.RATE_LIMIT_PER_MIN || 300) }]),
+    // Per signed-in session (or per IP when anonymous), plus a higher per-IP ceiling: a whole school lab
+    // usually shares one public IP, so the IP limit must allow many children at once.
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: 60_000, limit: Number(process.env.RATE_LIMIT_PER_MIN || 300), getTracker: sessionOrIp },
+      { name: 'ip', ttl: 60_000, limit: Number(process.env.RATE_LIMIT_PER_IP_PER_MIN || 5000), getTracker: (req: any) => req.ip },
+    ]),
     DbModule, AuditModule, AuthModule, StorageModule, CatalogModule, PublishingModule,
     CommerceModule, LicensingModule, SchoolsModule, SchoolAdminModule, LmsModule, AiModule, GamesModule,
   ],

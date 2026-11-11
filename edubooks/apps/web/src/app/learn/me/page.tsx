@@ -14,21 +14,21 @@ export default function Me() {
     <div className="space-y-8">
       <h1 className="text-4xl font-black text-slate-800">⭐ My Stars</h1>
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-[2rem] bg-gradient-to-br from-amber-300 to-orange-400 p-6 text-center text-white shadow"><div className="text-6xl font-black">{a.stars}</div><div className="text-xl font-black">stars</div></div>
-        <div className="rounded-[2rem] bg-gradient-to-br from-pink-400 to-rose-500 p-6 text-center text-white shadow"><div className="text-6xl font-black">{earned}</div><div className="text-xl font-black">badges</div></div>
-        <div className="rounded-[2rem] bg-gradient-to-br from-orange-400 to-red-500 p-6 text-center text-white shadow"><div className="text-6xl font-black">🔥 {a.streak}</div><div className="text-xl font-black">days in a row</div></div>
+        <div className="rounded-[2rem] bg-gradient-to-br from-amber-600 to-orange-700 p-6 text-center text-white shadow"><div className="text-6xl font-black">{a.stars}</div><div className="text-xl font-black">stars</div></div>
+        <div className="rounded-[2rem] bg-gradient-to-br from-pink-600 to-rose-700 p-6 text-center text-white shadow"><div className="text-6xl font-black">{earned}</div><div className="text-xl font-black">badges</div></div>
+        <div className="rounded-[2rem] bg-gradient-to-br from-orange-600 to-red-700 p-6 text-center text-white shadow"><div className="text-6xl font-black">🔥 {a.streak}</div><div className="text-xl font-black">days in a row</div></div>
       </div>
       <section className="rounded-[2rem] bg-white p-6 shadow-sm"><h2 className="mb-4 text-2xl font-black">📅 This week</h2>
-        <div className="flex justify-between gap-2">{week.map((d) => <div key={d.k} className="flex flex-col items-center gap-1"><span className={cn('grid size-12 place-items-center rounded-full text-2xl', d.on ? 'bg-emerald-400' : 'bg-slate-100')}>{d.on ? '⭐' : ''}</span><span className="font-black text-slate-400">{d.day}</span></div>)}</div></section>
+        <div className="flex justify-between gap-2">{week.map((d) => <div key={d.k} className="flex flex-col items-center gap-1"><span className={cn('grid size-12 place-items-center rounded-full text-2xl', d.on ? 'bg-emerald-400' : 'bg-slate-100')}>{d.on ? '⭐' : ''}</span><span className="font-black text-slate-500">{d.day}</span></div>)}</div></section>
       <section><h2 className="mb-4 text-2xl font-black text-slate-800">🏅 Badges</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">{a.badges.map((b: any) => (
           <div key={b.key} className={cn('rounded-[2rem] p-4 text-center shadow-sm', b.earnedAt ? 'bg-white' : 'bg-white/50')}>
             <div className={cn('text-5xl', !b.earnedAt && 'opacity-25 grayscale')}>{b.earnedAt ? b.emoji : '🔒'}</div>
-            <div className="mt-1 font-black text-slate-700">{b.label}</div><div className="text-xs font-bold text-slate-400">{b.hint}</div></div>))}</div></section>
+            <div className="mt-1 font-black text-slate-700">{b.label}</div><div className="text-xs font-bold text-slate-500">{b.hint}</div></div>))}</div></section>
       <section><h2 className="mb-4 text-2xl font-black text-slate-800">📈 My progress</h2>
         <div className="grid gap-4 sm:grid-cols-2">{a.books.map((b: any) => {
           const pct = b.pages ? Math.min(100, Math.round((b.pagesRead / b.pages) * 100)) : 0;
-          return <div key={b.editionId} className="rounded-[2rem] bg-white p-5 shadow-sm"><div className="mb-2 text-xl font-black" style={{ color: b.coverColor }}>{b.title}</div>
+          return <div key={b.editionId} className="rounded-[2rem] bg-white p-5 shadow-sm"><div className="mb-2 flex items-center gap-2 text-xl font-black text-slate-800"><span aria-hidden className="size-4 shrink-0 rounded-full" style={{ background: b.coverColor }} />{b.title}</div>
             <div className="mb-1 flex justify-between text-sm font-bold text-slate-500"><span>📖 Pages read</span><span>{pct}%</span></div>
             <div className="mb-3 h-4 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: b.coverColor }} /></div>
             <div className="flex gap-4 text-sm font-bold text-slate-600"><span>🎮 {b.plays} games</span><span>📝 {b.homework} homework</span></div></div>;

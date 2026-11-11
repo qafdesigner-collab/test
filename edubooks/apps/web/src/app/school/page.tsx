@@ -40,7 +40,7 @@ export default function SchoolOverview() {
               <div className={`text-xs ${daysLeft(p.validUntil) <= 45 ? 'text-amber-600' : 'text-slate-500'}`}>until {fmtDay(p.validUntil)}</div>
             </li>
           ))}
-          {!live.length && <li className="px-5 py-8 text-center text-sm text-slate-400">No active book licences. Please contact your publisher.</li>}
+          {!live.length && <li className="px-5 py-8 text-center text-sm text-slate-500">No active book licences. Please contact your publisher.</li>}
         </ul>
       </Card>
       <Card className="p-5"><h2 className="mb-2 font-semibold">Academic years</h2>

@@ -48,7 +48,7 @@ function NewDemo({ onClose }: { onClose: () => void }) {
         <Field label="Products to demo"><div className="space-y-1.5">{sellable.map((p: any) => (
           <label key={p.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm">
             <input type="checkbox" checked={f.productVersionIds.includes(p.active.id)} onChange={(e) => setF({ ...f, productVersionIds: e.target.checked ? [...f.productVersionIds, p.active.id] : f.productVersionIds.filter((x) => x !== p.active.id) })} />
-            {p.name} <span className="text-xs text-slate-400">{p.kind === 'BUNDLE' ? `${p.active.items} books` : '1 book'}</span></label>))}</div></Field>
+            {p.name} <span className="text-xs text-slate-500">{p.kind === 'BUNDLE' ? `${p.active.items} books` : '1 book'}</span></label>))}</div></Field>
         <Field label="Trial length"><Select value={f.days} onChange={(e) => setF({ ...f, days: Number(e.target.value) })}>{[7, 14, 30].map((d) => <option key={d} value={d}>{d} days</option>)}</Select></Field>
         <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button loading={m.isPending} disabled={!f.productVersionIds.length}><Sparkles className="size-4" />Create demo</Button></div>
       </form>
@@ -76,9 +76,9 @@ export default function SchoolsPage() {
           <Table head={['School', 'Code', 'People', 'Student seats in use', 'Status']}>
             {q.data.items.map((s: any) => (
               <tr key={s.id} className="hover:bg-slate-50">
-                <Td><Link className="font-medium text-slate-900 hover:text-brand-700" href={`/admin/schools/${s.id}`}>{s.name}</Link><div className="text-xs text-slate-400">{s.city}</div></Td>
+                <Td><Link className="font-medium text-slate-900 hover:text-brand-700" href={`/admin/schools/${s.id}`}>{s.name}</Link><div className="text-xs text-slate-500">{s.city}</div></Td>
                 <Td className="font-mono">{s.code}</Td><Td className="text-slate-600">{s.teachers} teacher{s.teachers === 1 ? "" : "s"} · {s.students} student{s.students === 1 ? "" : "s"}</Td>
-                <Td className="min-w-44">{s.seats ? <SeatBar assigned={s.assigned} total={s.seats} /> : <span className="text-xs text-slate-400">No active licences</span>}</Td>
+                <Td className="min-w-44">{s.seats ? <SeatBar assigned={s.assigned} total={s.seats} /> : <span className="text-xs text-slate-500">No active licences</span>}</Td>
                 <Td><Status s={s.status} />{s.isDemo && <Badge tone={daysLeft(s.demoExpiresAt) < 0 ? 'danger' : 'info'} className="ml-1">{daysLeft(s.demoExpiresAt) < 0 ? 'demo expired' : `demo · ${daysLeft(s.demoExpiresAt)}d left`}</Badge>}</Td>
               </tr>
             ))}

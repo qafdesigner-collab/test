@@ -50,7 +50,7 @@ export default function PackageBuilder({ params }: { params: Promise<{ id: strin
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold text-slate-900">{p.title}</h1><StatusBadge status={p.status} /></div>
             <div className="mt-1 flex flex-wrap gap-1.5"><Badge>{p.gradeName}</Badge><Badge tone="info">{p.subjectName}</Badge>
-              <span className="text-xs text-slate-400">Updated {fmtDate(p.updatedAt)}</span></div>
+              <span className="text-xs text-slate-500">Updated {fmtDate(p.updatedAt)}</span></div>
             {p.description && <p className="mt-2 max-w-3xl text-sm text-slate-600">{p.description}</p>}
           </div>
           <div className="flex gap-2">
@@ -168,7 +168,7 @@ function EditionDetails({ tree, editions }: { tree: EditionTree; editions: any[]
             <li key={e.id}><span className="absolute -left-1.5 mt-1.5 size-3 rounded-full border-2 border-white" style={{ background: e.status === 'PUBLISHED' ? '#10b981' : e.status === 'DRAFT' ? '#f59e0b' : '#94a3b8' }} />
               <div className="font-medium text-slate-800">{e.label} <StatusBadge status={e.status} /></div>
               <div className="text-xs text-slate-500">{e.publishedAt ? `Published ${fmtDate(e.publishedAt)}` : `Created ${fmtDate(e.createdAt)}`} · {e.componentCount} components · {e.resourceCount} resources</div>
-              {e.clonedFromId && <div className="text-xs text-slate-400">Based on {editions.find((x) => x.id === e.clonedFromId)?.label ?? 'an earlier edition'}</div>}
+              {e.clonedFromId && <div className="text-xs text-slate-500">Based on {editions.find((x) => x.id === e.clonedFromId)?.label ?? 'an earlier edition'}</div>}
             </li>
           ))}
         </ol>
