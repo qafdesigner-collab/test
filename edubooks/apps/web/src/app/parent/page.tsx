@@ -4,6 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { api, fmtDate } from '@/lib/api';
 import { Badge, Card, EmptyState, ErrorBox, PageLoader, cn } from '@/components/ui';
 import { UpcomingEvents } from '@/components/calendar';
+import { Printer } from 'lucide-react';
+import { useBranding } from '@/lib/branding';
+import { printReportCards } from '@/lib/print-docs';
 
 const pct = (s: number | null, m: number) => (s === null || s === undefined || !m ? null : Math.round((s / m) * 100));
 const STARS = (n: number) => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
@@ -31,6 +34,7 @@ export default function ParentHome() {
 
 function Child({ id }: { id: string }) {
   const q = useQuery({ queryKey: ['parentChild', id], queryFn: () => api.get<any>(`/parent/children/${id}`) });
+  const brand = useBranding();
   if (q.error) return <ErrorBox error={q.error} />;
   if (!q.data) return <PageLoader />;
   const d = q.data;
@@ -43,6 +47,8 @@ function Child({ id }: { id: string }) {
   const present = att?.filter((a) => ['PRESENT', 'LATE'].includes(a.status)).reduce((n, a) => n + a.n, 0) ?? 0;
   return (
     <div className="space-y-6">
+      <div className="flex justify-end -mb-3"><button onClick={() => printReportCards([d], brand, { term: '' })}
+        className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"><Printer className="size-4" />Print report card</button></div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Tile emoji="📝" label="Homework to do" value={todo.length} tone={todo.length ? 'amber' : 'green'} />
         <Tile emoji="✅" label="Marked work" value={marked.length} sub={d.bySubject.length ? `${Math.round(d.bySubject.reduce((n: number, s: any) => n + (s.percent ?? 0), 0) / d.bySubject.length)}% average` : undefined} />

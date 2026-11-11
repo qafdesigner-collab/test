@@ -2,17 +2,18 @@
 import Link from 'next/link';
 import { use, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Download, Plus } from 'lucide-react';
+import { ArrowLeft, Award, Download, Plus, Printer } from 'lucide-react';
 import { api, downloadCsv } from '@/lib/api';
 import { className } from '@/lib/lms';
 import { Card, ErrorBox, PageLoader } from '@/components/ui';
 import { PageHeader } from '@/components/common';
 import { StudentReportDialog } from '@/components/student-report';
 import { GameReport } from '@/components/game-report';
+import { CertificatesDialog, ReportCardsDialog } from '@/components/print-dialogs';
 
 export function Gradebook({ classId, back }: { classId: string; back: string }) {
   const q = useQuery({ queryKey: ['gradebook', classId], queryFn: () => api.get(`/teacher/classes/${classId}/gradebook`) });
-  const [student, setStudent] = useState<string | null>(null);
+  const [student, setStudent] = useState<string | null>(null); const [dlg, setDlg] = useState<'' | 'reports' | 'certs'>('');
   if (q.isLoading) return <PageLoader />;
   if (q.error) return <ErrorBox error={q.error} />;
   const g = q.data;
@@ -25,6 +26,8 @@ export function Gradebook({ classId, back }: { classId: string; back: string }) 
       <Link href={back} className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"><ArrowLeft className="size-4" />Back</Link>
       <PageHeader title={`${className(g.class)} — gradebook`} sub="Click a student for their report card and skill evaluations.">
         {back.startsWith('/teacher') && <Link href={`/teacher/assessments/new?classId=${classId}`} className="focus-ring inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50"><Plus className="size-4" />Homework</Link>}
+        <button onClick={() => setDlg('reports')} disabled={!g.students.length} className="focus-ring inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"><Printer className="size-4" />Report cards</button>
+        <button onClick={() => setDlg('certs')} className="focus-ring inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50"><Award className="size-4" />Certificates</button>
         <button onClick={exportCsv} className="focus-ring inline-flex h-10 items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700"><Download className="size-4" />Export CSV</button>
       </PageHeader>
       <Card className="overflow-x-auto">
@@ -40,6 +43,8 @@ export function Gradebook({ classId, back }: { classId: string; back: string }) 
         {!g.students.length && <p className="p-6 text-center text-sm text-slate-500">No students enrolled.</p>}
       </Card>
       <GameReport classId={classId} teacher={back.startsWith('/teacher')} />
+      {dlg === 'reports' && <ReportCardsDialog studentIds={g.students.map((s: any) => s.id)} onClose={() => setDlg('')} />}
+      {dlg === 'certs' && <CertificatesDialog students={g.students} onClose={() => setDlg('')} />}
       {student && <StudentReportDialog studentId={student} classId={classId} onClose={() => setStudent(null)} />}
     </div>
   );

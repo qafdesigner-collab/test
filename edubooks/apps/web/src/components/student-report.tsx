@@ -7,6 +7,7 @@ import { useAction } from '@/lib/hooks';
 import { KIND_LABEL } from '@/lib/lms';
 import { Button, Dialog, Field, Input, PageLoader, Select } from '@/components/ui';
 import { Status } from '@/components/common';
+import { ReportCardsDialog } from '@/components/print-dialogs';
 
 const SKILLS = ['Listening', 'Speaking', 'Reading', 'Writing', 'Numbers', 'Creativity', 'Participation', 'Behaviour'];
 export const Stars = ({ n }: { n: number }) => <span className="inline-flex" aria-label={`${n} of 5`}>{[1, 2, 3, 4, 5].map((i) => <Star key={i} className={`size-4 ${i <= n ? 'fill-amber-400 text-amber-400' : 'text-slate-500'}`} />)}</span>;
@@ -18,21 +19,13 @@ export function StudentReportDialog({ studentId, classId, onClose }: { studentId
   const add = useAction(() => api.post('/teacher/evaluations', { ...f, studentId, classId }), { ok: 'Evaluation saved', keys: ['report'] });
   const del = useAction((id: string) => api.del(`/teacher/evaluations/${id}`), { ok: 'Removed', keys: ['report'] });
   const r = q.data;
-  const print = () => {
-    const w = window.open('', '_blank'); if (!w || !r) return;
-    const e = (s: string) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!));
-    w.document.write(`<!doctype html><title>Report card</title><style>body{font-family:system-ui;max-width:760px;margin:24px auto}table{border-collapse:collapse;width:100%}td,th{border:1px solid #cbd5e1;padding:6px;text-align:left}</style>
-      <h1>Report card — ${e(r.student.displayName)}</h1><h3>By subject</h3><table><tr><th>Subject</th><th>Score</th></tr>${r.bySubject.map((b: any) => `<tr><td>${e(b.subject)}</td><td>${b.percent}%</td></tr>`).join('')}</table>
-      <h3>Skills</h3><table><tr><th>Skill</th><th>Rating</th><th>Term</th><th>Remarks</th></tr>${r.evaluations.map((v: any) => `<tr><td>${e(v.skill)}</td><td>${'★'.repeat(v.rating)}${'☆'.repeat(5 - v.rating)}</td><td>${e(v.term)}</td><td>${e(v.remarks)}</td></tr>`).join('')}</table>
-      <h3>Work</h3><table><tr><th>Title</th><th>Lesson</th><th>Score</th></tr>${r.work.map((x: any) => `<tr><td>${e(x.title)}</td><td>${e(x.lesson ?? '')}</td><td>${x.score ?? '—'} / ${x.maxScore ?? ''}</td></tr>`).join('')}</table><script>print()</script>`);
-    w.document.close();
-  };
+  const [printing, setPrinting] = useState(false);
   return (
     <Dialog open onOpenChange={onClose} wide title={r ? `Report — ${r.student.displayName}` : 'Report'}>
       {!r ? <PageLoader /> : (
         <div className="space-y-5 text-sm">
           <div className="flex flex-wrap gap-2">{r.bySubject.map((b: any) => <span key={b.subject} className="rounded-lg bg-slate-100 px-3 py-1.5"><b>{b.subject}</b> {b.percent}%</span>)}
-            {!r.bySubject.length && <span className="text-slate-500">No marked work yet.</span>}<span className="flex-1" /><Button size="sm" variant="secondary" onClick={print}><Printer className="size-4" />Print</Button></div>
+            {!r.bySubject.length && <span className="text-slate-500">No marked work yet.</span>}<span className="flex-1" /><Button size="sm" variant="secondary" onClick={() => setPrinting(true)}><Printer className="size-4" />Print report card</Button></div>
           <div><h3 className="mb-2 font-semibold">Skill evaluations</h3>
             <ul className="mb-3 divide-y divide-slate-100 rounded-lg border border-slate-200">{r.evaluations.map((v: any) => (
               <li key={v.id} className="flex items-center gap-3 px-3 py-2"><span className="w-28 font-medium">{v.skill}</span><Stars n={v.rating} /><span className="text-xs text-slate-500">{v.term}</span>
@@ -52,6 +45,7 @@ export function StudentReportDialog({ studentId, classId, onClose }: { studentId
                 {x.status ? <Status s={x.status} /> : <span className="text-xs text-red-500">missing</span>}<span className="w-16 text-right tabular-nums">{x.score ?? '—'}{x.maxScore ? ` / ${x.maxScore}` : ''}</span></li>))}</ul></div>
         </div>
       )}
+      {printing && <ReportCardsDialog studentIds={[studentId]} onClose={() => setPrinting(false)} />}
     </Dialog>
   );
 }

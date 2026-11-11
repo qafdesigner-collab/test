@@ -415,7 +415,25 @@ export class LmsService {
     const rows = (work.rows as any[]).map((r) => (isSelf && !['GRADED', 'RETURNED'].includes(r.status) ? { ...r, score: null } : r));
     const bySubject: Record<string, { earned: number; max: number }> = {};
     for (const r of rows) if (r.score !== null && r.score !== undefined) { const k = r.subject ?? 'General'; (bySubject[k] ??= { earned: 0, max: 0 }); bySubject[k].earned += r.score; bySubject[k].max += r.maxScore; }
-    return { student, work: rows, evaluations: evals, bySubject: Object.entries(bySubject).map(([subject, v]) => ({ subject, percent: v.max ? Math.round((v.earned / v.max) * 100) : null })) };
+    const extra = await this.reportExtras(studentId);
+    return { student, ...extra, work: rows, evaluations: evals, bySubject: Object.entries(bySubject).map(([subject, v]) => ({ subject, percent: v.max ? Math.round((v.earned / v.max) * 100) : null })) };
+  }
+
+  /** Header and summary details for a printed report card. */
+  private async reportExtras(studentId: string) {
+    const one = async (q: ReturnType<typeof sql>) => ((await this.q.execute(q)).rows[0] ?? {}) as any;
+    const school = await one(sql`SELECT s.name, s.code FROM users u JOIN schools s ON s.id = u.school_id WHERE u.id = ${studentId}`);
+    const cls = await one(sql`SELECT c.name, c.section, ay.name AS "academicYear", g.name AS grade,
+        (SELECT string_agg(DISTINCT t.display_name, ', ') FROM class_teachers ct JOIN users t ON t.id = ct.user_id WHERE ct.class_id = c.id) AS teachers
+      FROM enrolments e JOIN classes c ON c.id = e.class_id JOIN academic_years ay ON ay.id = c.academic_year_id LEFT JOIN grades g ON g.id = c.grade_id
+      WHERE e.student_id = ${studentId} ORDER BY ay.starts_on DESC LIMIT 1`);
+    const games = await one(sql`SELECT coalesce(sum(best), 0)::int AS stars FROM (SELECT max(stars) AS best FROM game_attempts WHERE student_id = ${studentId} GROUP BY activity_id) t`);
+    const badges = await one(sql`SELECT count(*)::int AS n FROM student_badges WHERE student_id = ${studentId}`);
+    const pages = await one(sql`SELECT coalesce(sum(max_page), 0)::int AS n FROM reader_progress WHERE user_id = ${studentId}`);
+    const hasAtt = (await one(sql`SELECT to_regclass('attendance') IS NOT NULL AS ok`)).ok;
+    const attendance = hasAtt ? (await this.q.execute(sql`SELECT status, count(*)::int AS n FROM attendance WHERE student_id = ${studentId} AND day > current_date - 365 GROUP BY status`)).rows : null;
+    return { school: school.name ? { name: school.name, code: school.code } : null, class: cls.name ? cls : null,
+      summary: { stars: games.stars ?? 0, badges: badges.n ?? 0, pagesRead: pages.n ?? 0, attendance } };
   }
 
   /** Class gradebook: students × published assessments (+ per-lesson/unit averages). */

@@ -198,6 +198,9 @@ describe('Phase 4 — classes, reader, assessments, reports', () => {
       const rep = (await s1.get('/api/student/report')).body;
       expect(rep.evaluations[0]).toMatchObject({ skill: 'Speaking', rating: 4 });
       expect(rep.bySubject).toEqual([{ subject: 'English', percent: 88 }]);
+      expect(rep.school.name).toBeTruthy();
+      expect(rep.class).toMatchObject({ academicYear: expect.any(String) });
+      expect(rep.summary).toMatchObject({ pagesRead: 7, stars: expect.any(Number), badges: expect.any(Number) });
       expect((await s1.get(`/api/teacher/students/${s1Id}/report`)).status).toBe(403);
     });
   });
