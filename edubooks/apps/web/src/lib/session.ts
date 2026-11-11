@@ -7,4 +7,4 @@ export const useMe = () => useQuery<Me>({ queryKey: ['me'], queryFn: () => api.g
 export const isPublisherStaff = (me?: Me) => !!me?.roles.some((r) => r.startsWith('PUBLISHER_'));
 export const hasRole = (me: Me | undefined, ...roles: string[]) => !!me?.roles.some((r) => roles.includes(r));
 export const homeFor = (me: Me) =>
-  isPublisherStaff(me) ? (hasRole(me, 'PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') ? '/admin' : '/admin/schools') : hasRole(me, 'SCHOOL_ADMIN') ? '/school' : hasRole(me, 'TEACHER') ? '/teacher' : hasRole(me, 'STUDENT') ? '/learn' : '/portal';
+  isPublisherStaff(me) ? (hasRole(me, 'PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') ? '/admin' : '/admin/schools') : hasRole(me, 'SCHOOL_ADMIN') ? '/school' : hasRole(me, 'TEACHER') ? '/teacher' : hasRole(me, 'STUDENT') ? '/learn' : hasRole(me, 'PARENT') ? '/parent' : '/portal';

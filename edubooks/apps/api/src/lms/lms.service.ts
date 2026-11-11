@@ -387,7 +387,12 @@ export class LmsService {
 
   /** Student report card: assessments (by subject/unit/lesson) + evaluations. Teachers see their classes; admins all; students themselves. */
   async studentReport(studentId: string) {
-    const isSelf = studentId === this.ctx.userId;
+    const isParent = this.access.is('PARENT') && studentId !== this.ctx.userId;
+    if (isParent) {
+      const linked = (await this.q.execute(sql`SELECT 1 FROM parent_students WHERE parent_id = ${this.ctx.userId} AND student_id = ${studentId}`)).rows.length;
+      if (!linked) throw new ForbiddenException('Not your child');
+    }
+    const isSelf = studentId === this.ctx.userId || isParent; // parents see what the child sees (no unmarked scores)
     if (!isSelf && !this.access.is('SCHOOL_ADMIN')) {
       const classIds = await this.access.teacherClassIds();
       const ok = classIds.length && (await this.q.execute(sql`SELECT 1 FROM enrolments WHERE student_id = ${studentId} AND class_id IN ${classIds}`)).rows.length;

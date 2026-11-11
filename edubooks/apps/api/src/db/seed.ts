@@ -71,6 +71,12 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
       u.principal = (await addUser({ schoolId: sc.id, username: 'principal', displayName: `${name} Admin`, pw: schoolPw, roles: ['SCHOOL_ADMIN'] })).id;
       u.teacher1 = (await addUser({ schoolId: sc.id, username: 'teacher1', displayName: 'Sample Teacher', pw: teacherPw, roles: ['TEACHER'] })).id;
       for (let i = 1; i <= 3; i++) u[`student${i}`] = (await addUser({ schoolId: sc.id, username: `student${i}`, displayName: `Sample Student ${i}`, pw: studentPw, roles: ['STUDENT'] })).id;
+      if (code === 'SUN01') {
+        // a demo parent with two children (siblings)
+        u.parent1 = (await addUser({ schoolId: sc.id, username: 'parent1', displayName: 'Sample Parent', pw: await hashPassword('Parent@123'), roles: ['PARENT'] })).id;
+        await db.update(s.users).set({ phone: '0300 0000000' }).where(sql`id = ${u.parent1}`);
+        for (const k of ['student1', 'student2']) await db.insert(s.parentStudents).values({ parentId: u.parent1, studentId: u[k], publisherId: P, schoolId: sc.id, relation: 'Mother' });
+      }
       schoolRows.push({ id: sc.id, code, users: u });
     }
 
@@ -252,7 +258,7 @@ export async function seed(url = config.databaseOwnerUrl, opts: { reset?: boolea
     for (const t of ['Picture and word', 'Count the fruit'])
       await db.insert(s.gameAssignments).values({ publisherId: P, schoolId: sun.id, activityId: gameIds[t], classId: kgRose.id, teacherId: sun.users.teacher1 });
 
-    log('✅ Seeded: 1 publisher, 3 staff, 3 schools (15 users), 8 curricula with their grades, 27 subjects, academic calendar templates, 5 book packages, 5 products (incl. KG Complete Bundle), 3 orders with licences.');
+    log('✅ Seeded: 1 publisher, 3 staff, 3 schools (16 users incl. a parent), 8 curricula with their grades, 27 subjects, academic calendar templates, 5 book packages, 5 products (incl. KG Complete Bundle), 3 orders with licences.');
   } finally {
     await pool.end();
   }

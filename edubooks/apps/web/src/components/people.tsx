@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { FileUp, KeyRound, Plus, Trash2, UserCheck, UserX } from 'lucide-react';
+import { FileUp, KeyRound, Plus, Trash2, UserCheck, UserX, Users } from 'lucide-react';
+import { ParentsDialog } from '@/components/parents';
 import { api, fmtDay, qs } from '@/lib/api';
 import { useAction } from '@/lib/hooks';
 import { useMe } from '@/lib/session';
@@ -15,6 +16,7 @@ export function PeoplePage({ role }: { role: 'TEACHER' | 'STUDENT' }) {
   const [f, setF] = useState({ search: '', page: 1 });
   const q = useQuery({ queryKey: ['people', role, f], queryFn: () => api.get(`/school/users${qs({ role, ...f, pageSize: 50 })}`), placeholderData: keepPreviousData });
   const [dlg, setDlg] = useState<'' | 'add' | 'import'>(''); const [creds, setCreds] = useState<Credential[] | null>(null);
+  const [parentsFor, setParentsFor] = useState<any>(null);
   const keys = ['people', 'schoolOverview', 'eligible'];
   const status = useAction((v: { id: string; status: string }) => api.patch(`/school/users/${v.id}`, { status: v.status }), { ok: 'Saved', keys });
   const reset = useAction((id: string) => api.post(`/school/users/${id}/reset-password`), { after: (r) => setCreds([{ displayName: r.username, username: r.username, password: r.password }]) });
@@ -33,6 +35,7 @@ export function PeoplePage({ role }: { role: 'TEACHER' | 'STUDENT' }) {
                 <Td>{u.seats ? <Badge tone="PUBLISHED">{u.seats} active</Badge> : <span className="text-xs text-slate-500">none</span>}</Td>
                 <Td className="text-slate-500">{u.lastLoginAt ? fmtDay(u.lastLoginAt) : 'never'}</Td><Td><Status s={u.status} /></Td>
                 <Td className="whitespace-nowrap text-right">
+                  {role === 'STUDENT' && <Button size="sm" variant="ghost" onClick={() => setParentsFor(u)} title="Parents"><Users className="size-4" /></Button>}
                   <Button size="sm" variant="ghost" onClick={() => reset.mutate(u.id)} title="New password"><KeyRound className="size-4" /></Button>
                   {u.id !== me?.id && (u.status === 'ACTIVE'
                     ? <Button size="sm" variant="ghost" onClick={() => status.mutate({ id: u.id, status: 'SUSPENDED' })} title="Suspend"><UserX className="size-4" /></Button>
@@ -45,6 +48,7 @@ export function PeoplePage({ role }: { role: 'TEACHER' | 'STUDENT' }) {
       )}
       {dlg === 'add' && <AddPeople role={role} onClose={() => setDlg('')} onCreated={setCreds} />}
       {dlg === 'import' && <ImportPeople role={role} onClose={() => setDlg('')} onCreated={setCreds} />}
+      {parentsFor && <ParentsDialog student={parentsFor} onClose={() => setParentsFor(null)} />}
       {creds && <CredentialsDialog title={`New ${noun} logins`} schoolCode={me?.school?.code} creds={creds} onClose={() => setCreds(null)} />}
     </div>
   );

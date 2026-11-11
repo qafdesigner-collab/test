@@ -7,8 +7,8 @@ import { AuditService } from '../audit/audit.service';
 import { hashPassword } from '../auth/password';
 import { friendlyPassword, slugUser } from '../common/creds';
 
-export type SchoolRole = 'SCHOOL_ADMIN' | 'TEACHER' | 'STUDENT';
-export interface NewUser { displayName: string; username?: string; password?: string }
+export type SchoolRole = 'SCHOOL_ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT';
+export interface NewUser { displayName: string; username?: string; password?: string; phone?: string }
 
 /** Accounts inside one school. Used by publisher staff (school setup) and by school admins. */
 @Injectable()
@@ -44,7 +44,7 @@ export class SchoolUsersService {
       const password = u.password || friendlyPassword();
       if (password.length < 6) throw new BadRequestException('Passwords need at least 6 characters');
       const [row] = await this.q.insert(users).values({
-        publisherId: pub, schoolId, username, displayName, passwordHash: await hashPassword(password), mustChangePassword: role !== 'STUDENT' && !u.password,
+        publisherId: pub, schoolId, username, displayName, phone: u.phone?.trim() || null, passwordHash: await hashPassword(password), mustChangePassword: !['STUDENT', 'PARENT'].includes(role) && !u.password,
       }).returning({ id: users.id });
       await this.q.insert(userRoles).values({ userId: row.id, role, publisherId: pub, schoolId });
       out.push({ id: row.id, displayName, username, password });
@@ -75,7 +75,7 @@ export class SchoolUsersService {
     if (f.role) w.push(sql`EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = ${qc(users.id)} AND r.role = ${f.role})`);
     const where = and(...w);
     const items = await this.q.select({
-      id: users.id, username: users.username, displayName: users.displayName, status: users.status, lastLoginAt: users.lastLoginAt, createdAt: users.createdAt,
+      id: users.id, username: users.username, displayName: users.displayName, phone: users.phone, status: users.status, lastLoginAt: users.lastLoginAt, createdAt: users.createdAt,
       roles: sql<string[]>`(SELECT array_agg(role::text) FROM user_roles r WHERE r.user_id = ${qc(users.id)})`,
       seats: sql<number>`(SELECT count(*)::int FROM license_assignments a WHERE a.user_id = ${qc(users.id)} AND a.status = 'ACTIVE')`,
     }).from(users).where(where).orderBy(asc(users.displayName)).limit(f.pageSize).offset((f.page - 1) * f.pageSize);
@@ -89,7 +89,7 @@ export class SchoolUsersService {
     return u;
   }
 
-  async update(schoolId: string, id: string, d: { displayName?: string; status?: 'ACTIVE' | 'SUSPENDED' }) {
+  async update(schoolId: string, id: string, d: { displayName?: string; status?: 'ACTIVE' | 'SUSPENDED'; phone?: string }) {
     const u = await this.user(schoolId, id);
     if (id === this.db.ctx.userId && d.status && d.status !== 'ACTIVE') throw new BadRequestException('You cannot suspend your own account.');
     await this.q.update(users).set({ ...d, updatedAt: new Date() }).where(eq(users.id, id));
