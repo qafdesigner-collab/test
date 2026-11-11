@@ -20,7 +20,7 @@ export default function Homework({ params }: { params: Promise<{ id: string }> }
 
   const shell = (children: React.ReactNode) => (
     <main className="min-h-screen bg-gradient-to-b from-sky-50 to-amber-50 p-4 sm:p-8"><div className="mx-auto max-w-2xl">
-      <Link href="/portal" className="mb-4 inline-flex items-center gap-1 rounded-xl px-2 py-1 font-semibold text-slate-600 hover:bg-white"><ArrowLeft className="size-5" />Home</Link>
+      <Link href="/learn" className="mb-4 inline-flex items-center gap-1 rounded-xl px-2 py-1 font-semibold text-slate-600 hover:bg-white"><ArrowLeft className="size-5" />Home</Link>
       <h1 className="text-2xl font-extrabold text-slate-800 sm:text-3xl">{h.title}</h1>{children}</div></main>);
 
   if (sub) {

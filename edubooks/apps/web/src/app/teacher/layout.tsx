@@ -1,5 +1,5 @@
 'use client';
-import { BookMarked, ClipboardList, Library, LayoutDashboard, NotebookPen, Sparkles, Users } from 'lucide-react';
+import { BookMarked, ClipboardList, Gamepad2, Library, LayoutDashboard, NotebookPen, Sparkles, Users } from 'lucide-react';
 import { Shell } from '@/components/shell';
 
 const NAV = [
@@ -9,6 +9,7 @@ const NAV = [
   { href: '/teacher/plans', label: 'Lesson planner', icon: NotebookPen },
   { href: '/teacher/assessments', label: 'Homework & tests', icon: ClipboardList },
   { href: '/teacher/questions', label: 'Question bank', icon: BookMarked },
+  { href: '/teacher/games', label: 'Games', icon: Gamepad2 },
   { href: '/teacher/classes', label: 'Classes & reports', icon: Users },
 ];
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {

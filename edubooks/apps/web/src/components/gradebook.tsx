@@ -8,6 +8,7 @@ import { className } from '@/lib/lms';
 import { Card, ErrorBox, PageLoader } from '@/components/ui';
 import { PageHeader } from '@/components/common';
 import { StudentReportDialog } from '@/components/student-report';
+import { GameReport } from '@/components/game-report';
 
 export function Gradebook({ classId, back }: { classId: string; back: string }) {
   const q = useQuery({ queryKey: ['gradebook', classId], queryFn: () => api.get(`/teacher/classes/${classId}/gradebook`) });
@@ -38,6 +39,7 @@ export function Gradebook({ classId, back }: { classId: string; back: string }) 
         </table>
         {!g.students.length && <p className="p-6 text-center text-sm text-slate-400">No students enrolled.</p>}
       </Card>
+      <GameReport classId={classId} teacher={back.startsWith('/teacher')} />
       {student && <StudentReportDialog studentId={student} classId={classId} onClose={() => setStudent(null)} />}
     </div>
   );

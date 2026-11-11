@@ -3,8 +3,10 @@ import { useMyBooks, useBook } from '@/lib/lms';
 import { Field, Select } from '@/components/ui';
 
 /** Pick book → lesson (from the teacher's licensed books). */
-export function BookScope({ editionId, lessonId, onChange, required }: { editionId?: string | null; lessonId?: string | null; onChange: (v: { editionId: string | null; lessonId: string | null }) => void; required?: boolean }) {
-  const books = useMyBooks(); const book = useBook(editionId ?? undefined);
+export function BookScope({ editionId, lessonId, onChange, required, books: given }: { editionId?: string | null; lessonId?: string | null; onChange: (v: { editionId: string | null; lessonId: string | null }) => void; required?: boolean;
+  /** Optional explicit book list (publisher screens); defaults to the teacher's licensed books. */
+  books?: { editionId: string; title: string; editionLabel: string }[] }) {
+  const mine = useMyBooks(!given); const books = given ? { data: given } : mine; const book = useBook(editionId ?? undefined);
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Field label="Book"><Select required={required} value={editionId ?? ''} onChange={(e) => onChange({ editionId: e.target.value || null, lessonId: null })}>

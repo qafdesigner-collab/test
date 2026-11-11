@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt } from 'lucide-react';
+import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { isPublisherStaff, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
@@ -16,11 +16,12 @@ const NAV = [
   { href: '/admin/schools', label: 'Schools', icon: Building2, roles: [A, E, S] },
   { href: '/admin/orders', label: 'Orders', icon: Receipt, roles: [A, S] },
   { href: '/admin/licences', label: 'Licences', icon: KeyRound, roles: [A, E, S] },
+  { href: '/admin/games', label: 'Game Library', icon: Gamepad2, roles: [A, E] },
   { href: '/admin/ai', label: 'AI Assistant', icon: Sparkles, roles: [A, E, S] },
   { href: '/admin/catalog', label: 'Grades & Subjects', icon: Tags, roles: [A, E] },
   { href: '/admin/audit', label: 'Audit Log', icon: ScrollText, roles: [A, E, S] },
 ];
-const NEXT = [{ label: 'Games & student portal', icon: BookOpen }];
+const NEXT: { label: string; icon: typeof BookOpen }[] = [];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { data: me, isLoading, isError } = useMe();
@@ -46,7 +47,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </Link>
             );
           })}
-          <p className="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wide text-slate-400">Coming next</p>
+          {NEXT.length > 0 && <p className="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wide text-slate-400">Coming next</p>}
           {NEXT.map(({ label, icon: Icon }) => (
             <span key={label} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-400" title="Planned in a later phase"><Icon className="size-4" />{label}</span>
           ))}
