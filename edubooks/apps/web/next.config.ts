@@ -19,7 +19,8 @@ const config: NextConfig = {
       "img-src 'self' data: blob:", "font-src 'self' data:", "connect-src 'self'", "worker-src 'self' blob:", "media-src 'self' blob:",
       "frame-src 'self'", "frame-ancestors 'self'", "object-src 'none'", "base-uri 'self'", "form-action 'self'",
     ].join('; ');
-    return [{ source: '/:path*', headers: [
+    // Not for /api: the API sets its own headers (e.g. sandboxed flipbooks).
+    return [{ source: '/((?!api/).*)', headers: [
       { key: 'Content-Security-Policy', value: csp },
       { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
       { key: 'X-Content-Type-Options', value: 'nosniff' },

@@ -12,7 +12,8 @@ import { useToast } from '@/components/ui/toast';
 // ---------- types ----------
 export interface Lesson { id: string; number: number; title: string; objectives: string; pageStart: number | null; pageEnd: number | null; unitId: string }
 export interface Unit { id: string; number: number; title: string; description: string; componentId: string; lessons: Lesson[] }
-export interface Component { id: string; type: string; title: string; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null; indexStatus: string; indexedPages: number; indexError: string | null }
+export interface Flipbook { id: string; kind: 'HTML' | 'SWF'; entry: string; fileCount: number; totalBytes: number; originalName: string; skippedFiles: number; createdAt: string }
+export interface Component { id: string; type: string; title: string; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null; flipbook: Flipbook | null; indexStatus: string; indexedPages: number; indexError: string | null }
 export interface Resource {
   id: string; title: string; resourceType: string; audience: string; componentId: string | null; unitId: string | null; lessonId: string | null;
   createdAt: string; sharedWith: number; asset: { id: string; originalName: string; ext: string; sizeBytes: number; scanStatus: string };
@@ -185,6 +186,7 @@ function NodePanel({ tree, sel, setSel, onExpand }: { tree: EditionTree; sel: Se
                 {!locked && <Button size="sm" variant="ghost" onClick={() => setConfirmDel(true)} aria-label="Delete component"><Trash2 className="size-4 text-red-500" /></Button>}</div>}
             </div>
             <BookPdf comp={comp} editionStatus={tree.status} readOnly={readOnly} />
+            <FlipbookRow comp={comp} editionStatus={tree.status} readOnly={readOnly} />
             {!locked && (
               <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (unitTitle.trim()) addUnit.mutate(unitTitle.trim()); }}>
                 <Input value={unitTitle} onChange={(e) => setUnitTitle(e.target.value)} placeholder={`New unit title, e.g. “Letters A–E”`} aria-label="New unit title" />
@@ -245,6 +247,45 @@ function BookPdf({ comp, editionStatus, readOnly }: { comp: Component; editionSt
         <Button size="sm" variant="secondary" loading={pct !== null} onClick={() => input.current?.click()}><UploadCloud className="size-4" />{comp.bookFile ? 'Replace PDF' : 'Upload PDF'}</Button></>}
       {comp.bookFile && editionStatus === 'DRAFT' && !readOnly && <Button size="sm" variant="ghost" onClick={() => remove.mutate(undefined)} aria-label="Remove book PDF"><Trash2 className="size-4 text-red-500" /></Button>}
       {comp.bookFile && <AiIndexStatus comp={comp} />}
+    </div>
+  );
+}
+
+/** Flipbook of the part: an HTML flipbook (zip whose main page is index.html) or a Flash flipbook (.swf, played with Ruffle). */
+function FlipbookRow({ comp, editionStatus, readOnly }: { comp: Component; editionStatus: string; readOnly: boolean }) {
+  const qc = useQueryClient(); const toast = useToast(); const input = useRef<HTMLInputElement>(null);
+  const [pct, setPct] = useState<number | null>(null); const [unpacking, setUnpacking] = useState(false);
+  const f = comp.flipbook;
+  const refresh = () => ['edition', 'package'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+  const remove = useBuilderMutation(() => api.del(`/publishing/components/${comp.id}/flipbook`), 'Flipbook removed');
+  const upload = async (file?: File) => {
+    if (!file) return;
+    const fd = new FormData(); fd.append('file', file); setPct(0);
+    try {
+      const r = await api.upload<any>(`/publishing/components/${comp.id}/flipbook`, fd, (p) => { setPct(p); if (p === 100) setUnpacking(true); });
+      toast(`${r.kind === 'SWF' ? 'Flash' : 'HTML'} flipbook ready: ${r.fileCount} files${r.skippedFiles ? ` (${r.skippedFiles} not allowed and left out)` : ''}`);
+      refresh();
+    } catch (e: any) { toast(e.message, 'err'); } finally { setPct(null); setUnpacking(false); }
+  };
+  const preview = async () => {
+    const w = window.open('', '_blank');
+    try { const { url } = await api.get<any>(`/reader/components/${comp.id}/flipbook`); if (w) w.location.href = url; }
+    catch (e: any) { w?.close(); toast(e.message, 'err'); }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-violet-300 bg-violet-50/60 p-3 text-sm">
+      <span className="text-xl" aria-hidden>📖</span>
+      <div className="min-w-[16rem] flex-1 break-words">
+        {f ? <><b>Flipbook ({f.kind === 'SWF' ? 'Flash' : 'HTML'}):</b> <span className="text-slate-700">{f.originalName} · {f.fileCount} files · {fmtBytes(f.totalBytes)} · opens <code className="text-xs">{f.entry}</code></span>
+          {f.skippedFiles > 0 && <span className="block text-xs text-amber-800">{f.skippedFiles} file(s) of a type that is not allowed were left out.</span>}</>
+          : <span className="text-slate-700">No flipbook yet. Upload the flipbook as a <b>.zip</b> (its main page must be <b>index.html</b>) or a Flash <b>.swf</b>.</span>}
+        {unpacking && <span className="block text-xs text-slate-700">Unpacking and checking the files…</span>}
+      </div>
+      {pct !== null && !unpacking && <span className="text-xs text-slate-700">{pct}%</span>}
+      {f && <Button size="sm" variant="ghost" onClick={preview}><ExternalLink className="size-4" />Preview</Button>}
+      {!readOnly && editionStatus !== 'ARCHIVED' && <><input ref={input} type="file" accept=".zip,application/zip,.swf,application/x-shockwave-flash" hidden onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ''; }} />
+        <Button size="sm" variant="secondary" loading={pct !== null} onClick={() => input.current?.click()}><UploadCloud className="size-4" />{f ? 'Replace flipbook' : 'Upload flipbook'}</Button></>}
+      {f && !readOnly && editionStatus !== 'ARCHIVED' && <Button size="sm" variant="ghost" onClick={() => remove.mutate(undefined)} aria-label="Remove flipbook"><Trash2 className="size-4 text-red-500" /></Button>}
     </div>
   );
 }

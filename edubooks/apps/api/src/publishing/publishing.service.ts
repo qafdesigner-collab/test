@@ -220,7 +220,8 @@ export class PublishingService {
     const e = await this.edition(id);
     const [pkg] = await this.q.select({ id: bookPackages.id, title: bookPackages.title, status: bookPackages.status, coverColor: bookPackages.coverColor })
       .from(bookPackages).where(eq(bookPackages.id, e.packageId));
-    const comps = await this.q.select({ ...getTableColumns(bookComponents), bookFile: sql<any>`(SELECT json_build_object('id', a.id, 'name', a.original_name, 'size', a.size_bytes) FROM digital_assets a WHERE a.id = ${qc(bookComponents.bookAssetId)})` })
+    const comps = await this.q.select({ ...getTableColumns(bookComponents), bookFile: sql<any>`(SELECT json_build_object('id', a.id, 'name', a.original_name, 'size', a.size_bytes) FROM digital_assets a WHERE a.id = ${qc(bookComponents.bookAssetId)})`,
+      flipbook: sql<any>`(SELECT json_build_object('id', f.id, 'kind', f.kind, 'entry', f.entry, 'fileCount', f.file_count, 'totalBytes', f.total_bytes, 'originalName', f.original_name, 'skippedFiles', f.skipped_files, 'createdAt', f.created_at) FROM flipbooks f WHERE f.component_id = ${qc(bookComponents.id)})` })
       .from(bookComponents).where(eq(bookComponents.editionId, id)).orderBy(asc(bookComponents.sort), asc(bookComponents.partNumber));
     const compIds = comps.map((c) => c.id);
     const units = compIds.length ? await this.q.select().from(bookUnits).where(inArray(bookUnits.componentId, compIds)).orderBy(asc(bookUnits.sort), asc(bookUnits.number)) : [];

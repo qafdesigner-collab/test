@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { qc } from '../db/qualify';
 import { DbService } from '../db/db.service';
 import {
   assessments, bookComponents, bookEditions, bookLessons, bookPackages, bookUnits, bookmarks, digitalAssets, readerProgress, teachingResources,
@@ -19,7 +20,8 @@ export class ReaderService {
       .from(bookEditions).innerJoin(bookPackages, eq(bookPackages.id, bookEditions.packageId)).where(eq(bookEditions.id, editionId));
     if (!ed) throw new NotFoundException('Book not found');
     const comps = await this.q.select({ id: bookComponents.id, type: bookComponents.type, title: bookComponents.title, partNumber: bookComponents.partNumber,
-      pageCount: bookComponents.pageCount, hasPdf: sql<boolean>`${bookComponents.bookAssetId} IS NOT NULL` })
+      pageCount: bookComponents.pageCount, hasPdf: sql<boolean>`${bookComponents.bookAssetId} IS NOT NULL`,
+      flipbook: sql<string | null>`(SELECT f.kind FROM flipbooks f WHERE f.component_id = ${qc(bookComponents.id)})` })
       .from(bookComponents).where(eq(bookComponents.editionId, editionId)).orderBy(asc(bookComponents.sort));
     const ids = comps.map((c) => c.id);
     const units = ids.length ? await this.q.select().from(bookUnits).where(inArray(bookUnits.componentId, ids)).orderBy(asc(bookUnits.sort)) : [];

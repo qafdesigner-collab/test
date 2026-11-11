@@ -35,12 +35,17 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   const kid = !!b?.student;
   const comps: any[] = b?.components ?? [];
   const comp = comps.find((c) => c.id === compId);
+  // Flipbook (HTML / Flash) or PDF view of the selected part.
+  const [view, setView] = useState<'flip' | 'pdf'>('pdf');
+  useEffect(() => { setView(comp?.flipbook ? 'flip' : 'pdf'); }, [comp?.id, comp?.flipbook]);
+  const flip = useQuery({ queryKey: ['flipbook', comp?.id], queryFn: () => api.get(`/reader/components/${comp!.id}/flipbook`), enabled: !!comp?.flipbook && view === 'flip', staleTime: 5 * 3600_000 });
+  const flipMode = view === 'flip' && !!comp?.flipbook;
 
   // Default part: the first one with pages; resume at last page read.
   useEffect(() => {
     if (!b || compId) return;
     const wanted = initial?.componentId && comps.find((x) => x.id === initial.componentId);
-    const c = wanted || comps.find((x) => x.hasPdf) || comps[0];
+    const c = wanted || comps.find((x) => x.hasPdf || x.flipbook) || comps[0];
     if (c) { setCompId(c.id); setPage(wanted && initial?.page ? initial.page : c.progress?.lastPage ?? 1); }
   }, [b, compId, comps]);
 
@@ -133,6 +138,12 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
         <Link href={backHref} className={btn} aria-label="Back"><ArrowLeft className="size-5" /></Link>
         <button className={btn} onClick={() => setToc(!toc)} aria-label="Contents" aria-pressed={toc}><PanelLeft className="size-5" /></button>
         <div className="min-w-0 flex-1"><div className={cn('truncate font-semibold', kid && 'text-lg')}>{b.title}</div><div className="truncate text-xs text-slate-600">{comp?.title}{lessonHere && ` · Unit ${lessonHere.unit.number} · Lesson ${lessonHere.number}: ${lessonHere.title}`}</div></div>
+        {comp?.flipbook && (
+          <div role="tablist" aria-label="View" className="flex rounded-xl bg-slate-100 p-1 text-sm font-medium">
+            <button role="tab" aria-selected={view === 'flip'} onClick={() => setView('flip')} className={cn('rounded-lg px-3 py-1', view === 'flip' ? 'bg-white shadow-sm' : 'text-slate-700')}>📖 Flipbook</button>
+            <button role="tab" aria-selected={view === 'pdf'} disabled={!comp.hasPdf} onClick={() => setView('pdf')} className={cn('rounded-lg px-3 py-1 disabled:opacity-40', view === 'pdf' ? 'bg-white shadow-sm' : 'text-slate-700')}>📄 Pages</button>
+          </div>)}
+        {!flipMode && <>
         <button className={btn} onClick={() => go(page - 1)} disabled={page <= 1} aria-label="Previous page"><ChevronLeft className="size-6" /></button>
         <label className="flex items-center gap-1 text-sm"><span className="sr-only">Page</span>
           <input type="number" min={1} max={pages} value={page} onChange={(e) => go(Number(e.target.value) || 1)} className="w-14 rounded-lg border border-slate-300 px-2 py-1 text-center" />
@@ -144,6 +155,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
         <button className={btn} onClick={() => setZoom((z) => Math.min(3, z + 0.25))} aria-label="Zoom in"><ZoomIn className="size-5" /></button>
         <button className={btn} onClick={toggleBookmark} aria-label={mark ? 'Remove bookmark' : 'Bookmark this page'} aria-pressed={!!mark} disabled={!doc}>{mark ? <BookmarkCheck className="size-5 text-amber-500" /> : <Bookmark className="size-5" />}</button>
         <button className={btn} onClick={speak} aria-label={speaking ? 'Stop reading' : 'Read aloud'} disabled={!doc}>{speaking ? <VolumeX className="size-5 text-pink-600" /> : <Volume2 className="size-5" />}</button>
+        </>}
         <button className={btn} onClick={toggleFull} aria-label={full ? 'Exit full screen' : 'Full screen'}>{full ? <Minimize className="size-5" /> : <Maximize className="size-5" />}</button>
       </header>
       <div className="flex min-h-0 flex-1">
@@ -152,9 +164,9 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
             <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Contents</p>
             {comps.map((c) => (
               <div key={c.id} className="mb-2">
-                <button onClick={() => { setCompId(c.id); setPage(c.progress?.lastPage ?? 1); }} disabled={!c.hasPdf}
-                  className={cn('flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left font-medium', c.id === compId ? 'bg-brand-50 text-brand-800' : 'hover:bg-slate-50', !c.hasPdf && 'text-slate-500')}>
-                  <span className="truncate">{c.title}</span>{c.progress && c.pageCount ? <span className="text-xs text-slate-600">{Math.round((c.progress.maxPage / c.pageCount) * 100)}%</span> : !c.hasPdf ? <span className="text-xs">no pages</span> : null}
+                <button onClick={() => { setCompId(c.id); setPage(c.progress?.lastPage ?? 1); }} disabled={!c.hasPdf && !c.flipbook}
+                  className={cn('flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left font-medium', c.id === compId ? 'bg-brand-50 text-brand-800' : 'hover:bg-slate-50', !c.hasPdf && !c.flipbook && 'text-slate-500')}>
+                  <span className="truncate">{c.title}</span>{c.progress && c.pageCount ? <span className="text-xs text-slate-600">{Math.round((c.progress.maxPage / c.pageCount) * 100)}%</span> : c.flipbook ? <span className="text-xs" title="Flipbook">📖</span> : !c.hasPdf ? <span className="text-xs">no pages</span> : null}
                 </button>
                 {c.id === compId && c.units.map((u: any) => (
                   <div key={u.id} className="ml-2 mt-1">
@@ -175,7 +187,11 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
           </aside>
         )}
         <main ref={wrap} className="relative flex min-w-0 flex-1 items-start justify-center overflow-auto p-4">
-          {!comp?.hasPdf ? <div className="m-auto max-w-sm text-center text-slate-500"><FileText className="mx-auto mb-2 size-10" />The digital pages of this part are not available yet.</div>
+          {flipMode ? (flip.error ? <div className="m-auto"><ErrorBox error={flip.error} /></div>
+            : !flip.data ? <Spinner className="m-auto size-8" />
+              : <iframe key={flip.data.url} src={flip.data.url} title={`${comp?.title} — flipbook`} className={cn('absolute inset-0 size-full border-0 bg-white', kid && 'rounded-2xl')}
+                  sandbox="allow-scripts allow-popups allow-forms allow-modals allow-pointer-lock allow-downloads allow-presentation" allow="fullscreen; autoplay" allowFullScreen referrerPolicy="no-referrer" />)
+          : !comp?.hasPdf ? <div className="m-auto max-w-sm text-center text-slate-500"><FileText className="mx-auto mb-2 size-10" />The digital pages of this part are not available yet.</div>
             : docError ? <div className="m-auto"><ErrorBox error={new Error(docError)} /></div>
               : <>{loadingDoc && <Spinner className="absolute left-1/2 top-1/2 size-8" />}<canvas ref={canvas} className={cn('bg-white shadow-xl', kid ? 'rounded-2xl' : 'rounded')} aria-label={`Page ${page} of ${pages}`} /></>}
         </main>

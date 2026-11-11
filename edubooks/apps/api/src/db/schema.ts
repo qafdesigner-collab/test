@@ -707,3 +707,28 @@ export const studentBadges = pgTable('student_badges', {
   badge: text('badge').notNull(),
   earnedAt: createdAt(),
 }, (t) => [primaryKey({ columns: [t.studentId, t.badge] })]);
+
+// ---------- flipbooks (HTML flipbook zip, or Flash/SWF played with Ruffle) ----------
+export const flipbooks = pgTable('flipbooks', {
+  id: id(),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  componentId: uuid('component_id').notNull().references(() => bookComponents.id, { onDelete: 'cascade' }),
+  kind: text('kind').notNull().$type<'HTML' | 'SWF'>(),
+  storagePrefix: text('storage_prefix').notNull(),
+  entry: text('entry').notNull(),
+  fileCount: integer('file_count').notNull(),
+  totalBytes: bigint('total_bytes', { mode: 'number' }).notNull(),
+  originalName: text('original_name').notNull(),
+  skippedFiles: integer('skipped_files').notNull().default(0),
+  uploadedBy: uuid('uploaded_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex('flipbooks_component_uq').on(t.componentId)]);
+
+export const flipbookFiles = pgTable('flipbook_files', {
+  flipbookId: uuid('flipbook_id').notNull().references(() => flipbooks.id, { onDelete: 'cascade' }),
+  publisherId: uuid('publisher_id').notNull().references(() => publishers.id),
+  path: text('path').notNull(),
+  sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+  mimeType: text('mime_type').notNull(),
+}, (t) => [primaryKey({ columns: [t.flipbookId, t.path] })]);
+
