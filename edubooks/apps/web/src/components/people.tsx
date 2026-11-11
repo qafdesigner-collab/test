@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { FileUp, KeyRound, Plus, Trash2, UserCheck, UserX, Users } from 'lucide-react';
+import { Eraser, FileUp, KeyRound, Plus, Trash2, UserCheck, UserX, Users } from 'lucide-react';
 import { ParentsDialog } from '@/components/parents';
 import { api, fmtDay, qs } from '@/lib/api';
 import { useAction } from '@/lib/hooks';
@@ -16,7 +16,7 @@ export function PeoplePage({ role }: { role: 'TEACHER' | 'STUDENT' }) {
   const [f, setF] = useState({ search: '', page: 1 });
   const q = useQuery({ queryKey: ['people', role, f], queryFn: () => api.get(`/school/users${qs({ role, ...f, pageSize: 50 })}`), placeholderData: keepPreviousData });
   const [dlg, setDlg] = useState<'' | 'add' | 'import'>(''); const [creds, setCreds] = useState<Credential[] | null>(null);
-  const [parentsFor, setParentsFor] = useState<any>(null);
+  const [parentsFor, setParentsFor] = useState<any>(null); const [eraseFor, setEraseFor] = useState<any>(null);
   const keys = ['people', 'schoolOverview', 'eligible'];
   const status = useAction((v: { id: string; status: string }) => api.patch(`/school/users/${v.id}`, { status: v.status }), { ok: 'Saved', keys });
   const reset = useAction((id: string) => api.post(`/school/users/${id}/reset-password`), { after: (r) => setCreds([{ displayName: r.username, username: r.username, password: r.password }]) });
@@ -36,6 +36,7 @@ export function PeoplePage({ role }: { role: 'TEACHER' | 'STUDENT' }) {
                 <Td className="text-slate-500">{u.lastLoginAt ? fmtDay(u.lastLoginAt) : 'never'}</Td><Td><Status s={u.status} /></Td>
                 <Td className="whitespace-nowrap text-right">
                   {role === 'STUDENT' && <Button size="sm" variant="ghost" onClick={() => setParentsFor(u)} title="Parents"><Users className="size-4" /></Button>}
+                  {role === 'STUDENT' && u.displayName !== 'Deleted student' && <Button size="sm" variant="ghost" onClick={() => setEraseFor(u)} title="Erase this child's data"><Eraser className="size-4 text-red-500" /></Button>}
                   <Button size="sm" variant="ghost" onClick={() => reset.mutate(u.id)} title="New password"><KeyRound className="size-4" /></Button>
                   {u.id !== me?.id && (u.status === 'ACTIVE'
                     ? <Button size="sm" variant="ghost" onClick={() => status.mutate({ id: u.id, status: 'SUSPENDED' })} title="Suspend"><UserX className="size-4" /></Button>
@@ -48,6 +49,7 @@ export function PeoplePage({ role }: { role: 'TEACHER' | 'STUDENT' }) {
       )}
       {dlg === 'add' && <AddPeople role={role} onClose={() => setDlg('')} onCreated={setCreds} />}
       {dlg === 'import' && <ImportPeople role={role} onClose={() => setDlg('')} onCreated={setCreds} />}
+      {eraseFor && <EraseDialog student={eraseFor} onClose={() => setEraseFor(null)} />}
       {parentsFor && <ParentsDialog student={parentsFor} onClose={() => setParentsFor(null)} />}
       {creds && <CredentialsDialog title={`New ${noun} logins`} schoolCode={me?.school?.code} creds={creds} onClose={() => setCreds(null)} />}
     </div>
@@ -89,3 +91,29 @@ function ImportPeople({ role, onClose, onCreated }: { role: 'TEACHER' | 'STUDENT
     </Dialog>
   );
 }
+
+/** Right to erasure: removes the child's personal data and learning records; their book seat is freed. */
+function EraseDialog({ student, onClose }: { student: any; onClose: () => void }) {
+  const [typed, setTyped] = useState('');
+  const m = useAction(() => api.post<any>(`/school/students/${student.id}/erase`, { confirmUsername: typed }),
+    { ok: (r: any) => `Data erased${r.seatsFreed ? ` — ${r.seatsFreed} book seat(s) freed` : ''}`, keys: ['people', 'schoolOverview', 'eligible', 'schoolParents'], after: onClose });
+  return (
+    <Dialog open onOpenChange={onClose} title={`Erase ${student.displayName}'s data?`}>
+      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
+        <div className="space-y-2 rounded-lg bg-red-50 p-3 text-sm text-red-900">
+          <p><b>This cannot be undone.</b> Use it when a parent asks for their child's data to be deleted, or the child has left.</p>
+          <ul className="list-disc pl-5">
+            <li>Deleted: homework answers and marks, reading progress, bookmarks, games, stars, badges, teacher comments, messages and parent links.</li>
+            <li>The account is anonymised (“Deleted student”) and can no longer sign in; the name is removed from earlier log entries.</li>
+            <li>The child's book seats are freed for another pupil.</li>
+          </ul>
+        </div>
+        <Field label={`Type the username “${student.username}” to confirm`}><Input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" autoFocus /></Field>
+        {m.error ? <ErrorBox error={m.error} /> : null}
+        <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="danger" loading={m.isPending} disabled={typed.trim().toLowerCase() !== String(student.username).toLowerCase()}>Erase data</Button></div>
+      </form>
+    </Dialog>
+  );
+}
+

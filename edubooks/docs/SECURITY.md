@@ -41,7 +41,7 @@ EduBooks holds children's data and paid publisher content. This page lists the p
 ## Children's privacy
 - Students need no email address or phone number: only a name, a username and a class.
 - Audit logs are append-only: the app role has no `UPDATE` or `DELETE` permission on them. They record admin actions, not children's activity.
-- Retention: learning records are kept for the school's use. A school can suspend a student's account at once. **Gap:** there is no in-app "delete this child's data" action yet. An erasure request currently needs a database operation by the publisher's technical team. Add a guided erasure feature before launching in places where the law requires one.
+- Retention: learning records are kept for the school's use. **Right to erasure:** a school admin (Students → eraser button) or the publisher admin can erase a child's data. Learning records, messages and parent links are deleted. The account is anonymised and cannot sign in, the name is scrubbed from earlier audit entries, and book seats are freed. Typing the username is required to confirm. Covered by `erasure.e2e.test.ts`.
 
 ## Dependencies
 - `npm audit --omit=dev` reports 0 vulnerabilities. CI fails on any *high* or *critical* finding. Next.js's bundled PostCSS is forced to a patched version with an npm `overrides` entry.

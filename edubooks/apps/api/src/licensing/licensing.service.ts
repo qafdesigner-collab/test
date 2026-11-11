@@ -182,6 +182,21 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** School admins may free TEACHER seats (staff changes). Student seats move only through publisher-approved transfers. */
+  /**
+   * Right to erasure: ends every live seat of a student (seats return to the pool) and then removes the
+   * student's personal data in the database. Callers: school admin (own school) or publisher admin.
+   */
+  async eraseStudent(schoolId: string, studentId: string, confirmUsername: string) {
+    const [u] = await this.q.select({ username: users.username }).from(users).where(and(eq(users.id, studentId), eq(users.schoolId, schoolId)));
+    if (!u) throw new NotFoundException('Student not found in this school');
+    if (String(u.username).toLowerCase() !== String(confirmUsername ?? '').trim().toLowerCase()) throw new BadRequestException('Type the student\'s username exactly to confirm.');
+    const live = await this.q.select({ id: licenseAssignments.id }).from(licenseAssignments)
+      .where(and(eq(licenseAssignments.userId, studentId), sql`${licenseAssignments.status} IN ('ACTIVE', 'SUSPENDED')`));
+    for (const a of live) await this.endAssignment(a.id, 'RELEASED', 'Student data erased');
+    const { rows } = await this.q.execute(sql`SELECT erase_student_data(${studentId}::uuid, ${schoolId}::uuid, ${this.ctx.userId}::uuid) AS anon`);
+    return { ok: true, seatsFreed: live.length, username: (rows[0] as any).anon };
+  }
+
   async release(id: string, reason: string) {
     const { a } = await this.assignment(id);
     if (this.ctx.schoolId && a.poolId) {

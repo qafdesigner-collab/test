@@ -5,6 +5,9 @@ import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsIn, IsInt, IsOptio
 import { Roles } from '../common/decorators';
 import { PageQuery } from '../common/pagination';
 import { SchoolsService } from './schools.service';
+import { LicensingService } from '../licensing/licensing.service';
+
+class EraseDto { @IsString() @MaxLength(60) confirmUsername: string }
 
 class SchoolQuery extends PageQuery {
   @IsOptional() @IsString() @MaxLength(100) search?: string;
@@ -49,7 +52,10 @@ const SALES = ['PUBLISHER_ADMIN', 'PUBLISHER_SALES'];
 @ApiTags('schools (publisher)')
 @Controller('schools')
 export class SchoolsController {
-  constructor(private readonly svc: SchoolsService) {}
+  constructor(private readonly svc: SchoolsService, private readonly licensing: LicensingService) {}
+  @Roles('PUBLISHER_ADMIN') @Post(':id/students/:studentId/erase') erase(@Param('id', ParseUUIDPipe) id: string, @Param('studentId', ParseUUIDPipe) studentId: string, @Body() d: EraseDto) {
+    return this.licensing.eraseStudent(id, studentId, d.confirmUsername);
+  }
   @Roles(...SALES, 'PUBLISHER_EDITOR') @Get() list(@Query() q: SchoolQuery) { return this.svc.list(q); }
   @Roles(...SALES) @Post() create(@Body() d: CreateSchoolDto) { return this.svc.create(d); }
   @Roles(...SALES) @Post('demo') demo(@Body() d: DemoDto) { return this.svc.createDemo(d); }

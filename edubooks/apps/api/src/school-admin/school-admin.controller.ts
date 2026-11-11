@@ -44,12 +44,16 @@ class ProfileDto {
 }
 const Id = () => new ParseUUIDPipe();
 
+class EraseDto { @IsString() @MaxLength(60) confirmUsername: string }
+
 /** School Admin portal API. Every call is scoped to the admin's own school (and RLS enforces it again). */
 @ApiTags('school admin')
 @Roles('SCHOOL_ADMIN')
 @Controller('school')
 export class SchoolAdminController {
   constructor(private readonly db: DbService, private readonly users: SchoolUsersService, private readonly licensing: LicensingService, private readonly audit: AuditService) {}
+  /** Right to erasure: removes the child's personal data and learning records; frees their book seats. */
+  @Post('students/:id/erase') erase(@Ctx() c: TenantCtx, @Param('id', Id()) id: string, @Body() d: EraseDto) { return this.licensing.eraseStudent(this.sid(c), id, d.confirmUsername); }
   private sid(c: TenantCtx) { return c.schoolId!; }
 
   @Get('overview')
