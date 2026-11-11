@@ -185,7 +185,7 @@ function NodePanel({ tree, sel, setSel, onExpand }: { tree: EditionTree; sel: Se
               {!readOnly && <div className="flex gap-1"><Button size="sm" variant="secondary" onClick={() => setEditComp(true)}><Pencil className="size-3.5" />Edit</Button>
                 {!locked && <Button size="sm" variant="ghost" onClick={() => setConfirmDel(true)} aria-label="Delete component"><Trash2 className="size-4 text-red-500" /></Button>}</div>}
             </div>
-            <BookPdf comp={comp} editionStatus={tree.status} readOnly={readOnly} />
+            <BookPdf comp={comp} editionId={tree.id} editionStatus={tree.status} readOnly={readOnly} />
             <FlipbookRow comp={comp} editionStatus={tree.status} readOnly={readOnly} />
             {!locked && (
               <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (unitTitle.trim()) addUnit.mutate(unitTitle.trim()); }}>
@@ -222,7 +222,7 @@ function NodePanel({ tree, sel, setSel, onExpand }: { tree: EditionTree; sel: Se
 }
 
 /** The digital pages of a book part, shown in the reader. Replaceable while the edition is a draft. */
-function BookPdf({ comp, editionStatus, readOnly }: { comp: Component; editionStatus: string; readOnly: boolean }) {
+function BookPdf({ comp, editionId, editionStatus, readOnly }: { comp: Component; editionId: string; editionStatus: string; readOnly: boolean }) {
   const qc = useQueryClient(); const toast = useToast(); const input = useRef<HTMLInputElement>(null);
   const [pct, setPct] = useState<number | null>(null);
   const remove = useBuilderMutation(() => api.del(`/publishing/components/${comp.id}/book-pdf`), 'Book PDF removed');
@@ -242,6 +242,7 @@ function BookPdf({ comp, editionStatus, readOnly }: { comp: Component; editionSt
       <div className="min-w-0 flex-1">{comp.bookFile ? <><b>Digital pages:</b> <span className="text-slate-600">{comp.bookFile.name} · {fmtBytes(comp.bookFile.size)}{comp.pageCount ? ` · ${comp.pageCount} pages` : ''}</span></>
         : <span className="text-slate-500">No digital pages yet — upload the PDF of this part for the digital reader.</span>}</div>
       {pct !== null && <span className="text-xs text-slate-600">{pct}%</span>}
+      {comp.bookFile && <a href={`/read/${editionId}?component=${comp.id}`} target="_blank" rel="noopener" title="Open in the reader to add tappable hotspots" className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-sm font-medium text-brand-700 hover:bg-brand-50">✏️ Hotspots</a>}
       {comp.bookFile && <Button size="sm" variant="ghost" onClick={() => openAsset(comp.bookFile!.id).catch((e) => toast(e.message, 'err'))}><ExternalLink className="size-4" />Open</Button>}
       {canUpload && <><input ref={input} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ''; }} />
         <Button size="sm" variant="secondary" loading={pct !== null} onClick={() => input.current?.click()}><UploadCloud className="size-4" />{comp.bookFile ? 'Replace PDF' : 'Upload PDF'}</Button></>}

@@ -8,6 +8,8 @@ import {
 import { api } from '@/lib/api';
 import { cn, ErrorBox, PageLoader, Spinner } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
+import { HotspotLayer } from '@/components/hotspots';
+import { useMe } from '@/lib/session';
 
 type PDFDoc = { numPages: number; getPage: (n: number) => Promise<any>; destroy: () => void };
 
@@ -30,6 +32,8 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   const [toc, setToc] = useState(true);
   const [full, setFull] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [editHot, setEditHot] = useState(false);
+  const me = useMe().data as any; const canEditHot = !!me?.roles?.some((r: string) => ['PUBLISHER_ADMIN', 'PUBLISHER_EDITOR'].includes(r));
   const canvas = useRef<HTMLCanvasElement>(null); const wrap = useRef<HTMLDivElement>(null); const shell = useRef<HTMLDivElement>(null);
   const b = book.data;
   const kid = !!b?.student;
@@ -154,6 +158,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
         <span className="w-10 text-center text-xs tabular-nums text-slate-500">{Math.round(zoom * 100)}%</span>
         <button className={btn} onClick={() => setZoom((z) => Math.min(3, z + 0.25))} aria-label="Zoom in"><ZoomIn className="size-5" /></button>
         <button className={btn} onClick={toggleBookmark} aria-label={mark ? 'Remove bookmark' : 'Bookmark this page'} aria-pressed={!!mark} disabled={!doc}>{mark ? <BookmarkCheck className="size-5 text-amber-500" /> : <Bookmark className="size-5" />}</button>
+        {canEditHot && <button className={cn(btn, 'w-auto px-2 text-sm font-medium', editHot && 'bg-sky-100 text-sky-800')} onClick={() => { setEditHot(!editHot); if (!editHot) toast('Drag on the page to draw a hotspot. Click one to edit it.'); }} aria-pressed={editHot}>✏️ Hotspots</button>}
         <button className={btn} onClick={speak} aria-label={speaking ? 'Stop reading' : 'Read aloud'} disabled={!doc}>{speaking ? <VolumeX className="size-5 text-pink-600" /> : <Volume2 className="size-5" />}</button>
         </>}
         <button className={btn} onClick={toggleFull} aria-label={full ? 'Exit full screen' : 'Full screen'}>{full ? <Minimize className="size-5" /> : <Maximize className="size-5" />}</button>
@@ -193,7 +198,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
                   sandbox="allow-scripts allow-popups allow-forms allow-modals allow-pointer-lock allow-downloads allow-presentation" allow="fullscreen; autoplay" allowFullScreen referrerPolicy="no-referrer" />)
           : !comp?.hasPdf ? <div className="m-auto max-w-sm text-center text-slate-500"><FileText className="mx-auto mb-2 size-10" />The digital pages of this part are not available yet.</div>
             : docError ? <div className="m-auto"><ErrorBox error={new Error(docError)} /></div>
-              : <>{loadingDoc && <Spinner className="absolute left-1/2 top-1/2 size-8" />}<canvas ref={canvas} className={cn('bg-white shadow-xl', kid ? 'rounded-2xl' : 'rounded')} aria-label={`Page ${page} of ${pages}`} /></>}
+              : <>{loadingDoc && <Spinner className="absolute left-1/2 top-1/2 size-8" />}<div className="relative"><canvas ref={canvas} className={cn('block bg-white shadow-xl', kid ? 'rounded-2xl' : 'rounded')} aria-label={`Page ${page} of ${pages}`} />{doc && comp && <HotspotLayer componentId={comp.id} page={page} editing={editHot} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} />}</div></>}
         </main>
         {(lessonResources.length > 0 || lessonWork.length > 0 || lessonGames.length > 0 || (!kid && lessonHere)) && (
           <aside className="hidden w-64 shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-3 text-sm xl:block">

@@ -14,7 +14,7 @@ export function GamePlayer({ game, onDone, preview }: { game: { engine: Engine; 
   const [sound, setSound] = useState(true); const started = useRef(0);
   const say = useCallback((t: string) => {
     if (!sound || typeof window === 'undefined' || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.rate = 0.85; u.pitch = 1.1; window.speechSynthesis.speak(u);
+    try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.rate = 0.85; u.pitch = 1.1; window.speechSynthesis.speak(u); } catch { /* no voice: the game still works */ }
   }, [sound]);
   const Engine = ENGINES[game.engine]; const info = ENGINE_INFO[game.engine]; const max = maxScore(game.engine, game.content);
   const start = () => { setPhase('play'); setRun(run + 1); setResult(null); started.current = Date.now(); say(game.instructions || game.title); };
