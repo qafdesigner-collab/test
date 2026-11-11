@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { hasRole, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
 import { NotificationBell } from '@/components/notifications';
+import { BrandMark } from '@/lib/branding';
 
 const NAV = [
   { href: '/school', label: 'Overview', icon: LayoutDashboard, exact: true },
@@ -31,7 +32,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
   return (
     <div className="min-h-screen lg:flex">
       <aside className={cn('fixed inset-y-0 left-0 z-40 w-64 transform border-r border-slate-200 bg-white transition-transform lg:static lg:translate-x-0', open ? 'translate-x-0' : '-translate-x-full')}>
-        <div className="border-b border-slate-100 px-5 py-4"><div className="flex items-center gap-2 font-semibold text-slate-900"><BookOpen className="size-5 text-emerald-600" />Knowledge Gate</div>
+        <div className="border-b border-slate-100 px-5 py-4"><div className="flex items-center gap-2 font-semibold text-slate-900"><BrandMark iconClass="size-5 text-emerald-600" /></div>
           <div className="mt-1 truncate text-sm text-slate-600">{me.school?.name}</div><div className="font-mono text-xs text-slate-500">{me.school?.code}</div></div>
         <nav className="space-y-1 p-3" aria-label="School">
           {NAV.map(({ href, label, icon: Icon, exact }) => {

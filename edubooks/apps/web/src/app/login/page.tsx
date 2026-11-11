@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { BookOpen, Building2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { homeFor, Me } from '@/lib/session';
+import { BrandMark, useBranding } from '@/lib/branding';
 import { Button, ErrorBox, Field, Input } from '@/components/ui';
 
 function LoginForm() {
@@ -41,14 +42,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
-      <div className="hidden lg:flex flex-col justify-between bg-gradient-to-br from-brand-700 via-brand-600 to-fuchsia-600 p-12 text-white">
-        <div className="flex items-center gap-2 text-lg font-semibold"><BookOpen className="size-6" /> Knowledge Gate</div>
-        <div>
-          <h1 className="text-4xl font-bold leading-tight">Books, licences and learning — in one place.</h1>
-          <p className="mt-4 max-w-md text-brand-100">Publish complete book packages, issue school licences, and give teachers and children a joyful digital classroom.</p>
-        </div>
-        <p className="text-sm text-brand-100 flex items-center gap-2"><Building2 className="size-4" /> Multi-school · secure · AI-assisted</p>
-      </div>
+      <BrandPanel />
       <div className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <h2 className="text-2xl font-semibold text-slate-900">Sign in</h2>
@@ -59,3 +53,18 @@ export default function LoginPage() {
     </main>
   );
 }
+
+function BrandPanel() {
+  const b = useBranding();
+  return (
+    <div className="hidden lg:flex flex-col justify-between bg-gradient-to-br from-brand-800 via-brand-700 to-brand-600 p-12 text-white">
+      <BrandMark className="text-lg font-semibold" iconClass="size-6" logoClass="h-12 w-auto max-w-[14rem] rounded-xl bg-white/95 object-contain p-1.5" />
+      <div>
+        <h1 className="text-4xl font-bold leading-tight">{b.tagline}</h1>
+        <p className="mt-4 max-w-md text-white/85">Complete book packages, school licences, and a joyful digital classroom for teachers, children and parents.</p>
+      </div>
+      <p className="flex items-center gap-2 text-sm text-white/85"><Building2 className="size-4" /> Multi-school · secure · AI-assisted</p>
+    </div>
+  );
+}
+

@@ -3,11 +3,12 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle } from 'lucide-react';
+import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle, Palette } from 'lucide-react';
 import { api } from '@/lib/api';
 import { isPublisherStaff, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
 import { NotificationBell } from '@/components/notifications';
+import { BrandMark } from '@/lib/branding';
 
 const A = 'PUBLISHER_ADMIN', E = 'PUBLISHER_EDITOR', S = 'PUBLISHER_SALES';
 const NAV = [
@@ -23,6 +24,7 @@ const NAV = [
   { href: '/admin/calendar', label: 'Academic Calendar', icon: CalendarDays, roles: [A, E, S] },
   { href: '/admin/audit', label: 'Audit Log', icon: ScrollText, roles: [A, E, S] },
   { href: '/admin/messages', label: 'Messages', icon: MessageCircle, roles: [A] },
+  { href: '/admin/branding', label: 'Branding', icon: Palette, roles: [A] },
   { href: '/admin/updates', label: 'Updates', icon: RefreshCw, roles: [A] },
 ];
 const NEXT: { label: string; icon: typeof BookOpen }[] = [];
@@ -40,7 +42,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="min-h-screen lg:flex">
       <aside className={cn('fixed inset-y-0 left-0 z-40 w-64 transform border-r border-slate-200 bg-white transition-transform lg:static lg:translate-x-0', open ? 'translate-x-0' : '-translate-x-full')}>
-        <div className="flex h-16 items-center gap-2 border-b border-slate-100 px-5 font-semibold text-slate-900"><BookOpen className="size-5 shrink-0 text-brand-600" /> <span className="whitespace-nowrap">Knowledge Gate</span> <span className="text-xs font-normal text-slate-500">Publisher</span></div>
+        <div className="flex h-16 items-center gap-2 border-b border-slate-100 px-5 font-semibold text-slate-900"><BrandMark textClass="whitespace-nowrap" /> <span className="text-xs font-normal text-slate-500">Publisher</span></div>
         <nav className="space-y-1 p-3" aria-label="Main">
           {NAV.filter((n) => n.roles.some((r) => me.roles.includes(r))).map(({ href, label, icon: Icon, exact }) => {
             const active = exact ? path === href : path.startsWith(href);
