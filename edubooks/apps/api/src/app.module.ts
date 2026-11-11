@@ -15,6 +15,7 @@ import { SchoolAdminModule } from './school-admin/school-admin.module';
 import { LmsModule } from './lms/lms.module';
 import { AiModule } from './ai/ai.module';
 import { GamesModule } from './games/games.module';
+import { HealthController } from './health/health.controller';
 import { TenantInterceptor } from './common/tenant.interceptor';
 import { AllExceptionsFilter } from './common/pg-exception.filter';
 
@@ -24,6 +25,7 @@ import { AllExceptionsFilter } from './common/pg-exception.filter';
     DbModule, AuditModule, AuthModule, StorageModule, CatalogModule, PublishingModule,
     CommerceModule, LicensingModule, SchoolsModule, SchoolAdminModule, LmsModule, AiModule, GamesModule,
   ],
+  controllers: [HealthController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },

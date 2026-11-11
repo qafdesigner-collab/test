@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 import { DbService, TenantCtx } from '../db/db.service';
@@ -15,7 +15,14 @@ export class AuthService {
   async login(schoolCode: string | undefined, username: string, password: string, ip?: string, userAgent?: string) {
     const { rows } = await this.db.root.execute(sql`SELECT * FROM auth_find_login(${schoolCode?.trim() || ''}, ${username.trim()})`);
     const u = rows.length === 1 ? (rows[0] as any) : null;
+    const lockedFor = (until: Date) => new HttpException(`Too many wrong passwords. This account is locked — try again in ${Math.max(1, Math.ceil((until.getTime() - Date.now()) / 60_000))} minute(s), or ask your school admin to reset the password.`, HttpStatus.TOO_MANY_REQUESTS);
+    if (u?.locked_until && new Date(u.locked_until) > new Date()) { await dummyHash(); throw lockedFor(new Date(u.locked_until)); }
     const ok = await verifyPassword(u?.password_hash ?? (await dummyHash()), password);
+    if (u) {
+      const { rows: r } = await this.db.root.execute(sql`SELECT auth_login_result(${u.user_id}, ${ok}) AS until`);
+      const until = (r[0] as any).until;
+      if (!ok && until) throw lockedFor(new Date(until));
+    }
     if (!u || !ok) throw new UnauthorizedException('Wrong school code, username or password');
     if (u.school_id && u.school_status !== 'ACTIVE') throw new ForbiddenException('This school account is suspended. Please contact the publisher.');
     if (u.user_status !== 'ACTIVE') throw new ForbiddenException('This account is not active.');

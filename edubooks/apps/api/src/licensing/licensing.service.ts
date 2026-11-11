@@ -23,7 +23,9 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
   // ---------- automatic expiry ----------
   onModuleInit() {
     if (process.env.NODE_ENV === 'test' || process.env.DISABLE_JOBS === '1') return;
-    const run = () => this.expireNow().catch((e) => this.log.error(`expiry job failed: ${e.message}`));
+    const run = () => this.expireNow()
+      .then(() => this.db.root.execute(sql`SELECT purge_sessions()`))
+      .catch((e) => this.log.error(`maintenance job failed: ${e.message}`));
     run();
     this.timer = setInterval(run, Number(process.env.EXPIRY_JOB_MINUTES || 60) * 60_000);
   }

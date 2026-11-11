@@ -4,6 +4,7 @@ import { createHash } from 'crypto';
 import { sql } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
 import { IS_PUBLIC, ROLES } from '../common/decorators';
+import { config } from '../config';
 
 export const SESSION_COOKIE = 'eb_session';
 export const hashToken = (t: string) => createHash('sha256').update(t).digest();
@@ -18,7 +19,7 @@ export class AuthGuard implements CanActivate {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, [context.getHandler(), context.getClass()]);
     const token: string | undefined = req.cookies?.[SESSION_COOKIE];
     if (token && token.length < 200) {
-      const { rows } = await this.db.root.execute(sql`SELECT * FROM auth_session(${hashToken(token)})`);
+      const { rows } = await this.db.root.execute(sql`SELECT * FROM auth_session(${hashToken(token)}, ${config.sessionIdleMinutes})`);
       const s = rows[0] as any;
       if (s) {
         req.me = s;

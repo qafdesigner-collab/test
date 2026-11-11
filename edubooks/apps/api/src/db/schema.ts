@@ -62,6 +62,8 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   status: accountStatusEnum('status').notNull().default('ACTIVE'),
   mustChangePassword: boolean('must_change_password').notNull().default(false),
+  failedLogins: integer('failed_logins').notNull().default(0),
+  lockedUntil: timestamp('locked_until', { withTimezone: true }),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),

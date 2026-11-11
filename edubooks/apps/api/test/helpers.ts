@@ -11,7 +11,7 @@ export async function createApp() {
   await runMigrations();
   await seed(undefined, { reset: true, quiet: true });
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  const app = configureApp(mod.createNestApplication());
+  const app = configureApp(mod.createNestApplication({ bodyParser: false }));
   await app.init();
   return app;
 }

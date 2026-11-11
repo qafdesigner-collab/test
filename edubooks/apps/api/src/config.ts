@@ -24,6 +24,11 @@ export const config = {
   fileUrlTtlSec: Number(env('FILE_URL_TTL_SEC', '300')),
   cookieSecure: env('COOKIE_SECURE', '0') === '1',
   sessionTtlHours: Number(env('SESSION_TTL_HOURS', '168')),
+  /** Sessions end after this much inactivity (minutes). */
+  sessionIdleMinutes: Number(env('SESSION_IDLE_MINUTES', '720')),
+  production: process.env.NODE_ENV === 'production',
+  apiDocs: (process.env.ENABLE_API_DOCS ?? (process.env.NODE_ENV === 'production' ? '0' : '1')) === '1',
+  logFormat: (process.env.LOG_FORMAT ?? (process.env.NODE_ENV === 'production' ? 'json' : 'pretty')) as 'json' | 'pretty',
   storageDriver: env('STORAGE_DRIVER', 'local') as 'local' | 's3',
   storageDir: path.resolve(env('STORAGE_DIR', path.resolve(__dirname, '..', 'storage'))),
   s3: {

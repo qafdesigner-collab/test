@@ -25,6 +25,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (hit) {
       return res.status(hit[0]).json({ statusCode: hit[0], message: hit[1], detail: pg.constraint || pg.detail });
     }
+    // body-parser errors (oversized / malformed bodies) carry a safe 4xx status.
+    if (err?.expose && err.status >= 400 && err.status < 500) {
+      const message = err.type === 'entity.too.large' ? 'Request is too large.' : err.type === 'entity.parse.failed' ? 'Malformed request body.' : 'Bad request.';
+      return res.status(err.status).json({ statusCode: err.status, message });
+    }
     if (err?.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ statusCode: 413, message: 'File is too large.' });
     this.log.error(`${err?.cause?.message ? `[${err.cause.code}] ${err.cause.message} — ` : ''}${String(err?.message).slice(0, 300)}`, err?.stack);
     return res.status(500).json({ statusCode: 500, message: 'Unexpected server error' });

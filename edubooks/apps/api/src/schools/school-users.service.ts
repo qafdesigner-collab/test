@@ -101,7 +101,7 @@ export class SchoolUsersService {
   async resetPassword(schoolId: string, id: string) {
     const u = await this.user(schoolId, id);
     const password = friendlyPassword();
-    await this.q.update(users).set({ passwordHash: await hashPassword(password), updatedAt: new Date() }).where(eq(users.id, id));
+    await this.q.update(users).set({ passwordHash: await hashPassword(password), failedLogins: 0, lockedUntil: null, updatedAt: new Date() }).where(eq(users.id, id));
     await this.q.update(sessions).set({ revokedAt: new Date() }).where(and(eq(sessions.userId, id), sql`revoked_at IS NULL`));
     await this.audit.log('school.user.reset_password', 'user', id, `Reset password of ${u.username}`, undefined, undefined, schoolId);
     return { username: u.username, password };
