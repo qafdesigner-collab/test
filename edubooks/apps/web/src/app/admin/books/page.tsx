@@ -6,11 +6,12 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { Library, Plus, Search } from 'lucide-react';
 import { api, fmtDate, qs } from '@/lib/api';
 import { COVER_COLORS, useGrades, useSubjects } from '@/lib/catalog';
+import { CurriculumGradePicker, CurriculumSelect, GradeOptions } from '@/components/curriculum';
 import { Badge, Button, Card, Dialog, EmptyState, ErrorBox, Field, Input, Pagination, Select, Spinner, StatusBadge, Textarea, cn } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 
 function NewPackageDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const grades = useGrades(); const subjects = useSubjects(); const router = useRouter(); const toast = useToast(); const qc = useQueryClient();
+  const subjects = useSubjects(); const router = useRouter(); const toast = useToast(); const qc = useQueryClient();
   const year = new Date().getFullYear();
   const [f, setF] = useState({ title: '', gradeId: '', subjectId: '', description: '', coverColor: COVER_COLORS[0], editionLabel: `${year} Edition`, editionYear: year, standardStructure: true, parts: 3 });
   const m = useMutation({
@@ -22,7 +23,9 @@ function NewPackageDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
         <Field label="Title"><Input required minLength={2} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="KG English" autoFocus /></Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Grade"><Select required value={f.gradeId} onChange={(e) => setF({ ...f, gradeId: e.target.value })}><option value="">Select…</option>{grades.data?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</Select></Field>
+        </div>
+        <CurriculumGradePicker required gradeId={f.gradeId} onChange={(gradeId) => setF({ ...f, gradeId })} />
+        <div className="grid grid-cols-2 gap-3">
           <Field label="Subject"><Select required value={f.subjectId} onChange={(e) => setF({ ...f, subjectId: e.target.value })}><option value="">Select…</option>{subjects.data?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></Field>
         </div>
         <Field label="Description"><Textarea rows={2} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
@@ -52,7 +55,7 @@ function NewPackageDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
 function BooksPage() {
   const params = useSearchParams(); const router = useRouter();
   const grades = useGrades(); const subjects = useSubjects();
-  const [filters, setFilters] = useState({ search: '', gradeId: '', subjectId: '', status: '', page: 1 });
+  const [filters, setFilters] = useState({ search: '', curriculumId: '', gradeId: '', subjectId: '', status: '', page: 1 });
   const [search, setSearch] = useState('');
   const [newOpen, setNewOpen] = useState(params.get('new') === '1');
   useEffect(() => { const t = setTimeout(() => setFilters((f) => ({ ...f, search, page: 1 })), 300); return () => clearTimeout(t); }, [search]);
@@ -67,7 +70,9 @@ function BooksPage() {
       <Card className="flex flex-wrap gap-3 p-4">
         <div className="relative min-w-56 flex-1"><Search className="pointer-events-none absolute left-3 top-3 size-4 text-slate-500" />
           <Input aria-label="Search" placeholder="Search title or description…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-        <Select aria-label="Grade" className="w-40" value={filters.gradeId} onChange={setF('gradeId')}><option value="">All grades</option>{grades.data?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</Select>
+        <CurriculumSelect className="w-52" value={filters.curriculumId} onChange={(v) => setFilters({ ...filters, curriculumId: v, gradeId: '', page: 1 })} />
+        <Select aria-label="Grade" className="w-40" value={filters.gradeId} onChange={setF('gradeId')} disabled={!filters.curriculumId}><option value="">{filters.curriculumId ? 'All grades' : 'Grade: pick a curriculum'}</option>
+          <GradeOptions grades={(grades.data ?? []).filter((g) => g.curriculumId === filters.curriculumId)} /></Select>
         <Select aria-label="Subject" className="w-48" value={filters.subjectId} onChange={setF('subjectId')}><option value="">All subjects</option>{subjects.data?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select>
         <Select aria-label="Status" className="w-40" value={filters.status} onChange={setF('status')}><option value="">Any status</option><option value="DRAFT">Draft</option><option value="PUBLISHED">Published</option><option value="ARCHIVED">Archived</option></Select>
         {q.isFetching && <Spinner className="self-center" />}
@@ -83,7 +88,7 @@ function BooksPage() {
                   <span className="text-lg font-semibold drop-shadow-sm">{p.title}</span><StatusBadge status={p.status} />
                 </div>
                 <div className="space-y-2 p-4">
-                  <div className="flex flex-wrap gap-1.5"><Badge>{p.grade.name}</Badge><Badge tone="info">{p.subject.name}</Badge></div>
+                  <div className="flex flex-wrap gap-1.5"><Badge>{p.curriculum} · {p.grade.name}</Badge><Badge tone="info">{p.subject.name}</Badge></div>
                   <p className="line-clamp-2 min-h-10 text-sm text-slate-500">{p.description || 'No description'}</p>
                   <div className="flex justify-between text-xs text-slate-500">
                     <span>{p.latestEdition} · {p.editionCount} edition{p.editionCount === 1 ? '' : 's'} · {p.resourceCount} resources</span><span>{fmtDate(p.updatedAt).split(',')[0]}</span>

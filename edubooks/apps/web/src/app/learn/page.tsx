@@ -6,6 +6,7 @@ import { useMe } from '@/lib/session';
 import { PageLoader } from '@/components/ui';
 import { Mascot } from '@/components/games/mascot';
 import { GameCard } from '@/components/games/cards';
+import { UpcomingEvents } from '@/components/calendar';
 
 const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
 
@@ -21,6 +22,7 @@ export default function LearnHome() {
         <h1 className="sr-only">Home</h1>
         <Mascot say={`${greet()}, ${first}! ${tip}`} size={110} />
       </section>
+      <UpcomingEvents playful limit={4} days={60} />
 
       {h.continueReading && (
         <Link href={`/read/${h.continueReading.editionId}?component=${h.continueReading.componentId}&page=${h.continueReading.page}`}

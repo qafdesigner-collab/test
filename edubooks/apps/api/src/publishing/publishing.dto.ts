@@ -14,6 +14,7 @@ export const STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'] as const;
 export class PackageQuery extends PageQuery {
   @IsOptional() @IsString() @MaxLength(100) search?: string;
   @IsOptional() @IsUUID() gradeId?: string;
+  @IsOptional() @IsUUID() curriculumId?: string;
   @IsOptional() @IsUUID() subjectId?: string;
   @IsOptional() @IsIn(STATUSES) status?: (typeof STATUSES)[number];
 }

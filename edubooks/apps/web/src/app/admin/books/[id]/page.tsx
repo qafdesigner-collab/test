@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Archive, ArchiveRestore, ArrowLeft, CopyPlus, Pencil, Rocket, Trash2 } from 'lucide-react';
 import { api, fmtDate } from '@/lib/api';
 import { COVER_COLORS, useGrades, useSubjects } from '@/lib/catalog';
+import { CurriculumGradePicker } from '@/components/curriculum';
 import { Badge, Button, Confirm, Dialog, ErrorBox, Field, Input, PageLoader, Select, StatusBadge, Tabs, Textarea, cn } from '@/components/ui';
 import { EditionTree, HistoryTab, LockBanner, ResourcesTab, StructureTab, useBuilderMutation } from '@/components/builder';
 
@@ -49,7 +50,7 @@ export default function PackageBuilder({ params }: { params: Promise<{ id: strin
           <div className="grid size-14 place-items-center rounded-xl text-xl font-bold text-white" style={{ background: p.coverColor }} aria-hidden>{p.title.slice(0, 2).toUpperCase()}</div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold text-slate-900">{p.title}</h1><StatusBadge status={p.status} /></div>
-            <div className="mt-1 flex flex-wrap gap-1.5"><Badge>{p.gradeName}</Badge><Badge tone="info">{p.subjectName}</Badge>
+            <div className="mt-1 flex flex-wrap gap-1.5"><Badge>{p.curriculumName} · {p.gradeName}</Badge><Badge tone="info">{p.subjectName}</Badge>
               <span className="text-xs text-slate-500">Updated {fmtDate(p.updatedAt)}</span></div>
             {p.description && <p className="mt-2 max-w-3xl text-sm text-slate-600">{p.description}</p>}
           </div>
@@ -105,7 +106,7 @@ export default function PackageBuilder({ params }: { params: Promise<{ id: strin
 }
 
 function DetailsDialog({ p, onClose }: { p: any; onClose: () => void }) {
-  const grades = useGrades(); const subjects = useSubjects();
+  const subjects = useSubjects();
   const [f, setF] = useState({ title: p.title, gradeId: p.gradeId, subjectId: p.subjectId, description: p.description, coverColor: p.coverColor });
   const m = useBuilderMutation(() => api.patch(`/publishing/packages/${p.id}`, f), 'Details saved', onClose);
   return (
@@ -113,7 +114,9 @@ function DetailsDialog({ p, onClose }: { p: any; onClose: () => void }) {
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); m.mutate(undefined); }}>
         <Field label="Title"><Input required minLength={2} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Grade"><Select value={f.gradeId} onChange={(e) => setF({ ...f, gradeId: e.target.value })}>{grades.data?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</Select></Field>
+        </div>
+        <CurriculumGradePicker required gradeId={f.gradeId} onChange={(gradeId) => setF({ ...f, gradeId })} />
+        <div className="grid grid-cols-2 gap-3">
           <Field label="Subject"><Select value={f.subjectId} onChange={(e) => setF({ ...f, subjectId: e.target.value })}>{subjects.data?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></Field>
         </div>
         <Field label="Description"><Textarea rows={3} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>

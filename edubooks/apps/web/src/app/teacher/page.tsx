@@ -7,6 +7,7 @@ import { className, KIND_LABEL, useMyBooks, useMyClasses } from '@/lib/lms';
 import { useMe } from '@/lib/session';
 import { Badge, Card, PageLoader } from '@/components/ui';
 import { PageHeader, Stat, Status } from '@/components/common';
+import { UpcomingEvents } from '@/components/calendar';
 
 export default function TeacherHome() {
   const { data: me } = useMe(); const classes = useMyClasses(); const books = useMyBooks();
@@ -20,6 +21,7 @@ export default function TeacherHome() {
         <Link href="/teacher/plans/new" className="focus-ring inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50"><NotebookPen className="size-4" />New lesson plan</Link>
         <Link href="/teacher/assessments/new" className="focus-ring inline-flex h-10 items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700"><Plus className="size-4" />New homework</Link>
       </PageHeader>
+      <UpcomingEvents />
       <div className="grid gap-4 sm:grid-cols-4">
         <Stat label="My classes" value={classes.data.length} /><Stat label="My books" value={books.data.length} />
         <Stat label="To mark" value={toGrade} tone={toGrade ? 'amber' : 'slate'} sub="written answers waiting" /><Stat label="Lesson plans" value={plans.data?.length ?? '…'} />

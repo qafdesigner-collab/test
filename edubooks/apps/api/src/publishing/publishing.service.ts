@@ -50,13 +50,15 @@ export class PublishingService {
     const w: SQL[] = [];
     if (f.search) w.push(or(ilike(bookPackages.title, `%${f.search}%`), ilike(bookPackages.description, `%${f.search}%`))!);
     if (f.gradeId) w.push(eq(bookPackages.gradeId, f.gradeId));
+    if (f.curriculumId) w.push(sql`${bookPackages.gradeId} IN (SELECT g.id FROM grades g WHERE g.curriculum_id = ${f.curriculumId})`);
     if (f.subjectId) w.push(eq(bookPackages.subjectId, f.subjectId));
     if (f.status) w.push(eq(bookPackages.status, f.status));
     const where = w.length ? and(...w) : undefined;
     const items = await this.q.select({
       id: bookPackages.id, title: bookPackages.title, slug: bookPackages.slug, status: bookPackages.status, coverColor: bookPackages.coverColor,
       description: bookPackages.description, updatedAt: bookPackages.updatedAt,
-      grade: { id: grades.id, name: grades.name }, subject: { id: subjects.id, name: subjects.name, color: subjects.color },
+      grade: { id: grades.id, name: grades.name, stage: grades.stage },
+      curriculum: sql<string>`(SELECT c.name FROM curricula c WHERE c.id = ${qc(grades.curriculumId)})`, subject: { id: subjects.id, name: subjects.name, color: subjects.color },
       editionCount: sql<number>`(SELECT count(*)::int FROM ${bookEditions} e WHERE e.package_id = ${qc(bookPackages.id)})`,
       latestEdition: sql<string | null>`(SELECT e.label FROM ${bookEditions} e WHERE e.package_id = ${qc(bookPackages.id)} ORDER BY e.edition_year DESC, e.created_at DESC LIMIT 1)`,
       resourceCount: sql<number>`(SELECT count(*)::int FROM ${teachingResources} r JOIN ${bookEditions} e ON e.id = r.edition_id WHERE e.package_id = ${qc(bookPackages.id)})`,
@@ -96,6 +98,7 @@ export class PublishingService {
       id: bookPackages.id, title: bookPackages.title, slug: bookPackages.slug, status: bookPackages.status, description: bookPackages.description,
       coverColor: bookPackages.coverColor, createdAt: bookPackages.createdAt, updatedAt: bookPackages.updatedAt,
       gradeId: bookPackages.gradeId, subjectId: bookPackages.subjectId, gradeName: grades.name, subjectName: subjects.name,
+      curriculumName: sql<string>`(SELECT c.name FROM curricula c WHERE c.id = ${qc(grades.curriculumId)})`,
     }).from(bookPackages).innerJoin(grades, eq(grades.id, bookPackages.gradeId)).innerJoin(subjects, eq(subjects.id, bookPackages.subjectId))
       .where(eq(bookPackages.id, id));
     if (!pkg) throw new NotFoundException('Book package not found');

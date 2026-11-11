@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Boxes, Package, Plus } from 'lucide-react';
 import { api, fmtMoney, qs } from '@/lib/api';
-import { useGrades } from '@/lib/catalog';
+import { CurriculumGradePicker } from '@/components/curriculum';
 import { hasRole, useMe } from '@/lib/session';
 import { useAction } from '@/lib/hooks';
 import { Badge, Button, Dialog, EmptyState, ErrorBox, Field, Input, PageLoader, Select, Textarea } from '@/components/ui';
@@ -13,7 +13,7 @@ import { PageHeader, Table, Td } from '@/components/common';
 import { EditionPicker } from '@/components/edition-picker';
 
 function NewProduct({ onClose }: { onClose: () => void }) {
-  const grades = useGrades(); const router = useRouter();
+  const router = useRouter();
   const [f, setF] = useState({ kind: 'BUNDLE' as 'SINGLE' | 'BUNDLE', sku: '', name: '', gradeId: '', description: '', price: '', currency: 'PKR', editionIds: [] as string[] });
   const m = useAction(() => api.post('/commerce/products', { ...f, gradeId: f.gradeId || undefined, price: undefined, priceMinor: f.price === '' ? undefined : Math.round(Number(f.price) * 100) }),
     { ok: 'Product created as a draft version', keys: ['products'], after: (r) => router.push(`/admin/products/${r.id}`) });
@@ -31,7 +31,7 @@ function NewProduct({ onClose }: { onClose: () => void }) {
         </div>
         <Field label={f.kind === 'SINGLE' ? 'Book edition' : 'Books in the bundle'}><EditionPicker single={f.kind === 'SINGLE'} value={f.editionIds} onChange={(editionIds) => setF({ ...f, editionIds })} /></Field>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Grade"><Select value={f.gradeId} onChange={(e) => setF({ ...f, gradeId: e.target.value })}><option value="">—</option>{grades.data?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</Select></Field>
+          <div className="sm:col-span-2"><CurriculumGradePicker allowEmpty gradeId={f.gradeId} onChange={(gradeId) => setF({ ...f, gradeId })} /></div>
           <Field label="Price per student seat" hint="Optional"><Input type="number" min={0} step="0.01" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></Field>
           <Field label="Currency"><Input maxLength={3} value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value.toUpperCase() })} /></Field>
         </div>

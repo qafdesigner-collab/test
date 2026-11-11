@@ -9,6 +9,7 @@ import { useAction } from '@/lib/hooks';
 import { Badge, Button, Card, Confirm, Dialog, ErrorBox, Field, Input, PageLoader, Select, Tabs } from '@/components/ui';
 import { CredentialsDialog, Stat, Status, Table, Td } from '@/components/common';
 import { PoolsTable, PublisherPoolDialog } from '@/components/pools';
+import { CurriculumSelect } from '@/components/curriculum';
 
 function YearDialog({ schoolId, onClose }: { schoolId: string; onClose: () => void }) {
   const y = new Date().getMonth() >= 7 ? new Date().getFullYear() : new Date().getFullYear() - 1;
@@ -63,6 +64,7 @@ export default function SchoolPage({ params }: { params: Promise<{ id: string }>
   const status = useAction((s: 'suspend' | 'reactivate') => api.post(`/schools/${id}/${s}`, {}), { ok: 'Saved', keys, after: () => setDlg('') });
   const convert = useAction(() => api.post(`/schools/${id}/convert-demo`), { ok: 'Now a customer school', keys, after: () => setDlg('') });
   const extend = useAction(() => api.post(`/schools/${id}/extend-demo`, { days: 7 }), { ok: 'Demo extended by 7 days', keys });
+  const setCurriculum = useAction((curriculumId: string) => api.patch(`/schools/${id}`, { curriculumId: curriculumId || null }), { ok: 'Curriculum saved', keys });
   const reset = useAction((userId: string) => api.post(`/schools/${id}/admins/${userId}/reset-password`), { after: (r) => setCreds([{ displayName: 'School admin', ...r }]) });
   if (q.isLoading) return <PageLoader />;
   if (q.error) return <ErrorBox error={q.error} />;
@@ -75,6 +77,8 @@ export default function SchoolPage({ params }: { params: Promise<{ id: string }>
           <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold text-slate-900">{s.name}</h1><Status s={s.status} />
             {s.isDemo && <Badge tone="info">Demo · {daysLeft(s.demoExpiresAt) < 0 ? 'expired' : `ends ${fmtDay(s.demoExpiresAt)}`}</Badge>}</div>
           <p className="text-sm text-slate-500">Code <b className="font-mono text-slate-700">{s.code}</b>{s.city && ` · ${s.city}`}{s.phone && ` · ${s.phone}`}</p>
+          <div className="mt-1 flex items-center gap-2 text-sm text-slate-600"><span>Curriculum</span>
+            {isAdmin ? <CurriculumSelect className="h-8 w-60 py-0 text-sm" emptyLabel="Not set" value={s.curriculumId ?? ''} onChange={(v) => setCurriculum.mutate(v)} /> : <b>{s.curriculumName ?? 'Not set'}</b>}</div>
           <p className="text-sm text-slate-500">{s.counts.TEACHER ?? 0} teachers · {s.counts.STUDENT ?? 0} students · {s.counts.SCHOOL_ADMIN ?? 0} admins</p>
         </div>
         <div className="flex flex-wrap gap-2">

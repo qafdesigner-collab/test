@@ -10,13 +10,13 @@ const BASE = process.argv[2] || process.env.WEB_URL || 'http://localhost:3000';
 const ROLES = [
   { name: 'anonymous', pages: ['/login'] },
   { name: 'publisher', login: { username: 'admin', password: 'Admin@12345' },
-    pages: ['/admin', '/admin/books', '/admin/books/:id', '/admin/catalog', '/admin/products', '/admin/products/:id', '/admin/schools', '/admin/schools/:id',
+    pages: ['/admin', '/admin/books', '/admin/books/:id', '/admin/catalog', '/admin/calendar', '/admin/products', '/admin/products/:id', '/admin/schools', '/admin/schools/:id',
       '/admin/orders', '/admin/orders/:id', '/admin/licences', '/admin/games', '/admin/games/:id', '/admin/ai', '/admin/audit'] },
   { name: 'school admin', login: { schoolCode: 'SUN01', username: 'principal', password: 'School@12345' },
-    pages: ['/school', '/school/licences', '/school/licences/:id', '/school/teachers', '/school/students', '/school/classes', '/school/classes/:id', '/school/classes/:id/gradebook', '/school/transfers'] },
+    pages: ['/school', '/school/licences', '/school/licences/:id', '/school/teachers', '/school/students', '/school/classes', '/school/classes/:id', '/school/classes/:id/gradebook', '/school/transfers', '/school/calendar'] },
   { name: 'teacher', login: { schoolCode: 'SUN01', username: 'teacher1', password: 'Teacher@12345' },
     pages: ['/teacher', '/teacher/books', '/read/:id', '/teacher/classes', '/teacher/classes/:id', '/teacher/plans', '/teacher/plans/:id', '/teacher/assessments', '/teacher/assessments/:id',
-      '/teacher/questions', '/teacher/games', '/teacher/games/:id', '/teacher/ai'] },
+      '/teacher/questions', '/teacher/games', '/teacher/games/:id', '/teacher/ai', '/teacher/calendar'] },
   { name: 'student', login: { schoolCode: 'SUN01', username: 'student1', password: 'Student@123' },
     pages: ['/learn', '/learn/books', '/learn/games', '/learn/games/:id', '/homework/:id', '/learn/me'] },
 ];

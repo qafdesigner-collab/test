@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw } from 'lucide-react';
+import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays } from 'lucide-react';
 import { api } from '@/lib/api';
 import { isPublisherStaff, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
@@ -18,7 +18,8 @@ const NAV = [
   { href: '/admin/licences', label: 'Licences', icon: KeyRound, roles: [A, E, S] },
   { href: '/admin/games', label: 'Game Library', icon: Gamepad2, roles: [A, E] },
   { href: '/admin/ai', label: 'AI Assistant', icon: Sparkles, roles: [A, E, S] },
-  { href: '/admin/catalog', label: 'Grades & Subjects', icon: Tags, roles: [A, E] },
+  { href: '/admin/catalog', label: 'Curricula & Grades', icon: Tags, roles: [A, E] },
+  { href: '/admin/calendar', label: 'Academic Calendar', icon: CalendarDays, roles: [A, E, S] },
   { href: '/admin/audit', label: 'Audit Log', icon: ScrollText, roles: [A, E, S] },
   { href: '/admin/updates', label: 'Updates', icon: RefreshCw, roles: [A] },
 ];

@@ -7,6 +7,7 @@ import { api, daysLeft, fmtDay } from '@/lib/api';
 import { useAction } from '@/lib/hooks';
 import { Badge, Button, Card, Dialog, ErrorBox, Field, Input, PageLoader } from '@/components/ui';
 import { PageHeader, SeatBar, Stat } from '@/components/common';
+import { UpcomingEvents } from '@/components/calendar';
 
 export default function SchoolOverview() {
   const q = useQuery({ queryKey: ['schoolOverview'], queryFn: () => api.get('/school/overview') });
@@ -22,6 +23,7 @@ export default function SchoolOverview() {
       <PageHeader title={s.name} sub={[s.city, s.phone, s.address].filter(Boolean).join(' · ') || 'Add your contact details'}>
         <Button variant="secondary" onClick={() => setEdit({ city: s.city ?? '', phone: s.phone ?? '', address: s.address ?? '' })}><Pencil className="size-4" />Edit contact details</Button>
       </PageHeader>
+      <UpcomingEvents />
       {s.isDemo && <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800">This is a <b>demo school</b>. It stops working on {fmtDay(s.demoExpiresAt)} ({daysLeft(s.demoExpiresAt)} days left).</div>}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Students" value={q.data.students} sub={`${L.students.assigned} with a book licence`} />

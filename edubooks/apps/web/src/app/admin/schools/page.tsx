@@ -6,13 +6,14 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Building2, Plus, Sparkles } from 'lucide-react';
 import { api, daysLeft, qs } from '@/lib/api';
 import { useAction } from '@/lib/hooks';
+import { CurriculumSelect } from '@/components/curriculum';
 import { Badge, Button, Dialog, EmptyState, ErrorBox, Field, Input, PageLoader, Pagination, Select } from '@/components/ui';
 import { CredentialsDialog, PageHeader, SeatBar, Status, Table, Td } from '@/components/common';
 
 function NewSchool({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const [f, setF] = useState({ name: '', code: '', city: '', phone: '', address: '', adminName: 'Principal', adminUsername: 'principal', adminPassword: '' });
-  const m = useAction(() => api.post('/schools', f), { ok: 'School registered', keys: ['schools'], after: (r) => router.push(`/admin/schools/${r.id}`) });
+  const [f, setF] = useState({ name: '', code: '', city: '', phone: '', address: '', curriculumId: '', adminName: 'Principal', adminUsername: 'principal', adminPassword: '' });
+  const m = useAction(() => api.post('/schools', { ...f, curriculumId: f.curriculumId || undefined }), { ok: 'School registered', keys: ['schools'], after: (r) => router.push(`/admin/schools/${r.id}`) });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   return (
     <Dialog open onOpenChange={onClose} title="Register a school" description="Creates the school, its unique school code and its first School Admin account.">
@@ -21,6 +22,7 @@ function NewSchool({ onClose }: { onClose: () => void }) {
         <div className="grid grid-cols-2 gap-3"><Field label="School code" hint="Used at login, e.g. SUN01"><Input required pattern="[A-Za-z0-9\-]{3,20}" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase() })} /></Field>
           <Field label="City"><Input value={f.city} onChange={set('city')} /></Field></div>
         <div className="grid grid-cols-2 gap-3"><Field label="Phone"><Input value={f.phone} onChange={set('phone')} /></Field><Field label="Address"><Input value={f.address} onChange={set('address')} /></Field></div>
+        <Field label="Curriculum" hint="Decides which grades the school sees for its classes"><CurriculumSelect className="w-full" emptyLabel="Not set" value={f.curriculumId} onChange={(v) => setF({ ...f, curriculumId: v })} /></Field>
         <fieldset className="space-y-3 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-medium text-slate-700">First School Admin</legend>
           <div className="grid grid-cols-2 gap-3"><Field label="Name"><Input required value={f.adminName} onChange={set('adminName')} /></Field><Field label="Username"><Input required value={f.adminUsername} onChange={(e) => setF({ ...f, adminUsername: e.target.value.toLowerCase() })} /></Field></div>
           <Field label="Temporary password" hint="At least 8 characters — they will be asked to change it."><Input required minLength={8} value={f.adminPassword} onChange={set('adminPassword')} /></Field>
@@ -76,7 +78,7 @@ export default function SchoolsPage() {
           <Table head={['School', 'Code', 'People', 'Student seats in use', 'Status']}>
             {q.data.items.map((s: any) => (
               <tr key={s.id} className="hover:bg-slate-50">
-                <Td><Link className="font-medium text-slate-900 hover:text-brand-700" href={`/admin/schools/${s.id}`}>{s.name}</Link><div className="text-xs text-slate-500">{s.city}</div></Td>
+                <Td><Link className="font-medium text-slate-900 hover:text-brand-700" href={`/admin/schools/${s.id}`}>{s.name}</Link><div className="text-xs text-slate-600">{[s.city, s.curriculumName].filter(Boolean).join(' · ')}</div></Td>
                 <Td className="font-mono">{s.code}</Td><Td className="text-slate-600">{s.teachers} teacher{s.teachers === 1 ? "" : "s"} · {s.students} student{s.students === 1 ? "" : "s"}</Td>
                 <Td className="min-w-44">{s.seats ? <SeatBar assigned={s.assigned} total={s.seats} /> : <span className="text-xs text-slate-500">No active licences</span>}</Td>
                 <Td><Status s={s.status} />{s.isDemo && <Badge tone={daysLeft(s.demoExpiresAt) < 0 ? 'danger' : 'info'} className="ml-1">{daysLeft(s.demoExpiresAt) < 0 ? 'demo expired' : `demo · ${daysLeft(s.demoExpiresAt)}d left`}</Badge>}</Td>
