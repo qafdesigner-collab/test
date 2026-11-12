@@ -232,6 +232,13 @@
       "when": 1794600000000,
       "tag": "0032_login_as",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794630000000,
+      "tag": "0033_whiteboard",
+      "breakpoints": true
     }
   ]
 }

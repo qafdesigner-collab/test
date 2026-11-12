@@ -8,6 +8,7 @@ import { Mascot } from '@/components/games/mascot';
 import { GameCard } from '@/components/games/cards';
 import { UpcomingEvents } from '@/components/calendar';
 import { Announcements, LiveLessons } from '@/components/messaging';
+import { LiveBoards } from '@/components/whiteboard';
 import { Book3D, Shelf, StarPath, levelOf } from '@/components/kid-ui';
 import { useT } from '@/lib/i18n';
 
@@ -54,6 +55,8 @@ export default function LearnHome() {
               <span className="grid size-11 place-items-center rounded-xl bg-white/25 text-2xl">{g.done ? '✅' : g.emoji}</span><span className="text-lg">{g.label}</span></Link>))}</div>
         </div>
       </section>
+
+      <LiveBoards />
 
       <StarPath stars={h.stars ?? 0} />
 

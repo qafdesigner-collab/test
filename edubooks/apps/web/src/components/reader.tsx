@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft, Bookmark, BookmarkCheck, ChevronLeft, ChevronRight, ExternalLink, FileText, Maximize, Minimize, PanelLeft, Volume2, VolumeX, ZoomIn, ZoomOut,
+  ArrowLeft, Bookmark, BookmarkCheck, Presentation, ChevronLeft, ChevronRight, ExternalLink, FileText, Maximize, Minimize, PanelLeft, Volume2, VolumeX, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn, ErrorBox, PageLoader, Spinner } from '@/components/ui';
@@ -19,7 +19,7 @@ import { isSaved, offlinePdf, offlineSupported, removeBook, saveBook } from '@/l
 type PDFDoc = { numPages: number; getPage: (n: number) => Promise<any>; destroy: () => void };
 
 /** Loads pdf.js lazily (client only); the worker is served from /public. */
-async function loadPdf(src: string | ArrayBuffer): Promise<PDFDoc> {
+export async function loadPdf(src: string | ArrayBuffer): Promise<PDFDoc> {
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
   const args = typeof src === 'string' ? { url: src, withCredentials: true } : { data: new Uint8Array(src) };
@@ -176,6 +176,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
         <span className="w-10 text-center text-xs tabular-nums text-slate-500">{Math.round(zoom * 100)}%</span>
         <button className={btn} onClick={() => setZoom((z) => Math.min(3, z + 0.25))} aria-label="Zoom in"><ZoomIn className="size-5" /></button>
         <button className={btn} onClick={toggleBookmark} aria-label={mark ? 'Remove bookmark' : 'Bookmark this page'} aria-pressed={!!mark} disabled={!doc}>{mark ? <BookmarkCheck className="size-5 text-amber-500" /> : <Bookmark className="size-5" />}</button>
+        {me?.roles?.includes('TEACHER') && comp?.hasPdf && <a href={`/teacher/whiteboard?new=1&editionId=${editionId}&componentId=${comp.id}&page=${page}`} className={btn} title="Teach this page live on the whiteboard" aria-label="Teach this page on the whiteboard"><Presentation className="size-5" /></a>}
         {canEditHot && <button className={cn(btn, 'w-auto px-2 text-sm font-medium', editHot && 'bg-sky-100 text-sky-800')} onClick={() => { setEditHot(!editHot); if (!editHot) toast('Drag on the page to draw a hotspot. Click one to edit it.'); }} aria-pressed={editHot}>✏️ Hotspots</button>}
         <button className={btn} onClick={speak} aria-label={speaking ? 'Stop reading' : 'Read aloud'} disabled={!doc}>{speaking ? <VolumeX className="size-5 text-pink-600" /> : <Volume2 className="size-5" />}</button>
         </>}
