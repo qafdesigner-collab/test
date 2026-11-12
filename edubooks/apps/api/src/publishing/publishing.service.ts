@@ -24,6 +24,8 @@ const STANDARD_EXTRAS = [
   { type: 'FLASHCARDS', title: 'Flashcards' },
   { type: 'TEACHER_CARDS', title: 'Teacher Cards' },
   { type: 'DANGLERS', title: 'Danglers' },
+  { type: 'CD', title: 'CD' },
+  { type: 'MOBILE_APP', title: 'Mobile App' },
 ] as const;
 
 @Injectable()
@@ -39,7 +41,7 @@ export class PublishingService {
     const [{ resources }] = await this.q.select({ resources: count() }).from(teachingResources);
     const [{ files, bytes }] = await this.q.select({ files: count(), bytes: sql<number>`coalesce(sum(${digitalAssets.sizeBytes}),0)::bigint` }).from(digitalAssets);
     const [{ lessons }] = await this.q.select({ lessons: count() }).from(bookLessons);
-    const recent = await this.q.select({ id: bookPackages.id, title: bookPackages.title, status: bookPackages.status, updatedAt: bookPackages.updatedAt, coverColor: bookPackages.coverColor })
+    const recent = await this.q.select({ id: bookPackages.id, title: bookPackages.title, status: bookPackages.status, updatedAt: bookPackages.updatedAt, coverUrl: sql<string | null>`CASE WHEN ${bookPackages.coverVersion} IS NOT NULL THEN '/api/covers/' || ${bookPackages.id} || '?v=' || ${bookPackages.coverVersion} END`, coverColor: bookPackages.coverColor })
       .from(bookPackages).orderBy(desc(bookPackages.updatedAt)).limit(6);
     const packages = Object.fromEntries(byStatus.map((r) => [r.status, r.n]));
     return { packages: { DRAFT: 0, PUBLISHED: 0, ARCHIVED: 0, ...packages }, editions, resources, lessons, files, storageBytes: Number(bytes), recent };
@@ -55,7 +57,7 @@ export class PublishingService {
     if (f.status) w.push(eq(bookPackages.status, f.status));
     const where = w.length ? and(...w) : undefined;
     const items = await this.q.select({
-      id: bookPackages.id, title: bookPackages.title, slug: bookPackages.slug, status: bookPackages.status, coverColor: bookPackages.coverColor,
+      id: bookPackages.id, title: bookPackages.title, slug: bookPackages.slug, status: bookPackages.status, coverUrl: sql<string | null>`CASE WHEN ${bookPackages.coverVersion} IS NOT NULL THEN '/api/covers/' || ${bookPackages.id} || '?v=' || ${bookPackages.coverVersion} END`, coverColor: bookPackages.coverColor,
       description: bookPackages.description, updatedAt: bookPackages.updatedAt,
       grade: { id: grades.id, name: grades.name, stage: grades.stage },
       curriculum: sql<string>`(SELECT c.name FROM curricula c WHERE c.id = ${qc(grades.curriculumId)})`, subject: { id: subjects.id, name: subjects.name, color: subjects.color },
@@ -96,7 +98,7 @@ export class PublishingService {
   async getPackage(id: string) {
     const [pkg] = await this.q.select({
       id: bookPackages.id, title: bookPackages.title, slug: bookPackages.slug, status: bookPackages.status, description: bookPackages.description,
-      coverColor: bookPackages.coverColor, createdAt: bookPackages.createdAt, updatedAt: bookPackages.updatedAt,
+      coverUrl: sql<string | null>`CASE WHEN ${bookPackages.coverVersion} IS NOT NULL THEN '/api/covers/' || ${bookPackages.id} || '?v=' || ${bookPackages.coverVersion} END`, coverColor: bookPackages.coverColor, createdAt: bookPackages.createdAt, updatedAt: bookPackages.updatedAt,
       gradeId: bookPackages.gradeId, subjectId: bookPackages.subjectId, gradeName: grades.name, subjectName: subjects.name,
       curriculumName: sql<string>`(SELECT c.name FROM curricula c WHERE c.id = ${qc(grades.curriculumId)})`,
     }).from(bookPackages).innerJoin(grades, eq(grades.id, bookPackages.gradeId)).innerJoin(subjects, eq(subjects.id, bookPackages.subjectId))
@@ -218,7 +220,7 @@ export class PublishingService {
 
   async getEditionTree(id: string) {
     const e = await this.edition(id);
-    const [pkg] = await this.q.select({ id: bookPackages.id, title: bookPackages.title, status: bookPackages.status, coverColor: bookPackages.coverColor })
+    const [pkg] = await this.q.select({ id: bookPackages.id, title: bookPackages.title, status: bookPackages.status, coverUrl: sql<string | null>`CASE WHEN ${bookPackages.coverVersion} IS NOT NULL THEN '/api/covers/' || ${bookPackages.id} || '?v=' || ${bookPackages.coverVersion} END`, coverColor: bookPackages.coverColor })
       .from(bookPackages).where(eq(bookPackages.id, e.packageId));
     const comps = await this.q.select({ ...getTableColumns(bookComponents), bookFile: sql<any>`(SELECT json_build_object('id', a.id, 'name', a.original_name, 'size', a.size_bytes) FROM digital_assets a WHERE a.id = ${qc(bookComponents.bookAssetId)})`,
       flipbook: sql<any>`(SELECT json_build_object('id', f.id, 'kind', f.kind, 'entry', f.entry, 'fileCount', f.file_count, 'totalBytes', f.total_bytes, 'originalName', f.original_name, 'skippedFiles', f.skipped_files, 'createdAt', f.created_at) FROM flipbooks f WHERE f.component_id = ${qc(bookComponents.id)})` })

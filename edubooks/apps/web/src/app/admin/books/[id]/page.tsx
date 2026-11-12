@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { BookCover, CoverUpload } from '@/components/book-cover';
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -47,7 +48,7 @@ export default function PackageBuilder({ params }: { params: Promise<{ id: strin
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="h-2" style={{ background: p.coverColor }} />
         <div className="flex flex-wrap items-start gap-4 p-5">
-          <div className="grid size-14 place-items-center rounded-xl text-xl font-bold text-white" style={{ background: p.coverColor }} aria-hidden>{p.title.slice(0, 2).toUpperCase()}</div>
+          {archived ? <BookCover url={p.coverUrl} color={p.coverColor} title={p.title} className="aspect-[3/4] w-24 rounded-lg text-[10px]" label={!p.coverUrl} /> : <CoverUpload packageId={p.id} url={p.coverUrl} color={p.coverColor} title={p.title} />}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold text-slate-900">{p.title}</h1><StatusBadge status={p.status} /></div>
             <div className="mt-1 flex flex-wrap gap-1.5"><Badge>{p.curriculumName} · {p.gradeName}</Badge><Badge tone="info">{p.subjectName}</Badge>

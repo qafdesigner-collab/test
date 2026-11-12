@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import { AssetsService } from '../storage/assets.service';
 import { AccessService } from '../lms/access.service';
 import { safeUnzip } from './safe-unzip';
+import { guardScript, protectionFor } from '../common/protection';
 import { appTmp } from '../common/tmp';
 
 /** File types a flipbook may contain. Anything else (programs, server scripts…) is left out. */
@@ -133,13 +134,14 @@ export class FlipbookService {
       await this.access.assertEdition(c.editionId);
     }
     const exp = Math.floor(Date.now() / 1000) + TOKEN_HOURS * 3600;
-    const token = this.sign(f.id, f.publisherId, exp);
+    const prot = await protectionFor(this.db);
+    const token = this.sign(f.id, f.publisherId, exp, prot.protect ? prot.watermark || ' ' : '');
     return { url: `/api/flip/${token}/${f.entry.split('/').map(encodeURIComponent).join('/')}`, kind: f.kind, expiresAt: new Date(exp * 1000) };
   }
 
   private mac(payload: string) { return createHmac('sha256', config.fileUrlSecret).update(`flip:${payload}`).digest('base64url').slice(0, 32); }
-  private sign(id: string, pub: string, exp: number) {
-    const payload = Buffer.from(`${id}.${pub}.${exp}`).toString('base64url');
+  private sign(id: string, pub: string, exp: number, watermark = '') {
+    const payload = Buffer.from(`${id}.${pub}.${exp}${watermark ? `.${Buffer.from(watermark).toString('base64url')}` : ''}`).toString('base64url');
     return `${payload}.${this.mac(payload)}`;
   }
   verify(token: string) {
@@ -147,9 +149,9 @@ export class FlipbookService {
     if (!payload || !sig) throw new NotFoundException();
     const a = Buffer.from(this.mac(payload)); const b = Buffer.from(sig);
     if (a.length !== b.length || !timingSafeEqual(a, b)) throw new NotFoundException();
-    const [id, pub, exp] = Buffer.from(payload, 'base64url').toString().split('.');
+    const [id, pub, exp, wm] = Buffer.from(payload, 'base64url').toString().split('.');
     if (!id || !pub || Number(exp) < Date.now() / 1000) throw new NotFoundException('This link has expired. Reopen the book.');
-    return { id, pub };
+    return { id, pub, protect: wm !== undefined, watermark: wm ? Buffer.from(wm, 'base64url').toString().trim() : '' };
   }
 
   /** Finds one file of a flipbook (RLS: inside the flipbook's publisher). */

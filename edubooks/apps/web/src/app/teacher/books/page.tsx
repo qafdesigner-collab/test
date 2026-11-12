@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { BookCover } from '@/components/book-cover';
 import { BookOpen, ClipboardList, NotebookPen } from 'lucide-react';
 import { fmtDay } from '@/lib/api';
 import { useMyBooks } from '@/lib/lms';
@@ -15,7 +16,7 @@ export default function TeacherBooks() {
       {!books.data.length ? <EmptyState icon={<BookOpen className="size-10" />} title="No teacher seats yet">Ask your school admin to assign you a teacher seat.</EmptyState> : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{books.data.map((b) => (
           <div key={b.editionId} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex h-28 items-end p-4 text-white" style={{ background: `linear-gradient(135deg, ${b.coverColor}, ${b.coverColor}bb)` }}><span className="text-lg font-semibold">{b.title}</span></div>
+            <div className="flex gap-4 p-4"><BookCover url={b.coverUrl} color={b.coverColor} title={b.title} className="aspect-[3/4] w-20 shrink-0 rounded-md text-[10px] shadow" label={!b.coverUrl} /><span className="text-lg font-semibold text-slate-900">{b.title}</span></div>
             <div className="space-y-3 p-4"><p className="text-xs text-slate-500">{b.grade} · {b.subject} · {b.editionLabel} · access until {fmtDay(b.validUntil)}</p>
               <div className="flex flex-wrap gap-2 text-sm">
                 <Link href={`/read/${b.editionId}`} className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700"><BookOpen className="size-4" />Open book</Link>

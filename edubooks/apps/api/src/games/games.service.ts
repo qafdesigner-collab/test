@@ -219,7 +219,7 @@ export class GamesService {
     const mine = await this.q.select().from(studentBadges).where(eq(studentBadges.studentId, me));
     const days = await this.activeDays(me);
     const eds = await this.access.editions();
-    const books = eds === 'ALL' || !eds.length ? [] : (await this.q.execute(sql`SELECT e.id AS "editionId", p.title, p.cover_color AS "coverColor",
+    const books = eds === 'ALL' || !eds.length ? [] : (await this.q.execute(sql`SELECT e.id AS "editionId", p.title, CASE WHEN p.cover_version IS NOT NULL THEN '/api/covers/' || p.id || '?v=' || p.cover_version END AS "coverUrl", p.cover_color AS "coverColor",
         (SELECT coalesce(sum(c.page_count), 0)::int FROM book_components c WHERE c.edition_id = e.id AND c.book_asset_id IS NOT NULL) AS pages,
         (SELECT coalesce(sum(rp.max_page), 0)::int FROM reader_progress rp JOIN book_components c ON c.id = rp.component_id WHERE c.edition_id = e.id AND rp.user_id = ${me}) AS "pagesRead",
         (SELECT count(*)::int FROM game_attempts a JOIN game_activities g ON g.id = a.activity_id WHERE g.edition_id = e.id AND a.student_id = ${me}) AS plays,

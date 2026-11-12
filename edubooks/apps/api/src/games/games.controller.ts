@@ -68,12 +68,15 @@ export class GamesController {
   /** One call for the child's home screen. */
   @Roles('STUDENT') @Get('student/home')
   async home(@Ctx() c: TenantCtx) {
-    const { rows } = await this.db.q.execute(sql`SELECT rp.last_page AS page, rp.component_id AS "componentId", c.title AS part, e.id AS "editionId", p.title, p.cover_color AS "coverColor", c.page_count AS "pageCount"
+    const { rows } = await this.db.q.execute(sql`SELECT rp.last_page AS page, rp.component_id AS "componentId", c.title AS part, e.id AS "editionId", p.title, p.cover_color AS "coverColor", CASE WHEN p.cover_version IS NOT NULL THEN '/api/covers/' || p.id || '?v=' || p.cover_version END AS "coverUrl", c.page_count AS "pageCount"
       FROM reader_progress rp JOIN book_components c ON c.id = rp.component_id JOIN book_editions e ON e.id = c.edition_id JOIN book_packages p ON p.id = e.package_id
       WHERE rp.user_id = ${c.userId} ORDER BY rp.updated_at DESC LIMIT 1`);
     // Sequential: all queries share the request's single transaction connection.
     const homework = await this.lms.studentList(); const games = await this.games.studentAvailable(); const ach = await this.games.achievements();
+    const today = ((await this.db.q.execute(sql`SELECT coalesce(sum(reading), 0)::int AS reading, coalesce(sum(games), 0)::int AS games, coalesce(sum(homework), 0)::int AS homework
+      FROM user_activity WHERE user_id = ${c.userId} AND day = current_date`)).rows[0] ?? { reading: 0, games: 0, homework: 0 }) as any;
     return {
+      today,
       continueReading: rows[0] ?? null,
       homework: homework.filter((h: any) => !h.submission && h.status === 'PUBLISHED'),
       games: games.slice(0, 8),

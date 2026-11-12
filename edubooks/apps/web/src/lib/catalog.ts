@@ -16,7 +16,7 @@ export function byStage<T extends { stage: string }>(list: T[]) {
 export const useSubjects = () => useQuery<Subject[]>({ queryKey: ['subjects'], queryFn: () => api.get('/catalog/subjects') });
 export const COMPONENT_TYPES: Record<string, string> = {
   STUDENT_BOOK: 'Student Book', HOMEWORK_BOOK: 'Homework Book', WORKBOOK: 'Workbook', TEACHER_GUIDE: 'Teacher Guide',
-  FLASHCARDS: 'Flashcards', TEACHER_CARDS: 'Teacher Cards', DANGLERS: 'Danglers', POSTERS: 'Posters & Charts', OTHER: 'Other',
+  FLASHCARDS: 'Flashcards', TEACHER_CARDS: 'Teacher Cards', DANGLERS: 'Danglers', POSTERS: 'Posters & Charts', OTHER: 'Other', CD: 'CD (Flash / SWF)', MOBILE_APP: 'Mobile App',
 };
 export const RESOURCE_TYPES: Record<string, string> = {
   PDF: 'PDF', PRESENTATION: 'PowerPoint', DOCUMENT: 'Word document', SPREADSHEET: 'Spreadsheet', HTML5: 'HTML5 activity', IMAGE: 'Image',

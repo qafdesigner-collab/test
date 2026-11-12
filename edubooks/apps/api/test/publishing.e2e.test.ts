@@ -34,7 +34,7 @@ describe('Phase 2 — Book Package Management', () => {
     pkgId = r.body.id; edId = r.body.editionId;
     const tree = (await admin.get(`/api/publishing/editions/${edId}`)).body;
     expect(tree.components.map((c: any) => c.title)).toEqual([
-      'Student Book Part 1', 'Student Book Part 2', 'Student Book Part 3', 'Homework Book', 'Teacher Guide', 'Flashcards', 'Teacher Cards', 'Danglers',
+      'Student Book Part 1', 'Student Book Part 2', 'Student Book Part 3', 'Homework Book', 'Teacher Guide', 'Flashcards', 'Teacher Cards', 'Danglers', 'CD', 'Mobile App',
     ]);
     partId = tree.components[0].id;
   });

@@ -17,7 +17,7 @@ export const roleEnum = pgEnum('role', ['PUBLISHER_ADMIN', 'PUBLISHER_EDITOR', '
 export const accountStatusEnum = pgEnum('account_status', ['ACTIVE', 'SUSPENDED', 'DISABLED']);
 export const contentStatusEnum = pgEnum('content_status', ['DRAFT', 'PUBLISHED', 'ARCHIVED']);
 export const componentTypeEnum = pgEnum('component_type', [
-  'STUDENT_BOOK', 'HOMEWORK_BOOK', 'WORKBOOK', 'TEACHER_GUIDE', 'FLASHCARDS', 'TEACHER_CARDS', 'DANGLERS', 'POSTERS', 'OTHER',
+  'STUDENT_BOOK', 'HOMEWORK_BOOK', 'WORKBOOK', 'TEACHER_GUIDE', 'FLASHCARDS', 'TEACHER_CARDS', 'DANGLERS', 'POSTERS', 'OTHER', 'CD', 'MOBILE_APP',
 ]);
 export const resourceTypeEnum = pgEnum('resource_type', [
   'PDF', 'PRESENTATION', 'DOCUMENT', 'SPREADSHEET', 'HTML5', 'IMAGE', 'AUDIO', 'VIDEO',
@@ -171,6 +171,9 @@ export const bookPackages = pgTable('book_packages', {
   title: text('title').notNull(),
   slug: citext('slug').notNull(),
   description: text('description').notNull().default(''),
+  coverKey: text('cover_key'),
+  coverMime: text('cover_mime'),
+  coverVersion: text('cover_version'),
   coverColor: text('cover_color').notNull().default('#f97316'),
   status: contentStatusEnum('status').notNull().default('DRAFT'),
   createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),

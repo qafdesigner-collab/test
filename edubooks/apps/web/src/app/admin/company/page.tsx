@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, Coins, FileUp, Globe2, Trash2 } from 'lucide-react';
+import { Building2, Coins, FileUp, Globe2, ShieldCheck, Trash2 } from 'lucide-react';
 import { api, fmtBytes } from '@/lib/api';
 import { formatMoney } from '@/lib/company';
 import { PageHeader } from '@/components/common';
@@ -23,6 +23,7 @@ export default function CompanyPage() {
       <PageHeader title="Company & currency" sub="Your company details, documents, currency and tax. They appear on the sign-in page, for schools, and on quotations, invoices and report cards. Your logo and colours are under Branding." />
       <Profile initial={q.data.company} />
       <div className="grid gap-6 xl:grid-cols-2"><Finance initial={q.data.finance} /><Region initial={q.data.region} /></div>
+      <Protection />
       <Documents />
     </div>
   );
@@ -135,6 +136,24 @@ function Documents() {
             <Badge tone={VIS[d.visibility][0]}>{d.visibility.toLowerCase()}</Badge>
             <button aria-label={`Delete ${d.title}`} onClick={async () => { if (!confirm(`Delete “${d.title}”?`)) return; await api.del(`/company/documents/${d.id}`); refresh(); toast('Deleted'); }} className="text-slate-500 hover:text-red-600"><Trash2 className="size-4" /></button>
           </li>))}</ul>)}
+    </Card>
+  );
+}
+
+function Protection() {
+  const q = useQuery({ queryKey: ['protectionSettings'], queryFn: () => api.get<any>('/company/protection') });
+  const qc = useQueryClient(); const toast = useToast();
+  if (!q.data) return null;
+  const save = async (d: any) => { try { qc.setQueryData(['protectionSettings'], await api.put('/company/protection', d)); qc.invalidateQueries({ queryKey: ['myProtection'] }); toast('Content protection saved'); } catch (e: any) { toast(e.message, 'err'); } };
+  const d = q.data;
+  return (
+    <Card className="space-y-3 p-5">
+      <h2 className="flex items-center gap-2 font-semibold text-slate-900"><ShieldCheck className="size-5 text-brand-600" />Content protection</h2>
+      <p className="text-sm text-slate-700">When on, book pages, flipbooks, CDs, flashcards and resources can only be <b>viewed inside the platform</b>: no downloading, no right-click, no copying or selecting, no printing, and Print Screen covers the page.
+        Each page shows a faint watermark with the reader’s name and school, so any photo or screenshot can be traced. The book’s mobile app (QR code) stays downloadable.</p>
+      <p className="text-xs text-slate-600">Please note: no website can completely stop screenshots or a phone camera. These measures make copying hard and traceable.</p>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={d.enabled} onChange={(e) => save({ ...d, enabled: e.target.checked })} />Protect book content for pupils and parents</label>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!d.enabled} checked={d.enabled && d.teachers} onChange={(e) => save({ ...d, teachers: e.target.checked })} />Also for teachers and school admins (they cannot download teaching resources either)</label>
     </Card>
   );
 }

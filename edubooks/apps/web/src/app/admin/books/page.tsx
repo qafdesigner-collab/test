@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { BookCover } from '@/components/book-cover';
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -84,8 +85,9 @@ function BooksPage() {
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {q.data.items.map((p: any) => (
               <Link key={p.id} href={`/admin/books/${p.id}`} className="focus-ring group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
-                <div className="flex h-24 items-end justify-between p-4 text-white" style={{ background: `linear-gradient(135deg, ${p.coverColor}, ${p.coverColor}cc)` }}>
-                  <span className="text-lg font-semibold drop-shadow-sm">{p.title}</span><StatusBadge status={p.status} />
+                <div className="flex gap-4 border-b border-slate-100 p-4">
+                  <BookCover url={p.coverUrl} color={p.coverColor} title={p.title} className="aspect-[3/4] w-16 shrink-0 rounded-md text-[9px] shadow" label={!p.coverUrl} />
+                  <div className="min-w-0 flex-1"><span className="block text-lg font-semibold text-slate-900">{p.title}</span><StatusBadge status={p.status} /></div>
                 </div>
                 <div className="space-y-2 p-4">
                   <div className="flex flex-wrap gap-1.5"><Badge>{p.curriculum} · {p.grade.name}</Badge><Badge tone="info">{p.subject.name}</Badge></div>

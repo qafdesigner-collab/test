@@ -39,7 +39,7 @@ export class CommerceService {
   /** Editions that can be sold: published editions of non-archived packages. */
   async sellableEditions() {
     return this.q.select({
-      id: bookEditions.id, label: bookEditions.label, packageId: bookPackages.id, packageTitle: bookPackages.title, coverColor: bookPackages.coverColor,
+      id: bookEditions.id, label: bookEditions.label, packageId: bookPackages.id, packageTitle: bookPackages.title, coverUrl: sql<string | null>`CASE WHEN ${bookPackages.coverVersion} IS NOT NULL THEN '/api/covers/' || ${bookPackages.id} || '?v=' || ${bookPackages.coverVersion} END`, coverColor: bookPackages.coverColor,
       gradeName: grades.name,
     }).from(bookEditions).innerJoin(bookPackages, eq(bookPackages.id, bookEditions.packageId)).innerJoin(grades, eq(grades.id, bookPackages.gradeId))
       .where(and(eq(bookEditions.status, 'PUBLISHED'), sql`${bookPackages.status} <> 'ARCHIVED'`))
@@ -80,7 +80,7 @@ export class CommerceService {
     const versions = await this.q.select().from(productVersions).where(eq(productVersions.productId, id)).orderBy(desc(productVersions.versionNo));
     const items = versions.length ? await this.q.select({
       versionId: bundleItems.productVersionId, editionId: bookEditions.id, editionLabel: bookEditions.label, editionStatus: bookEditions.status,
-      packageId: bookPackages.id, packageTitle: bookPackages.title, coverColor: bookPackages.coverColor,
+      packageId: bookPackages.id, packageTitle: bookPackages.title, coverUrl: sql<string | null>`CASE WHEN ${bookPackages.coverVersion} IS NOT NULL THEN '/api/covers/' || ${bookPackages.id} || '?v=' || ${bookPackages.coverVersion} END`, coverColor: bookPackages.coverColor,
     }).from(bundleItems).innerJoin(bookEditions, eq(bookEditions.id, bundleItems.editionId)).innerJoin(bookPackages, eq(bookPackages.id, bookEditions.packageId))
       .where(inArray(bundleItems.productVersionId, versions.map((v) => v.id))).orderBy(asc(bookPackages.title)) : [];
     const sold = versions.length ? await this.q.select({ versionId: orderLines.productVersionId, n: count() }).from(orderLines)

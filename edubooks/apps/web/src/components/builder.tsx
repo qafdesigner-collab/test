@@ -185,9 +185,10 @@ function NodePanel({ tree, sel, setSel, onExpand }: { tree: EditionTree; sel: Se
               {!readOnly && <div className="flex gap-1"><Button size="sm" variant="secondary" onClick={() => setEditComp(true)}><Pencil className="size-3.5" />Edit</Button>
                 {!locked && <Button size="sm" variant="ghost" onClick={() => setConfirmDel(true)} aria-label="Delete component"><Trash2 className="size-4 text-red-500" /></Button>}</div>}
             </div>
-            <BookPdf comp={comp} editionId={tree.id} editionStatus={tree.status} readOnly={readOnly} />
-            <FlipbookRow comp={comp} editionStatus={tree.status} readOnly={readOnly} />
-            {!locked && (
+            {comp.type === 'MOBILE_APP' ? <MobileAppRow comp={comp} readOnly={readOnly} />
+              : <>{comp.type !== 'CD' && <BookPdf comp={comp} editionId={tree.id} editionStatus={tree.status} readOnly={readOnly} />}
+                <FlipbookRow comp={comp} editionStatus={tree.status} readOnly={readOnly} /></>}
+            {!locked && !['MOBILE_APP', 'CD'].includes(comp.type) && (
               <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (unitTitle.trim()) addUnit.mutate(unitTitle.trim()); }}>
                 <Input value={unitTitle} onChange={(e) => setUnitTitle(e.target.value)} placeholder={`New unit title, e.g. “Letters A–E”`} aria-label="New unit title" />
                 <Button loading={addUnit.isPending} disabled={!unitTitle.trim()}><Plus className="size-4" />Add unit</Button>
@@ -279,6 +280,7 @@ function FlipbookRow({ comp, editionStatus, readOnly }: { comp: Component; editi
       <div className="min-w-[16rem] flex-1 break-words">
         {f ? <><b>Flipbook ({f.kind === 'SWF' ? 'Flash' : 'HTML'}):</b> <span className="text-slate-700">{f.originalName} · {f.fileCount} files · {fmtBytes(f.totalBytes)} · opens <code className="text-xs">{f.entry}</code></span>
           {f.skippedFiles > 0 && <span className="block text-xs text-amber-800">{f.skippedFiles} file(s) of a type that is not allowed were left out.</span>}</>
+          : comp.type === 'CD' ? <span className="text-slate-700">No CD content yet. Upload the CD’s Flash file (<b>.swf</b>), or a <b>.zip</b> of the CD folder. It plays in the browser — no Flash Player needed.</span>
           : <span className="text-slate-700">No flipbook yet. Upload the flipbook as a <b>.zip</b> (its main page must be <b>index.html</b>) or a Flash <b>.swf</b>.</span>}
         {unpacking && <span className="block text-xs text-slate-700">Unpacking and checking the files…</span>}
       </div>
@@ -541,4 +543,37 @@ export function LockBanner({ tree }: { tree: EditionTree }) {
     </div>
   );
   return null;
+}
+
+/** The "Mobile App" part: an Android .apk and/or store links. Pupils see a QR code to install it. */
+function MobileAppRow({ comp, readOnly }: { comp: Component; readOnly: boolean }) {
+  const q = useQuery({ queryKey: ['bookApp', comp.id], queryFn: () => api.get<any>(`/publishing/components/${comp.id}/app`) });
+  const [f, setF] = useState<any>(null); const input = useRef<HTMLInputElement>(null); const [pct, setPct] = useState<number | null>(null);
+  const qc = useQueryClient(); const toast = useToast();
+  useEffect(() => { if (q.data) setF({ androidUrl: q.data.androidUrl ?? '', iosUrl: q.data.iosUrl ?? '', version: q.data.version ?? '', notes: q.data.notes ?? '' }); }, [q.data]);
+  if (!q.data || !f) return null;
+  const set = (d: any) => qc.setQueryData(['bookApp', comp.id], d);
+  const upload = async (file?: File) => {
+    if (!file) return; const fd = new FormData(); fd.append('file', file); setPct(0);
+    try { set(await api.upload(`/publishing/components/${comp.id}/app/apk`, fd, setPct)); toast('App uploaded'); } catch (e: any) { toast(e.message, 'err'); } finally { setPct(null); }
+  };
+  return (
+    <div className="space-y-3 rounded-lg border border-dashed border-emerald-300 bg-emerald-50/60 p-4 text-sm">
+      <div className="flex flex-wrap items-center gap-3"><span className="text-xl" aria-hidden>📱</span>
+        <div className="min-w-[14rem] flex-1">{q.data.apkName ? <><b>Android app:</b> {q.data.apkName} · {fmtBytes(q.data.apkSize)}</> : <span className="text-slate-700">No Android app file yet. Upload the <b>.apk</b>, and/or add store links below.</span>}
+          <span className="block text-xs text-slate-600">Pupils with a licence see a QR code in the book to install the app on a phone. The app is the only thing pupils can download.</span></div>
+        {pct !== null && <span className="text-xs">{pct}%</span>}
+        {!readOnly && <><input ref={input} type="file" accept=".apk,application/vnd.android.package-archive" hidden onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ''; }} />
+          <Button size="sm" variant="secondary" loading={pct !== null} onClick={() => input.current?.click()}><UploadCloud className="size-4" />{q.data.apkName ? 'Replace .apk' : 'Upload .apk'}</Button>
+          {q.data.apkName && <Button size="sm" variant="ghost" aria-label="Remove the app file" onClick={async () => { set(await api.del(`/publishing/components/${comp.id}/app/apk`)); toast('App file removed'); }}><Trash2 className="size-4 text-red-500" /></Button>}</>}
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Field label="Google Play link (optional)"><Input disabled={readOnly} placeholder="https://play.google.com/store/apps/…" value={f.androidUrl} onChange={(e) => setF({ ...f, androidUrl: e.target.value })} /></Field>
+        <Field label="App Store link for iPhone (optional)"><Input disabled={readOnly} placeholder="https://apps.apple.com/…" value={f.iosUrl} onChange={(e) => setF({ ...f, iosUrl: e.target.value })} /></Field>
+        <Field label="Version"><Input disabled={readOnly} maxLength={40} value={f.version} onChange={(e) => setF({ ...f, version: e.target.value })} /></Field>
+        <Field label="Note for pupils"><Input disabled={readOnly} maxLength={1000} placeholder="e.g. Scan the pictures in your book with the app" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
+      </div>
+      {!readOnly && <div className="flex justify-end"><Button size="sm" onClick={async () => { try { set(await api.put(`/publishing/components/${comp.id}/app`, f)); toast('Saved'); } catch (e: any) { toast(e.message, 'err'); } }}>Save app details</Button></div>}
+    </div>
+  );
 }

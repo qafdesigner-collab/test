@@ -18,3 +18,16 @@ body { @apply bg-slate-50 text-slate-800 antialiased; }
 @keyframes pop-in { 0% { transform: scale(.3); opacity: 0 } 70% { transform: scale(1.15) } 100% { transform: scale(1); opacity: 1 } }
 @keyframes bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; } }
+@keyframes drift { 0% { transform: translateX(-20vw) } 100% { transform: translateX(120vw) } }
+@keyframes twinkle { 0%,100% { opacity: .25; transform: scale(.8) } 50% { opacity: 1; transform: scale(1.15) } }
+@keyframes float-y { 0%,100% { transform: translateY(0) rotate(-3deg) } 50% { transform: translateY(-14px) rotate(3deg) } }
+@keyframes shine { 0% { transform: translateX(-120%) skewX(-20deg) } 60%,100% { transform: translateX(220%) skewX(-20deg) } }
+@keyframes rise { 0% { opacity: 0; transform: translateY(18px) } 100% { opacity: 1; transform: translateY(0) } }
+.kid-rise { animation: rise .6s cubic-bezier(.2,.8,.2,1) both }
+@media (prefers-reduced-motion: reduce) { .kid-rise { animation: none } }
+/* 3D book: a cover with a page edge, tilting a little on hover */
+.book3d { transform-style: preserve-3d; transform: perspective(900px) rotateY(-18deg); transition: transform .4s cubic-bezier(.2,.8,.2,1); box-shadow: 10px 12px 24px -8px rgba(15,23,42,.45); border-radius: 4px 10px 10px 4px }
+.book3d::after { content: ''; position: absolute; top: 3%; bottom: 3%; right: -7px; width: 8px; border-radius: 0 3px 3px 0; background: repeating-linear-gradient(90deg, #fff 0 1px, #e2e8f0 1px 2px); transform: rotateY(60deg); transform-origin: left }
+.book3d::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 8%; background: linear-gradient(90deg, rgba(0,0,0,.25), rgba(255,255,255,.15) 60%, transparent); z-index: 1; pointer-events: none }
+.group:hover .book3d, .book3d:hover { transform: perspective(900px) rotateY(-4deg) translateY(-6px) scale(1.03) }
+@media (prefers-reduced-motion: reduce) { .book3d, .group:hover .book3d { transform: none; transition: none } }

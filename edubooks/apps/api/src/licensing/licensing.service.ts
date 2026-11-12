@@ -377,7 +377,7 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
     const editionIds = await this.entitledEditionIds(c.userId, isSchoolAdmin ? c.schoolId : null);
     if (!editionIds.length) return [];
     return this.q.select({
-      editionId: bookEditions.id, editionLabel: bookEditions.label, packageId: bookPackages.id, title: bookPackages.title, coverColor: bookPackages.coverColor,
+      editionId: bookEditions.id, editionLabel: bookEditions.label, packageId: bookPackages.id, title: bookPackages.title, coverUrl: sql<string | null>`CASE WHEN ${bookPackages.coverVersion} IS NOT NULL THEN '/api/covers/' || ${bookPackages.id} || '?v=' || ${bookPackages.coverVersion} END`, coverColor: bookPackages.coverColor,
       description: bookPackages.description, grade: grades.name, subject: subjects.name,
       validUntil: sql<string>`(SELECT max(e.valid_until) FROM access_entitlements e WHERE e.edition_id = ${qc(bookEditions.id)} AND e.user_id = ${c.userId})`,
     }).from(bookEditions).innerJoin(bookPackages, eq(bookPackages.id, bookEditions.packageId))

@@ -15,6 +15,7 @@ import { AuditService } from '../audit/audit.service';
 import { AssetsService } from '../storage/assets.service';
 import { StorageModule } from '../storage/storage.module';
 import { setRegion } from '../common/region';
+import { PROTECTION_DEFAULTS, protectionFor } from '../common/protection';
 
 const URL_RE = /^https:\/\/[^\s]+$/;
 const opt = (s?: string | null) => (s ?? '').trim();
@@ -52,6 +53,7 @@ class RegionDto {
   @Matches(/^\d{1,4}$/, { message: 'Country calling code, digits only (e.g. 971)' }) phoneCode!: string;
   @IsString() @MaxLength(60) timezone!: string;
 }
+class ProtectionDto { @IsBoolean() enabled!: boolean; @IsBoolean() teachers!: boolean; }
 class DocDto {
   @IsOptional() @IsString() @MaxLength(160) title?: string;
   @IsOptional() @IsString() @MaxLength(1000) description?: string;
@@ -90,6 +92,16 @@ export class CompanyService implements OnModuleInit {
     await this.db.q.execute(sql`SELECT set_publisher_setting(${key}, ${JSON.stringify(value)}::jsonb)`);
     await this.audit.log(`company.${key}.update`, 'publisher', this.ctx.publisherId, summary, before, value);
     return this.settings();
+  }
+  async protectionSettings() {
+    const { rows } = await this.db.q.execute(sql`SELECT coalesce(settings -> 'protection', '{}') AS p FROM publishers WHERE id = ${this.ctx.publisherId}`);
+    return { ...PROTECTION_DEFAULTS, ...((rows[0] as any)?.p ?? {}) };
+  }
+  async saveProtection(d: ProtectionDto) {
+    const before = await this.protectionSettings();
+    await this.db.q.execute(sql`SELECT set_publisher_setting('protection', ${JSON.stringify(d)}::jsonb)`);
+    await this.audit.log('company.protection.update', 'publisher', this.ctx.publisherId, `Content protection ${d.enabled ? `on${d.teachers ? ' (also for teachers)' : ' (pupils and parents)'}` : 'off'}`, before, d);
+    return this.protectionSettings();
   }
   saveCompany(d: CompanyDto) {
     const clean = Object.fromEntries(Object.entries(d).map(([k, v]) => [k, typeof v === 'string' ? opt(v) : v]));
@@ -168,6 +180,10 @@ export class CompanyController {
   @Roles(A) @Put('finance') finance(@Body() d: FinanceDto) { return this.svc.saveFinance(d); }
   @Roles(A) @Put('region') region(@Body() d: RegionDto) { return this.svc.saveRegion(d); }
   @Get('documents') docs() { return this.svc.listDocuments(); }
+  /** For the viewers: does this user see book content in protected mode, and with which watermark? */
+  @Get('my-protection') myProtection() { return protectionFor(this.db); }
+  @Roles(A) @Get('protection') protection() { return this.svc.protectionSettings(); }
+  @Roles(A) @Put('protection') saveProtection(@Body() d: ProtectionDto) { return this.svc.saveProtection(d); }
   @Get('documents/:id/file') async doc(@Param('id', new ParseUUIDPipe()) id: string, @Res() res: Response) { await this.svc.stream(await this.svc.documentFile(id), res); }
   @Roles(A) @ManualTx() @Post('documents')
   @UseInterceptors(FileInterceptor('file', { storage: diskStorage({ destination: appTmp('uploads'), filename: (_r: any, _f: any, cb: any) => cb(null, randomBytes(16).toString('hex')) }), limits: { fileSize: 50 * 1048576, files: 1 } }))

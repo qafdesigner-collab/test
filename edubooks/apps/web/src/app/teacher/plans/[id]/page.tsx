@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { Suspense, use, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useProtection } from '@/components/content-guard';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Copy, Download, ExternalLink, Plus, Printer, Sparkles, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -24,7 +25,7 @@ const SECTIONS: [keyof Content, string, string][] = [
 const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!));
 
 function Editor({ id }: { id: string }) {
-  const isNew = id === 'new'; const router = useRouter(); const params = useSearchParams(); const toast = useToast();
+  const isNew = id === 'new'; const router = useRouter(); const protection = useProtection(); const params = useSearchParams(); const toast = useToast();
   const existing = useQuery({ queryKey: ['plan', id], queryFn: () => api.get(`/teacher/lesson-plans/${id}`), enabled: !isNew });
   const classes = useMyClasses();
   const [f, setF] = useState<any>(null);
@@ -118,7 +119,7 @@ function Editor({ id }: { id: string }) {
               {lesson.pageStart && <Link href={`/read/${f.editionId}`} className="mt-1 inline-flex items-center gap-1 text-brand-700 hover:underline">Open pages {lesson.pageStart}–{lesson.pageEnd ?? lesson.pageStart}<ExternalLink className="size-3" /></Link>}
               <p className="mb-1 mt-3 text-xs font-semibold uppercase text-slate-500">Resources</p>
               {resources.length ? resources.map((r: any) => (
-                <button key={r.id} onClick={async () => { const w = window.open('', '_blank'); try { const { url } = await api.get(`/assets/${r.assetId}/link`); if (w) { w.opener = null; w.location.href = url; } } catch (e: any) { w?.close(); toast(e.message, 'err'); } }}
+                <button key={r.id} onClick={async () => { if (protection.protect) return router.push(`/view/${r.assetId}?t=${encodeURIComponent(r.title)}&e=${r.ext ?? ''}`); const w = window.open('', '_blank'); try { const { url } = await api.get(`/assets/${r.assetId}/link`); if (w) { w.opener = null; w.location.href = url; } } catch (e: any) { w?.close(); toast(e.message, 'err'); } }}
                   className="flex w-full items-center gap-2 rounded px-1 py-1 text-left hover:bg-slate-50"><span className="rounded bg-slate-100 px-1 text-[9px] font-bold uppercase">{r.ext}</span><span className="truncate">{r.title}</span></button>
               )) : <p className="text-slate-500">No resources for this lesson yet.</p>}
               <Button size="sm" variant="secondary" className="mt-3 w-full" onClick={() => setC({ materials: [c.materials, ...resources.map((r: any) => `• ${r.title}`), lesson.pageStart ? `• Student book pages ${lesson.pageStart}–${lesson.pageEnd ?? lesson.pageStart}` : ''].filter(Boolean).join('\n') })}>Add to materials</Button>

@@ -5,7 +5,7 @@ import {
 } from 'class-validator';
 import { PageQuery } from '../common/pagination';
 
-export const COMPONENT_TYPES = ['STUDENT_BOOK', 'HOMEWORK_BOOK', 'WORKBOOK', 'TEACHER_GUIDE', 'FLASHCARDS', 'TEACHER_CARDS', 'DANGLERS', 'POSTERS', 'OTHER'] as const;
+export const COMPONENT_TYPES = ['STUDENT_BOOK', 'HOMEWORK_BOOK', 'WORKBOOK', 'TEACHER_GUIDE', 'FLASHCARDS', 'TEACHER_CARDS', 'DANGLERS', 'POSTERS', 'OTHER', 'CD', 'MOBILE_APP'] as const;
 export const RESOURCE_TYPES = ['PDF', 'PRESENTATION', 'DOCUMENT', 'SPREADSHEET', 'HTML5', 'IMAGE', 'AUDIO', 'VIDEO',
   'FLASHCARD', 'TEACHER_CARD', 'DANGLER', 'POSTER', 'WORKSHEET', 'GAME', 'OTHER'] as const;
 export const AUDIENCES = ['TEACHER', 'STUDENT', 'ALL'] as const;

@@ -1,3 +1,4 @@
+import { guardScript } from '../common/protection';
 import { BadRequestException, Controller, Delete, Get, Module, NotFoundException, Param, ParseUUIDPipe, Post, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -71,13 +72,19 @@ export class FlipbookController {
       res.setHeader('Cache-Control', 'public, max-age=86400');
       return fs.createReadStream(r.path).on('error', () => res.destroy()).pipe(res);
     }
+    const t = this.svc.verify(token);
+    // Protected readers: the flipbook works only inside the reader's frame, not opened as a page of its own.
+    if (t.protect && String(req.headers['sec-fetch-dest'] ?? '') === 'document') { res.status(403).type('text/plain').send('This book can only be read inside the platform.'); return; }
     const f = await this.svc.file(token, segs.join('/'));
     flipHeaders(res, f.mime);
+    if (t.protect) res.setHeader('Cache-Control', 'no-store');
     const stream = await this.svc['assets'].driver.read(f.key);
-    if (f.kind === 'SWF' && f.mime.startsWith('text/html')) {
+    if ((f.kind === 'SWF' || t.protect) && f.mime.startsWith('text/html')) {
       const chunks: Buffer[] = [];
       for await (const c of stream) chunks.push(c as Buffer);
-      const html = this.svc.injectRuffle(Buffer.concat(chunks).toString('utf8'), base);
+      let html = Buffer.concat(chunks).toString('utf8');
+      if (t.protect) html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + guardScript(t.watermark)) : guardScript(t.watermark) + html;
+      if (f.kind === 'SWF') html = this.svc.injectRuffle(html, base);
       res.setHeader('Content-Length', String(Buffer.byteLength(html)));
       return res.end(html);
     }

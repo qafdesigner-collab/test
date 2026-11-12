@@ -21,7 +21,7 @@ class BrandingDto {
   @IsOptional() @IsHexColor() primaryColor?: string;
 }
 const DEFAULTS = { name: 'Knowledge Gate', tagline: 'Books, licences and learning — in one place.', primaryColor: '#4f46e5' };
-const LOGO_TYPES: Record<string, { mime: string; magic: (b: Buffer) => boolean }> = {
+export const LOGO_TYPES: Record<string, { mime: string; magic: (b: Buffer) => boolean }> = {
   png: { mime: 'image/png', magic: (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
   jpg: { mime: 'image/jpeg', magic: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
   webp: { mime: 'image/webp', magic: (b) => b.subarray(0, 4).toString() === 'RIFF' && b.subarray(8, 12).toString() === 'WEBP' },

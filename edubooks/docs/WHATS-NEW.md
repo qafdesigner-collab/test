@@ -7,6 +7,10 @@
 - **Company documents:** upload your company profile, brochures, catalogues, price lists and certificates (PDF, Word, Excel, PowerPoint or images, up to 50 MB). For each one choose who sees it: everyone (also linked on the sign-in page), schools, or your staff only.
 - **Region:** UAE calling code +971 (so 050 123 4567 becomes +971 50 123 4567 for WhatsApp/SMS) and the Dubai time zone.
 - **Quotations and invoices:** on any order, **Print quotation** (draft orders) or **Print invoice** (confirmed orders) with your logo, company details, TRN, VAT and the total in AED and USD.
+- **Book cover mockups:** in Book Packages, click the cover square of a book to upload its cover image (PNG, JPG or WebP). It is shown on the pupils' bookshelf, in the teachers' library and in your book list.
+- **CD and Mobile App parts:** every new book gets a **CD** part (upload the CD's Flash `.swf` or a zip of the CD folder; it plays in the browser) and a **Mobile App** part (upload the Android `.apk` and/or add Google Play and App Store links). Pupils open the Mobile App part in the book and **scan a QR code** with their phone to install the app. For older books, add the parts with **Add component** while the edition is a draft.
+- **Content protection (on by default):** pupils and parents — and, unless you turn it off, teachers — can only **view** book pages, flipbooks, CDs, flashcards and resources inside the platform: no downloading, no right-click, no copying, no printing. Each page carries a faint watermark with the reader's name and school, and the page is covered when Print Screen is pressed or the window loses focus. The mobile app is the only thing pupils can download. Settings: Company & Currency → Content protection. Note: no website can completely stop screenshots or a phone camera; the watermark makes copies traceable.
+- **New pupil home:** a sky full of clouds and stars, levels from stars, three daily goals, a 3D "continue reading" book with the real cover, and wooden bookshelves.
 - **Flipbooks:** besides `index.html`, a flipbook zip may now open from `start.html`, `default.html` or `main.html`, also inside a folder.
 
 # Knowledge Gate 1.2.1

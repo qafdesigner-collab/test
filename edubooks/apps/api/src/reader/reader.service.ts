@@ -17,7 +17,7 @@ export class ReaderService {
   /** Everything the reader needs for one licensed edition. */
   async edition(editionId: string) {
     await this.access.assertEdition(editionId);
-    const [ed] = await this.q.select({ id: bookEditions.id, label: bookEditions.label, title: bookPackages.title, coverColor: bookPackages.coverColor })
+    const [ed] = await this.q.select({ id: bookEditions.id, label: bookEditions.label, title: bookPackages.title, coverUrl: sql<string | null>`CASE WHEN ${bookPackages.coverVersion} IS NOT NULL THEN '/api/covers/' || ${bookPackages.id} || '?v=' || ${bookPackages.coverVersion} END`, coverColor: bookPackages.coverColor })
       .from(bookEditions).innerJoin(bookPackages, eq(bookPackages.id, bookEditions.packageId)).where(eq(bookEditions.id, editionId));
     if (!ed) throw new NotFoundException('Book not found');
     const comps = await this.q.select({ id: bookComponents.id, type: bookComponents.type, title: bookComponents.title, partNumber: bookComponents.partNumber,

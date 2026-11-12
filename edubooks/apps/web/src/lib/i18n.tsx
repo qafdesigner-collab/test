@@ -64,6 +64,7 @@ const AR: Record<string, string> = {
   'Explain this page': 'اشرح هذه الصفحة', 'Quiz me': 'اختبرني', 'Ask Owl': 'اسأل البومة', '{n} left today': 'باقي {n} اليوم', Close: 'إغلاق', 'Read to me': 'اقرأ لي',
   'Owl is thinking…': 'البومة تفكر…', 'Type your question': 'اكتب سؤالك', 'Your question': 'سؤالك', 'Ask about your book…': 'اسأل عن كتابك…', Ask: 'اسأل',
   'Owl only knows your book. Your teacher can see your questions.': 'البومة تعرف كتابك فقط. يستطيع معلمك رؤية أسئلتك.', 'Perfect! ⭐⭐⭐': 'ممتاز! ⭐⭐⭐', '{a} of {b} right — well done!': '{a} من {b} صحيحة — أحسنت!',
+  "Today's goals": 'أهداف اليوم', 'Read a page': 'اقرأ صفحة', 'Play a game': 'العب لعبة', 'Do homework': 'أنجز الواجب', 'My bookshelf': 'رف كتبي', 'Read ▶': 'اقرأ ◀', 'Level {n}': 'المستوى {n}',
   // switch
   'العربية': 'العربية', English: 'English',
 };
