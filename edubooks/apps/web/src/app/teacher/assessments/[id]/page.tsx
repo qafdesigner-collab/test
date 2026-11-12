@@ -40,7 +40,7 @@ function Builder({ initial, id }: { initial: any; id: string | null }) {
   const points = items.reduce((n, i) => n + (i.points || 0), 0);
   return (
     <div className="space-y-6">
-      <Link href="/teacher/assessments" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"><ArrowLeft className="size-4" />Homework & tests</Link>
+      <Link href="/teacher/assessments" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"><ArrowLeft className="size-4" />Assessments</Link>
       <PageHeader title={id ? `Edit: ${f.title}` : 'New assessment sheet'} sub={`${items.length} questions · ${points} points`}>
         <Button variant="secondary" onClick={() => save.mutate()} loading={save.isPending} disabled={!f.title || !f.classId}>Save draft</Button>
         {id && <Button variant="success" onClick={() => setPublishAsk(true)}><Send className="size-4" />Publish</Button>}
@@ -181,7 +181,7 @@ function Results({ a }: { a: any }) {
   const exportCsv = () => downloadCsv(`${a.title}.csv`, a.students.map((s: any) => ({ student: s.displayName, username: s.username, status: s.submission?.status ?? 'NOT SUBMITTED', score: s.submission?.score ?? '', max: a.maxScore, late: s.submission?.late ? 'yes' : '' })));
   return (
     <div className="space-y-6">
-      <Link href="/teacher/assessments" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"><ArrowLeft className="size-4" />Homework & tests</Link>
+      <Link href="/teacher/assessments" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"><ArrowLeft className="size-4" />Assessments</Link>
       <PageHeader title={a.title} sub={`${KIND_LABEL[a.kind]} · ${a.items.length} questions · ${a.maxScore} points${a.dueAt ? ` · due ${fmtDate(a.dueAt)}` : ''}`}>
         <Status s={a.status} /><Button variant="secondary" onClick={exportCsv}><Download className="size-4" />CSV</Button>
         {a.status === 'PUBLISHED' && <Button variant="ghost" onClick={() => setCloseAsk(true)}>Close</Button>}

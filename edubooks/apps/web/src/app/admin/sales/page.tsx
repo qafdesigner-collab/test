@@ -37,7 +37,7 @@ export default function SalesPage() {
           </div>
         </div>
       </Hero>
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">{tiles.map((t, i) => (
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{tiles.map((t, i) => (
         <StatTile key={t.label} icon={['💰', '🎟️', '🏫', '📊'][i]} bg={['#e3f3ec', '#e6e9fb', '#f6e6ef', '#fbf0dc'][i]} value={t.value} label={`${t.label.toLowerCase()} · ${t.sub}`} />))}</div>
 
       <Card className="p-5">

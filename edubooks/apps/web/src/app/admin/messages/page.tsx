@@ -36,14 +36,14 @@ export default function MessagesPage() {
                 <li><b>Local SMS company:</b> <code>NOTIFY_CHANNEL=webhook</code>, <code>NOTIFY_WEBHOOK_URL</code> (receives <code>{'{'}to, body, kind{'}'}</code>), optional <code>NOTIFY_WEBHOOK_TOKEN</code></li>
               </ul>
               {c.missing?.length > 0 && <p className="text-red-700">Missing: {c.missing.join(', ')}</p>}
-              <p>Numbers like <code>0300 1234567</code> become <code>923001234567</code> (country code from <code>DEFAULT_COUNTRY_CODE</code>, default 92).</p>
+              <p>Numbers like <code>050 123 4567</code> become <code>971501234567</code> (the calling code is set under Company &amp; Currency → Region; UAE +971 by default).</p>
             </div>)}
         </div>
         {c.configured ? <Badge tone="PUBLISHED"><CheckCircle2 className="size-3" />Ready</Badge> : <Badge tone="DRAFT"><XCircle className="size-3" />In-app only</Badge>}
       </Card>
       <Card className="p-5">
         <form className="flex flex-wrap items-end gap-3" onSubmit={(e) => { e.preventDefault(); test.mutate(); }}>
-          <Field label="Send a test message to" className="w-64"><Input required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0300 1234567" inputMode="tel" /></Field>
+          <Field label="Send a test message to" className="w-64"><Input required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="050 123 4567" inputMode="tel" /></Field>
           <Button loading={test.isPending}><Send className="size-4" />Send test</Button>
         </form>
       </Card>

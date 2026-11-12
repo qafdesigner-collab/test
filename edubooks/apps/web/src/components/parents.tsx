@@ -42,7 +42,7 @@ export function ParentsDialog({ student, onClose }: { student: { id: string; dis
             {mode === 'new' ? (
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Parent's name"><Input required value={f.displayName} onChange={(e) => setF({ ...f, displayName: e.target.value })} autoFocus /></Field>
-                <Field label="Mobile (WhatsApp)"><Input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} placeholder="0300 1234567" /></Field>
+                <Field label="Mobile (WhatsApp)"><Input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} placeholder="050 123 4567" /></Field>
               </div>
             ) : (
               <Field label="Parent"><Select required value={f.parentId} onChange={(e) => setF({ ...f, parentId: e.target.value })}>

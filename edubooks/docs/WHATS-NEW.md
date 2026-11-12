@@ -1,3 +1,19 @@
+# What's new in Knowledge Gate 1.3.5
+
+## Live whiteboard (Teacher → Whiteboard)
+- **Start a whiteboard** for a class on a **blank board** or on **a page of your book** (also from the book reader: the new whiteboard button teaches the page you are on).
+- Write with the **pen**, **highlighter**, **text** and **eraser**, in 7 colours and 4 sizes; **undo**, **clear** and **turn pages**.
+- Pupils of the class see a **“Live whiteboard — Watch”** banner on their home page and follow everything you write within about a second. When you **End lesson**, they can still look at the board.
+- Works on normal cPanel hosting (no extra server needed).
+
+## Assessment sheets by topic, with AI help (Teacher → Assessments)
+- Pick the **book and lesson** (the topic), then add questions yourself, from the question bank, or with **✨ Ask AI for questions** (choose how many, the level and the kind; tick the ones you want).
+- **Print sheet** gives a branded A4 sheet with name, roll number and date lines; **Answer key** prints the answers. Or save and publish it to the class online.
+
+## Checked and tidied
+- Every page was checked for every role on a laptop and on a phone: no sideways scrolling, nothing cut off.
+- On phones the book reader opens on the page (contents on the ☰ button); Sales figures fit; UAE phone examples everywhere.
+
 # What's new in Knowledge Gate 1.3.4
 
 ## A colourful look for every portal, in calmer colours

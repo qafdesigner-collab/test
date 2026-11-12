@@ -36,6 +36,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   const [loadingDoc, setLoadingDoc] = useState(false);
   const [docError, setDocError] = useState<string | null>(null);
   const [toc, setToc] = useState(true);
+  useEffect(() => { if (window.innerWidth < 1024) setToc(false); }, []); // phones: show the page first, contents on demand
   const [full, setFull] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [editHot, setEditHot] = useState(false);

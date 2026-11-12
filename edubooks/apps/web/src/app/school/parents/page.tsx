@@ -34,7 +34,7 @@ export default function SchoolParents() {
         <Dialog open onOpenChange={() => setEdit(null)} title={`Edit ${edit.displayName}`}>
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
             <Field label="Name"><Input required value={edit.displayName} onChange={(e) => setEdit({ ...edit, displayName: e.target.value })} /></Field>
-            <Field label="Mobile (WhatsApp)"><Input inputMode="tel" value={edit.phone ?? ''} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} placeholder="0300 1234567" /></Field>
+            <Field label="Mobile (WhatsApp)"><Input inputMode="tel" value={edit.phone ?? ''} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} placeholder="050 123 4567" /></Field>
             <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setEdit(null)}>Cancel</Button><Button loading={save.isPending}>Save</Button></div>
           </form>
         </Dialog>)}

@@ -14,7 +14,7 @@ export default function Assessments() {
   const q = useQuery({ queryKey: ['assessments', f], queryFn: () => api.get(`/teacher/assessments?${new URLSearchParams(Object.entries(f).filter(([, v]) => v))}`) });
   return (
     <div className="space-y-6">
-      <PageHeader title="Homework & tests" sub="Create homework, quizzes and tests for your classes. Objective questions are marked automatically.">
+      <PageHeader title="Assessments & homework" sub="Build assessment sheets by topic (with AI help), homework, quizzes and tests. Print them, or set them online — objective questions are marked automatically.">
         <Link href="/teacher/assessments/new" className="focus-ring inline-flex h-10 items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700"><Plus className="size-4" />New</Link>
       </PageHeader>
       <div className="flex gap-3">

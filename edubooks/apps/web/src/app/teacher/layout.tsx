@@ -9,7 +9,7 @@ const NAV = [
   { href: '/teacher/whiteboard', label: 'Whiteboard', icon: Presentation },
   { href: '/teacher/ai', label: 'AI assistant', icon: Sparkles },
   { href: '/teacher/plans', label: 'Lesson planner', icon: NotebookPen },
-  { href: '/teacher/assessments', label: 'Assessments & homework', icon: ClipboardList },
+  { href: '/teacher/assessments', label: 'Assessments', icon: ClipboardList },
   { href: '/teacher/questions', label: 'Question bank', icon: BookMarked },
   { href: '/teacher/exams', label: 'Exams', icon: FileText },
   { href: '/teacher/games', label: 'Games', icon: Gamepad2 },
