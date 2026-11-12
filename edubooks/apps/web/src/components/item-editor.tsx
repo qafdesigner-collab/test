@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, CheckCircle2, Circle, Plus, Trash2 } from 'lucide-r
 import { QTYPE_LABEL } from '@/lib/lms';
 import { Button, Card, Input, Select, Textarea, cn } from '@/components/ui';
 
-export interface Item { id?: string; type: 'MCQ' | 'TRUE_FALSE' | 'FILL_BLANK' | 'SHORT'; prompt: string; options: string[]; answer: any[]; points: number }
+export interface Item { id?: string; type: 'MCQ' | 'TRUE_FALSE' | 'FILL_BLANK' | 'SHORT' | 'READING'; prompt: string; options: string[]; answer: any[]; points: number }
 export const newItem = (type: Item['type'] = 'MCQ'): Item => ({ type, prompt: '', options: type === 'MCQ' ? ['', '', ''] : [], answer: type === 'MCQ' ? [0] : type === 'TRUE_FALSE' ? [true] : [], points: 1 });
 
 export function ItemEditor({ item, index, onChange, onRemove, onMove, count }: { item: Item; index: number; onChange: (i: Item) => void; onRemove?: () => void; onMove?: (d: -1 | 1) => void; count?: number }) {
@@ -20,7 +20,7 @@ export function ItemEditor({ item, index, onChange, onRemove, onMove, count }: {
           <button aria-label="Move down" disabled={index === (count ?? 1) - 1} onClick={() => onMove(1)} className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-30"><ArrowDown className="size-4" /></button></>}
         {onRemove && <button aria-label="Remove question" onClick={onRemove} className="rounded p-1 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 className="size-4" /></button>}
       </div>
-      <Textarea aria-label="Question" rows={2} placeholder={item.type === 'FILL_BLANK' ? 'Use ___ for the blank, e.g. “A is for ___”' : 'Write the question'} value={item.prompt} onChange={(e) => set({ prompt: e.target.value })} />
+      <Textarea aria-label="Question" rows={2} placeholder={item.type === 'FILL_BLANK' ? 'Use ___ for the blank, e.g. “A is for ___”' : item.type === 'READING' ? 'What should they read? e.g. “Read page 12 aloud, slowly and clearly”' : 'Write the question'} value={item.prompt} onChange={(e) => set({ prompt: e.target.value })} />
       {item.type === 'MCQ' && (
         <div className="space-y-2">
           {item.options.map((o, i) => (
@@ -43,6 +43,9 @@ export function ItemEditor({ item, index, onChange, onRemove, onMove, count }: {
       {item.type === 'FILL_BLANK' && (
         <div><Input aria-label="Accepted answers" placeholder="Accepted answers, separated by commas (e.g. cat, kitten)" value={item.answer.join(', ')} onChange={(e) => set({ answer: e.target.value.split(',').map((x) => x.trim()) })} />
           <p className="mt-1 text-xs text-slate-500">Marked automatically; capital letters and extra spaces are ignored.</p></div>
+      )}
+      {item.type === 'READING' && (
+        <p className="rounded-lg bg-violet-50 p-2 text-xs text-violet-800">🎤 Pupils record themselves reading (in the app, with the microphone) and hand in the recording. You listen and give the points. Write above what to read, e.g. “Read page 12 aloud”.</p>
       )}
       {item.type === 'SHORT' && (
         <div><Input aria-label="Model answer" placeholder="Model answer for you (optional)" value={item.answer[0] ?? ''} onChange={(e) => set({ answer: e.target.value ? [e.target.value] : [] })} />

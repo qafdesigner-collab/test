@@ -33,10 +33,11 @@ describe('Messaging, announcements and live lessons', () => {
     expect((await principal.get(`/api/messages/conversations/${conv.id}`)).body.readOnly).toBe(true);
     expect((await principal.post(`/api/messages/conversations/${conv.id}`).send({ body: 'x' })).status).toBe(403);
     expect((await teacher.get('/api/messages/conversations?all=1')).status).toBe(403);
-    // rules: no stranger chats, no pupil chat
+    // rules: no stranger chats; pupils only reach their own teachers and the school office
     const other = (await principal.get('/api/school/users?role=TEACHER')).body.items.find((u: any) => u.username !== 'teacher1');
     if (other) expect((await parent.post('/api/messages/conversations').send({ studentId: t.studentId, withId: other.id })).status).toBe(403);
-    expect((await student.get('/api/messages/contacts')).status).toBe(403);
+    const mine = (await student.get('/api/messages/contacts')).body;
+    expect(mine.every((c: any) => ['School office', 'Teacher'].includes(c.role) || /English|Maths|Urdu|General/i.test(c.role))).toBe(true);
     expect((await parent.post(`/api/messages/conversations/${conv.id}`).send({ body: '' })).status).toBe(400);
   });
 

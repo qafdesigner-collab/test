@@ -38,6 +38,7 @@ function LearnShell({ children }: { children: React.ReactNode }) {
         <Link href="/learn/me"><LevelBadge stars={ach.data?.stars ?? 0} /></Link>
         <Link href="/learn/me" className="flex items-center gap-1 rounded-full bg-white px-4 py-2 text-xl font-black text-amber-600 shadow">⭐ {ach.data?.stars ?? '…'}</Link>
         {ach.data?.streak > 0 && <span className="hidden items-center gap-1 rounded-full bg-white px-4 py-2 text-xl font-black text-orange-600 shadow sm:flex" title={t('Days in a row')}>🔥 {ach.data.streak}</span>}
+        <PupilMessagesButton />
         <LangSwitch className="bg-white text-violet-700 shadow" />
         <NotificationBell playful />
         <button onClick={async () => { await api.post('/auth/logout'); qc.clear(); router.replace('/login'); }} className="focus-ring rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-500 shadow" aria-label={t('Sign out')}>👋 {t('Bye')}</button>
@@ -60,6 +61,16 @@ function OfflineNote() {
   const { t } = useT(); const [off, setOff] = useState(false);
   useEffect(() => { const f = () => setOff(!navigator.onLine); f(); window.addEventListener('online', f); window.addEventListener('offline', f); return () => { window.removeEventListener('online', f); window.removeEventListener('offline', f); }; }, []);
   return off ? <p role="status" className="mx-auto mt-4 max-w-5xl rounded-2xl bg-slate-800 px-4 py-2 text-center font-bold text-white">📶 {t('You are offline. Saved books still open.')}</p> : null;
+}
+
+function PupilMessagesButton() {
+  const { t } = useT();
+  const q = useQuery({ queryKey: ['unread'], queryFn: () => api.get<{ unread: number }>('/messages/unread'), refetchInterval: 30_000 });
+  return (
+    <Link href="/learn/messages" className="focus-ring relative grid size-11 place-items-center rounded-full bg-white text-xl shadow" aria-label={t('Messages')} title={t('Messages')}>
+      💬{(q.data?.unread ?? 0) > 0 && <span className="absolute -end-1 -top-1 grid min-w-5 place-items-center rounded-full bg-red-500 px-1 text-xs font-black text-white">{q.data!.unread}</span>}
+    </Link>
+  );
 }
 
 function KidBrand() { return <>{useBranding().name}</>; }

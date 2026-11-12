@@ -34,13 +34,17 @@ export function cleanItem(i: ItemDto, n: number) {
       break;
     case 'SHORT':
       answer = answer.map((a) => String(a).trim()).filter(Boolean).slice(0, 1); break;
+    case 'READING': // the pupil records themself reading; the teacher listens and marks
+      answer = []; break;
   }
   return { type: i.type, prompt: i.prompt.trim(), options: i.type === 'MCQ' ? options : [], answer, points: i.points ?? 1 };
 }
 
 /** Auto-marks one response. Returns null for items needing a teacher (SHORT). */
 export function mark(item: { type: string; answer: any; points: number; options: any }, response: unknown): { correct: boolean | null; awarded: number | null } {
-  if (response === undefined || response === null || response === '') return { correct: item.type === 'SHORT' ? null : false, awarded: item.type === 'SHORT' ? null : 0 };
+  const manual = item.type === 'SHORT' || item.type === 'READING';
+  if (response === undefined || response === null || response === '') return { correct: manual ? null : false, awarded: manual ? null : 0 };
+  if (item.type === 'READING') return { correct: null, awarded: null };
   let correct: boolean | null = null;
   if (item.type === 'MCQ') correct = Number(response) === Number(item.answer[0]);
   else if (item.type === 'TRUE_FALSE') correct = (response === true || response === 'true') === item.answer[0];
@@ -338,7 +342,7 @@ export class LmsService {
     return {
       id: a.id, title: a.title, kind: a.kind, instructions: a.instructions, dueAt: a.dueAt, status: a.status, allowLate: a.allowLate,
       // Answers are NEVER sent before the work is marked.
-      items: items.map((i) => ({ id: i.id, type: i.type, prompt: i.prompt, options: i.options, points: i.points, ...(reveal && i.type !== 'SHORT' ? { answer: i.answer } : {}) })),
+      items: items.map((i) => ({ id: i.id, type: i.type, prompt: i.prompt, options: i.options, points: i.points, ...(reveal && i.type !== 'SHORT' && i.type !== 'READING' ? { answer: i.answer } : {}) })),
       submission: sub ? { status: sub.status, submittedAt: sub.submittedAt, answers: reveal ? sub.answers : (sub.answers as any[]).map((x) => ({ itemId: x.itemId, response: x.response })),
         score: reveal ? sub.score : null, maxScore: sub.maxScore, feedback: reveal ? sub.feedback : '' } : null,
     };
@@ -351,8 +355,12 @@ export class LmsService {
     const late = !!a.dueAt && a.dueAt < new Date();
     if (late && !a.allowLate) throw new ConflictException('The due date has passed.');
     const items = await this.q.select().from(assessmentItems).where(eq(assessmentItems.assessmentId, id));
+    // Read-aloud answers are recordings: they must be this pupil's own reading clips.
+    const clipIds = items.filter((it) => it.type === 'READING').map((it) => d.answers.find((x) => x.itemId === it.id)?.response).filter((v): v is string => typeof v === 'string' && /^[0-9a-f-]{36}$/.test(v));
+    const okClips = new Set(clipIds.length ? ((await this.q.execute(sql`SELECT id FROM audio_clips WHERE owner_id = ${this.ctx.userId} AND kind = 'READING' AND id = ANY(${`{${clipIds.join(',')}}`}::uuid[])`)).rows as any[]).map((r) => r.id) : []);
     const answers = items.map((it) => {
-      const response = d.answers.find((x) => x.itemId === it.id)?.response ?? null;
+      let response = d.answers.find((x) => x.itemId === it.id)?.response ?? null;
+      if (it.type === 'READING' && !(typeof response === 'string' && okClips.has(response))) response = null;
       const typed = typeof response === 'string' ? response.slice(0, 4000) : response;
       return { itemId: it.id, response: typed, ...mark(it, typed) };
     });

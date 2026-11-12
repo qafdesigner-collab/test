@@ -16,7 +16,7 @@ const arr = (ids: string[]) => `{${ids.join(',')}}`;
 const NONE = '00000000-0000-0000-0000-000000000000';
 
 class StartDto { @IsUUID() studentId!: string; @IsUUID() withId!: string; }
-class SendDto { @IsString() @Length(1, 2000) body!: string; }
+class SendDto { @IsOptional() @IsString() @MaxLength(2000) body?: string; @IsOptional() @IsUUID() audioId?: string; }
 class AnnouncementDto {
   @IsOptional() @IsUUID() classId?: string | null;
   @IsString() @Length(2, 160) title!: string;
@@ -39,6 +39,7 @@ export class MessagingService {
   private get ctx() { return this.db.ctx; }
   private async rows(s: ReturnType<typeof sql>) { return (await this.db.q.execute(s)).rows as any[]; }
   private async one(s: ReturnType<typeof sql>) { return (await this.rows(s))[0]; }
+  private isPupil() { return this.access.is('STUDENT') && !this.access.is('TEACHER') && !this.access.is('SCHOOL_ADMIN'); }
   private isParent() { return this.access.is('PARENT') && !this.access.is('TEACHER') && !this.access.is('SCHOOL_ADMIN'); }
   private async childIds() { return (await this.rows(sql`SELECT student_id FROM parent_students WHERE parent_id = ${this.ctx.userId}`)).map((r) => r.student_id as string); }
   /** Classes whose pupils this user may address: a teacher's own classes, every class for a school admin, a parent's children's classes. */
@@ -52,6 +53,17 @@ export class MessagingService {
   // ------------------------------------------------------------ contacts & conversations
   /** Parents see their children's teachers and the school office; staff see the parents of their pupils. */
   async contacts() {
+    if (this.isPupil()) {
+      // Pupils talk to their own teachers and the school office.
+      const cls = await this.access.studentClassIds();
+      return this.rows(sql`SELECT me.id AS "studentId", me.display_name AS "studentName", u.id, u.display_name AS "displayName",
+          CASE WHEN r.role = 'SCHOOL_ADMIN' THEN 'School office' ELSE coalesce((SELECT string_agg(DISTINCT s.name, ', ') FROM class_teachers ct2 LEFT JOIN subjects s ON s.id = ct2.subject_id
+            WHERE ct2.user_id = u.id AND ct2.class_id = ANY(${arr(cls.length ? cls : [NONE])}::uuid[])), 'Teacher') END AS role
+        FROM users me JOIN users u ON u.school_id = me.school_id AND u.status = 'ACTIVE' AND u.id <> me.id
+        JOIN user_roles r ON r.user_id = u.id AND r.role IN ('TEACHER', 'SCHOOL_ADMIN')
+        WHERE me.id = ${this.ctx.userId} AND (r.role = 'SCHOOL_ADMIN' OR EXISTS (SELECT 1 FROM class_teachers ct WHERE ct.user_id = u.id AND ct.class_id = ANY(${arr(cls.length ? cls : [NONE])}::uuid[])))
+        ORDER BY r.role DESC, u.display_name`);
+    }
     if (this.isParent()) {
       return this.rows(sql`SELECT k.id AS "studentId", k.display_name AS "studentName", u.id, u.display_name AS "displayName",
           CASE WHEN r.role = 'SCHOOL_ADMIN' THEN 'School office' ELSE coalesce((SELECT string_agg(DISTINCT s.name, ', ') FROM class_teachers ct2 LEFT JOIN subjects s ON s.id = ct2.subject_id
@@ -64,15 +76,23 @@ export class MessagingService {
     }
     const cls = await this.myClassIds();
     if (cls !== 'ALL' && !cls.length) return [];
-    return this.rows(sql`SELECT DISTINCT k.id AS "studentId", k.display_name AS "studentName", p.id, p.display_name AS "displayName", ps.relation AS role
-      FROM enrolments e JOIN users k ON k.id = e.student_id JOIN parent_students ps ON ps.student_id = k.id JOIN users p ON p.id = ps.parent_id AND p.status = 'ACTIVE'
-      WHERE ${cls === 'ALL' ? sql`true` : sql`e.class_id = ANY(${arr(cls)}::uuid[])`} ORDER BY k.display_name, p.display_name`);
+    // Staff: the parents of their pupils, and the pupils themselves.
+    const where = cls === 'ALL' ? sql`true` : sql`e.class_id = ANY(${arr(cls)}::uuid[])`;
+    return this.rows(sql`SELECT * FROM (
+        SELECT DISTINCT k.id AS "studentId", k.display_name AS "studentName", p.id, p.display_name AS "displayName", ps.relation AS role
+        FROM enrolments e JOIN users k ON k.id = e.student_id JOIN parent_students ps ON ps.student_id = k.id JOIN users p ON p.id = ps.parent_id AND p.status = 'ACTIVE'
+        WHERE ${where}
+        UNION
+        SELECT DISTINCT k.id, k.display_name, k.id, k.display_name, 'Pupil'
+        FROM enrolments e JOIN users k ON k.id = e.student_id AND k.status = 'ACTIVE' WHERE ${where}
+      ) t ORDER BY "studentName", (role = 'Pupil') DESC, "displayName"`);
   }
 
   async start(d: StartDto) {
     const ok = (await this.contacts()).some((c: any) => c.studentId === d.studentId && c.id === d.withId);
-    if (!ok) throw new ForbiddenException('You can only message the parents of your pupils, or your child’s teachers and school office');
-    const [parentId, staffId] = this.isParent() ? [this.ctx.userId, d.withId] : [d.withId, this.ctx.userId];
+    if (!ok) throw new ForbiddenException('You can only message your pupils and their parents, or your (child’s) teachers and school office');
+    // "parent_id" is the family side of the chat: a parent, or the pupil themself.
+    const [parentId, staffId] = this.isParent() || this.isPupil() ? [this.ctx.userId, d.withId] : [d.withId, this.ctx.userId];
     const c = await this.one(sql`INSERT INTO conversations (publisher_id, school_id, parent_id, staff_id, student_id) VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${parentId}, ${staffId}, ${d.studentId})
       ON CONFLICT (parent_id, staff_id, student_id) DO UPDATE SET parent_id = excluded.parent_id RETURNING id`);
     return c;
@@ -83,7 +103,8 @@ export class MessagingService {
     const me = this.ctx.userId;
     return this.rows(sql`SELECT c.id, c.last_message_at AS "lastMessageAt", k.display_name AS "studentName",
         p.id AS "parentId", p.display_name AS "parentName", s.id AS "staffId", s.display_name AS "staffName",
-        (SELECT body FROM messages m WHERE m.conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS "lastMessage",
+        (SELECT CASE WHEN m.body = '' AND m.audio_id IS NOT NULL THEN '🎤 Voice message' ELSE m.body END FROM messages m WHERE m.conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS "lastMessage",
+        c.parent_id = c.student_id AS "withPupil",
         (SELECT count(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_id <> ${me}
            AND m.created_at > coalesce((SELECT last_read_at FROM conversation_reads r WHERE r.conversation_id = c.id AND r.user_id = ${me}), '-infinity'))::int AS unread
       FROM conversations c JOIN users k ON k.id = c.student_id JOIN users p ON p.id = c.parent_id JOIN users s ON s.id = c.staff_id
@@ -107,29 +128,37 @@ export class MessagingService {
 
   async read(id: string) {
     const c = await this.conv(id, false);
-    const messages = await this.rows(sql`SELECT m.id, m.body, m.created_at AS "createdAt", m.sender_id AS "senderId", u.display_name AS "senderName"
-      FROM messages m LEFT JOIN users u ON u.id = m.sender_id WHERE m.conversation_id = ${id} ORDER BY m.created_at`);
+    const messages = await this.rows(sql`SELECT m.id, m.body, m.created_at AS "createdAt", m.sender_id AS "senderId", u.display_name AS "senderName",
+        m.audio_id AS "audioId", a.duration_ms AS "audioMs"
+      FROM messages m LEFT JOIN users u ON u.id = m.sender_id LEFT JOIN audio_clips a ON a.id = m.audio_id WHERE m.conversation_id = ${id} ORDER BY m.created_at`);
     if (c.mine) await this.db.q.execute(sql`INSERT INTO conversation_reads (conversation_id, user_id, publisher_id, school_id) VALUES (${id}, ${this.ctx.userId}, ${this.ctx.publisherId}, ${this.ctx.schoolId})
       ON CONFLICT (conversation_id, user_id) DO UPDATE SET last_read_at = now()`);
     const names = await this.one(sql`SELECT k.display_name AS "studentName", p.display_name AS "parentName", s.display_name AS "staffName" FROM users k, users p, users s WHERE k.id = ${c.student_id} AND p.id = ${c.parent_id} AND s.id = ${c.staff_id}`);
-    return { id, ...names, readOnly: !c.mine, me: this.ctx.userId, messages };
+    return { id, ...names, withPupil: c.parent_id === c.student_id, readOnly: !c.mine, me: this.ctx.userId, messages };
   }
 
   async send(id: string, d: SendDto) {
     const c = await this.conv(id, true);
-    const body = d.body.trim(); if (!body) throw new BadRequestException('Write a message');
+    const body = (d.body ?? '').trim();
+    if (!body && !d.audioId) throw new BadRequestException('Write a message or record a voice note');
+    if (d.audioId) {
+      const clip = await this.one(sql`SELECT owner_id, kind, (SELECT count(*)::int FROM messages WHERE audio_id = ${d.audioId}) AS used FROM audio_clips WHERE id = ${d.audioId}`);
+      if (!clip || clip.owner_id !== this.ctx.userId || clip.kind !== 'MESSAGE' || clip.used) throw new BadRequestException('That voice note cannot be sent');
+    }
     const to = c.parent_id === this.ctx.userId ? c.staff_id : c.parent_id;
     // Phone only for parents, and only when they have no unread message in this conversation yet (no flood of texts).
     const pending = await this.one(sql`SELECT count(*)::int AS n FROM messages m WHERE m.conversation_id = ${id} AND m.sender_id <> ${to}
       AND m.created_at > coalesce((SELECT last_read_at FROM conversation_reads r WHERE r.conversation_id = ${id} AND r.user_id = ${to}), '-infinity')`);
-    await this.db.q.execute(sql`INSERT INTO messages (publisher_id, school_id, conversation_id, sender_id, body) VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${id}, ${this.ctx.userId}, ${body})`);
+    await this.db.q.execute(sql`INSERT INTO messages (publisher_id, school_id, conversation_id, sender_id, body, audio_id) VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${id}, ${this.ctx.userId}, ${body}, ${d.audioId ?? null})`);
     await this.db.q.execute(sql`UPDATE conversations SET last_message_at = now() WHERE id = ${id}`);
     await this.db.q.execute(sql`INSERT INTO conversation_reads (conversation_id, user_id, publisher_id, school_id) VALUES (${id}, ${this.ctx.userId}, ${this.ctx.publisherId}, ${this.ctx.schoolId})
       ON CONFLICT (conversation_id, user_id) DO UPDATE SET last_read_at = now()`);
     const sender = await this.one(sql`SELECT display_name FROM users WHERE id = ${this.ctx.userId}`);
-    const toParent = to === c.parent_id;
+    const toPupil = to === c.parent_id && c.parent_id === c.student_id;
+    const toParent = to === c.parent_id && !toPupil;
     const target = await this.one(sql`SELECT id, phone FROM users WHERE id = ${to}`);
-    await this.notifications.notify([target], { kind: 'MESSAGE', title: `New message from ${sender.display_name}`, body: body.slice(0, 140), link: toParent ? `/parent/messages?c=${id}` : `/messages?c=${id}` },
+    await this.notifications.notify([target], { kind: 'MESSAGE', title: `New message from ${sender.display_name}`, body: body ? body.slice(0, 140) : '🎤 Voice message',
+      link: toParent ? `/parent/messages?c=${id}` : toPupil ? `/learn/messages?c=${id}` : `/messages?c=${id}` },
       { phone: toParent && !pending.n });
     return this.read(id);
   }
@@ -210,7 +239,7 @@ export class MessagingService {
   }
 }
 
-const SCHOOL = ['SCHOOL_ADMIN', 'TEACHER', 'PARENT'];
+const SCHOOL = ['SCHOOL_ADMIN', 'TEACHER', 'PARENT', 'STUDENT'];
 const ALLIN = ['SCHOOL_ADMIN', 'TEACHER', 'PARENT', 'STUDENT'];
 @ApiTags('messaging')
 @Controller()

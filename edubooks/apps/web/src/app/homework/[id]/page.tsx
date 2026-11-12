@@ -4,6 +4,7 @@ import { use, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Volume2, XCircle } from 'lucide-react';
 import { LangScope, useT } from '@/lib/i18n';
+import { Clip, ReadAloud } from '@/components/voice';
 import { api, fmtDay } from '@/lib/api';
 import { cn, ErrorBox, PageLoader } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
@@ -16,7 +17,7 @@ export default function Homework(props: { params: Promise<{ id: string }> }) { r
 function HomeworkPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params); const qc = useQueryClient(); const toast = useToast(); const { t } = useT();
   const q = useQuery({ queryKey: ['homework', id], queryFn: () => api.get(`/student/homework/${id}`) });
-  const [i, setI] = useState(0); const [answers, setAnswers] = useState<Record<string, any>>({}); const [busy, setBusy] = useState(false);
+  const [i, setI] = useState(0); const [answers, setAnswers] = useState<Record<string, any>>({}); const [clips, setClips] = useState<Record<string, Clip>>({}); const [busy, setBusy] = useState(false);
   if (q.isLoading) return <PageLoader />;
   if (q.error) return <div className="p-6"><ErrorBox error={q.error} /></div>;
   const h = q.data; const sub = h.submission;
@@ -70,6 +71,7 @@ function HomeworkPage({ params }: { params: Promise<{ id: string }> }) {
           <button key={n} onClick={() => set(n)} aria-pressed={val === n} className={cn('rounded-2xl px-5 py-4 text-left text-xl font-bold text-white shadow transition', COLORS[n % COLORS.length], val === n ? 'scale-105 ring-4 ring-slate-800' : '')}>{o}</button>))}</div>}
         {it.type === 'TRUE_FALSE' && <div className="grid grid-cols-2 gap-3">{[true, false].map((v) => (
           <button key={String(v)} onClick={() => set(v)} aria-pressed={val === v} className={cn('rounded-2xl py-6 text-2xl font-extrabold text-white shadow', v ? 'bg-emerald-700' : 'bg-red-600', val === v ? 'scale-105 ring-4 ring-slate-800' : '')}>{v ? '👍 True' : '👎 False'}</button>))}</div>}
+        {it.type === 'READING' && <ReadAloud playful value={clips[it.id] ?? null} onChange={(c: Clip | null) => { setClips({ ...clips, [it.id]: c as Clip }); set(c ? c.id : undefined); }} />}
         {(it.type === 'FILL_BLANK' || it.type === 'SHORT') && <input autoFocus aria-label="Your answer" value={val ?? ''} onChange={(e) => set(e.target.value)} placeholder="Type your answer ✏️"
           className="w-full rounded-2xl border-4 border-sky-200 px-5 py-4 text-2xl outline-none focus:border-sky-400" />}
       </div>

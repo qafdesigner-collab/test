@@ -8,6 +8,7 @@ import { useBranding } from '@/lib/branding';
 import { useMe } from '@/lib/session';
 import { printExamPaper } from '@/lib/print-docs';
 import { useToast } from '@/components/ui/toast';
+import { VoicePlayer } from '@/components/voice';
 import { api, downloadCsv, fmtDate, fmtDay } from '@/lib/api';
 import { useAction } from '@/lib/hooks';
 import { className, KIND_LABEL, QTYPE_LABEL, useMyClasses } from '@/lib/lms';
@@ -160,7 +161,7 @@ function MarkDialog({ a, student, onClose }: { a: any; student: any; onClose: ()
           return (
             <div key={it.id} className="rounded-lg border border-slate-200 p-3 text-sm">
               <div className="flex justify-between gap-2"><span className="font-medium">{i + 1}. {it.prompt}</span><span className="text-xs text-slate-500">{QTYPE_LABEL[it.type]}</span></div>
-              <div className="mt-1 flex flex-wrap items-center gap-2"><span className="text-slate-500">Answer:</span><b>{String(shown(it, ans.response))}</b>
+              <div className="mt-1 flex flex-wrap items-center gap-2"><span className="text-slate-500">Answer:</span>{it.type === 'READING' ? (ans.response ? <VoicePlayer id={ans.response} big /> : <b>— no recording</b>) : <b>{String(shown(it, ans.response))}</b>}
                 {ans.correct === true && <CheckCircle2 className="size-4 text-emerald-600" />}{ans.correct === false && <XCircle className="size-4 text-red-500" />}
                 {it.type === 'SHORT' && it.answer[0] && <span className="text-xs text-slate-500">Model: {it.answer[0]}</span>}
                 <span className="flex-1" /><label className="flex items-center gap-1">Points<Input type="number" min={0} max={it.points} className="h-8 w-16" value={scores[it.id] ?? ''}

@@ -3,7 +3,7 @@ import {
   ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsDefined, IsEnum, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Length, Max, MaxLength, Min, ValidateNested,
 } from 'class-validator';
 
-export const QTYPES = ['MCQ', 'TRUE_FALSE', 'FILL_BLANK', 'SHORT'] as const;
+export const QTYPES = ['MCQ', 'TRUE_FALSE', 'FILL_BLANK', 'SHORT', 'READING'] as const;
 export type QType = (typeof QTYPES)[number];
 
 export class ItemDto {

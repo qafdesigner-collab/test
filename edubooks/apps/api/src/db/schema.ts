@@ -490,7 +490,7 @@ export const accessEntitlements = pgTable('access_entitlements', {
 // =====================================================================================
 export const assessmentKindEnum = pgEnum('assessment_kind', ['HOMEWORK', 'QUIZ', 'TEST']);
 export const assessmentStatusEnum = pgEnum('assessment_status', ['DRAFT', 'PUBLISHED', 'CLOSED']);
-export const questionTypeEnum = pgEnum('question_type', ['MCQ', 'TRUE_FALSE', 'FILL_BLANK', 'SHORT']);
+export const questionTypeEnum = pgEnum('question_type', ['MCQ', 'TRUE_FALSE', 'FILL_BLANK', 'SHORT', 'READING']);
 export const submissionStatusEnum = pgEnum('submission_status', ['SUBMITTED', 'GRADED', 'RETURNED']);
 export const planStatusEnum = pgEnum('plan_status', ['DRAFT', 'READY']);
 const schoolCols = () => ({

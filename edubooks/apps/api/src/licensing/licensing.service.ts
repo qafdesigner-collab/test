@@ -1,3 +1,4 @@
+import { AssetsService } from '../storage/assets.service';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, sql, SQL } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
@@ -16,7 +17,7 @@ const LIVE = ['ACTIVE', 'SUSPENDED'] as const;
 export class LicensingService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger('Licensing');
   private timer?: NodeJS.Timeout;
-  constructor(private readonly db: DbService, private readonly audit: AuditService, private readonly commerce: CommerceService) {}
+  constructor(private readonly db: DbService, private readonly audit: AuditService, private readonly commerce: CommerceService, private readonly assets: AssetsService) {}
   private get q() { return this.db.q; }
   private get ctx() { return this.db.ctx; }
 
@@ -193,8 +194,12 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
     const live = await this.q.select({ id: licenseAssignments.id }).from(licenseAssignments)
       .where(and(eq(licenseAssignments.userId, studentId), sql`${licenseAssignments.status} IN ('ACTIVE', 'SUSPENDED')`));
     for (const a of live) await this.endAssignment(a.id, 'RELEASED', 'Student data erased');
+    // Voice recordings: the child's own, and voice notes in chats about the child.
+    const { rows: clips } = await this.q.execute(sql`DELETE FROM audio_clips WHERE owner_id = ${studentId}
+      OR id IN (SELECT m.audio_id FROM messages m JOIN conversations c ON c.id = m.conversation_id WHERE c.student_id = ${studentId} AND m.audio_id IS NOT NULL) RETURNING storage_key`);
     const { rows } = await this.q.execute(sql`SELECT erase_student_data(${studentId}::uuid, ${schoolId}::uuid, ${this.ctx.userId}::uuid) AS anon`);
-    return { ok: true, seatsFreed: live.length, username: (rows[0] as any).anon };
+    for (const c of clips as any[]) this.assets.driver.remove(c.storage_key).catch(() => undefined);
+    return { ok: true, seatsFreed: live.length, username: (rows[0] as any).anon, recordingsDeleted: clips.length };
   }
 
   async release(id: string, reason: string) {
