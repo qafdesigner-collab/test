@@ -14,7 +14,7 @@ export default function UpdatesPage() {
   const { data: me } = useMe();
   const qc = useQueryClient();
   const [waiting, setWaiting] = useState(false);
-  const q = useQuery({ queryKey: ['updates'], queryFn: () => api.get('/system/updates'), refetchInterval: waiting ? 2500 : false, retry: false });
+  const q = useQuery({ queryKey: ['updates'], queryFn: () => api.get('/system/updates'), refetchInterval: (qq) => (waiting || BUSY.includes((qq.state.data as any)?.state?.state) ? 3000 : false), retry: false });
   const st = q.data?.state;
   const busy = waiting || BUSY.includes(st?.state);
   const atBefore = useRef<string | null>(null);
@@ -141,11 +141,24 @@ function PasswordDialog({ title, action, path, note, onClose, onDone }: { title:
 }
 
 function Progress({ state, offline }: { state: any; offline: boolean }) {
+  const [t0] = useState(() => Date.now());
+  const [, tick] = useState(0);
+  useEffect(() => { const i = setInterval(() => tick((n) => n + 1), 5000); return () => clearInterval(i); }, []);
+  const since = state?.at ? Date.now() - new Date(state.at).getTime() : 0;
+  const mins = Math.floor(Math.max(Date.now() - t0, since) / 60_000);
   return (
-    <Card className="flex items-center gap-4 p-6">
-      <Loader2 className="size-8 animate-spin text-brand-600" />
-      <div><div className="font-semibold">{offline ? 'Restarting Knowledge Gate…' : state?.step || 'Working…'}</div>
-        <div className="text-sm text-slate-600">Please keep this page open. It updates by itself, usually within a minute or two.</div></div>
+    <Card className="space-y-3 p-6">
+      <div className="flex items-center gap-4">
+        <Loader2 className="size-8 animate-spin text-brand-600" />
+        <div><div className="font-semibold">{offline ? 'Restarting Knowledge Gate…' : state?.step || 'Working…'}</div>
+          <div className="text-sm text-slate-600">Please keep this page open. It updates by itself, usually within a minute or two.{mins > 0 && ` (${mins} min)`}</div></div>
+      </div>
+      {mins >= 3 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <b>This is taking longer than usual.</b> Your hosting may not have restarted the app by itself. Open <b>cPanel → Setup Node.js App</b>, click <b>Restart</b> next to Knowledge Gate, wait a minute and reload this page.
+          The update finishes on its own after the restart; if anything went wrong, the previous version is put back automatically.
+        </div>
+      )}
     </Card>
   );
 }

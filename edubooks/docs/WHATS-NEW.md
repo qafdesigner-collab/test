@@ -1,3 +1,8 @@
+# What's new in Knowledge Gate 1.3.2
+
+- **More reliable updates on shared hosting.** Some hosts keep several copies of the app running and do not restart all of them after an update, so the Updates page could stay on "Restarting with the new version". Now every copy notices a newly installed version within about 20 seconds and restarts itself, the update confirms itself as soon as the new version runs, and a check that never reports back is resolved automatically (finished, or a clear message) instead of spinning.
+- The Updates page keeps checking for the result even after you reload it, and after 3 minutes it tells you what to do (cPanel → Setup Node.js App → Restart).
+
 # What's new in Knowledge Gate 1.3.1
 
 Install with the full zip (`edubooks-lms-public_html.zip`) through **Super admin → Updates**. The database is updated automatically.

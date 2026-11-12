@@ -37,7 +37,43 @@ function addHistory(entry) {
 }
 const rm = (p) => fs.rmSync(p, { recursive: true, force: true });
 
-function status() {
+const BUSY = ['applying', 'restarting'];
+const ageMin = (st) => (st?.at ? (Date.now() - new Date(st.at).getTime()) / 60_000 : 0);
+
+/**
+ * Self-healing for an update that never reported back (e.g. the host kept an old app process alive,
+ * or the start-up bookkeeping was interrupted). Called whenever the status is read.
+ */
+function heal(log = () => {}) {
+  const st = readJson(STATE);
+  if (!st || !BUSY.includes(st.state)) return;
+  const p = readJson(PENDING);
+  const running = process.env.EDUBOOKS_RUNNING_BUILD || '';
+  if (p && !p.rollback && running && running === p.build) { onBootSuccess(log); return; } // new code is running: just confirm
+  if (p && p.rollback && running && running === buildOf(ROOT)) { onBootSuccess(log); return; }
+  const age = ageMin(st);
+  if (st.state === 'restarting' && p && age > 2 && running && running !== (p.build || buildOf(ROOT))) {
+    // An old process is still serving: ask the host to restart again (at most every 2 minutes).
+    if (!st.kickedAt || Date.now() - new Date(st.kickedAt).getTime() > 120_000) {
+      writeJson(STATE, { ...st, kickedAt: new Date().toISOString() });
+      log('warn', 'Update: an old app process is still running; restarting again');
+      restart();
+    }
+    return;
+  }
+  if (st.state === 'restarting' && !p && age > 2) {
+    const now = buildOf(ROOT);
+    if (st.build && now === st.build) {
+      setState({ state: 'done', build: st.build, from: st.current, newDatabaseChanges: st.newDatabaseChanges });
+      if (!readJson(HISTORY, []).some((h) => h.to === st.build && h.result === 'ok')) addHistory({ action: 'update', from: st.current, to: st.build, result: 'ok', newDatabaseChanges: st.newDatabaseChanges });
+    } else setState({ state: 'failed', error: `The update did not finish. The installed version is still ${now}. Please upload the update again.` });
+    return;
+  }
+  if (st.state === 'applying' && age > 45) setState({ state: 'failed', error: 'The update stopped while installing. Your site keeps the installed version. Please upload the update again.' });
+}
+
+function status(log) {
+  try { heal(log); } catch (e) { log && log('error', `Update self-check failed: ${e.message}`); }
   return {
     current: buildOf(ROOT),
     previous: fs.existsSync(path.join(PREVIOUS, 'BUILD_ID')) ? buildOf(PREVIOUS) : null,
@@ -79,8 +115,9 @@ function unzip(zipFile, dest) {
 
 /** Unpacks and checks an update package. Accepts the full public_html zip or the small update zip. */
 async function stage(zipFile) {
+  try { heal(); } catch { /* best effort */ }
   const st = readJson(STATE);
-  if (st && ['applying', 'restarting'].includes(st.state)) throw new Error('An update is already running.');
+  if (st && BUSY.includes(st.state) && ageMin(st) < 45) throw new Error('An update is already running.');
   rm(STAGING); fs.mkdirSync(STAGING, { recursive: true });
   try {
     await unzip(zipFile, STAGING);
@@ -152,18 +189,21 @@ function restart() {
 
 /** Called at start-up when the database and website are running again. */
 function onBootSuccess(log = () => {}) {
-  const p = readJson(PENDING);
+  // Several app processes may start at once: only the one that claims the marker does the bookkeeping.
+  const claimed = `${PENDING}.${process.pid}`;
+  try { fs.renameSync(PENDING, claimed); } catch { return; }
+  const p = readJson(claimed); rm(claimed);
   if (!p) return;
-  rm(PENDING);
-  rm(`${PREVIOUS}-older`);
   if (p.rollback) {
     setState({ state: 'rolled_back', build: buildOf(ROOT), message: p.message || 'Returned to the previous version.' });
     addHistory({ action: 'rollback', from: p.from, to: buildOf(ROOT), result: 'ok', message: p.message });
-    return;
+  } else {
+    setState({ state: 'done', build: p.build, from: p.from, newDatabaseChanges: p.newDatabaseChanges, backupFile: p.backupFile });
+    addHistory({ action: 'update', from: p.from, to: p.build, result: 'ok', newDatabaseChanges: p.newDatabaseChanges, backupFile: p.backupFile });
+    log('info', `Update to ${p.build} completed`);
   }
-  setState({ state: 'done', build: p.build, from: p.from, newDatabaseChanges: p.newDatabaseChanges, backupFile: p.backupFile });
-  addHistory({ action: 'update', from: p.from, to: p.build, result: 'ok', newDatabaseChanges: p.newDatabaseChanges, backupFile: p.backupFile });
-  log('info', `Update to ${p.build} completed`);
+  // Tidy up the version before last afterwards, without holding up start-up; failures here never matter.
+  setTimeout(() => { try { rm(`${PREVIOUS}-older`); } catch (e) { log('warn', `Could not remove an old version folder: ${e.message}`); } }, 5000).unref();
 }
 
 /** Called at start-up when the new version could not start: puts the previous code back and restarts. Returns true when it did. */

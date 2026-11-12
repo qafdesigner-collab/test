@@ -52,6 +52,7 @@ async function bootApp() {
   loadEnv();
   process.env.NODE_ENV = 'production';
   process.env.EDUBOOKS_APP_ROOT = ROOT; // enables Super admin → Updates
+  try { process.env.EDUBOOKS_RUNNING_BUILD = fs.readFileSync(path.join(ROOT, 'BUILD_ID'), 'utf8').trim(); } catch { /* no build id */ }
   if (process.env.DB_MODE === 'embedded') {
     const edb = require('./embedded-db');
     const restored = await edb.restoreIfRequested(process.env.PG_SUPER_PASSWORD);
@@ -90,6 +91,14 @@ async function bootApp() {
   await app.init();
   handler = withStatus(ex);
   try { require('./updater').onBootSuccess(log); } catch (e) { log('error', `Update bookkeeping failed: ${e.message}`); }
+  // Hosts may keep several app processes and not all of them honour tmp/restart.txt. A process whose code
+  // was replaced by an update steps down by itself, so the host starts the new version in its place.
+  const mine = process.env.EDUBOOKS_RUNNING_BUILD;
+  if (mine) setInterval(() => {
+    let onDisk = '';
+    try { onDisk = fs.readFileSync(path.join(ROOT, 'BUILD_ID'), 'utf8').trim(); } catch { return; }
+    if (onDisk && onDisk !== mine) { log('info', `A new version (${onDisk}) is installed; this process (${mine}) restarts`); setTimeout(() => process.exit(0), 1000).unref(); }
+  }, 20_000).unref();
   console.log(JSON.stringify({ level: 'info', msg: 'Knowledge Gate started', node: process.version }));
 }
 

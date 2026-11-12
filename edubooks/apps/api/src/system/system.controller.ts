@@ -50,7 +50,7 @@ export class SystemController {
   @Get()
   status() {
     if (!root() || !fs.existsSync(path.join(root(), 'updater.js'))) return { supported: false };
-    return { supported: true, ...updater().status() };
+    return { supported: true, ...updater().status(logFn(this.log)) };
   }
 
   /** Upload a package: it is unpacked and checked, nothing is changed yet. */
