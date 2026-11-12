@@ -13,7 +13,8 @@ export function extractPdfPages(file: string, opts: { timeoutMs?: number; maxPag
       { timeout: opts.timeoutMs ?? 180_000, maxBuffer: 256 * 1024 * 1024, cwd: path.dirname(SCRIPT) },
       (err, stdout, stderr) => {
         if (err) return reject(new Error(err.killed ? 'Text extraction timed out' : `Could not read the PDF: ${(stderr || err.message).split('\n')[0].slice(0, 200)}`));
-        try { resolve(JSON.parse(stdout)); } catch { reject(new Error('Text extraction produced unreadable output')); }
+        // Tolerate stray text before the JSON (older scripts / third-party warnings).
+        try { resolve(JSON.parse(stdout.slice(Math.max(0, stdout.indexOf('{"numPages"'))))); } catch { reject(new Error('Text extraction produced unreadable output')); }
       });
   });
 }

@@ -1,6 +1,9 @@
 // Extracts text per page from a PDF. Runs as a separate, time-limited child process so a
 // malformed or hostile PDF can never crash or hang the API. Output: JSON { pages: string[] } on stdout.
 import { readFile } from 'fs/promises';
+// pdf.js may print warnings (e.g. when the optional canvas package is not installed on shared hosting).
+// Send every console message to stderr so stdout carries only the JSON result.
+for (const k of ['log', 'info', 'warn', 'debug']) console[k] = (...a) => process.stderr.write(a.join(' ') + '\n');
 const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
 const file = process.argv[2];
 const maxPages = Number(process.argv[3] || 2000);

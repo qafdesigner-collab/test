@@ -1,4 +1,15 @@
-# What's new in Knowledge Gate 1.2
+# What's new in Knowledge Gate 1.2.1
+
+## Demo data you can load and remove
+**Super admin → Demo data → Load demo data** fills your site with sample content to try every feature:
+3 demo schools (codes **DEMO1**, **DEMO2**, **DEMO3**) with a school admin, teacher, pupils and a parent; 5 sample books marked “(Demo)”;
+products, orders and licences; games; a class with homework, attendance, a timetable, an exam with results, messages, announcements and a live lesson; and a training course.
+The page lists the demo sign-ins (for example school **DEMO1**, user **student1**, password **Student@123**).
+
+When you are done, **Remove all demo data** (type REMOVE to confirm) deletes all of it in one go. Your real schools, books, users and settings are not touched.
+If a real school has started using a demo item — for example ordered a demo product — nothing is removed and the page tells you which school, so you can fix that first.
+
+# Knowledge Gate 1.2
 
 Install with the full zip (`edubooks-lms-public_html.zip`) through **Super admin → Updates**. The database is updated automatically.
 
