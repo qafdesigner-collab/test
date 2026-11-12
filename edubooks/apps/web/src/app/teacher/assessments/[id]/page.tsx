@@ -3,7 +3,11 @@ import Link from 'next/link';
 import { Suspense, use, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, BookMarked, CheckCircle2, Download, Plus, Send, Trash2, XCircle } from 'lucide-react';
+import { ArrowLeft, BookMarked, CheckCircle2, Download, KeyRound, Plus, Printer, Send, Sparkles, Trash2, XCircle } from 'lucide-react';
+import { useBranding } from '@/lib/branding';
+import { useMe } from '@/lib/session';
+import { printExamPaper } from '@/lib/print-docs';
+import { useToast } from '@/components/ui/toast';
 import { api, downloadCsv, fmtDate, fmtDay } from '@/lib/api';
 import { useAction } from '@/lib/hooks';
 import { className, KIND_LABEL, QTYPE_LABEL, useMyClasses } from '@/lib/lms';
@@ -16,7 +20,15 @@ function Builder({ initial, id }: { initial: any; id: string | null }) {
   const router = useRouter(); const classes = useMyClasses();
   const [f, setF] = useState<any>(initial); const [items, setItems] = useState<Item[]>(initial.items ?? [newItem()]);
   const roster = useQuery({ queryKey: ['class', f.classId], queryFn: () => api.get(`/classes/${f.classId}`), enabled: !!f.classId });
-  const [bank, setBank] = useState(false); const [publishAsk, setPublishAsk] = useState(false);
+  const [bank, setBank] = useState(false); const [publishAsk, setPublishAsk] = useState(false); const [ai, setAi] = useState(false);
+  const brand = useBranding(); const me = useMe().data;
+  const printSheet = (key: boolean) => {
+    const cls = classes.data?.find((c) => c.id === f.classId);
+    const list = items.filter((i) => i.prompt.trim());
+    printExamPaper({ title: f.title || 'Assessment sheet', durationMin: f.durationMin ?? 30, instructions: f.instructions ?? '', total: list.reduce((n, i) => n + (i.points || 0), 0),
+      school: me?.school?.name, className: cls?.name, classSection: cls?.section, subject: f.bookTitle ?? null,
+      items: list.map((i, n) => ({ id: String(n), section: 'A', type: i.type, prompt: i.prompt, options: i.options, answer: i.answer, marks: i.points || 0, lines: i.type === 'SHORT' ? 3 : 0 })) }, brand, { key });
+  };
   const body = () => ({ title: f.title, instructions: f.instructions, dueAt: f.dueAt ? new Date(f.dueAt).toISOString() : null, allowLate: f.allowLate, studentIds: f.studentIds ?? [],
     // Send only question fields (server rows also carry ids/positions, which the API rightly rejects).
     items: items.map(({ type, prompt, options, answer, points }) => ({ type, prompt, options, points, answer: type === 'FILL_BLANK' ? answer.filter((x: string) => x) : answer })) });
@@ -29,7 +41,7 @@ function Builder({ initial, id }: { initial: any; id: string | null }) {
   return (
     <div className="space-y-6">
       <Link href="/teacher/assessments" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"><ArrowLeft className="size-4" />Homework & tests</Link>
-      <PageHeader title={id ? `Edit: ${f.title}` : 'New homework or test'} sub={`${items.length} questions · ${points} points`}>
+      <PageHeader title={id ? `Edit: ${f.title}` : 'New assessment sheet'} sub={`${items.length} questions · ${points} points`}>
         <Button variant="secondary" onClick={() => save.mutate()} loading={save.isPending} disabled={!f.title || !f.classId}>Save draft</Button>
         {id && <Button variant="success" onClick={() => setPublishAsk(true)}><Send className="size-4" />Publish</Button>}
       </PageHeader>
@@ -54,12 +66,63 @@ function Builder({ initial, id }: { initial: any; id: string | null }) {
         )}
       </Card>
       <div className="space-y-3">{items.map((it, i) => <ItemEditor key={i} item={it} index={i} count={items.length} onChange={(n) => setItems(items.map((x, j) => (j === i ? n : x)))} onRemove={() => setItems(items.filter((_, j) => j !== i))} onMove={(d) => move(i, d)} />)}</div>
-      <div className="flex gap-2"><Button variant="secondary" onClick={() => setItems([...items, newItem()])}><Plus className="size-4" />Add question</Button>
-        {id && <Button variant="ghost" onClick={() => setBank(true)}><BookMarked className="size-4" />From question bank</Button>}</div>
+      <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setItems([...items, newItem()])}><Plus className="size-4" />Add question</Button>
+        <Button variant="secondary" onClick={() => setAi(true)} className="border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100"><Sparkles className="size-4" />Ask AI for questions</Button>
+        {id && <Button variant="ghost" onClick={() => setBank(true)}><BookMarked className="size-4" />From question bank</Button>}
+        <span className="flex-1" />
+        <Button variant="ghost" onClick={() => printSheet(false)} disabled={!items.some((i) => i.prompt.trim())}><Printer className="size-4" />Print sheet</Button>
+        <Button variant="ghost" onClick={() => printSheet(true)} disabled={!items.some((i) => i.prompt.trim())}><KeyRound className="size-4" />Answer key</Button></div>
+      {ai && <AiQuestions editionId={f.editionId} lessonId={f.lessonId} onClose={() => setAi(false)}
+        onAdd={(add) => { setItems([...items.filter((i) => i.prompt.trim()), ...add]); setAi(false); }} />}
       {bank && id && <BankPicker assessmentId={id} editionId={f.editionId} onClose={() => setBank(false)} beforeAdd={() => api.patch(`/teacher/assessments/${id}`, body())} />}
       <Confirm open={publishAsk} onOpenChange={setPublishAsk} title="Publish to the class?" confirmLabel="Publish" loading={publish.isPending} onConfirm={() => publish.mutate()}
         body={<p>Students can see and answer it straight away. Once someone has answered, the questions can no longer be changed.</p>} />
     </div>
+  );
+}
+
+/** Ask the AI for questions on the chosen book lesson, review them, then add the ones you want to the sheet. */
+function AiQuestions({ editionId, lessonId, onClose, onAdd }: { editionId?: string | null; lessonId?: string | null; onClose: () => void; onAdd: (items: Item[]) => void }) {
+  const toast = useToast();
+  const [o, setO] = useState({ task: 'ASSESSMENT', count: 5, difficulty: 'EASY', notes: '' });
+  const [busy, setBusy] = useState(false); const [res, setRes] = useState<any>(null); const [pick, setPick] = useState<number[]>([]);
+  const ask = async () => {
+    setBusy(true); setRes(null);
+    try { const r = await api.post<any>('/ai/generate', { task: o.task, editionId, lessonId: lessonId || undefined, count: o.count, difficulty: o.difficulty, notes: o.notes || undefined });
+      setRes(r); setPick((r.output?.items ?? []).map((_: any, i: number) => i)); }
+    catch (e: any) { toast(e.message, 'err'); } finally { setBusy(false); }
+  };
+  const items: any[] = res?.output?.items ?? [];
+  const toItem = (it: any): Item => ({ type: it.type, prompt: it.prompt ?? '', options: it.type === 'MCQ' ? (it.options ?? []) : [], answer: it.answer ?? (it.type === 'TRUE_FALSE' ? [true] : it.type === 'MCQ' ? [0] : []), points: 1 });
+  return (
+    <Dialog open onOpenChange={onClose} wide title="✨ Ask AI for questions" description="The AI reads the chosen lesson of your book and suggests questions. Check each one before you use it.">
+      {!editionId ? <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Choose the book and lesson (the topic) above first, so the questions match what your pupils have read.</p> : (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-4">
+            <Field label="Kind"><Select value={o.task} onChange={(e) => setO({ ...o, task: e.target.value })}><option value="ASSESSMENT">Assessment (mixed)</option><option value="WORKSHEET">Worksheet (write-in)</option><option value="HOMEWORK">Homework</option></Select></Field>
+            <Field label="How many"><Input type="number" min={1} max={20} value={o.count} onChange={(e) => setO({ ...o, count: Math.min(20, Math.max(1, Number(e.target.value) || 1)) })} /></Field>
+            <Field label="Level"><Select value={o.difficulty} onChange={(e) => setO({ ...o, difficulty: e.target.value })}><option value="EASY">Easy</option><option value="MEDIUM">Medium</option><option value="HARD">Hard</option></Select></Field>
+            <div className="flex items-end"><Button className="w-full" onClick={ask} loading={busy}><Sparkles className="size-4" />{res ? 'Ask again' : 'Suggest'}</Button></div>
+          </div>
+          <Field label="Anything special?" hint="Optional, e.g. “focus on words that start with B”"><Input value={o.notes} maxLength={500} onChange={(e) => setO({ ...o, notes: e.target.value })} /></Field>
+          {!lessonId && <p className="text-xs text-slate-500">Tip: choose a lesson above for questions on that exact topic; otherwise the AI uses the whole book.</p>}
+          {res && (
+            <div className="space-y-2">
+              {(res.warnings ?? []).map((w: string) => <p key={w} className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">{w}</p>)}
+              <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+                {items.map((it, i) => (
+                  <li key={i}><label className="flex items-start gap-3 p-3 text-sm"><input type="checkbox" className="mt-1" checked={pick.includes(i)} onChange={(e) => setPick(e.target.checked ? [...pick, i] : pick.filter((x) => x !== i))} />
+                    <span className="min-w-0"><span className="font-medium text-slate-900">{i + 1}. {it.prompt}</span>
+                      <span className="block text-xs text-slate-500">{QTYPE_LABEL[it.type] ?? it.type}{it.type === 'MCQ' && it.options ? ` · ${it.options.map((x: string, k: number) => (it.answer?.[0] === k ? `✔ ${x}` : x)).join(' · ')}` : it.type === 'TRUE_FALSE' ? ` · answer: ${it.answer?.[0] ? 'True' : 'False'}` : it.answer?.length ? ` · answer: ${it.answer.join(' / ')}` : ''}</span></span></label></li>))}
+                {!items.length && <li className="p-4 text-center text-sm text-slate-500">No questions came back. Try again or change the notes.</li>}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+      <div className="mt-4 flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button disabled={!pick.length} onClick={() => onAdd(pick.sort((a, b) => a - b).map((i) => toItem(items[i])))}><Plus className="size-4" />Add {pick.length || ''} to the sheet</Button></div>
+    </Dialog>
   );
 }
 
