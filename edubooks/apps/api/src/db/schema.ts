@@ -94,6 +94,8 @@ export const sessions = pgTable('sessions', {
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
   ip: text('ip'),
   userAgent: text('user_agent'),
+  impersonatorId: uuid('impersonator_id'),
+  impersonatorName: text('impersonator_name'),
 }, (t) => [index('sessions_user_idx').on(t.userId)]);
 
 export const auditLogs = pgTable('audit_logs', {

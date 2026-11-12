@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle, Palette, TrendingUp, GraduationCap, LineChart, FlaskConical, Building } from 'lucide-react';
+import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle, Palette, TrendingUp, GraduationCap, LineChart, FlaskConical, Building, Users } from 'lucide-react';
 import { api } from '@/lib/api';
 import { isPublisherStaff, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
@@ -16,6 +16,7 @@ const NAV = [
   { href: '/admin/books', label: 'Book Packages', icon: Library, roles: [A, E] },
   { href: '/admin/products', label: 'Products & Bundles', icon: Package, roles: [A, E, S] },
   { href: '/admin/schools', label: 'Schools', icon: Building2, roles: [A, E, S] },
+  { href: '/admin/users', label: 'Users', icon: Users, roles: [A] },
   { href: '/admin/orders', label: 'Orders', icon: Receipt, roles: [A, S] },
   { href: '/admin/sales', label: 'Sales', icon: TrendingUp, roles: [A, S] },
   { href: '/admin/insights', label: 'Usage Insights', icon: LineChart, roles: [A, E, S] },

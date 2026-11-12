@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
 
-export interface Me { id: string; username: string; displayName: string; roles: string[]; mustChangePassword: boolean; school: { id: string; name: string; code: string } | null }
+export interface Me { id: string; username: string; displayName: string; roles: string[]; mustChangePassword: boolean; impersonatedBy?: { id: string; name: string } | null; school: { id: string; name: string; code: string } | null }
 export const useMe = () => useQuery<Me>({ queryKey: ['me'], queryFn: () => api.get('/auth/me'), retry: false, staleTime: 60_000 });
 export const isPublisherStaff = (me?: Me) => !!me?.roles.some((r) => r.startsWith('PUBLISHER_'));
 export const hasRole = (me: Me | undefined, ...roles: string[]) => !!me?.roles.some((r) => roles.includes(r));

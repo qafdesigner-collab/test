@@ -1,3 +1,12 @@
+# What's new in Knowledge Gate 1.3.3
+
+## Super admin → Users: every school's accounts, and "Log in as"
+- A new **Users** page shows **one folder per school** (with how many school admins, teachers, students and parents it has).
+- Open a folder to see its **School admins**, **Teachers**, **Students** and **Parents** (search by name, login ID or email).
+- Click **Log in as admin / teacher / student / parent** to open the portal exactly as that person sees it — useful for support and for checking what a class sees.
+- A yellow bar at the top shows whose account you are using, with **Back to …** to return to your own account. The visit ends by itself after 2 hours.
+- Their password is never shown or changed (changing a password is blocked while you are signed in as them), and every "Log in as" is recorded in the **Audit Log**. Only the super admin can do this; suspended accounts and suspended schools cannot be opened.
+
 # What's new in Knowledge Gate 1.3.2
 
 - **More reliable updates on shared hosting.** Some hosts keep several copies of the app running and do not restart all of them after an update, so the Updates page could stay on "Restarting with the new version". Now every copy notices a newly installed version within about 20 seconds and restarts itself, the update confirms itself as soon as the new version runs, and a check that never reports back is resolved automatically (finished, or a clear message) instead of spinning.

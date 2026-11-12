@@ -25,7 +25,7 @@ export class AuthGuard implements CanActivate {
         req.me = s;
         req.ctx = {
           userId: s.user_id, publisherId: s.publisher_id, schoolId: s.school_id, roles: s.roles,
-          staff: s.roles.some((r: string) => STAFF_ROLES.includes(r)), ip: req.ip, sessionId: s.session_id,
+          staff: s.roles.some((r: string) => STAFF_ROLES.includes(r)), ip: req.ip, sessionId: s.session_id, impersonatorId: s.impersonator_id ?? undefined,
         };
       }
     }

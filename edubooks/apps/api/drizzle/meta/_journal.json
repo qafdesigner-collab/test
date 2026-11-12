@@ -225,6 +225,13 @@
       "when": 1794570000000,
       "tag": "0031_people_email_login",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794600000000,
+      "tag": "0032_login_as",
+      "breakpoints": true
     }
   ]
 }
