@@ -1,3 +1,4 @@
+import { MailerService } from './mailer.service';
 import { Body, Controller, Get, Global, Module, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { IsString, MaxLength } from 'class-validator';
@@ -23,5 +24,5 @@ export class NotificationsController {
 }
 
 @Global()
-@Module({ controllers: [NotificationsController], providers: [NotificationsService], exports: [NotificationsService] })
+@Module({ controllers: [NotificationsController], providers: [NotificationsService, MailerService], exports: [NotificationsService, MailerService] })
 export class NotificationsModule {}

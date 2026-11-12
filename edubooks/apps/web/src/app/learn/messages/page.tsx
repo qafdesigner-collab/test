@@ -9,6 +9,7 @@ export default function PupilMessages() {
     <div className="space-y-4">
       <h1 className="text-3xl font-black text-slate-800">💬 {t('Messages')}</h1>
       <p className="font-bold text-slate-600">{t('Write or send a voice message to your teacher. Your school can see these messages.')}</p>
+      <a href="/learn/mail" className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 font-black text-violet-700 shadow">📬 {t('Mail from school')}</a>
       <div className="rounded-[2rem] bg-white/90 p-3 shadow-sm ring-4 ring-white"><Suspense><Inbox pupil /></Suspense></div>
     </div>
   );

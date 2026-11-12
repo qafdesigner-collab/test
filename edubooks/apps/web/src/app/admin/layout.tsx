@@ -1,5 +1,5 @@
 'use client';
-import { LayoutDashboard, Library, Tags, ScrollText, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle, Palette, TrendingUp, GraduationCap, LineChart, FlaskConical, Building, Users } from 'lucide-react';
+import { LayoutDashboard, Library, Tags, ScrollText, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle, Palette, TrendingUp, GraduationCap, LineChart, FlaskConical, Building, Users, Mail, AtSign } from 'lucide-react';
 import { Shell } from '@/components/shell';
 
 const A = 'PUBLISHER_ADMIN', E = 'PUBLISHER_EDITOR', S = 'PUBLISHER_SALES';
@@ -19,7 +19,9 @@ const NAV = [
   { href: '/admin/catalog', label: 'Curricula & Grades', icon: Tags, roles: [A, E] },
   { href: '/admin/calendar', label: 'Academic Calendar', icon: CalendarDays, roles: [A, E, S] },
   { href: '/admin/audit', label: 'Audit Log', icon: ScrollText, roles: [A, E, S] },
+  { href: '/admin/mail', label: 'Mail', icon: Mail, roles: [A, E, S] },
   { href: '/admin/messages', label: 'Messages', icon: MessageCircle, roles: [A] },
+  { href: '/admin/email', label: 'Email settings', icon: AtSign, roles: [A] },
   { href: '/admin/company', label: 'Company & Currency', icon: Building, roles: [A] },
   { href: '/admin/branding', label: 'Branding', icon: Palette, roles: [A] },
   { href: '/admin/demo', label: 'Demo data', icon: FlaskConical, roles: [A] },

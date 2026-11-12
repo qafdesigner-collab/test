@@ -1,10 +1,11 @@
 'use client';
-import { ArrowLeftRight, School, GraduationCap, KeyRound, LayoutDashboard, Users, CalendarDays, HeartHandshake, UserCheck, Clock, Award, LineChart, FileText, MessagesSquare, Bird, Building } from 'lucide-react';
+import { ArrowLeftRight, School, GraduationCap, KeyRound, LayoutDashboard, Users, CalendarDays, HeartHandshake, UserCheck, Clock, Award, LineChart, FileText, MessagesSquare, Bird, Building, Mail } from 'lucide-react';
 import { Shell } from '@/components/shell';
 
 const NAV = [
   { href: '/school', label: 'Overview', icon: LayoutDashboard, exact: true },
   { href: '/school/insights', label: 'Insights', icon: LineChart },
+  { href: '/school/mail', label: 'Mail', icon: Mail },
   { href: '/school/messages', label: 'Messages', icon: MessagesSquare },
   { href: '/school/tutor', label: 'Ask Owl (AI tutor)', icon: Bird },
   { href: '/school/classes', label: 'Classes', icon: School },

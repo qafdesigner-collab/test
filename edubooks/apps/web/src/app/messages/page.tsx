@@ -9,7 +9,7 @@ function Go() {
   const { data: me, isError } = useMe(); const router = useRouter(); const q = useSearchParams().toString();
   useEffect(() => {
     if (isError) router.replace('/login'); if (!me) return;
-    const base = hasRole(me, 'SCHOOL_ADMIN') ? '/school/messages' : hasRole(me, 'TEACHER') ? '/teacher/messages' : '/parent/messages';
+    const base = hasRole(me, 'SCHOOL_ADMIN') ? '/school/messages' : hasRole(me, 'TEACHER') ? '/teacher/messages' : hasRole(me, 'STUDENT') ? '/learn/messages' : '/parent/messages';
     router.replace(q ? `${base}?${q}` : base);
   }, [me, isError, router, q]);
   return <PageLoader />;

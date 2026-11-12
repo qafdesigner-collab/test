@@ -25,6 +25,7 @@ function ParentShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
           <div className="min-w-0 flex-1"><div className="font-bold text-slate-900"><BrandMark /></div><div className="truncate text-xs text-slate-600">{me.school?.name} · {t('Parents')}</div></div>
           <MessagesLink />
+          <MailLink />
           <LangSwitch className="border border-slate-300 text-slate-700 hover:bg-slate-50" />
           <NotificationBell />
           <button onClick={async () => { await api.post('/auth/logout'); qc.clear(); router.replace('/login'); }} className="focus-ring rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100">{t('Sign out')}</button>
@@ -33,6 +34,13 @@ function ParentShell({ children }: { children: React.ReactNode }) {
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
     </div>
   );
+}
+
+function MailLink() {
+  const { t } = useT();
+  const q = useQuery({ queryKey: ['mailUnread'], queryFn: () => api.get<{ unread: number }>('/mail/unread'), refetchInterval: 60_000 });
+  return <Link href="/parent/mail" className="focus-ring relative rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100">📬 {t('Mail')}
+    {!!q.data?.unread && <span className="absolute -end-1 -top-1 rounded-full bg-red-600 px-1.5 text-xs font-bold text-white">{q.data.unread}</span>}</Link>;
 }
 
 function MessagesLink() {

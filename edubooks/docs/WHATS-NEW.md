@@ -1,3 +1,22 @@
+# What's new in Knowledge Gate 1.3.6
+
+## Mail for everyone, meeting invitations and email copies
+- Every portal has a **Mail** page (Inbox, Sent, Archived). Super admin, sales, school admins and teachers can **write to people or whole groups**:
+  - **Super admin / publisher:** publisher team, all school admins, all teachers, or the admins / teachers of one school.
+  - **School admin:** all staff, all teachers, all pupils, all parents, one class's pupils or parents, or **our publisher**.
+  - **Teacher:** the school office, other teachers, and the pupils or parents of their own classes.
+  - Pupils and parents get **Mail from school** and can **reply**.
+- **Meeting invitations:** tick “This is a meeting invitation”, set the date, time, place or online link and send — e.g. to all teachers in one click. People answer **Going / Maybe / Not going**; you see the answers and **who has read it**.
+- **Email copies:** Super admin → **Email settings**: connect one mailbox (e.g. from cPanel → Email Accounts: server mail.yourdomain.com, port 465, the mailbox and its password) and press **Send test**. Then everyone who has an email address also gets mail and meeting invitations by email (with a calendar invite), and — if ticked — copies of notifications (homework, results, messages, announcements) to pupils, parents and teachers.
+
+## Voice messages and pupil chat
+- In **Messages**, press the 🎤 microphone to record a **voice message**, press ■ to send. Everyone can play it in the chat.
+- **Pupils can now chat** with their own teachers and the school office (text or voice) from the 💬 button on their home page; teachers can start a chat with a pupil. The school admin can still read every conversation.
+
+## Read aloud homework
+- New question type **Read aloud 🎤** in Assessments: e.g. “Read page 12 aloud”. The pupil taps **Tap to start reading**, reads, listens back, and hands in. The teacher **listens in the marking window** and gives the points.
+- Recordings stay inside the school; only the pupil, their teachers, their parents and the school admin can play them. Erasing a pupil's data also deletes their recordings and mail.
+
 # What's new in Knowledge Gate 1.3.5
 
 ## Live whiteboard (Teacher → Whiteboard)

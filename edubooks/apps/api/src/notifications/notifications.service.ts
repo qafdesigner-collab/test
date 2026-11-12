@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { MailerService } from './mailer.service';
 import { DbService } from '../db/db.service';
 import { messageOutbox, notifications } from '../db/schema';
 import { channelInfo, normalisePhone, sendMessage } from './channels';
@@ -12,7 +13,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger('Notifications');
   private timers: NodeJS.Timeout[] = [];
   private sending = false;
-  constructor(private readonly db: DbService) {}
+  constructor(private readonly db: DbService, private readonly mailer: MailerService) {}
 
   onModuleInit() {
     if (process.env.NODE_ENV === 'test' || process.env.NOTIFY_WORKER === 'off') return;
@@ -48,7 +49,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
    * Notify users in the current tenant: always in-app; also WhatsApp/SMS when `phone` is true and the user has a number.
    * Runs inside the caller's transaction (RLS: own school, or publisher staff).
    */
-  async notify(targets: NotifyTarget[], m: NotifyMessage, opts: { phone?: boolean; schoolId?: string | null } = {}) {
+  async notify(targets: NotifyTarget[], m: NotifyMessage, opts: { phone?: boolean; schoolId?: string | null; email?: boolean } = {}) {
     if (!targets.length) return 0;
     const ctx = this.db.ctx; const schoolId = opts.schoolId !== undefined ? opts.schoolId : ctx.schoolId ?? null;
     const uniq = [...new Map(targets.map((t) => [t.id, t])).values()];
@@ -66,7 +67,19 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         })));
       }
     }
+    if (opts.email !== false) await this.emailCopies(uniq.map((t) => t.id), m).catch(() => undefined);
     return uniq.length;
+  }
+
+  /** Copies of in-app notifications to users who have an email address (when the publisher switched email on). */
+  private async emailCopies(ids: string[], m: NotifyMessage) {
+    const c = await this.mailer.config();
+    if (!c || !c.notify_students || !ids.length) return;
+    const { rows } = await this.db.q.execute(sql`SELECT DISTINCT email::text AS email FROM users WHERE id = ANY(${`{${ids.join(',')}}`}::uuid[]) AND email IS NOT NULL AND status = 'ACTIVE'`);
+    const to = (rows as any[]).map((r) => r.email).filter(Boolean);
+    if (!to.length) return;
+    const body = m.body ?? '';
+    this.mailer.later(c, { to, subject: m.title.slice(0, 200), text: `${body}${m.link && c.site_url ? `\n\n${c.site_url.replace(/\/$/, '')}${m.link}` : ''}`, html: this.mailer.html(c, m.title, body, m.link) });
   }
 
   // ---------------------------------------------------------------- outbox
