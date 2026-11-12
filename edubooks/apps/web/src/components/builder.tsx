@@ -73,7 +73,9 @@ export function StructureTab({ tree }: { tree: EditionTree }) {
   };
   const count = (s: Sel) => tree.resources.filter((r) => isScope(r, s)).length;
 
-  const Row = ({ s, depth, icon, label, sub, actions, toggle, isOpen }: { s: Sel; depth: number; icon: React.ReactNode; label: string; sub?: string; actions?: React.ReactNode; toggle?: () => void; isOpen?: boolean }) => {
+  const [editRow, setEditRow] = useState<Component | null>(null); const [delRow, setDelRow] = useState<Component | null>(null);
+  const delComp = useBuilderMutation((id: string) => api.del(`/publishing/components/${id}`), 'Part removed', () => { setDelRow(null); setSel({ kind: 'edition' }); });
+  const Row = ({ s, depth, icon, label, sub, actions, toggle, isOpen, canAct }: { s: Sel; depth: number; icon: React.ReactNode; label: string; sub?: string; actions?: React.ReactNode; toggle?: () => void; isOpen?: boolean; canAct?: boolean }) => {
     const active = sel.kind === s.kind && (s.kind === 'edition' || (sel as any).id === (s as any).id);
     const n = count(s);
     return (
@@ -85,7 +87,7 @@ export function StructureTab({ tree }: { tree: EditionTree }) {
           {icon}<span className="truncate font-medium">{label}</span>{sub && <span className="truncate text-xs text-slate-600">{sub}</span>}
           {n > 0 && <Badge className="ml-auto">{n}</Badge>}
         </button>
-        {!locked && <div className="flex opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">{actions}</div>}
+        {(canAct ?? !locked) && <div className="flex opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">{actions}</div>}
       </div>
     );
   };
@@ -100,13 +102,15 @@ export function StructureTab({ tree }: { tree: EditionTree }) {
     <div className="grid gap-6 lg:grid-cols-[minmax(280px,380px)_1fr]">
       <Card className="h-fit p-3">
         <div className="mb-2 flex items-center justify-between px-2"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Book structure</span>
-          {!locked && <Button size="sm" variant="ghost" onClick={() => setAddComp(true)}><Plus className="size-4" />Component</Button>}</div>
+          {!tree.locked.all && <Button size="sm" variant="ghost" onClick={() => setAddComp(true)}><Plus className="size-4" />Add part</Button>}</div>
         <Row s={{ kind: 'edition' }} depth={0} icon={<BookOpen className="size-4 text-slate-500" />} label="Whole book" sub={tree.label} />
         {tree.components.map((c, ci) => (
           <div key={c.id}>
             <Row s={{ kind: 'component', id: c.id }} depth={0} isOpen={open[c.id]} toggle={() => setOpen({ ...open, [c.id]: !open[c.id] })}
-              icon={<Layers className="size-4 text-brand-500" />} label={c.title} sub={COMPONENT_TYPES[c.type]}
-              actions={<MoveBtns kind="component" list={tree.components} i={ci} />} />
+              icon={<Layers className="size-4 text-brand-500" />} label={c.title} sub={COMPONENT_TYPES[c.type]} canAct={!tree.locked.all}
+              actions={<><MoveBtns kind="component" list={tree.components} i={ci} />
+                <button className="rounded p-1 text-slate-500 hover:bg-white" onClick={() => setEditRow(c)} aria-label={`Edit ${c.title}`}><Pencil className="size-3.5" /></button>
+                <button className="rounded p-1 text-red-500 hover:bg-white" onClick={() => setDelRow(c)} aria-label={`Remove ${c.title}`}><Trash2 className="size-3.5" /></button></>} />
             {open[c.id] && c.units.map((u, ui) => (
               <div key={u.id}>
                 <Row s={{ kind: 'unit', id: u.id }} depth={1} isOpen={open[u.id] !== false} toggle={() => setOpen({ ...open, [u.id]: open[u.id] === false })}
@@ -120,11 +124,29 @@ export function StructureTab({ tree }: { tree: EditionTree }) {
             {open[c.id] && c.units.length === 0 && <p className="py-1 pl-12 text-xs text-slate-600">No units yet</p>}
           </div>
         ))}
-        {tree.components.length === 0 && <p className="p-4 text-center text-sm text-slate-500">Add the first component, e.g. “Student Book Part 1”.</p>}
+        {tree.components.length === 0 && <p className="p-4 text-center text-sm text-slate-500">Add the first part, e.g. “Student Book Part 1”.</p>}
+        {!tree.locked.all && tree.components.length > 0 && <p className="px-2 pt-2 text-xs text-slate-500">Hover a part to rename, move or remove it. Use “Add part” for anything you left out.</p>}
       </Card>
       <NodePanel tree={tree} sel={sel} setSel={setSel} onExpand={(id) => setOpen((o) => ({ ...o, [id]: true }))} />
       {addComp && <ComponentDialog editionId={tree.id} onClose={() => setAddComp(false)} />}
+      {editRow && <ComponentDialog editionId={tree.id} comp={editRow} locked={locked} onClose={() => setEditRow(null)} />}
+      {delRow && <RemovePartDialog comp={delRow} published={tree.status !== 'DRAFT'} loading={delComp.isPending} onCancel={() => setDelRow(null)} onConfirm={() => delComp.mutate(delRow.id)} />}
     </div>
+  );
+}
+
+function RemovePartDialog({ comp, published, loading, onCancel, onConfirm }: { comp: Component; published: boolean; loading: boolean; onCancel: () => void; onConfirm: () => void }) {
+  const lessons = comp.units.reduce((n, u) => n + u.lessons.length, 0);
+  return (
+    <Dialog open onOpenChange={onCancel} title={`Remove “${comp.title}”?`} description="The part disappears from this edition for publisher, teachers and pupils.">
+      <div className="space-y-3 text-sm text-slate-700">
+        {(comp.units.length > 0 || lessons > 0) && <p>It has <b>{comp.units.length} units</b> and <b>{lessons} lessons</b>; these and the files linked to them go too.</p>}
+        {published && <p className="rounded-lg bg-amber-50 p-3 text-amber-900">This edition is published. Pupils lose their reading place and bookmarks in this part. Licences for the edition stay valid.</p>}
+        <p>You can add the part again later with “Add part”, but its contents would need uploading again.</p>
+        <div className="flex justify-end gap-2"><Button variant="secondary" onClick={onCancel}>Keep it</Button>
+          <Button variant="danger" loading={loading} onClick={onConfirm}><Trash2 className="size-4" />Remove part</Button></div>
+      </div>
+    </Dialog>
   );
 }
 
@@ -132,15 +154,15 @@ function ComponentDialog({ editionId, comp, onClose, locked }: { editionId: stri
   const [f, setF] = useState({ type: comp?.type ?? 'STUDENT_BOOK', title: comp?.title ?? '', partNumber: comp?.partNumber ?? '', description: comp?.description ?? '', pageCount: comp?.pageCount ?? '' });
   const m = useBuilderMutation(() => {
     const body = { ...f, partNumber: f.partNumber === '' ? null : Number(f.partNumber), pageCount: f.pageCount === '' ? null : Number(f.pageCount) };
-    if (locked) { delete (body as any).type; delete (body as any).partNumber; delete (body as any).pageCount; }
+    if (locked) delete (body as any).pageCount;
     return comp ? api.patch(`/publishing/components/${comp.id}`, body) : api.post(`/publishing/editions/${editionId}/components`, body);
-  }, comp ? 'Component updated' : 'Component added', onClose);
+  }, comp ? 'Part updated' : 'Part added', onClose);
   return (
-    <Dialog open onOpenChange={onClose} title={comp ? 'Edit component' : 'Add component'} description="Components are the physical items in the package: book parts, homework book, cards, danglers…">
+    <Dialog open onOpenChange={onClose} title={comp ? 'Edit part' : 'Add part'} description="Parts are the items in the package: student book parts, homework book, cards, danglers, CD, mobile app…">
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); m.mutate(undefined); }}>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Type"><Select disabled={locked} value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })}>{Object.entries(COMPONENT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
-          <Field label="Part number" hint="Optional"><Input disabled={locked} type="number" min={1} max={20} value={f.partNumber} onChange={(e) => setF({ ...f, partNumber: e.target.value })} /></Field>
+          <Field label="Type"><Select value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })}>{Object.entries(COMPONENT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
+          <Field label="Part number" hint="Optional"><Input type="number" min={1} max={20} value={f.partNumber} onChange={(e) => setF({ ...f, partNumber: e.target.value })} /></Field>
         </div>
         <Field label="Title"><Input required value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="Student Book Part 1" autoFocus /></Field>
         <Field label="Pages" hint="Optional — used by the digital reader"><Input disabled={locked} type="number" min={1} value={f.pageCount} onChange={(e) => setF({ ...f, pageCount: e.target.value })} /></Field>
@@ -183,7 +205,7 @@ function NodePanel({ tree, sel, setSel, onExpand }: { tree: EditionTree; sel: Se
                 <h3 className="mt-1 text-lg font-semibold">{comp.title}</h3>
                 <p className="text-sm text-slate-500">{comp.units.length} units · {comp.units.reduce((n, u) => n + u.lessons.length, 0)} lessons{comp.pageCount ? ` · ${comp.pageCount} pages` : ''}</p></div>
               {!readOnly && <div className="flex gap-1"><Button size="sm" variant="secondary" onClick={() => setEditComp(true)}><Pencil className="size-3.5" />Edit</Button>
-                {!locked && <Button size="sm" variant="ghost" onClick={() => setConfirmDel(true)} aria-label="Delete component"><Trash2 className="size-4 text-red-500" /></Button>}</div>}
+                <Button size="sm" variant="ghost" onClick={() => setConfirmDel(true)} aria-label="Remove part"><Trash2 className="size-4 text-red-500" /></Button></div>}
             </div>
             {comp.type === 'MOBILE_APP' ? <MobileAppRow comp={comp} readOnly={readOnly} />
               : <>{comp.type !== 'CD' && <BookPdf comp={comp} editionId={tree.id} editionStatus={tree.status} readOnly={readOnly} />}
@@ -539,7 +561,7 @@ export function LockBanner({ tree }: { tree: EditionTree }) {
   if (tree.locked.all) return <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-100 p-4 text-sm text-slate-700"><ShieldAlert className="size-5 shrink-0" />This {tree.package.status === 'ARCHIVED' ? 'package' : 'edition'} is archived and read-only.</div>;
   if (tree.locked.structure) return (
     <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-      <Lock className="size-5 shrink-0" /><div><b>Published — structure locked.</b> Schools may hold licences for this edition, so parts, units, lessons and page ranges can’t change. You can still fix titles and objectives, and attach or update resources. To restructure, create a new edition.</div>
+      <Lock className="size-5 shrink-0" /><div><b>Published — units and lessons locked.</b> Schools may hold licences for this edition, so units, lessons and page ranges can’t change. You can still add, rename or remove whole parts, fix titles and objectives, and attach or update resources. To restructure, create a new edition.</div>
     </div>
   );
   return null;

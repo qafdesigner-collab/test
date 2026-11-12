@@ -13,8 +13,8 @@ import {
 } from './publishing.dto';
 
 type Edition = typeof bookEditions.$inferSelect;
-/** structure = add/delete/reorder parts, units, lessons, page ranges; text = titles/descriptions; resources = attach/detach files */
-type Change = 'structure' | 'text' | 'resources';
+/** part = add/remove whole parts (allowed on published editions too); structure = units, units, lessons, page ranges; text = titles/descriptions; resources = attach/detach files */
+type Change = 'structure' | 'part' | 'text' | 'resources';
 
 const slugify = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'book';
 
@@ -85,9 +85,10 @@ export class PublishingService {
     }).returning();
     if (dto.standardStructure) {
       const parts = dto.parts ?? 3;
+      const wanted = dto.extras ? new Set(dto.extras) : null;
       const rows = [
         ...Array.from({ length: parts }, (_, i) => ({ type: 'STUDENT_BOOK' as const, title: `Student Book Part ${i + 1}`, partNumber: i + 1 })),
-        ...STANDARD_EXTRAS.map((x) => ({ ...x, partNumber: null })),
+        ...STANDARD_EXTRAS.filter((x) => !wanted || wanted.has(x.type)).map((x) => ({ ...x, partNumber: null })),
       ];
       await this.q.insert(bookComponents).values(rows.map((r, i) => ({ publisherId: this.pub, editionId: edition.id, sort: i, ...r })));
     }
@@ -153,7 +154,7 @@ export class PublishingService {
     const [pkg] = await this.q.select({ status: bookPackages.status }).from(bookPackages).where(eq(bookPackages.id, e.packageId));
     if (e.status === 'ARCHIVED' || pkg.status === 'ARCHIVED') throw new ConflictException('This edition is archived and read-only.');
     if (e.status === 'PUBLISHED' && change === 'structure') {
-      throw new ConflictException('This edition is published, so its structure is locked (schools may already hold licences for it). Create a new edition to change parts, units or lessons.');
+      throw new ConflictException('This edition is published, so its structure is locked (schools may already hold licences for it). You can still add or remove whole parts and rename things; create a new edition to change units, lessons or page ranges.');
     }
     return e;
   }
@@ -289,7 +290,7 @@ export class PublishingService {
 
   // =============== structure: components / units / lessons ===============
   async addComponent(editionId: string, dto: CreateComponentDto) {
-    await this.editable(editionId, 'structure');
+    await this.editable(editionId, 'part');
     const [{ m }] = await this.q.select({ m: max(bookComponents.sort) }).from(bookComponents).where(eq(bookComponents.editionId, editionId));
     const [row] = await this.q.insert(bookComponents).values({ publisherId: this.pub, editionId, ...dto, sort: (m ?? -1) + 1 }).returning();
     await this.touch(editionId);
@@ -303,8 +304,9 @@ export class PublishingService {
   }
   async updateComponent(id: string, dto: UpdateComponentDto) {
     const before = await this.component(id);
-    const structural = (dto.type && dto.type !== before.type) || (dto.partNumber !== undefined && dto.partNumber !== before.partNumber) || (dto.pageCount !== undefined && dto.pageCount !== before.pageCount);
-    await this.editable(before.editionId, structural ? 'structure' : 'text');
+    const structural = dto.pageCount !== undefined && dto.pageCount !== before.pageCount;
+    const part = (dto.type && dto.type !== before.type) || (dto.partNumber !== undefined && dto.partNumber !== before.partNumber);
+    await this.editable(before.editionId, structural ? 'structure' : part ? 'part' : 'text');
     const [row] = await this.q.update(bookComponents).set(dto).where(eq(bookComponents.id, id)).returning();
     await this.touch(before.editionId);
     await this.audit.log('publishing.component.update', 'book_component', id, `Updated "${row.title}"`, before, row);
@@ -312,7 +314,7 @@ export class PublishingService {
   }
   async deleteComponent(id: string) {
     const c = await this.component(id);
-    await this.editable(c.editionId, 'structure');
+    await this.editable(c.editionId, 'part');
     await this.q.delete(bookComponents).where(eq(bookComponents.id, id));
     await this.touch(c.editionId);
     await this.audit.log('publishing.component.delete', 'book_component', id, `Removed "${c.title}" (with its units, lessons and resource links)`, c);
@@ -399,7 +401,7 @@ export class PublishingService {
     if (rows.length !== ids.length || new Set(rows.map((r) => r.parent)).size !== 1) throw new BadRequestException('Items must exist and share the same parent');
     const editionId = dto.kind === 'component' || dto.kind === 'resource' ? rows[0].parent
       : dto.kind === 'unit' ? (await this.component(rows[0].parent)).editionId : (await this.unit(rows[0].parent)).editionId;
-    await this.editable(editionId, dto.kind === 'resource' ? 'resources' : 'structure');
+    await this.editable(editionId, dto.kind === 'resource' ? 'resources' : dto.kind === 'component' ? 'part' : 'structure');
     for (const [i, id] of ids.entries()) await this.q.update(t as any).set({ sort: i }).where(eq(t.id, id));
     await this.touch(editionId);
     await this.audit.log(`publishing.${dto.kind}.reorder`, 'book_edition', editionId, `Reordered ${dto.kind}s`, undefined, { ids });

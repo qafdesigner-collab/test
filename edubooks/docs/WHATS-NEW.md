@@ -1,3 +1,22 @@
+# What's new in Knowledge Gate 1.3.1
+
+Install with the full zip (`edubooks-lms-public_html.zip`) through **Super admin → Updates**. The database is updated automatically.
+
+## Colourful teacher and school-admin portals
+- **Teacher home:** a purple sidebar with coloured icons, a greeting banner with **today's lessons** (the current one highlighted, live lessons marked), tiles for pupils, work to mark, today's attendance and stars, six big buttons (Take register, Set homework, Plan a lesson, Ask the AI, Assign a game, Make an exam), colourful **class cards** (pupils, average, how many need help), a **To mark** list, **Pupils who need a little help** with a *Message parent* button, and **My books** on a shelf with a tip for the next lesson.
+- **School admin home:** the same look, with today's registers, classes, licences ending soon, free pupil seats and quick buttons (Add pupils, Add teachers, Give books, Send a message, Timetable, Exams). Everything else in the school area also uses the new sidebar.
+
+## Book parts: choose, rename, remove
+- **New book:** tick only the parts the book has (how many Student Book parts, Homework Book, Teacher Guide, Flashcards, Teacher Cards, Danglers, CD, Mobile App).
+- **Later:** in Book structure, hover a part to **rename, move or remove** it, and use **Add part** for anything you left out. This also works on **published** editions (units, lessons and page ranges stay locked). Removing a part asks first and tells you what goes with it.
+- **Only what you upload is shown:** teachers and pupils see a part only when it has something in it (pages, a flipbook or CD, the app, or resources). Empty parts stay hidden until you upload.
+
+## Bulk add teachers and pupils (only the name is required)
+- **Teachers → Bulk import (Excel)** and **Students → Bulk import (Excel)**: one person per row; only **Name** is required. Optional columns: **Designation**, **Email**, **Mobile**, **Login ID**, **Password** (pupils also: class, section and parent details). Download the template from the import window.
+- Everyone without a login ID gets one made automatically, with a simple password; the logins (and printable QR cards) are shown once after the import.
+- **Sign in with login ID or email:** on the sign-in page people type the school code, then their **login ID or their email** and password.
+- **Add teachers / Add students** also has Designation (teachers) and Email fields, and the ✏️ button on each person edits name, designation, email and mobile.
+
 # What's new in Knowledge Gate 1.3
 
 ## Company & currency (Super admin → Company & Currency)

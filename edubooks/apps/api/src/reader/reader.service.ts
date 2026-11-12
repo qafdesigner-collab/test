@@ -20,19 +20,23 @@ export class ReaderService {
     const [ed] = await this.q.select({ id: bookEditions.id, label: bookEditions.label, title: bookPackages.title, coverUrl: sql<string | null>`CASE WHEN ${bookPackages.coverVersion} IS NOT NULL THEN '/api/covers/' || ${bookPackages.id} || '?v=' || ${bookPackages.coverVersion} END`, coverColor: bookPackages.coverColor })
       .from(bookEditions).innerJoin(bookPackages, eq(bookPackages.id, bookEditions.packageId)).where(eq(bookEditions.id, editionId));
     if (!ed) throw new NotFoundException('Book not found');
-    const comps = await this.q.select({ id: bookComponents.id, type: bookComponents.type, title: bookComponents.title, partNumber: bookComponents.partNumber,
+    let comps = await this.q.select({ id: bookComponents.id, type: bookComponents.type, title: bookComponents.title, partNumber: bookComponents.partNumber,
       pageCount: bookComponents.pageCount, hasPdf: sql<boolean>`${bookComponents.bookAssetId} IS NOT NULL`,
-      flipbook: sql<string | null>`(SELECT f.kind FROM flipbooks f WHERE f.component_id = ${qc(bookComponents.id)})` })
+      flipbook: sql<string | null>`(SELECT f.kind FROM flipbooks f WHERE f.component_id = ${qc(bookComponents.id)})`,
+      hasApp: sql<boolean>`EXISTS (SELECT 1 FROM book_apps a WHERE a.component_id = ${qc(bookComponents.id)} AND (a.asset_id IS NOT NULL OR a.android_url IS NOT NULL OR a.ios_url IS NOT NULL))` })
       .from(bookComponents).where(eq(bookComponents.editionId, editionId)).orderBy(asc(bookComponents.sort));
-    const ids = comps.map((c) => c.id);
-    const units = ids.length ? await this.q.select().from(bookUnits).where(inArray(bookUnits.componentId, ids)).orderBy(asc(bookUnits.sort)) : [];
-    const lessons = units.length ? await this.q.select().from(bookLessons).where(inArray(bookLessons.unitId, units.map((u) => u.id))).orderBy(asc(bookLessons.sort)) : [];
     const student = this.access.is('STUDENT') && !this.access.is('TEACHER');
     const resources = await this.q.select({ id: teachingResources.id, title: teachingResources.title, resourceType: teachingResources.resourceType, audience: teachingResources.audience,
       componentId: teachingResources.componentId, unitId: teachingResources.unitId, lessonId: teachingResources.lessonId, assetId: teachingResources.assetId, ext: digitalAssets.ext })
       .from(teachingResources).innerJoin(digitalAssets, eq(digitalAssets.id, teachingResources.assetId))
       .where(and(eq(teachingResources.editionId, editionId), student ? sql`${teachingResources.audience} IN ('ALL','STUDENT')` : undefined))
       .orderBy(asc(teachingResources.sort));
+    // Only parts the publisher actually uploaded something for are shown (pages, flipbook/CD, app, or resources).
+    const withFiles = new Set(resources.map((r) => r.componentId).filter(Boolean));
+    comps = comps.filter((c) => c.hasPdf || c.flipbook || c.hasApp || withFiles.has(c.id));
+    const ids = comps.map((c) => c.id);
+    const units = ids.length ? await this.q.select().from(bookUnits).where(inArray(bookUnits.componentId, ids)).orderBy(asc(bookUnits.sort)) : [];
+    const lessons = units.length ? await this.q.select().from(bookLessons).where(inArray(bookLessons.unitId, units.map((u) => u.id))).orderBy(asc(bookLessons.sort)) : [];
     const progress = ids.length && !this.db.ctx.staff ? await this.q.select().from(readerProgress).where(and(eq(readerProgress.userId, this.db.ctx.userId), inArray(readerProgress.componentId, ids))) : [];
     const marks = ids.length && !this.db.ctx.staff ? await this.q.select().from(bookmarks).where(and(eq(bookmarks.userId, this.db.ctx.userId), inArray(bookmarks.componentId, ids))).orderBy(asc(bookmarks.page)) : [];
     // Homework linked to this book for the current user's classes.
@@ -49,7 +53,7 @@ export class ReaderService {
         units: units.filter((u) => u.componentId === c.id).map((u) => ({ id: u.id, number: u.number, title: u.title,
           lessons: lessons.filter((l) => l.unitId === u.id).map((l) => ({ id: l.id, number: l.number, title: l.title, pageStart: l.pageStart, pageEnd: l.pageEnd })) })),
       })),
-      resources, assessments: linked,
+      resources: resources.filter((r) => !r.componentId || ids.includes(r.componentId)), assessments: linked,
     };
   }
 

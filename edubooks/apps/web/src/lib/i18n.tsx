@@ -9,7 +9,7 @@ export type Lang = 'en' | 'ar';
 const AR: Record<string, string> = {
   // sign-in
   'Sign in': 'تسجيل الدخول', 'Use the login your school or publisher gave you.': 'استخدم بيانات الدخول التي أعطتك إياها مدرستك أو دار النشر.',
-  School: 'المدرسة', 'Publisher staff': 'فريق دار النشر', 'School code': 'رمز المدرسة', Username: 'اسم المستخدم', Password: 'كلمة المرور', 'e.g. SUN01': 'مثال: SUN01',
+  School: 'المدرسة', 'Publisher staff': 'فريق دار النشر', 'School code': 'رمز المدرسة', Username: 'اسم المستخدم', 'Login ID or email': 'رقم الدخول أو البريد الإلكتروني', Password: 'كلمة المرور', 'e.g. SUN01': 'مثال: SUN01',
   'Complete book packages, school licences, and a joyful digital classroom for teachers, children and parents.': 'كتب متكاملة وتراخيص مدرسية وفصل رقمي ممتع للمعلمين والأطفال وأولياء الأمور.',
   'Multi-school · secure · AI-assisted': 'لعدة مدارس · آمن · بمساعدة الذكاء الاصطناعي',
   // student shell

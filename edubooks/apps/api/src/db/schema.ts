@@ -62,6 +62,7 @@ export const users = pgTable('users', {
   displayName: text('display_name').notNull(),
   email: citext('email'),
   phone: text('phone'),
+  designation: text('designation').notNull().default(''),
   passwordHash: text('password_hash').notNull(),
   status: accountStatusEnum('status').notNull().default('ACTIVE'),
   mustChangePassword: boolean('must_change_password').notNull().default(false),

@@ -218,6 +218,13 @@
       "when": 1794560000000,
       "tag": "0030_covers_apps_protection",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794570000000,
+      "tag": "0031_people_email_login",
+      "breakpoints": true
     }
   ]
 }

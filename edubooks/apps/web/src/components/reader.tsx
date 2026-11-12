@@ -190,9 +190,9 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
             <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Contents</p>
             {comps.map((c) => (
               <div key={c.id} className="mb-2">
-                <button onClick={() => { setCompId(c.id); setPage(c.progress?.lastPage ?? 1); }} disabled={!c.hasPdf && !c.flipbook && c.type !== 'MOBILE_APP'}
-                  className={cn('flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left font-medium', c.id === compId ? 'bg-brand-50 text-brand-800' : 'hover:bg-slate-50', !c.hasPdf && !c.flipbook && c.type !== 'MOBILE_APP' && 'text-slate-500')}>
-                  <span className="truncate">{c.title}</span>{c.progress && c.pageCount ? <span className="text-xs text-slate-600">{Math.round((c.progress.maxPage / c.pageCount) * 100)}%</span> : c.type === 'MOBILE_APP' ? <span className="text-xs" title="Mobile app">📱</span> : c.flipbook ? <span className="text-xs" title={c.type === 'CD' ? 'CD' : 'Flipbook'}>{c.type === 'CD' ? '💿' : '📖'}</span> : !c.hasPdf ? <span className="text-xs">no pages</span> : null}
+                <button onClick={() => { setCompId(c.id); setPage(c.progress?.lastPage ?? 1); }}
+                  className={cn('flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left font-medium', c.id === compId ? 'bg-brand-50 text-brand-800' : 'hover:bg-slate-50')}>
+                  <span className="truncate">{c.title}</span>{c.progress && c.pageCount ? <span className="text-xs text-slate-600">{Math.round((c.progress.maxPage / c.pageCount) * 100)}%</span> : c.type === 'MOBILE_APP' ? <span className="text-xs" title="Mobile app">📱</span> : c.flipbook ? <span className="text-xs" title={c.type === 'CD' ? 'CD' : 'Flipbook'}>{c.type === 'CD' ? '💿' : '📖'}</span> : !c.hasPdf ? <span className="text-xs" title="Resources only">📎</span> : null}
                 </button>
                 {c.id === compId && c.units.map((u: any) => (
                   <div key={u.id} className="ml-2 mt-1">
@@ -218,7 +218,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
             : !flip.data ? <Spinner className="m-auto size-8" />
               : <ContentGuard className="absolute inset-0"><iframe key={flip.data.url} src={flip.data.url} title={`${comp?.title} — flipbook`} className={cn('absolute inset-0 size-full border-0 bg-white', kid && 'rounded-2xl')}
                   sandbox="allow-scripts allow-popups allow-forms allow-modals allow-pointer-lock allow-downloads allow-presentation" allow="fullscreen; autoplay" allowFullScreen referrerPolicy="no-referrer" /></ContentGuard>)
-          : !comp?.hasPdf ? <div className="m-auto max-w-sm text-center text-slate-500"><FileText className="mx-auto mb-2 size-10" />The digital pages of this part are not available yet.</div>
+          : !comp?.hasPdf ? <div className="m-auto max-w-sm text-center text-slate-500"><FileText className="mx-auto mb-2 size-10" />This part has resources only — see the files listed for it.</div>
             : docError ? <div className="m-auto"><ErrorBox error={new Error(docError)} /></div>
               : <>{loadingDoc && <Spinner className="absolute left-1/2 top-1/2 size-8" />}<ContentGuard className="relative"><canvas ref={canvas} className={cn('block bg-white shadow-xl', kid ? 'rounded-2xl' : 'rounded')} aria-label={`Page ${page} of ${pages}`} />{doc && comp && <HotspotLayer componentId={comp.id} page={page} editing={editHot} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} />}</ContentGuard></>}
         </main>

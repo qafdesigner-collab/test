@@ -22,5 +22,5 @@ const NAV = [
   { href: '/teacher/publisher', label: 'Our publisher', icon: Building },
 ];
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
-  return <Shell role="TEACHER" roleLabel="Teacher" nav={NAV} accent="sky">{children}</Shell>;
+  return <Shell role="TEACHER" roleLabel="Teacher" nav={NAV}>{children}</Shell>;
 }

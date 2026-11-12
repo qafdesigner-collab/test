@@ -6,10 +6,11 @@ import { useAction } from '@/lib/hooks';
 import { Button, Dialog, ErrorBox, Field, Input } from '@/components/ui';
 import { Credential } from '@/components/common';
 
-type Row = { name: string; username?: string; password?: string; className?: string; section?: string; parentName?: string; parentPhone?: string; relation?: string };
+type Row = { name: string; email?: string; username?: string; password?: string; className?: string; section?: string; parentName?: string; parentPhone?: string; relation?: string };
 const HEADINGS: Record<keyof Row, RegExp> = {
   name: /^(student'?s?\s*)?(full\s*)?name$|^student$|^child$/i,
-  username: /^user\s*name$|^login$/i,
+  username: /^user\s*name$|^login(\s*id)?$|^user\s*id$/i,
+  email: /^e-?mail(\s*address)?$/i,
   password: /^password$/i,
   className: /^class(\s*name)?$|^grade$/i,
   section: /^section$/i,
@@ -17,7 +18,7 @@ const HEADINGS: Record<keyof Row, RegExp> = {
   parentPhone: /^(parent|father|mother|guardian)?('?s)?\s*(mobile|phone|whatsapp|cell)(\s*(no\.?|number))?$/i,
   relation: /^relation(ship)?$/i,
 };
-const TEMPLATE = 'Name,Class,Section,Parent name,Parent mobile,Relation,Username,Password\nAli Raza,KG,Rose,Imran Raza,0321 5550001,Father,,\nZara Raza,KG,Rose,Imran Raza,0321 5550001,Father,,\n';
+const TEMPLATE = 'Name,Class,Section,Parent name,Parent mobile,Relation,Email,Login ID,Password\nAli Raza,KG,Rose,Imran Raza,050 555 0001,Father,,,\nZara Raza,KG,Rose,Imran Raza,050 555 0001,Father,,,\n';
 
 function parseCsv(text: string): string[][] {
   const out: string[][] = []; let row: string[] = []; let cur = ''; let q = false;
@@ -30,7 +31,7 @@ function parseCsv(text: string): string[][] {
   return out.filter((r) => r.some((c) => String(c).trim()));
 }
 
-async function readFile(file: File): Promise<string[][]> {
+export async function readFile(file: File): Promise<string[][]> {
   if (/\.xlsx$/i.test(file.name)) {
     const { readSheet } = await import('read-excel-file/browser');
     const data = (await readSheet(file)) as unknown as unknown[][]; // first sheet
@@ -64,7 +65,7 @@ export function StudentImport({ onClose, onCreated }: { onClose: () => void; onC
   };
   const errors = (check?.issues ?? []).filter((i: any) => i.level === 'error'); const warnings = (check?.issues ?? []).filter((i: any) => i.level === 'warning');
   return (
-    <Dialog open onOpenChange={onClose} wide title="Import students from Excel" description="One student per row. Optional: class and section (the class must exist), parent name and mobile (one parent account per mobile number, shared by brothers and sisters).">
+    <Dialog open onOpenChange={onClose} wide title="Import students from Excel" description="One student per row. Only the name is required: a login ID and password are made for each child. Optional: email (they can then sign in with it), class and section (the class must exist), parent name and mobile (one parent account per mobile number, shared by brothers and sisters).">
       <div className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Excel (.xlsx) or CSV file" className="min-w-64 flex-1"><Input type="file" accept=".xlsx,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" onChange={(e) => load(e.target.files?.[0])} /></Field>

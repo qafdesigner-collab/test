@@ -51,4 +51,30 @@ describe('Student import (Excel/CSV rows) with classes and parents', () => {
     const teacher = await login(app, 'teacher1', 'Teacher@12345', 'SUN01');
     expect((await teacher.post('/api/school/import/students').send({ rows })).status).toBe(403);
   });
+
+  it('bulk-adds teachers with only a name; optional designation and email; sign-in by login ID or email', async () => {
+    const r = await principal.post('/api/school/users').send({ role: 'TEACHER', users: [
+      { displayName: 'Noor Bulk', designation: 'Class teacher', email: 'Noor.Bulk@School.ae' },
+      { displayName: 'Hamid Bulk' },
+    ] });
+    expect(r.status).toBe(201);
+    const [noor, hamid] = r.body;
+    expect(noor.username).toMatch(/^noor/); expect(noor.email).toBe('noor.bulk@school.ae'); expect(hamid.username).toBeTruthy(); expect(hamid.password).toBeTruthy();
+    const list = (await principal.get('/api/school/users?role=TEACHER&search=Bulk')).body.items;
+    expect(list.find((u: any) => u.id === noor.id)).toMatchObject({ designation: 'Class teacher', email: 'noor.bulk@school.ae' });
+    // same email again is refused, a bad email too
+    expect((await principal.post('/api/school/users').send({ role: 'TEACHER', users: [{ displayName: 'X', email: 'noor.bulk@school.ae' }] })).status).toBe(409);
+    expect((await principal.post('/api/school/users').send({ role: 'TEACHER', users: [{ displayName: 'X', email: 'not-an-email' }] })).status).toBe(400);
+    expect((await principal.post('/api/school/users').send({ role: 'TEACHER', users: [{ displayName: '  ' }] })).status).toBe(400);
+    // login with the generated ID, and with the email (any case)
+    await login(app, hamid.username, hamid.password, 'SUN01');
+    await login(app, 'NOOR.BULK@school.ae', noor.password, 'SUN01');
+    // CSV with headings maps optional columns by name
+    const c = await principal.post('/api/school/users/import').send({ role: 'TEACHER', csv: 'Name,Designation,Email\nRania Csv,Arabic teacher,rania.csv@school.ae\nTariq Csv,,\n' });
+    expect(c.status).toBe(201);
+    expect(c.body.map((x: any) => x.email ?? null)).toEqual(['rania.csv@school.ae', null]);
+    // editing details
+    expect((await principal.patch(`/api/school/users/${hamid.id}`).send({ designation: 'Maths teacher', email: 'hamid@school.ae' })).status).toBe(200);
+    await login(app, 'hamid@school.ae', hamid.password, 'SUN01');
+  });
 });

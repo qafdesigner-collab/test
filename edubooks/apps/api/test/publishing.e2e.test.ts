@@ -104,6 +104,25 @@ describe('Phase 2 — Book Package Management', () => {
     expect((await admin.patch(`/api/publishing/lessons/${lessonId}`).send({ pageStart: 1 })).status).toBe(409);
     expect((await admin.patch(`/api/publishing/lessons/${lessonId}`).send({ title: 'Letter A — Apple' })).status).toBe(200);
     expect((await admin.post(`/api/publishing/editions/${edId}/publish`)).status).toBe(409);
+    // whole parts can still be added, renamed and removed on a published edition; page ranges stay locked
+    expect((await admin.patch(`/api/publishing/components/${partId}`).send({ title: 'Student Book Part 1 (Letters)' })).status).toBe(200);
+    expect((await admin.patch(`/api/publishing/components/${partId}`).send({ pageCount: 99 })).status).toBe(409);
+    const extra = await admin.post(`/api/publishing/editions/${edId}/components`).send({ type: 'POSTERS', title: 'Posters' });
+    expect(extra.status).toBe(201);
+    expect((await admin.delete(`/api/publishing/components/${extra.body.id}`)).status).toBe(200);
+    expect((await admin.get(`/api/publishing/editions/${edId}`)).body.components.some((c: any) => c.title === 'Posters')).toBe(false);
+  });
+
+  it('lets the publisher choose which standard parts to create', async () => {
+    const r = await admin.post('/api/publishing/packages').send({
+      title: 'Grade 2 Maths Lite', gradeId, subjectId, editionLabel: '2026 Edition', editionYear: 2026, standardStructure: true, parts: 2, extras: ['HOMEWORK_BOOK', 'MOBILE_APP'],
+    });
+    expect(r.status).toBe(201);
+    const tree = (await admin.get(`/api/publishing/editions/${r.body.editionId}`)).body;
+    expect(tree.components.map((c: any) => c.title)).toEqual(['Student Book Part 1', 'Student Book Part 2', 'Homework Book', 'Mobile App']);
+    expect((await admin.post('/api/publishing/packages').send({
+      title: 'Bad extras', gradeId, subjectId, editionLabel: '2026', editionYear: 2026, standardStructure: true, extras: ['SPACESHIP'],
+    })).status).toBe(400);
   });
 
   it('a new edition copies structure and links the SAME files (no duplication); editing it leaves the old one intact', async () => {

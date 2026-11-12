@@ -34,7 +34,7 @@ function LoginForm() {
         <button type="button" role="tab" aria-selected={staff} onClick={() => setStaff(true)} className={`rounded-md py-2 ${staff ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600'}`}>{t('Publisher staff')}</button>
       </div>
       {!staff && <Field label={t('School code')}><Input required dir="ltr" value={form.schoolCode} onChange={set('schoolCode')} placeholder={t('e.g. SUN01')} autoComplete="organization" /></Field>}
-      <Field label={t('Username')}><Input required dir="ltr" value={form.username} onChange={set('username')} autoComplete="username" /></Field>
+      <Field label={t('Login ID or email')}><Input required dir="ltr" value={form.username} onChange={set('username')} autoComplete="username" /></Field>
       <Field label={t('Password')}><Input required dir="ltr" type="password" value={form.password} onChange={set('password')} autoComplete="current-password" /></Field>
       {error ? <ErrorBox error={error} /> : null}
       <Button type="submit" loading={busy} className="w-full">{t('Sign in')}</Button>

@@ -18,6 +18,7 @@ class ImportRow {
   @IsOptional() @IsString() @MaxLength(120) parentName?: string;
   @IsOptional() @IsString() @MaxLength(30) parentPhone?: string;
   @IsOptional() @IsString() @MaxLength(40) relation?: string;
+  @IsOptional() @IsString() @MaxLength(200) email?: string;
 }
 class ImportDto {
   @IsOptional() @IsUUID() academicYearId?: string;
@@ -49,7 +50,9 @@ export class StudentImportService {
     const takenSet = new Set((taken as any[]).map((r) => r.u));
     const { rows: parentRows } = await this.q.execute(sql`SELECT u.id, u.display_name AS name, u.phone FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role::text = 'PARENT' WHERE u.school_id = ${school} AND u.phone IS NOT NULL`);
     const existingParents = new Map((parentRows as any[]).map((p) => [normalisePhone(p.phone), p]));
-    const seen = new Set<string>();
+    const seen = new Set<string>(); const seenEmail = new Set<string>();
+    const { rows: em } = await this.q.execute(sql`SELECT lower(email::text) AS e FROM users WHERE school_id = ${school} AND email IS NOT NULL`);
+    const takenEmail = new Set((em as any[]).map((r) => r.e));
     const plan = d.rows.map((r, i) => {
       const n = i + 2; // spreadsheet row (row 1 = headings)
       const name = r.name?.trim();
@@ -60,6 +63,10 @@ export class StudentImportService {
         else if (takenSet.has(username) || seen.has(username)) issues.push({ row: n, level: 'error', message: `Username “${username}” is already used` });
         seen.add(username);
       }
+      const em = r.email?.trim().toLowerCase();
+      if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) issues.push({ row: n, level: 'error', message: `“${em}” is not a valid email` });
+      else if (em && (takenEmail.has(em) || seenEmail.has(em))) issues.push({ row: n, level: 'error', message: `Email “${em}” is already used` });
+      if (em) seenEmail.add(em);
       if (r.password && r.password.length < 6) issues.push({ row: n, level: 'error', message: 'Password must have at least 6 characters' });
       let classId: string | null = null;
       if (r.className?.trim()) {
@@ -73,7 +80,7 @@ export class StudentImportService {
       const phone = r.parentPhone?.trim() ? normalisePhone(r.parentPhone) : '';
       if (r.parentPhone?.trim() && phone.length < 9) issues.push({ row: n, level: 'error', message: `Parent mobile “${r.parentPhone}” does not look like a phone number` });
       if (phone && !r.parentName?.trim() && !existingParents.has(phone)) issues.push({ row: n, level: 'warning', message: 'Parent mobile without a parent name: “Parent of …” is used' });
-      return { n, name, username, password: r.password || undefined, classId, parentName: r.parentName?.trim(), parentPhone: r.parentPhone?.trim(), phone, relation: r.relation?.trim() || 'Parent' };
+      return { n, name, username, password: r.password || undefined, email: r.email?.trim().toLowerCase() || undefined, classId, parentName: r.parentName?.trim(), parentPhone: r.parentPhone?.trim(), phone, relation: r.relation?.trim() || 'Parent' };
     });
     const errors = issues.filter((x) => x.level === 'error');
     const parentsPlanned = new Set(plan.filter((p) => p.phone && !existingParents.has(p.phone)).map((p) => p.phone)).size + plan.filter((p) => !p.phone && p.parentName).length;
@@ -84,7 +91,7 @@ export class StudentImportService {
     }
 
     // ---- write (inside the request transaction: all or nothing)
-    const studentCreds = await this.users.create(school, 'STUDENT', plan.map((p) => ({ displayName: p.name!, username: p.username, password: p.password })));
+    const studentCreds = await this.users.create(school, 'STUDENT', plan.map((p) => ({ displayName: p.name!, username: p.username, password: p.password, email: p.email })));
     const parentCreds: any[] = []; const parentByKey = new Map<string, string>();
     for (const [i, p] of plan.entries()) {
       const kid = studentCreds[i];

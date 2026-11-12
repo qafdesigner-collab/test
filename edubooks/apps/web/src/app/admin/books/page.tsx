@@ -11,10 +11,15 @@ import { CurriculumGradePicker, CurriculumSelect, GradeOptions } from '@/compone
 import { Badge, Button, Card, Dialog, EmptyState, ErrorBox, Field, Input, Pagination, Select, Spinner, StatusBadge, Textarea, cn } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 
+const EXTRAS = [
+  { type: 'HOMEWORK_BOOK', title: 'Homework Book' }, { type: 'TEACHER_GUIDE', title: 'Teacher Guide' }, { type: 'FLASHCARDS', title: 'Flashcards' },
+  { type: 'TEACHER_CARDS', title: 'Teacher Cards' }, { type: 'DANGLERS', title: 'Danglers' }, { type: 'CD', title: 'CD' }, { type: 'MOBILE_APP', title: 'Mobile App' },
+];
+
 function NewPackageDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const subjects = useSubjects(); const router = useRouter(); const toast = useToast(); const qc = useQueryClient();
   const year = new Date().getFullYear();
-  const [f, setF] = useState({ title: '', gradeId: '', subjectId: '', description: '', coverColor: COVER_COLORS[0], editionLabel: `${year} Edition`, editionYear: year, standardStructure: true, parts: 3 });
+  const [f, setF] = useState({ title: '', gradeId: '', subjectId: '', description: '', coverColor: COVER_COLORS[0], editionLabel: `${year} Edition`, editionYear: year, standardStructure: true, parts: 3, extras: EXTRAS.map((x) => x.type) as string[] });
   const m = useMutation({
     mutationFn: () => api.post('/publishing/packages', f),
     onSuccess: (r) => { qc.invalidateQueries({ queryKey: ['packages'] }); qc.invalidateQueries({ queryKey: ['stats'] }); toast(`“${r.title}” created`); router.push(`/admin/books/${r.id}`); },
@@ -39,13 +44,27 @@ function NewPackageDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
           <Field label="First edition"><Input required value={f.editionLabel} onChange={(e) => setF({ ...f, editionLabel: e.target.value })} /></Field>
           <Field label="Edition year"><Input required type="number" min={1990} max={2100} value={f.editionYear} onChange={(e) => setF({ ...f, editionYear: Number(e.target.value) })} /></Field>
         </div>
-        <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-sm">
-          <input type="checkbox" className="mt-0.5 size-4" checked={f.standardStructure} onChange={(e) => setF({ ...f, standardStructure: e.target.checked })} />
-          <span><span className="font-medium text-slate-800">Start with the standard structure</span><br />
-            <span className="text-slate-500">Student Book Parts, Homework Book, Teacher Guide, Flashcards, Teacher Cards, Danglers</span>
-            {f.standardStructure && <span className="mt-2 flex items-center gap-2">Parts: <Input type="number" min={1} max={6} value={f.parts} onChange={(e) => setF({ ...f, parts: Number(e.target.value) })} className="h-8 w-20" /></span>}
-          </span>
-        </label>
+        <div className="rounded-lg border border-slate-200 p-3 text-sm">
+          <label className="flex items-start gap-3">
+            <input type="checkbox" className="mt-0.5 size-4" checked={f.standardStructure} onChange={(e) => setF({ ...f, standardStructure: e.target.checked })} />
+            <span><span className="font-medium text-slate-800">Start with ready-made parts</span><br />
+              <span className="text-slate-500">Tick only what this book has. You can add, rename or remove parts later too.</span></span>
+          </label>
+          {f.standardStructure && (
+            <div className="mt-3 space-y-3 pl-7">
+              <label className="flex items-center gap-2">Student Book parts:
+                <Input type="number" min={0} max={6} value={f.parts} onChange={(e) => setF({ ...f, parts: Math.max(0, Math.min(6, Number(e.target.value))) })} className="h-8 w-20" aria-label="Number of student book parts" />
+                <span className="text-xs text-slate-500">{f.parts > 0 ? Array.from({ length: f.parts }, (_, i) => `Part ${i + 1}`).join(', ') : 'none'}</span></label>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                {EXTRAS.map((x) => (
+                  <label key={x.type} className="flex items-center gap-2">
+                    <input type="checkbox" className="size-4" checked={f.extras.includes(x.type)}
+                      onChange={(e) => setF({ ...f, extras: e.target.checked ? [...f.extras, x.type] : f.extras.filter((t) => t !== x.type) })} />{x.title}</label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
         {m.error && <ErrorBox error={m.error} />}
         <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit" loading={m.isPending}>Create package</Button></div>
       </form>

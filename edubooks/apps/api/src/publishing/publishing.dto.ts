@@ -30,7 +30,9 @@ export class CreatePackageDto {
   @ApiPropertyOptional({ description: 'Create Student Book Parts 1–3, Homework Book, Teacher Guide, Flashcards, Teacher Cards, Danglers' })
   @IsOptional() @IsBoolean() standardStructure?: boolean;
   @ApiPropertyOptional({ description: 'Number of student book parts for the standard structure', default: 3 })
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(6) parts?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(6) parts?: number;
+  @ApiPropertyOptional({ description: 'Which standard extra parts to include (default: all)', example: ['HOMEWORK_BOOK', 'TEACHER_GUIDE'] })
+  @IsOptional() @IsArray() @IsIn(COMPONENT_TYPES, { each: true }) extras?: string[];
 }
 export class UpdatePackageDto extends PartialType(PickType(CreatePackageDto, ['title', 'gradeId', 'subjectId', 'description', 'coverColor'] as const)) {}
 

@@ -20,6 +20,8 @@ class NewUserDto {
   @IsOptional() @IsString() @MaxLength(40) username?: string;
   @IsOptional() @IsString() @Length(6, 200) password?: string;
   @IsOptional() @IsString() @MaxLength(30) phone?: string;
+  @IsOptional() @IsString() @MaxLength(200) email?: string;
+  @IsOptional() @IsString() @MaxLength(80) designation?: string;
 }
 class CreateUsersDto {
   @IsIn(['TEACHER', 'STUDENT']) role: 'TEACHER' | 'STUDENT';
@@ -33,6 +35,8 @@ class UpdateUserDto {
   @IsOptional() @IsString() @Length(1, 120) displayName?: string;
   @IsOptional() @IsIn(['ACTIVE', 'SUSPENDED']) status?: 'ACTIVE' | 'SUSPENDED';
   @IsOptional() @IsString() @MaxLength(30) phone?: string;
+  @IsOptional() @IsString() @MaxLength(200) email?: string;
+  @IsOptional() @IsString() @MaxLength(80) designation?: string;
 }
 class AssignDto { @IsArray() @ArrayMinSize(1) @ArrayMaxSize(1000) @IsUUID('all', { each: true }) userIds: string[]; }
 class TransferDto { @IsUUID() assignmentId: string; @IsUUID() toUserId: string; @IsString() @Length(3, 500) reason: string; }
