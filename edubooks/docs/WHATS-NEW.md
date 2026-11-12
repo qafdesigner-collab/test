@@ -1,3 +1,11 @@
+# What's new in Knowledge Gate 1.3.4
+
+## A colourful look for every portal, in calmer colours
+- **Super admin and Sales** (publisher area) now have the colourful sidebar with coloured icons, in navy-indigo. The dashboard has a welcome banner, picture tiles and six quick buttons (Books, Products, Schools, Orders, Users, Games). The Sales page shows the revenue in a banner with the date range.
+- **School admin** uses a teal theme, **Teacher** a soft violet one, so each portal is easy to recognise. All colours were toned down: still bright, but easier on the eyes.
+- **Teacher:** floating doodles in the banner, a **My week** chart (lessons per day, today highlighted) and a **Tip of the day** sticky note with a new teaching idea every day.
+- **Pupils:** softer colours for the big buttons and the banner, and a new **My star path** — stepping stones to the next level, with the owl standing where the child is now.
+
 # What's new in Knowledge Gate 1.3.3
 
 ## Super admin → Users: every school's accounts, and "Log in as"

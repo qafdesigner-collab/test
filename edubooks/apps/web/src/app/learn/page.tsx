@@ -8,7 +8,7 @@ import { Mascot } from '@/components/games/mascot';
 import { GameCard } from '@/components/games/cards';
 import { UpcomingEvents } from '@/components/calendar';
 import { Announcements, LiveLessons } from '@/components/messaging';
-import { Book3D, Shelf, levelOf } from '@/components/kid-ui';
+import { Book3D, Shelf, StarPath, levelOf } from '@/components/kid-ui';
 import { useT } from '@/lib/i18n';
 
 const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
@@ -22,9 +22,9 @@ export default function LearnHome() {
   const tip = h.homework.length ? t('You have {n} homework to do!', { n: h.homework.length }) : h.continueReading ? t("Let's read {title}!", { title: h.continueReading.title }) : t("Let's play and learn!");
   const lv = levelOf(h.stars ?? 0); const today = h.today ?? { reading: 0, games: 0, homework: 0 };
   const goals = [
-    { done: today.reading > 0, emoji: '📖', label: t('Read a page'), href: h.continueReading ? `/read/${h.continueReading.editionId}` : '/learn/books', color: 'from-sky-400 to-blue-600' },
-    { done: today.games > 0, emoji: '🎮', label: t('Play a game'), href: '/learn/games', color: 'from-emerald-400 to-green-600' },
-    { done: today.homework > 0 || !h.homework.length, emoji: '✏️', label: t('Do homework'), href: h.homework[0] ? `/homework/${h.homework[0].id}` : '/learn', color: 'from-pink-400 to-rose-600' },
+    { done: today.reading > 0, emoji: '📖', label: t('Read a page'), href: h.continueReading ? `/read/${h.continueReading.editionId}` : '/learn/books', color: 'from-[#5fb0e6] to-[#3a86c9]' },
+    { done: today.games > 0, emoji: '🎮', label: t('Play a game'), href: '/learn/games', color: 'from-[#4fbf92] to-[#2c9a6c]' },
+    { done: today.homework > 0 || !h.homework.length, emoji: '✏️', label: t('Do homework'), href: h.homework[0] ? `/homework/${h.homework[0].id}` : '/learn', color: 'from-[#ea8db0] to-[#cf5f8c]' },
   ];
   const doneCount = goals.filter((g) => g.done).length;
   const cr = h.continueReading;
@@ -32,7 +32,7 @@ export default function LearnHome() {
     <div className="space-y-10">
       <h1 className="sr-only">{t('Home')}</h1>
       {/* hero */}
-      <section className="kid-rise relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-violet-600 via-fuchsia-600 to-pink-500 p-6 text-white shadow-xl sm:p-8">
+      <section className="kid-rise relative overflow-hidden rounded-[2.5rem] bg-[linear-gradient(125deg,#6f5fd6_0%,#9a62cc_50%,#d8789f_100%)] p-6 text-white shadow-[0_24px_50px_-24px_rgba(90,70,170,.6)] sm:p-8">
         <span aria-hidden className="absolute -right-10 -top-10 size-48 rounded-full bg-white/10" /><span aria-hidden className="absolute bottom-[-4rem] left-1/3 size-56 rounded-full bg-white/10" />
         <div className="relative grid items-center gap-6 lg:grid-cols-[1fr_auto]">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -55,6 +55,8 @@ export default function LearnHome() {
         </div>
       </section>
 
+      <StarPath stars={h.stars ?? 0} />
+
       <LiveLessons playful />
 
       {cr && (
@@ -63,7 +65,7 @@ export default function LearnHome() {
           <span className="flex-1 text-center sm:text-start"><span className="block text-sm font-black uppercase tracking-wide text-violet-600">{t('Continue reading')}</span>
             <span className="block text-3xl font-black text-slate-800">{cr.title}</span><span className="font-bold text-slate-600">{cr.part} · {t('page {n}', { n: cr.page })}</span>
             {cr.pageCount && <span className="mt-3 block h-4 overflow-hidden rounded-full bg-slate-100"><span className="relative block h-full overflow-hidden rounded-full bg-gradient-to-r from-violet-500 to-pink-500" style={{ width: `${Math.min(100, (cr.page / cr.pageCount) * 100)}%` }}><span className="absolute inset-y-0 w-1/3 bg-white/40 motion-safe:animate-[shine_2.5s_ease-in-out_infinite]" /></span></span>}</span>
-          <span className="rounded-full bg-gradient-to-r from-violet-600 to-pink-500 px-8 py-4 text-2xl font-black text-white shadow-[0_6px_0_#6d28d9] transition group-hover:-translate-y-0.5">{t('Read ▶')}</span>
+          <span className="rounded-full bg-gradient-to-r from-[#7a66d8] to-[#d3709c] px-8 py-4 text-2xl font-black text-white shadow-[0_6px_0_#5a49b5] transition group-hover:-translate-y-0.5">{t('Read ▶')}</span>
         </Link>
       )}
 
@@ -80,7 +82,7 @@ export default function LearnHome() {
             <Link key={w.id} href={`/homework/${w.id}`} className="flex items-center gap-4 rounded-[2rem] bg-white p-5 shadow-sm ring-4 ring-white transition hover:-translate-y-1 hover:shadow-lg motion-reduce:transform-none">
               <span className="grid size-16 shrink-0 place-items-center rounded-3xl text-3xl shadow-inner" style={{ background: w.coverColor ?? '#f472b6' }}>✏️</span>
               <span className="flex-1"><span className="block text-xl font-black">{w.title}</span><span className="text-sm font-bold text-slate-500">{t('{n} questions', { n: w.items })}{w.dueAt && ` · ${daysLeft(w.dueAt) <= 0 ? t('due today!') : t('{n} days left', { n: daysLeft(w.dueAt) })}`}</span></span>
-              <span className="rounded-full bg-pink-600 px-5 py-3 text-lg font-black text-white shadow-[0_5px_0_#be185d]">{t('Start')}</span></Link>))}</div>
+              <span className="rounded-full bg-[#d4618e] px-5 py-3 text-lg font-black text-white shadow-[0_5px_0_#a8466f]">{t('Start')}</span></Link>))}</div>
         )}</section>
 
       <Announcements playful limit={3} />

@@ -9,7 +9,7 @@ import { useMe } from '@/lib/session';
 import { Badge, Button, Dialog, ErrorBox, Field, Input, PageLoader } from '@/components/ui';
 import { SeatBar } from '@/components/common';
 import { UpcomingEvents } from '@/components/calendar';
-import { ActionTile, Bar, Faces, GRADIENTS, GradientCard, greeting, Hero, Panel, Pill, Ring, StatTile } from '@/components/vivid';
+import { ActionTile, Bar, Doodles, Faces, GRADIENTS, GradientCard, greeting, Hero, Panel, Pill, Ring, StatTile } from '@/components/vivid';
 
 const HEX = ['#6366f1', '#ec4899', '#0ea5e9', '#f43f5e', '#10b981', '#a855f7', '#2563eb', '#ef4444'];
 const cname = (c: { name: string; section?: string }) => `${c.name}${c.section ? ` ${c.section}` : ''}`;
@@ -37,6 +37,7 @@ export default function SchoolOverview() {
   return (
     <div className="space-y-6">
       <Hero>
+        <Doodles items={['🏫', '📚', '🎒', '⭐', '🗓️', '✏️']} />
         <p className="font-medium opacity-95">{g.icon} {g.text}, {(me?.displayName ?? '').split(' ')[0]}</p>
         <h1 className="mb-1.5 mt-1 text-3xl font-extrabold sm:text-[32px]">{s.name} 🏫</h1>
         <p className="font-medium opacity-95">{[s.city, s.phone, s.address].filter(Boolean).join(' · ') || 'Add your contact details'}
@@ -64,12 +65,12 @@ export default function SchoolOverview() {
       </div>
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-        <ActionTile href="/school/students" icon="🎒" label="Add pupils" gradient="from-green-500 to-green-700" />
-        <ActionTile href="/school/teachers" icon="🧑‍🏫" label="Add teachers" gradient="from-orange-500 to-orange-700" />
-        <ActionTile href="/school/licences" icon="📚" label="Give books" gradient="from-violet-500 to-violet-700" />
-        <ActionTile href="/school/messages" icon="💬" label="Send a message" gradient="from-pink-500 to-pink-700" />
-        <ActionTile href="/school/timetable" icon="🗓️" label="Timetable" gradient="from-sky-500 to-sky-700" />
-        <ActionTile href="/school/exams" icon="🧾" label="Exams" gradient="from-red-500 to-red-700" />
+        <ActionTile href="/school/students" icon="🎒" label="Add pupils" gradient="from-[#45b483] to-[#2f9468]" />
+        <ActionTile href="/school/teachers" icon="🧑‍🏫" label="Add teachers" gradient="from-[#ec9a5c] to-[#cf7840]" />
+        <ActionTile href="/school/licences" icon="📚" label="Give books" gradient="from-[#8b7be0] to-[#6a5acb]" />
+        <ActionTile href="/school/messages" icon="💬" label="Send a message" gradient="from-[#e07aa3] to-[#c45886]" />
+        <ActionTile href="/school/timetable" icon="🗓️" label="Timetable" gradient="from-[#4fa9dc] to-[#3486bf]" />
+        <ActionTile href="/school/exams" icon="🧾" label="Exams" gradient="from-[#e27c7c] to-[#c55c5c]" />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[1.45fr_1fr]">

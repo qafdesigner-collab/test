@@ -6,7 +6,7 @@ import { Download } from 'lucide-react';
 import { api, downloadCsv, fmtDay, qs } from '@/lib/api';
 import { Money, useMoney } from '@/lib/company';
 import { Badge, Card, ErrorBox, Input, PageLoader } from '@/components/ui';
-import { PageHeader } from '@/components/common';
+import { Hero, StatTile } from '@/components/vivid';
 
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : null);
 const short = (minor: number) => { const v = minor / 100; return v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${Math.round(v / 1e3)}k` : String(Math.round(v)); };
@@ -19,21 +19,26 @@ export default function SalesPage() {
   if (!q.data) return <PageLoader />;
   const d = q.data; const cur = d.currency; const k = d.kpis;
   const tiles = [
-    { label: 'Revenue', value: <Money v={k.revenue} />, sub: `${k.orders} confirmed order(s) · ${k.orderingSchools} school(s)` },
+    { label: 'Revenue', value: <span className="text-lg"><Money v={k.revenue} /></span>, sub: `${k.orders} confirmed order(s) · ${k.orderingSchools} school(s)` },
     { label: 'Seats sold', value: k.seatsSold.toLocaleString(), sub: 'student + teacher, in this period' },
     { label: 'Paying schools', value: k.licensedSchools, sub: `${k.activeSchools} active schools · ${k.demoSchools} on demo` },
     { label: 'Seat usage today', value: k.usage === null ? '—' : `${k.usage}%`, sub: `${k.assignedSeats.toLocaleString()} of ${k.liveSeats.toLocaleString()} student seats given out` },
   ];
   return (
     <div className="space-y-6">
-      <PageHeader title="Sales" sub="Revenue from confirmed orders, licences in use, and the schools to follow up.">
-        <div className="flex items-end gap-2 text-sm">
-          <label className="text-slate-700">From<Input type="date" className="mt-1 h-9" value={range.from || d.range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} /></label>
-          <label className="text-slate-700">To<Input type="date" className="mt-1 h-9" value={range.to || d.range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} /></label>
+      <Hero>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div><p className="font-medium opacity-95">📈 Sales</p>
+            <h1 className="mt-1 text-3xl font-extrabold sm:text-[32px]"><Money v={k.revenue} light /></h1>
+            <p className="font-medium opacity-95">Revenue from {k.orders} confirmed order{k.orders === 1 ? '' : 's'} between {fmtDay(d.range.from)} and {fmtDay(d.range.to)}.</p></div>
+          <div className="flex items-end gap-2 text-sm">
+            <label className="font-medium">From<Input type="date" className="mt-1 h-9 border-white/40 bg-white/90 text-slate-800" value={range.from || d.range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} /></label>
+            <label className="font-medium">To<Input type="date" className="mt-1 h-9 border-white/40 bg-white/90 text-slate-800" value={range.to || d.range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} /></label>
+          </div>
         </div>
-      </PageHeader>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{tiles.map((t) => (
-        <Card key={t.label} className="p-5"><div className="text-sm text-slate-600">{t.label}</div><div className="mt-2 text-2xl font-semibold text-slate-900">{t.value}</div><div className="mt-1 text-xs text-slate-600">{t.sub}</div></Card>))}</div>
+      </Hero>
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">{tiles.map((t, i) => (
+        <StatTile key={t.label} icon={['💰', '🎟️', '🏫', '📊'][i]} bg={['#e3f3ec', '#e6e9fb', '#f6e6ef', '#fbf0dc'][i]} value={t.value} label={`${t.label.toLowerCase()} · ${t.sub}`} />))}</div>
 
       <Card className="p-5">
         <div className="mb-4 flex items-center justify-between"><h2 className="font-semibold text-slate-900">Revenue by month <span className="font-normal text-slate-600">({cur})</span></h2>

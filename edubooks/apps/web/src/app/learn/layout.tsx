@@ -12,11 +12,11 @@ import { LangScope, LangSwitch, useT } from '@/lib/i18n';
 import { KidSky, LevelBadge } from '@/components/kid-ui';
 
 const NAV = [
-  { href: '/learn', label: 'Home', emoji: '🏠', color: 'bg-pink-600', exact: true },
-  { href: '/learn/books', label: 'My Books', emoji: '📚', color: 'bg-sky-700' },
-  { href: '/learn/games', label: 'Play', emoji: '🎮', color: 'bg-emerald-700' },
-  { href: '/learn/timetable', label: 'Timetable', emoji: '🗓️', color: 'bg-violet-700' },
-  { href: '/learn/me', label: 'My Stars', emoji: '⭐', color: 'bg-amber-700' },
+  { href: '/learn', label: 'Home', emoji: '🏠', color: 'bg-gradient-to-br from-[#e47aa5] to-[#cc5a8a]', exact: true },
+  { href: '/learn/books', label: 'My Books', emoji: '📚', color: 'bg-gradient-to-br from-[#4f9fdc] to-[#2f7cbf]' },
+  { href: '/learn/games', label: 'Play', emoji: '🎮', color: 'bg-gradient-to-br from-[#3fae86] to-[#24895f]' },
+  { href: '/learn/timetable', label: 'Timetable', emoji: '🗓️', color: 'bg-gradient-to-br from-[#8f7fe3] to-[#6a58c9]' },
+  { href: '/learn/me', label: 'My Stars', emoji: '⭐', color: 'bg-gradient-to-br from-[#e3a24e] to-[#c27a22]' },
 ];
 
 /** Playful student shell: big tiles, bright colours, minimal reading. */

@@ -16,7 +16,7 @@ const AR: Record<string, string> = {
   Home: 'الرئيسية', 'My Books': 'كتبي', Play: 'العب', Timetable: 'الجدول', 'My Stars': 'نجومي', Bye: 'وداعًا', 'Sign out': 'تسجيل الخروج', 'Days in a row': 'أيام متتالية',
   'Good morning': 'صباح الخير', 'Good afternoon': 'مساء الخير', 'Good evening': 'مساء الخير',
   'You have {n} homework to do!': 'لديك {n} من الواجبات!', "Let's read {title}!": 'هيا نقرأ {title}!', "Let's play and learn!": 'هيا نلعب ونتعلم!',
-  'Continue reading': 'تابع القراءة', 'page {n}': 'صفحة {n}', 'Go ▶': 'هيا ◀', "📝 Today's homework": '📝 واجبات اليوم', 'All done! 🎉': 'أنجزت كل شيء! 🎉',
+  '🗺️ My star path': '🗺️ طريق نجومي', '{n} ⭐ to level {m}': '{n} ⭐ حتى المستوى {m}', 'Read, play and finish homework to collect stars and walk the path!': 'اقرأ والعب وأنهِ واجبك لتجمع النجوم وتمشي على الطريق!', 'Continue reading': 'تابع القراءة', 'page {n}': 'صفحة {n}', 'Go ▶': 'هيا ◀', "📝 Today's homework": '📝 واجبات اليوم', 'All done! 🎉': 'أنجزت كل شيء! 🎉',
   '{n} questions': '{n} أسئلة', 'due today!': 'التسليم اليوم!', '{n} days left': 'باقي {n} أيام', Start: 'ابدأ', '🎮 Play & learn': '🎮 العب وتعلم', 'See all ▶': 'عرض الكل ◀',
   '🏅 My newest badges': '🏅 أحدث أوسمتي', '📚 My Books': '📚 كتبي', 'No books yet — ask your teacher! 🌈': 'لا توجد كتب بعد — اسأل معلمك! 🌈', '{n}% read': 'قرأت {n}%',
   'No games yet!': 'لا توجد ألعاب بعد!', '💌 From your teacher': '💌 من معلمك', 'More games': 'ألعاب أخرى', '◀ Games': '▶ الألعاب',

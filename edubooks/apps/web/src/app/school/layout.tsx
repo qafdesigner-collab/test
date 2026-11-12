@@ -22,5 +22,5 @@ const NAV = [
 ];
 
 export default function SchoolLayout({ children }: { children: React.ReactNode }) {
-  return <Shell role="SCHOOL_ADMIN" roleLabel="School admin" nav={NAV} deny="This area is for school administrators.">{children}</Shell>;
+  return <Shell role="SCHOOL_ADMIN" roleLabel="School admin" nav={NAV} theme="school" deny="This area is for school administrators.">{children}</Shell>;
 }

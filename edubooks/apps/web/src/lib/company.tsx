@@ -32,9 +32,9 @@ export function useMoney() {
 }
 
 /** Amount in the main currency with the second currency underneath. */
-export function Money({ v, inline }: { v: number | null | undefined; inline?: boolean }) {
+export function Money({ v, inline, light }: { v: number | null | undefined; inline?: boolean; light?: boolean }) {
   const m = useMoney(); const s = m.second(v);
   if (v === null || v === undefined) return <>—</>;
   return inline || !s ? <span className="whitespace-nowrap">{m.main(v)}{s && inline ? <span className="text-slate-500"> ≈ {s}</span> : null}</span>
-    : <span className="inline-flex flex-col leading-tight"><span className="whitespace-nowrap">{m.main(v)}</span><span className="whitespace-nowrap text-xs font-normal text-slate-500">≈ {s}</span></span>;
+    : <span className="inline-flex flex-col leading-tight"><span className="whitespace-nowrap">{m.main(v)}</span><span className={`whitespace-nowrap text-xs font-normal ${light ? 'text-white/85' : 'text-slate-500'}`}>≈ {s}</span></span>;
 }

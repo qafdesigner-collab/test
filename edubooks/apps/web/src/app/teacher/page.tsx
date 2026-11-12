@@ -7,7 +7,7 @@ import { useMe } from '@/lib/session';
 import { PageLoader } from '@/components/ui';
 import { UpcomingEvents } from '@/components/calendar';
 import { Book3D, Shelf } from '@/components/kid-ui';
-import { ActionTile, Bar, Faces, GRADIENTS, GradientCard, greeting, Hero, Panel, Pill, Ring, StatTile } from '@/components/vivid';
+import { ActionTile, Bar, Doodles, Faces, GRADIENTS, GradientCard, greeting, Hero, Panel, Pill, Ring, StatTile, TipNote, WeekStrip } from '@/components/vivid';
 
 const HEX = ['#6366f1', '#ec4899', '#0ea5e9', '#f43f5e', '#10b981', '#a855f7', '#2563eb', '#ef4444'];
 const today = () => new Date().toISOString().slice(0, 10);
@@ -49,6 +49,7 @@ export default function TeacherHome() {
   return (
     <div className="space-y-6">
       <Hero>
+        <Doodles />
         <p className="font-medium opacity-95">{g.icon} {g.text}</p>
         <h1 className="mb-1.5 mt-1 text-3xl font-extrabold sm:text-[32px]">{firstName} 👋</h1>
         <p className="font-medium opacity-95">
@@ -78,12 +79,20 @@ export default function TeacherHome() {
       </div>
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-        <ActionTile href="/teacher/attendance" icon="✅" label="Take register" gradient="from-green-500 to-green-700" />
-        <ActionTile href="/teacher/assessments/new" icon="✏️" label="Set homework" gradient="from-orange-500 to-orange-700" />
-        <ActionTile href="/teacher/plans/new" icon="📝" label="Plan a lesson" gradient="from-violet-500 to-violet-700" />
-        <ActionTile href="/teacher/ai" icon="✨" label="Ask the AI" gradient="from-pink-500 to-pink-700" />
-        <ActionTile href="/teacher/games" icon="🎮" label="Assign a game" gradient="from-sky-500 to-sky-700" />
-        <ActionTile href="/teacher/exams" icon="🧾" label="Make an exam" gradient="from-red-500 to-red-700" />
+        <ActionTile href="/teacher/attendance" icon="✅" label="Take register" gradient="from-[#45b483] to-[#2f9468]" />
+        <ActionTile href="/teacher/assessments/new" icon="✏️" label="Set homework" gradient="from-[#ec9a5c] to-[#cf7840]" />
+        <ActionTile href="/teacher/plans/new" icon="📝" label="Plan a lesson" gradient="from-[#8b7be0] to-[#6a5acb]" />
+        <ActionTile href="/teacher/ai" icon="✨" label="Ask the AI" gradient="from-[#e07aa3] to-[#c45886]" />
+        <ActionTile href="/teacher/games" icon="🎮" label="Assign a game" gradient="from-[#4fa9dc] to-[#3486bf]" />
+        <ActionTile href="/teacher/exams" icon="🧾" label="Make an exam" gradient="from-[#e27c7c] to-[#c55c5c]" />
+      </div>
+
+      <div className="grid gap-5 md:grid-cols-[1.45fr_1fr]">
+        <Panel title="My week" link={{ href: '/teacher/timetable', label: 'Timetable' }}>
+          {(tt.data?.slots ?? []).length ? <WeekStrip slots={tt.data.slots} />
+            : <p className="py-4 text-center text-sm text-slate-500">Your lessons appear here once your school admin fills in the timetable.</p>}
+        </Panel>
+        <div className="flex items-center px-2 py-1"><div className="w-full"><TipNote /></div></div>
       </div>
 
       {!books.data.length && <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">You don&apos;t have a teacher seat for any book yet. Ask your school admin to give you one under “Book licences”.</div>}
