@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download } from 'lucide-react';
-import { api, downloadCsv, fmtDay, fmtMoney, qs } from '@/lib/api';
+import { api, downloadCsv, fmtDay, qs } from '@/lib/api';
+import { Money, useMoney } from '@/lib/company';
 import { Badge, Card, ErrorBox, Input, PageLoader } from '@/components/ui';
 import { PageHeader } from '@/components/common';
 
@@ -18,7 +19,7 @@ export default function SalesPage() {
   if (!q.data) return <PageLoader />;
   const d = q.data; const cur = d.currency; const k = d.kpis;
   const tiles = [
-    { label: 'Revenue', value: fmtMoney(k.revenue, cur), sub: `${k.orders} confirmed order(s) · ${k.orderingSchools} school(s)` },
+    { label: 'Revenue', value: <Money v={k.revenue} />, sub: `${k.orders} confirmed order(s) · ${k.orderingSchools} school(s)` },
     { label: 'Seats sold', value: k.seatsSold.toLocaleString(), sub: 'student + teacher, in this period' },
     { label: 'Paying schools', value: k.licensedSchools, sub: `${k.activeSchools} active schools · ${k.demoSchools} on demo` },
     { label: 'Seat usage today', value: k.usage === null ? '—' : `${k.usage}%`, sub: `${k.assignedSeats.toLocaleString()} of ${k.liveSeats.toLocaleString()} student seats given out` },
@@ -42,16 +43,16 @@ export default function SalesPage() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Table title="By city" csv="sales-by-city.csv" rows={d.byCity} cols={[
-          ['City', (r) => r.city], ['Schools', (r) => `${r.licensed} / ${r.schools}`, 'paying / all'], ['Revenue', (r) => fmtMoney(r.revenue, cur), '', (r) => r.revenue / 100],
+          ['City', (r) => r.city], ['Schools', (r) => `${r.licensed} / ${r.schools}`, 'paying / all'], ['Revenue', (r) => <Money v={r.revenue} />, '', (r) => r.revenue / 100],
           ['Seats in use', (r) => r.seats ? `${r.assigned} / ${r.seats}` : '—']]} />
         <Table title="By product" csv="sales-by-product.csv" rows={d.byProduct} empty="No confirmed orders in this period." cols={[
           ['Product', (r) => <><b>{r.product}</b><span className="block text-xs text-slate-600">{r.sku}</span></>, '', (r) => r.product], ['Schools', (r) => r.schools],
-          ['Seats', (r) => `${r.studentSeats} + ${r.teacherSeats}`, 'student + teacher'], ['Revenue', (r) => fmtMoney(r.revenue, cur), '', (r) => r.revenue / 100]]} />
+          ['Seats', (r) => `${r.studentSeats} + ${r.teacherSeats}`, 'student + teacher'], ['Revenue', (r) => <Money v={r.revenue} />, '', (r) => r.revenue / 100]]} />
       </div>
 
       <Table title="Top schools" csv="top-schools.csv" rows={d.topSchools} cols={[
         ['School', (r) => <Link className="font-medium text-brand-700 hover:underline" href={`/admin/schools/${r.id}`}>{r.name}</Link>, '', (r) => r.name], ['City', (r) => r.city ?? ''],
-        ['Orders', (r) => r.orders], ['Revenue', (r) => fmtMoney(r.revenue, cur), '', (r) => r.revenue / 100],
+        ['Orders', (r) => r.orders], ['Revenue', (r) => <Money v={r.revenue} />, '', (r) => r.revenue / 100],
         ['Seats in use', (r) => r.seats ? <Usage a={r.assigned} b={r.seats} /> : '—', '', (r) => `${r.assigned}/${r.seats}`]]} />
 
       <h2 className="pt-2 text-lg font-semibold text-slate-900">Follow up</h2>
@@ -110,12 +111,12 @@ function MonthChart({ data, currency }: { data: { month: string; revenue: number
           <div key={m.month} className="relative z-10 flex flex-1 items-end justify-center" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
             <div className={`w-full max-w-10 rounded-t ${hover === i ? 'bg-brand-700' : 'bg-brand-600'}`} style={{ height: `${(m.revenue / top) * 100}%`, minHeight: m.revenue ? 2 : 0 }} />
             {hover === i && <div className="pointer-events-none absolute bottom-full z-20 mb-1 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-2 text-xs text-white shadow-lg">
-              <b>{monthName(m.month)}</b><br />{fmtMoney(m.revenue, currency)}<br />{m.orders} order(s)</div>}
+              <b>{monthName(m.month)}</b><br />{<Money v={m.revenue} />}<br />{m.orders} order(s)</div>}
           </div>))}
       </div>
       <div className="mt-2 flex gap-3 pl-12 text-[11px] text-slate-600" aria-hidden>{data.map((m) => <span key={m.month} className="flex-1 text-center">{monthName(m.month)}</span>)}</div>
       <table className="sr-only"><caption>Revenue by month</caption><thead><tr><th>Month</th><th>Revenue</th><th>Orders</th></tr></thead>
-        <tbody>{data.map((m) => <tr key={m.month}><td>{monthName(m.month)}</td><td>{fmtMoney(m.revenue, currency)}</td><td>{m.orders}</td></tr>)}</tbody></table>
+        <tbody>{data.map((m) => <tr key={m.month}><td>{monthName(m.month)}</td><td>{<Money v={m.revenue} />}</td><td>{m.orders}</td></tr>)}</tbody></table>
     </div>
   );
 }

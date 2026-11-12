@@ -55,10 +55,10 @@ describe('Notifications, WhatsApp/SMS outbox and licence reminders', () => {
     process.env.NOTIFY_WEBHOOK_TOKEN = 'secret-token';
     try {
       expect((await admin.get('/api/notifications/channel')).body).toEqual({ channel: 'webhook', configured: true, missing: [] });
-      await admin.post('/api/notifications/test').send({ phone: '0300 7654321' });
+      await admin.post('/api/notifications/test').send({ phone: '050 765 4321' }); // local UAE number: country code 971 from Company → Region
       await app.get(NotificationsService).sendPending();
       expect(got).toHaveLength(1);
-      expect(got[0]).toMatchObject({ to: '923007654321', kind: 'TEST', auth: 'Bearer secret-token' });
+      expect(got[0]).toMatchObject({ to: '971507654321', kind: 'TEST', auth: 'Bearer secret-token' });
       expect((await admin.get('/api/notifications/outbox')).body.find((x: any) => x.kind === 'TEST')).toMatchObject({ status: 'SENT' });
     } finally { srv.close(); delete process.env.NOTIFY_WEBHOOK_TOKEN; }
   });

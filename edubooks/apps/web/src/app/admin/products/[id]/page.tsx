@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { use, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, CopyPlus, Lock, Rocket, Trash2 } from 'lucide-react';
-import { api, fmtDay, fmtMoney } from '@/lib/api';
+import { api, fmtDay } from '@/lib/api';
+import { Money, useMoney } from '@/lib/company';
 import { hasRole, useMe } from '@/lib/session';
 import { useAction } from '@/lib/hooks';
 import { Badge, Button, Card, Confirm, ErrorBox, Field, Input, PageLoader } from '@/components/ui';
@@ -13,7 +14,7 @@ import { EditionPicker } from '@/components/edition-picker';
 function DraftEditor({ p, v }: { p: any; v: any }) {
   const [ids, setIds] = useState<string[]>(v.items.map((i: any) => i.editionId));
   const [price, setPrice] = useState(v.priceMinor === null ? '' : String(v.priceMinor / 100));
-  const [currency, setCurrency] = useState(v.currency);
+  const money = useMoney(); const currency = money.finance.currency;
   const [confirm, setConfirm] = useState<'' | 'activate' | 'delete'>('');
   const keys = ['product', 'products'];
   const save = useAction(() => api.patch(`/commerce/versions/${v.id}`, { editionIds: ids, priceMinor: price === '' ? null : Math.round(Number(price) * 100), currency }), { ok: 'Draft saved', keys });
@@ -23,8 +24,7 @@ function DraftEditor({ p, v }: { p: any; v: any }) {
     <div className="space-y-4">
       <Field label={p.kind === 'SINGLE' ? 'Book edition' : 'Books in this version'}><EditionPicker single={p.kind === 'SINGLE'} value={ids} onChange={setIds} /></Field>
       <div className="grid max-w-md grid-cols-2 gap-3">
-        <Field label="Price per student seat"><Input type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
-        <Field label="Currency"><Input maxLength={3} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} /></Field>
+        <Field label={`Price per student seat (${currency})`}><Input type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
       </div>
       <div className="flex flex-wrap justify-end gap-2">
         {p.versions.length > 1 && <Button variant="ghost" onClick={() => setConfirm('delete')}><Trash2 className="size-4" />Delete draft</Button>}
@@ -65,7 +65,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
             <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-3">
               <h2 className="font-semibold">Version {v.versionNo}</h2><Status s={v.status} />
               {v.status !== 'DRAFT' && <span className="flex items-center gap-1 text-xs text-slate-500"><Lock className="size-3" />frozen{v.activatedAt && ` since ${fmtDay(v.activatedAt)}`}</span>}
-              <span className="text-sm text-slate-500">{fmtMoney(v.priceMinor, v.currency)} / student seat · sold on {v.orderLines} order line{v.orderLines === 1 ? '' : 's'}</span>
+              <span className="text-sm text-slate-500"><Money v={v.priceMinor} inline /> / student seat · sold on {v.orderLines} order line{v.orderLines === 1 ? '' : 's'}</span>
               <div className="flex-1" />
               {canEdit && v.status === 'ACTIVE' && <Button size="sm" variant="ghost" onClick={() => retire.mutate(v.id)}>Stop selling</Button>}
             </div>

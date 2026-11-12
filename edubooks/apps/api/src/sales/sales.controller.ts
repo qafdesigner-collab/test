@@ -85,7 +85,7 @@ export class SalesService {
 
     const money = (r: any) => ({ ...r, revenue: n(r.revenue) });
     return {
-      range: { from: start, to: end }, currency: k.currency ?? 'PKR',
+      range: { from: start, to: end }, currency: (await this.rows(sql`SELECT coalesce(settings -> 'finance' ->> 'currency', 'AED') AS c FROM publishers WHERE id = ${this.db.ctx.publisherId}`))[0]?.c ?? 'AED',
       kpis: { revenue: n(k.revenue), orders: k.orders, orderingSchools: k.schools, seatsSold: k.seats, activeSchools: sc.active, demoSchools: sc.demos,
         liveSeats: u.seats, assignedSeats: u.assigned, licensedSchools: u.schools, usage: u.seats ? Math.round((u.assigned / u.seats) * 100) : null },
       monthly: monthly.map(money), byCity: byCity.map(money), byProduct: byProduct.map(money), topSchools: topSchools.map(money),

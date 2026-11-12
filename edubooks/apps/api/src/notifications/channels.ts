@@ -1,3 +1,4 @@
+import { countryCode } from '../common/region';
 /**
  * Outgoing messages (WhatsApp / SMS). Choose with NOTIFY_CHANNEL:
  *   whatsapp — Meta WhatsApp Cloud API: WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, optional WHATSAPP_TEMPLATE (+ WHATSAPP_TEMPLATE_LANG)
@@ -18,7 +19,7 @@ export function channelInfo() {
   return { channel: ch, configured: !missing.length, missing };
 }
 
-/** International format without "+": 0300 1234567 → 923001234567 (DEFAULT_COUNTRY_CODE, default 92). */
+/** International format without "+": 050 123 4567 → 971501234567 (country code from Company → Region, or DEFAULT_COUNTRY_CODE). */
 export function normalisePhone(raw: string) {
   let s = String(raw || '').trim();
   const plus = s.startsWith('+');
@@ -26,7 +27,7 @@ export function normalisePhone(raw: string) {
   if (!s) return '';
   if (plus) return s;
   if (s.startsWith('00')) return s.slice(2);
-  if (s.startsWith('0')) return (env('DEFAULT_COUNTRY_CODE') || '92') + s.slice(1);
+  if (s.startsWith('0')) return countryCode() + s.slice(1);
   return s;
 }
 

@@ -1,4 +1,15 @@
-# What's new in Knowledge Gate 1.2.1
+# What's new in Knowledge Gate 1.3
+
+## Company & currency (Super admin → Company & Currency)
+- **Currency:** the main currency is now the **UAE dirham (AED)**, and amounts are also shown in **US dollars** (≈ USD) using your exchange rate (default: the official peg, 1 USD = 3.6725 AED). You can choose other currencies, or switch the second one off. Product prices are entered in the main currency; the old per-product “PKR” box is gone.
+- **Tax:** VAT rate (5% by default), TRN and payment details (bank, IBAN) for invoices.
+- **Company details:** legal name, licence number, address, phone, WhatsApp, email, website, about text and social links. They appear on the sign-in page (you can turn this off), on a new **Our publisher** page for schools and teachers, and on quotations and invoices.
+- **Company documents:** upload your company profile, brochures, catalogues, price lists and certificates (PDF, Word, Excel, PowerPoint or images, up to 50 MB). For each one choose who sees it: everyone (also linked on the sign-in page), schools, or your staff only.
+- **Region:** UAE calling code +971 (so 050 123 4567 becomes +971 50 123 4567 for WhatsApp/SMS) and the Dubai time zone.
+- **Quotations and invoices:** on any order, **Print quotation** (draft orders) or **Print invoice** (confirmed orders) with your logo, company details, TRN, VAT and the total in AED and USD.
+- **Flipbooks:** besides `index.html`, a flipbook zip may now open from `start.html`, `default.html` or `main.html`, also inside a folder.
+
+# Knowledge Gate 1.2.1
 
 ## Demo data you can load and remove
 **Super admin → Demo data → Load demo data** fills your site with sample content to try every feature:

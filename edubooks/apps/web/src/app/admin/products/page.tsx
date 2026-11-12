@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Boxes, Package, Plus } from 'lucide-react';
-import { api, fmtMoney, qs } from '@/lib/api';
+import { api, qs } from '@/lib/api';
+import { Money, useMoney } from '@/lib/company';
 import { CurriculumGradePicker } from '@/components/curriculum';
 import { hasRole, useMe } from '@/lib/session';
 import { useAction } from '@/lib/hooks';
@@ -13,8 +14,9 @@ import { PageHeader, Table, Td } from '@/components/common';
 import { EditionPicker } from '@/components/edition-picker';
 
 function NewProduct({ onClose }: { onClose: () => void }) {
+  const money = useMoney();
   const router = useRouter();
-  const [f, setF] = useState({ kind: 'BUNDLE' as 'SINGLE' | 'BUNDLE', sku: '', name: '', gradeId: '', description: '', price: '', currency: 'PKR', editionIds: [] as string[] });
+  const [f, setF] = useState({ kind: 'BUNDLE' as 'SINGLE' | 'BUNDLE', sku: '', name: '', gradeId: '', description: '', price: '', editionIds: [] as string[] });
   const m = useAction(() => api.post('/commerce/products', { ...f, gradeId: f.gradeId || undefined, price: undefined, priceMinor: f.price === '' ? undefined : Math.round(Number(f.price) * 100) }),
     { ok: 'Product created as a draft version', keys: ['products'], after: (r) => router.push(`/admin/products/${r.id}`) });
   return (
@@ -32,8 +34,7 @@ function NewProduct({ onClose }: { onClose: () => void }) {
         <Field label={f.kind === 'SINGLE' ? 'Book edition' : 'Books in the bundle'}><EditionPicker single={f.kind === 'SINGLE'} value={f.editionIds} onChange={(editionIds) => setF({ ...f, editionIds })} /></Field>
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="sm:col-span-2"><CurriculumGradePicker allowEmpty gradeId={f.gradeId} onChange={(gradeId) => setF({ ...f, gradeId })} /></div>
-          <Field label="Price per student seat" hint="Optional"><Input type="number" min={0} step="0.01" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></Field>
-          <Field label="Currency"><Input maxLength={3} value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value.toUpperCase() })} /></Field>
+          <Field label={`Price per student seat (${money.finance.currency})`} hint="Optional"><Input type="number" min={0} step="0.01" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></Field>
         </div>
         <Field label="Description"><Textarea rows={2} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
         <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button loading={m.isPending} disabled={!f.editionIds.length}>Create draft</Button></div>
@@ -66,7 +67,7 @@ export default function ProductsPage() {
               <Td className="font-mono text-xs">{p.sku}</Td>
               <Td>{p.kind === 'BUNDLE' ? <Badge tone="info"><Boxes className="size-3" />Bundle</Badge> : <Badge>Single</Badge>}</Td>
               <Td>{p.active ? <span>v{p.active.versionNo} · {p.active.items} book{p.active.items === 1 ? '' : 's'}</span> : <span className="text-amber-600">Not on sale</span>}{p.hasDraft && <Badge tone="DRAFT" className="ml-2">draft</Badge>}{p.archived && <Badge tone="ARCHIVED" className="ml-2">archived</Badge>}</Td>
-              <Td className="tabular-nums">{p.active ? fmtMoney(p.active.priceMinor, p.active.currency) : '—'}</Td>
+              <Td className="tabular-nums">{p.active ? <Money v={p.active.priceMinor} /> : '—'}</Td>
               <Td className="text-right"><Link href={`/admin/products/${p.id}`} className="text-sm text-brand-600 hover:underline">Open</Link></Td>
             </tr>
           ))}

@@ -27,9 +27,9 @@ describe('Student import (Excel/CSV rows) with classes and parents', () => {
 
   it('imports students into classes and links one parent (same mobile) to siblings', async () => {
     const rows = [
-      { name: 'Ali Raza', className: 'kg', section: 'rose', parentName: 'Imran Raza', parentPhone: '0321 5550001', relation: 'Father' },
-      { name: 'Zara Raza', className: 'KG', parentName: 'Imran Raza', parentPhone: '+92 321 5550001', relation: 'Father' },
-      { name: 'Bilal Khan', parentPhone: '0333 4440000' },
+      { name: 'Ali Raza', className: 'kg', section: 'rose', parentName: 'Imran Raza', parentPhone: '050 555 0001', relation: 'Father' },
+      { name: 'Zara Raza', className: 'KG', parentName: 'Imran Raza', parentPhone: '+971 50 555 0001', relation: 'Father' },
+      { name: 'Bilal Khan', parentPhone: '055 444 0000' },
     ];
     const dry = (await principal.post('/api/school/import/students?dryRun=1').send({ rows })).body;
     expect(dry).toMatchObject({ ok: true, summary: { students: 3, withClass: 2, newParents: 2 } });
@@ -45,7 +45,7 @@ describe('Student import (Excel/CSV rows) with classes and parents', () => {
     const kidsOfImran = (await owner.query(`SELECT count(*) n FROM parent_students WHERE parent_id = $1`, [imran.id])).rows[0].n;
     expect(Number(kidsOfImran)).toBe(2);
     // a second import with the same mobile links the existing parent instead of creating one
-    const again = (await principal.post('/api/school/import/students').send({ rows: [{ name: 'Sana Raza', parentPhone: '03215550001' }] })).body;
+    const again = (await principal.post('/api/school/import/students').send({ rows: [{ name: 'Sana Raza', parentPhone: '0505550001' }] })).body;
     expect(again.parents).toHaveLength(0);
     expect(Number((await owner.query(`SELECT count(*) n FROM parent_students WHERE parent_id = $1`, [imran.id])).rows[0].n)).toBe(3);
     const teacher = await login(app, 'teacher1', 'Teacher@12345', 'SUN01');

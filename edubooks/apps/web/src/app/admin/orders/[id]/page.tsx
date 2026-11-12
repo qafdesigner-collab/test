@@ -2,8 +2,11 @@
 import Link from 'next/link';
 import { use, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, BadgeCheck, KeyRound, XCircle } from 'lucide-react';
-import { api, fmtDate, fmtDay, fmtMoney } from '@/lib/api';
+import { ArrowLeft, BadgeCheck, KeyRound, XCircle, Printer } from 'lucide-react';
+import { api, fmtDate, fmtDay } from '@/lib/api';
+import { Money, useCompany } from '@/lib/company';
+import { useBranding } from '@/lib/branding';
+import { printOrderDocument } from '@/lib/print-docs';
 import { hasRole, useMe } from '@/lib/session';
 import { useAction } from '@/lib/hooks';
 import { Button, Card, Confirm, ErrorBox, PageLoader } from '@/components/ui';
@@ -11,7 +14,7 @@ import { Status, Table, Td } from '@/components/common';
 
 export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data: me } = useMe();
+  const { data: me } = useMe(); const company = useCompany(); const brand = useBranding();
   const q = useQuery({ queryKey: ['order', id], queryFn: () => api.get(`/commerce/orders/${id}`) });
   const [dlg, setDlg] = useState<'' | 'fulfil' | 'cancel'>('');
   const keys = ['order', 'orders', 'pools', 'school', 'schools'];
@@ -29,6 +32,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           <p className="text-sm text-slate-500"><Link className="text-brand-700 underline underline-offset-2" href={`/admin/schools/${o.school.id}`}>{o.school.name}</Link> · {o.type.toLowerCase()} order · academic year {o.academicYear.name} ({fmtDay(o.academicYear.startsOn)} – {fmtDay(o.academicYear.endsOn)})</p>
           {o.notes && <p className="mt-1 text-sm text-slate-600">{o.notes}</p>}</div>
         <div className="flex gap-2">
+          {o.status !== 'CANCELLED' && <Button variant="secondary" onClick={() => printOrderDocument(o, company, brand)}><Printer className="size-4" />{['CONFIRMED', 'FULFILLED'].includes(o.status) ? 'Print invoice' : 'Print quotation'}</Button>}
           {o.status === 'DRAFT' && <Button onClick={() => act.mutate('confirm')} loading={act.isPending}><BadgeCheck className="size-4" />Confirm order</Button>}
           {o.status === 'CONFIRMED' && hasRole(me, 'PUBLISHER_ADMIN') && <Button variant="success" onClick={() => setDlg('fulfil')}><KeyRound className="size-4" />Issue licences</Button>}
           {o.status === 'CONFIRMED' && !hasRole(me, 'PUBLISHER_ADMIN') && <span className="text-sm text-slate-500">Waiting for a publisher admin to issue licences.</span>}
@@ -42,11 +46,11 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         {o.lines.map((l: any) => (
           <tr key={l.id}><Td><div className="font-medium">{l.productName}</div><div className="font-mono text-xs text-slate-500">{l.sku} · v{l.versionNo}</div></Td>
             <Td className="max-w-xs text-xs text-slate-600">{l.books?.join(', ')}</Td><Td className="tabular-nums">{l.studentQty}</Td><Td className="tabular-nums">{l.teacherQty}</Td>
-            <Td className="tabular-nums">{fmtMoney(l.unitPriceMinor, l.currency)}</Td><Td className="tabular-nums">{fmtMoney((l.unitPriceMinor ?? 0) * l.studentQty, l.currency)}</Td>
+            <Td className="tabular-nums"><Money v={l.unitPriceMinor} /></Td><Td className="tabular-nums"><Money v={(l.unitPriceMinor ?? 0) * l.studentQty} /></Td>
             <Td className="text-xs">{l.pools.length ? l.pools.map((p: any) => <div key={p.id}>{p.quantity} {p.seatType.toLowerCase()} · until {fmtDay(p.validUntil)} · <Status s={p.status} /></div>) : <span className="text-slate-500">—</span>}</Td></tr>
         ))}
       </Table>
-      <p className="text-right text-sm text-slate-600">Order value (student seats): <b className="text-slate-900">{fmtMoney(total)}</b></p>
+      <p className="text-right text-sm text-slate-600">Order value (student seats): <b className="text-slate-900"><Money v={total} inline /></b></p>
       <Confirm open={dlg === 'fulfil'} onOpenChange={() => setDlg('')} title="Issue licences for this order?" confirmLabel="Issue licences" loading={act.isPending} onConfirm={() => act.mutate('fulfil')}
         body={<p>Creates {o.lines.reduce((n: number, l: any) => n + l.studentQty, 0)} student and {o.lines.reduce((n: number, l: any) => n + l.teacherQty, 0)} teacher seats for <b>{o.school.name}</b>, valid until <b>{fmtDay(o.academicYear.endsOn)}</b>. The school can then assign them. This cannot be undone (seats can be revoked later).</p>} />
       <Confirm open={dlg === 'cancel'} onOpenChange={() => setDlg('')} title="Cancel this order?" danger confirmLabel="Cancel order" loading={act.isPending} onConfirm={() => act.mutate('cancel')} body="No licences have been issued for it." />

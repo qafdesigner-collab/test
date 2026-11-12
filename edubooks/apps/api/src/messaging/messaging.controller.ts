@@ -7,6 +7,7 @@ import { DbService } from '../db/db.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Roles } from '../common/decorators';
 import { checkUrl } from '../common/urls';
+import { timezone } from '../common/region';
 import { AccessService } from '../lms/access.service';
 import { LmsModule } from '../lms/lms.module';
 
@@ -190,7 +191,7 @@ export class MessagingService {
     const l = await this.one(sql`INSERT INTO live_sessions (publisher_id, school_id, class_id, teacher_id, title, starts_at, duration_min, url, notes)
       VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${d.classId}, ${this.ctx.userId}, ${d.title.trim()}, ${d.startsAt}, ${d.durationMin ?? 40}, ${url}, ${d.notes ?? ''}) RETURNING id`);
     const kids = await this.access.studentIdsOf(d.classId);
-    const when = new Date(d.startsAt).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: process.env.TZ || 'Asia/Karachi' });
+    const when = new Date(d.startsAt).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: timezone() });
     const m = { kind: 'LIVE', title: `Live lesson: ${d.title.trim()}`, body: `${when}. Open the app to join.` };
     if (kids.length) {
       await this.notifications.notify(kids.map((id) => ({ id })), { ...m, link: '/learn' });

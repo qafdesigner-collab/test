@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle, Palette, TrendingUp, GraduationCap, LineChart, FlaskConical } from 'lucide-react';
+import { BookOpen, LayoutDashboard, Library, Tags, ScrollText, LogOut, Menu, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle, Palette, TrendingUp, GraduationCap, LineChart, FlaskConical, Building } from 'lucide-react';
 import { api } from '@/lib/api';
 import { isPublisherStaff, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
@@ -27,6 +27,7 @@ const NAV = [
   { href: '/admin/calendar', label: 'Academic Calendar', icon: CalendarDays, roles: [A, E, S] },
   { href: '/admin/audit', label: 'Audit Log', icon: ScrollText, roles: [A, E, S] },
   { href: '/admin/messages', label: 'Messages', icon: MessageCircle, roles: [A] },
+  { href: '/admin/company', label: 'Company & Currency', icon: Building, roles: [A] },
   { href: '/admin/branding', label: 'Branding', icon: Palette, roles: [A] },
   { href: '/admin/demo', label: 'Demo data', icon: FlaskConical, roles: [A] },
   { href: '/admin/updates', label: 'Updates', icon: RefreshCw, roles: [A] },

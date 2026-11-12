@@ -1,5 +1,5 @@
 'use client';
-import { BookMarked, ClipboardList, Gamepad2, Library, LayoutDashboard, NotebookPen, Sparkles, Users, CalendarDays, UserCheck, Clock, GraduationCap, LineChart, FileText, MessagesSquare, Bird } from 'lucide-react';
+import { BookMarked, ClipboardList, Gamepad2, Library, LayoutDashboard, NotebookPen, Sparkles, Users, CalendarDays, UserCheck, Clock, GraduationCap, LineChart, FileText, MessagesSquare, Bird, Building } from 'lucide-react';
 import { Shell } from '@/components/shell';
 
 const NAV = [
@@ -19,6 +19,7 @@ const NAV = [
   { href: '/teacher/timetable', label: 'Timetable', icon: Clock },
   { href: '/teacher/training', label: 'Training', icon: GraduationCap },
   { href: '/teacher/calendar', label: 'Academic calendar', icon: CalendarDays },
+  { href: '/teacher/publisher', label: 'Our publisher', icon: Building },
 ];
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   return <Shell role="TEACHER" roleLabel="Teacher" nav={NAV} accent="sky">{children}</Shell>;

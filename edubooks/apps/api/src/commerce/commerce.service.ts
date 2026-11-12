@@ -58,12 +58,17 @@ export class CommerceService {
     return ids;
   }
 
+  /** The publisher's main currency (Company → Currency), used for new prices. */
+  private async currency() {
+    const { rows } = await this.q.execute(sql`SELECT coalesce(settings -> 'finance' ->> 'currency', 'AED') AS c FROM publishers WHERE id = ${this.pub}`);
+    return (rows[0] as any)?.c ?? 'AED';
+  }
   async createProduct(dto: CreateProductDto) {
     const ids = await this.validateItems(dto.kind, dto.editionIds);
     const [p] = await this.q.insert(products).values({
       publisherId: this.pub, sku: dto.sku.toUpperCase(), name: dto.name.trim(), kind: dto.kind, gradeId: dto.gradeId ?? null, description: dto.description ?? '',
     }).returning();
-    const [v] = await this.q.insert(productVersions).values({ publisherId: this.pub, productId: p.id, versionNo: 1, priceMinor: dto.priceMinor ?? null, currency: dto.currency ?? 'PKR' }).returning();
+    const [v] = await this.q.insert(productVersions).values({ publisherId: this.pub, productId: p.id, versionNo: 1, priceMinor: dto.priceMinor ?? null, currency: dto.currency ?? (await this.currency()) }).returning();
     await this.q.insert(bundleItems).values(ids.map((editionId) => ({ productVersionId: v.id, editionId, publisherId: this.pub })));
     await this.audit.log('commerce.product.create', 'product', p.id, `Created ${p.kind === 'BUNDLE' ? 'bundle' : 'product'} ${p.sku} “${p.name}” (v1 draft)`, undefined, { ...p, editionIds: ids });
     return { ...p, draftVersionId: v.id };
@@ -106,7 +111,7 @@ export class CommerceService {
     if (p.versions.some((v) => v.status === 'DRAFT')) throw new ConflictException('This product already has a draft version. Edit or activate it first.');
     const src = copyFromVersionId ? p.versions.find((v) => v.id === copyFromVersionId) : p.versions.find((v) => v.status === 'ACTIVE') ?? p.versions[0];
     const [v] = await this.q.insert(productVersions).values({
-      publisherId: this.pub, productId, versionNo: (p.versions[0]?.versionNo ?? 0) + 1, priceMinor: src?.priceMinor ?? null, currency: src?.currency ?? 'PKR',
+      publisherId: this.pub, productId, versionNo: (p.versions[0]?.versionNo ?? 0) + 1, priceMinor: src?.priceMinor ?? null, currency: await this.currency(),
     }).returning();
     // Only still-published editions are carried over.
     const items = (src?.items ?? []).filter((i) => i.editionStatus === 'PUBLISHED');

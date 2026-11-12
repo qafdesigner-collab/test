@@ -28,7 +28,7 @@ const brandHead = (b: Branding) => b.logoUrl ? `<img class="logo" src="${esc(loc
 export interface ReportOptions { term: string; comment?: string; comments?: Record<string, string>; nextTerm?: string }
 
 /** One A4 page per student: subjects with grades, skills, activity summary, comment and signatures. */
-export function printReportCards(reports: any[], brand: Branding, o: ReportOptions) {
+export function printReportCards(reports: any[], brand: Branding, o: ReportOptions & { company?: CompanyInfo }) {
   const p = palette(brand.primaryColor);
   const css = `
     .sheet{padding:14mm 15mm;display:flex;flex-direction:column;gap:5mm;font-size:12.5px}
@@ -82,6 +82,7 @@ export function printReportCards(reports: any[], brand: Branding, o: ReportOptio
       <div><h2>Teacher's comment</h2><div class="comment">${esc(comment)}</div></div>
       ${o.nextTerm ? `<p><b>Next term begins:</b> ${esc(o.nextTerm)}</p>` : ''}
       <div class="sign"><div>Class teacher</div><div>Principal</div><div>Parent / guardian</div></div>
+      ${o.company ? `<div class="legend" style="text-align:center;margin-top:3mm">${companyFooter(o.company)}</div>` : ''}
     </section>`;
   });
   return openDoc(reports.length === 1 ? `Report card — ${reports[0].student.displayName}` : 'Report cards', css, pages.join(''));
@@ -166,4 +167,47 @@ export function printExamPaper(e: ExamPrint, brand: Branding, o: { key?: boolean
     ${o.key ? '' : `<div class="who"><div>Name</div><div>Roll no.</div><div>Date${e.examDate ? `: ${new Date(e.examDate + 'T12:00:00').toLocaleDateString()}` : ''}</div></div>`}
     ${e.instructions && !o.key ? `<div class="ins"><b>Instructions:</b> ${esc(e.instructions)}</div>` : ''}`;
   return openDoc(`${e.title}${o.key ? ' — answer key' : ''}${o.version ? ` (Version ${o.version})` : ''}`, css, `<section class="sheet">${head}${body}<div class="end">— End of paper —</div></section>`);
+}
+
+import type { CompanyInfo } from '@/lib/company';
+import { formatMoney } from '@/lib/company';
+
+/** Company details block used at the foot of printed documents. */
+export const companyFooter = (c: CompanyInfo) => [c.company.legalName || c.name, c.company.address && `${c.company.address}${c.company.city ? `, ${c.company.city}` : ''}`, c.company.phone, c.company.email, c.company.website?.replace(/^https?:\/\//, '')]
+  .filter(Boolean).map((x) => esc(x)).join(' · ');
+
+/** A4 quotation (draft order) or tax invoice (confirmed / fulfilled order) in the company currency, with the second currency and tax. */
+export function printOrderDocument(o: any, c: CompanyInfo, brand: Branding) {
+  const p = palette(brand.primaryColor); const f = c.finance;
+  const invoice = ['CONFIRMED', 'FULFILLED'].includes(o.status);
+  const money = (m: number) => formatMoney(m, f.currency, f.decimals);
+  const lines = o.lines.map((l: any) => ({ ...l, value: (l.unitPriceMinor ?? 0) * l.studentQty }));
+  const subtotal = lines.reduce((n: number, l: any) => n + l.value, 0);
+  const tax = Math.round(subtotal * (Number(f.vatRate) || 0) / 100); const total = subtotal + tax;
+  const second = f.secondaryCurrency && f.rate ? formatMoney(Math.round(total * f.rate), f.secondaryCurrency) : null;
+  const date = new Date(o.confirmedAt ?? o.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  const css = `.sheet{height:auto;min-height:297mm;padding:14mm 16mm;font-size:12.5px;display:flex;flex-direction:column}
+    .top{display:flex;justify-content:space-between;gap:6mm;border-bottom:3px solid ${p[600]};padding-bottom:4mm} .logo{height:16mm;max-width:50mm;object-fit:contain} .logo-txt{font-size:32px}
+    .co{font-size:11.5px;color:#334155;line-height:1.5} .co b{font-size:15px;color:${p[800]}}
+    .doc{text-align:right} .doc h1{margin:0;font-size:22px;letter-spacing:.06em;color:${p[700]};text-transform:uppercase} .doc div{font-size:12px;color:#334155}
+    .parties{display:grid;grid-template-columns:1fr 1fr;gap:8mm;margin:6mm 0} .parties h3{margin:0 0 1mm;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#64748b}
+    table{width:100%;border-collapse:collapse} th{background:${p[50]};color:${p[800]};text-align:left;font-size:10.5px;text-transform:uppercase;padding:2mm} td{padding:2mm;border-bottom:1px solid #e2e8f0;vertical-align:top}
+    .r{text-align:right;white-space:nowrap} .muted{color:#64748b;font-size:11px}
+    .tot{margin-left:auto;margin-top:4mm;width:85mm} .tot div{display:flex;justify-content:space-between;padding:1mm 0} .tot .g{border-top:2px solid ${p[600]};font-weight:800;font-size:15px;padding-top:2mm}
+    .pay{margin-top:6mm;background:#f8fafc;border-radius:2mm;padding:3mm 4mm;white-space:pre-wrap} .foot{margin-top:auto;padding-top:8mm;text-align:center;font-size:10.5px;color:#64748b}`;
+  const body = `<section class="sheet">
+    <div class="top"><div class="co">${brandHead(brand)}<br><b>${esc(c.company.legalName || c.name || brand.name)}</b><br>${esc(c.company.address ?? '')}${c.company.city ? `, ${esc(c.company.city)}` : ''}${c.company.country ? `, ${esc(c.company.country)}` : ''}<br>
+      ${[c.company.phone, c.company.email].filter(Boolean).map((x) => esc(x)).join(' · ')}${f.taxNumber ? `<br>${esc(f.taxLabel)} TRN: <b style="font-size:12px">${esc(f.taxNumber)}</b>` : ''}${c.company.registrationNo ? `<br>Licence no.: ${esc(c.company.registrationNo)}` : ''}</div>
+      <div class="doc"><h1>${invoice ? (f.vatRate ? 'Tax invoice' : 'Invoice') : 'Quotation'}</h1><div>No. <b>${esc(o.orderNo)}</b></div><div>Date: ${date}</div><div>Academic year: ${esc(o.academicYear?.name ?? '')}</div></div></div>
+    <div class="parties"><div><h3>${invoice ? 'Bill to' : 'Prepared for'}</h3><b>${esc(o.school.name)}</b>${o.school.code ? `<div class="muted">School code ${esc(o.school.code)}</div>` : ''}${o.school.city ? `<div>${esc(o.school.city)}</div>` : ''}</div>
+      <div><h3>Currency</h3>${esc(f.currency)}${f.secondaryCurrency && f.rate ? `<div class="muted">1 ${esc(f.secondaryCurrency)} = ${(1 / f.rate).toFixed(4)} ${esc(f.currency)}</div>` : ''}</div></div>
+    <table><tr><th>Item</th><th class="r">Student seats</th><th class="r">Teacher seats</th><th class="r">Unit price</th><th class="r">Amount</th></tr>
+      ${lines.map((l: any) => `<tr><td><b>${esc(l.productName)}</b><div class="muted">${esc(l.sku)}${l.books?.length ? ` · ${esc(l.books.join(', '))}` : ''}</div></td><td class="r">${l.studentQty}</td><td class="r">${l.teacherQty} <span class="muted">(free)</span></td>
+        <td class="r">${money(l.unitPriceMinor ?? 0)}</td><td class="r">${money(l.value)}</td></tr>`).join('')}</table>
+    <div class="tot"><div><span>Subtotal</span><span>${money(subtotal)}</span></div>${f.vatRate ? `<div><span>${esc(f.taxLabel)} ${f.vatRate}%</span><span>${money(tax)}</span></div>` : ''}
+      <div class="g"><span>Total</span><span>${money(total)}</span></div>${second ? `<div class="muted"><span>Approx. in ${esc(f.secondaryCurrency!)}</span><span>${second}</span></div>` : ''}</div>
+    ${f.paymentDetails ? `<div class="pay"><b>Payment details</b>\n${esc(f.paymentDetails)}</div>` : ''}
+    ${!invoice ? '<p class="muted">This quotation is valid for 30 days. Licences are issued when the order is confirmed and paid.</p>' : ''}
+    <div class="foot">${companyFooter(c)}</div></section>`;
+  return openDoc(`${invoice ? 'Invoice' : 'Quotation'} ${o.orderNo}`, css, body);
 }

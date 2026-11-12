@@ -60,12 +60,13 @@ export class FlipbookService {
       } else throw new BadRequestException('Upload a .zip (HTML or Flash flipbook) or a .swf file.');
       if (!files.length) throw new BadRequestException('The zip contains no usable flipbook files.');
 
-      // main page: the shallowest index.html (any case); else the only .html file; else a player for the main .swf
+      // main page: the shallowest index.html (any case); else start/default/main.html; else the only .html file; else a player for the main .swf
       const depth = (p: string) => p.split('/').length;
       const byDepth = (a: { path: string }, b: { path: string }) => depth(a.path) - depth(b.path) || a.path.length - b.path.length;
       const swfs = files.filter((f) => extOf(f.path) === 'swf').sort((a, b) => byDepth(a, b) || b.size - a.size);
       let entry = files.filter((f) => /^index\.html?$/i.test(path.posix.basename(f.path))).sort(byDepth)[0]?.path;
       const htmls = files.filter((f) => ['html', 'htm'].includes(extOf(f.path)));
+      if (!entry) entry = htmls.filter((f) => /^(start|default|main|book|flipbook)\.html?$/i.test(path.posix.basename(f.path))).sort(byDepth)[0]?.path;
       if (!entry && htmls.length === 1) entry = htmls[0].path;
       if (!entry && swfs.length) {
         const main = swfs.find((s) => /(^|\/)(index|main|book|flipbook)\.swf$/i.test(s.path)) ?? swfs[0];
@@ -73,7 +74,9 @@ export class FlipbookService {
         fs.writeFileSync(path.join(tmp, entry), playerPage(main.path));
         files.push({ path: entry, size: fs.statSync(path.join(tmp, entry)).size });
       }
-      if (!entry) throw new BadRequestException('No index.html found. The main page of the flipbook must be called index.html.');
+      if (!entry) throw new BadRequestException(htmls.length
+        ? `Could not tell which page opens the flipbook. Rename the main page to index.html (found: ${htmls.slice(0, 5).map((h) => h.path).join(', ')}${htmls.length > 5 ? ', …' : ''}).`
+        : 'No index.html found. The main page of the flipbook must be called index.html.');
       const kind: 'HTML' | 'SWF' = swfs.length ? 'SWF' : 'HTML';
 
       // store every file, then switch the part to the new flipbook (old files are removed afterwards)

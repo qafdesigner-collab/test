@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { use, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, CalendarPlus, Gift, KeyRound, Pause, Play, Receipt } from 'lucide-react';
-import { api, daysLeft, fmtDay, fmtMoney } from '@/lib/api';
+import { api, daysLeft, fmtDay } from '@/lib/api';
+import { Money, useMoney } from '@/lib/company';
 import { hasRole, useMe } from '@/lib/session';
 import { useAction } from '@/lib/hooks';
 import { Badge, Button, Card, Confirm, Dialog, ErrorBox, Field, Input, PageLoader, Select, Tabs } from '@/components/ui';
@@ -103,7 +104,7 @@ export default function SchoolPage({ params }: { params: Promise<{ id: string }>
         <Table head={['Order', 'Type', 'Year', 'Seats', 'Value', 'Status']} empty={!orders.data?.items.length}>
           {orders.data?.items.map((o: any) => (
             <tr key={o.id} className="hover:bg-slate-50"><Td><Link className="font-mono font-medium text-brand-700 hover:underline" href={`/admin/orders/${o.id}`}>{o.orderNo}</Link></Td>
-              <Td>{o.type.toLowerCase()}</Td><Td>{o.academicYear}</Td><Td>{o.students} students · {o.teachers} teachers</Td><Td className="tabular-nums">{fmtMoney(o.totalMinor)}</Td><Td><Status s={o.status} /></Td></tr>))}
+              <Td>{o.type.toLowerCase()}</Td><Td>{o.academicYear}</Td><Td>{o.students} students · {o.teachers} teachers</Td><Td className="tabular-nums"><Money v={o.totalMinor} /></Td><Td><Status s={o.status} /></Td></tr>))}
         </Table>
       )}
       {tab === 'years' && (

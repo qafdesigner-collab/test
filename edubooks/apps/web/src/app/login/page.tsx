@@ -8,6 +8,7 @@ import { homeFor, Me } from '@/lib/session';
 import { BrandMark, useBranding } from '@/lib/branding';
 import { Button, ErrorBox, Field, Input } from '@/components/ui';
 import { LangScope, LangSwitch, useT } from '@/lib/i18n';
+import { LoginContact } from '@/components/company-card';
 
 function LoginForm() {
   const { t } = useT();
@@ -54,6 +55,7 @@ function LoginScreen() {
           <h2 className="text-2xl font-semibold text-slate-900">{t('Sign in')}</h2>
           <p className="mb-6 mt-1 text-sm text-slate-500">{t('Use the login your school or publisher gave you.')}</p>
           <Suspense><LoginForm /></Suspense>
+          <div className="mt-8 lg:hidden"><LoginContact /></div>
         </div>
       </div>
     </main>
@@ -69,7 +71,7 @@ function BrandPanel() {
         <h1 className="text-4xl font-bold leading-tight">{b.tagline}</h1>
         <p className="mt-4 max-w-md text-white/85">{t('Complete book packages, school licences, and a joyful digital classroom for teachers, children and parents.')}</p>
       </div>
-      <p className="flex items-center gap-2 text-sm text-white/85"><Building2 className="size-4" /> {t('Multi-school · secure · AI-assisted')}</p>
+      <div className="space-y-3"><LoginContact dark /><p className="flex items-center gap-2 text-sm text-white/85"><Building2 className="size-4" /> {t('Multi-school · secure · AI-assisted')}</p></div>
     </div>
   );
 }
