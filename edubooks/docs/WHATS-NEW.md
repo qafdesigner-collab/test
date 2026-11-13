@@ -1,3 +1,49 @@
+# What's new in Knowledge Gate 1.3.7
+
+## Easier whiteboard
+- **Big labelled tools:** Pen, Marker, **Line, Arrow, Box, Circle** (with Fill), Text and Eraser; 8 colours; Thin / Medium / Thick / Huge.
+- **Undo and Redo**, and **Clear** clears only the page you are on.
+- **Pages keep their writing:** turn to the next book page and back, and your notes are still there. On a blank board press **New page**.
+- **Paper for blank pages:** dots, squares, lines, or **Handwriting** (four-line KG paper).
+- On a book board, **⬜ Blank page** gives you space to explain; **📖 Back to the book** returns to your page.
+- **Full screen** for the projector or smart board (students can use full screen too).
+- **Keyboard shortcuts:** P pen · M marker · L line · A arrow · B box · C circle · T text · E eraser · 1–8 colours · Ctrl+Z / Ctrl+Y · ← → pages · N new page · F full screen.
+- **Who is watching:** the teacher sees how many students of the class have the board open.
+
+## Your own email (Mail → My email account)
+- Teachers, school admins, the super admin, editors and sales can **connect their own email address** (school or company domain on cPanel, Gmail, Outlook / Microsoft 365, Zoho, or any other mail server). The login is checked before saving; the password is stored encrypted.
+- **My email** tab: read the email you receive, search it, and **reply from your own address**. **Write email** sends to any outside address.
+- New mail can also go to **outside email addresses**, and email copies go out from your own address.
+- Gmail and Outlook need an **app password** (the setup window explains where to get it).
+
+## Email campaigns (Mail → Campaigns)
+- Send one email to many people: choose **groups** (classes, parents, teachers, all school admins…) and/or **paste addresses** or load a CSV.
+- Personalise with **{name}**, **{first_name}** and **{email}**.
+- Choose the **speed**, e.g. **50 emails every 10 minutes**, and **start now or at a set date and time**. The window shows how long it will take.
+- Watch the progress: sent, waiting, failed, next batch time, and the status of every address. **Pause, resume or cancel** at any time. If the mail server refuses a whole batch, the campaign pauses itself and tells you why.
+
+## Exam results and assessment marking for teachers
+- Exams have a **pass mark** (40% unless you change it). The **Results** tab shows marks, %, grade, **Pass / Fail / Absent** and position, with totals.
+- **Print result sheet** and **Save (Excel / CSV)**.
+- Assessments: **Mark next** goes straight to the next student; results show %, grade and pass/fail and can be printed or saved.
+
+## Download logins (school admin and super admin)
+- **Download logins** for students or teachers (one class or everyone): a list of login IDs, or **new passwords with printable login cards**.
+
+## Student progress graph
+- Click a student in your class: a **graph across Term 1, Term 2, Term 3 and Final**, built automatically from exams (60%) and homework (40%), with class position, reading days and attendance. The teacher can **adjust a term's score** and add a comment.
+
+## The school's own name and logo on prints
+- School admin → Overview → **Edit**: change the **school name, email, phone, address** and upload the **school logo**.
+- Everything printed from a school account (result sheets, report cards, certificates, exam papers, assessment sheets, login cards) shows **the school's name and logo**.
+
+## Book licences by grade
+- When you give seats, the **students of the book's grade come first** (e.g. a KG book shows KG students), with each student's class.
+- **Use for other grades:** if your school uses a book in another grade too (e.g. a KG book in KG2), tick that grade; those students then show first as well.
+
+## Wording
+- “Pupil” is now **“Student”** everywhere.
+
 # What's new in Knowledge Gate 1.3.6
 
 ## Mail for everyone, meeting invitations and email copies
