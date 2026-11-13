@@ -198,6 +198,7 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
     const { rows: clips } = await this.q.execute(sql`DELETE FROM audio_clips WHERE owner_id = ${studentId}
       OR id IN (SELECT m.audio_id FROM messages m JOIN conversations c ON c.id = m.conversation_id WHERE c.student_id = ${studentId} AND m.audio_id IS NOT NULL) RETURNING storage_key`);
     // Mail: what the child received, and anything the child wrote (replies).
+    await this.q.execute(sql`DELETE FROM progress_overrides WHERE student_id = ${studentId}`);
     await this.q.execute(sql`DELETE FROM mail_recipients WHERE user_id = ${studentId}`);
     await this.q.execute(sql`DELETE FROM mail_messages WHERE sender_id = ${studentId}`);
     const { rows } = await this.q.execute(sql`SELECT erase_student_data(${studentId}::uuid, ${schoolId}::uuid, ${this.ctx.userId}::uuid) AS anon`);

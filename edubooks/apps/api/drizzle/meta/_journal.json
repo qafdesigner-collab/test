@@ -260,6 +260,13 @@
       "when": 1794720000000,
       "tag": "0036_exam_pass",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794750000000,
+      "tag": "0037_progress",
+      "breakpoints": true
     }
   ]
 }

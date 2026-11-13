@@ -8,6 +8,7 @@ import { KIND_LABEL } from '@/lib/lms';
 import { Button, Dialog, Field, Input, PageLoader, Select } from '@/components/ui';
 import { Status } from '@/components/common';
 import { ReportCardsDialog } from '@/components/print-dialogs';
+import { ProgressPanel } from '@/components/progress';
 
 const SKILLS = ['Listening', 'Speaking', 'Reading', 'Writing', 'Numbers', 'Creativity', 'Participation', 'Behaviour'];
 export const Stars = ({ n }: { n: number }) => <span className="inline-flex" aria-label={`${n} of 5`}>{[1, 2, 3, 4, 5].map((i) => <Star key={i} className={`size-4 ${i <= n ? 'fill-amber-400 text-amber-400' : 'text-slate-500'}`} />)}</span>;
@@ -24,6 +25,7 @@ export function StudentReportDialog({ studentId, classId, onClose }: { studentId
     <Dialog open onOpenChange={onClose} wide title={r ? `Report — ${r.student.displayName}` : 'Report'}>
       {!r ? <PageLoader /> : (
         <div className="space-y-5 text-sm">
+          {classId && <ProgressPanel classId={classId} studentId={studentId} />}
           <div className="flex flex-wrap gap-2">{r.bySubject.map((b: any) => <span key={b.subject} className="rounded-lg bg-slate-100 px-3 py-1.5"><b>{b.subject}</b> {b.percent}%</span>)}
             {!r.bySubject.length && <span className="text-slate-500">No marked work yet.</span>}<span className="flex-1" /><Button size="sm" variant="secondary" onClick={() => setPrinting(true)}><Printer className="size-4" />Print report card</Button></div>
           <div><h3 className="mb-2 font-semibold">Skill evaluations</h3>
