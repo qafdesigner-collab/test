@@ -84,16 +84,70 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
     return { ...pool, assignments };
   }
 
-  /** Users of the pool's school who could receive a seat from this pool. */
+  /** The grades a pool's book is for: the publisher's grade(s) plus any extra grades this school added. */
+  private async gradeSets(pool: { id: string; schoolId: string; productVersionId: string }) {
+    const { rows: [pv] } = await this.q.execute(sql`SELECT product_id FROM product_versions WHERE id = ${pool.productVersionId}`);
+    const productId = (pv as any).product_id as string;
+    const book = (await this.q.execute(sql`SELECT DISTINCT g.id, g.name, g.sort FROM grades g WHERE g.id IN (
+        SELECT grade_id FROM products WHERE id = ${productId} AND grade_id IS NOT NULL
+        UNION SELECT p.grade_id FROM bundle_items bi JOIN book_editions e ON e.id = bi.edition_id JOIN book_packages p ON p.id = e.package_id WHERE bi.product_version_id = ${pool.productVersionId})
+      ORDER BY g.sort, g.name`)).rows as any[];
+    const extra = (await this.q.execute(sql`SELECT g.id, g.name FROM school_book_grades m JOIN grades g ON g.id = m.grade_id
+      WHERE m.school_id = ${pool.schoolId} AND m.product_id = ${productId} ORDER BY g.sort, g.name`)).rows as any[];
+    return { productId, book: book.map((g) => ({ id: g.id, name: g.name })), extra: extra.map((g) => ({ id: g.id, name: g.name })) };
+  }
+
+  /** Book grades and the grades this school can add (grades used by its classes, plus all of the publisher's). */
+  async poolGrades(poolId: string) {
+    const [pool] = await this.q.select().from(licensePools).where(eq(licensePools.id, poolId));
+    if (!pool) throw new NotFoundException('Licence pool not found');
+    const g = await this.gradeSets(pool);
+    const options = (await this.q.execute(sql`SELECT g.id, g.name, (SELECT cu.name FROM curricula cu WHERE cu.id = g.curriculum_id) AS curriculum, EXISTS (SELECT 1 FROM classes c WHERE c.grade_id = g.id AND c.school_id = ${pool.schoolId} AND NOT c.archived) AS "inSchool"
+      FROM grades g WHERE g.publisher_id = ${pool.publisherId} ORDER BY g.sort, g.name`)).rows;
+    return { book: g.book, extra: g.extra, options };
+  }
+
+  /** The school admin chooses extra grades for this book (e.g. a KG book also for KG2). */
+  async setPoolGrades(poolId: string, gradeIds: string[]) {
+    const [pool] = await this.q.select().from(licensePools).where(eq(licensePools.id, poolId));
+    if (!pool) throw new NotFoundException('Licence pool not found');
+    if (this.ctx.schoolId && pool.schoolId !== this.ctx.schoolId) throw new ForbiddenException();
+    const { productId, book } = await this.gradeSets(pool);
+    const ids = [...new Set(gradeIds)].filter((id) => !book.some((b) => b.id === id));
+    if (ids.length) {
+      const { rows } = await this.q.execute(sql`SELECT count(*)::int AS n FROM grades WHERE publisher_id = ${pool.publisherId} AND id = ANY(${`{${ids.join(',')}}`}::uuid[])`);
+      if ((rows[0] as any).n !== ids.length) throw new BadRequestException('Unknown grade');
+    }
+    await this.q.execute(sql`DELETE FROM school_book_grades WHERE school_id = ${pool.schoolId} AND product_id = ${productId}`);
+    for (const id of ids) await this.q.execute(sql`INSERT INTO school_book_grades (school_id, publisher_id, product_id, grade_id) VALUES (${pool.schoolId}, ${pool.publisherId}, ${productId}, ${id})`);
+    await this.audit.log('licensing.book_grades', 'license_pool', pool.id, `Book also used for ${ids.length} more grade(s)`);
+    return this.poolGrades(poolId);
+  }
+
+  /**
+   * Users of the pool's school who could receive a seat from this pool, with their class and grade.
+   * `match` is true when they are in (or teach) a class of the book's grade or one of the school's extra grades; those come first.
+   */
   async eligibleUsers(poolId: string) {
     const [pool] = await this.q.select().from(licensePools).where(eq(licensePools.id, poolId));
     if (!pool) throw new NotFoundException('Licence pool not found');
-    const role = pool.seatType === 'STUDENT' ? 'STUDENT' : 'TEACHER';
-    return this.q.select({ id: users.id, displayName: users.displayName, username: users.username }).from(users)
-      .innerJoin(userRoles, and(eq(userRoles.userId, users.id), eq(userRoles.role, role)))
-      .where(and(eq(users.schoolId, pool.schoolId), eq(users.status, 'ACTIVE'),
-        sql`NOT EXISTS (SELECT 1 FROM license_assignments a WHERE a.pool_id = ${pool.id} AND a.user_id = ${qc(users.id)} AND a.status IN ('ACTIVE','SUSPENDED'))`))
-      .orderBy(asc(users.displayName));
+    const g = await this.gradeSets(pool);
+    const want = `{${[...g.book, ...g.extra].map((x) => x.id).join(',')}}`;
+    const student = pool.seatType === 'STUDENT';
+    const classesOf = student
+      ? sql`SELECT c.id, c.name, c.section, c.grade_id FROM enrolments e JOIN classes c ON c.id = e.class_id JOIN academic_years y ON y.id = c.academic_year_id
+          WHERE e.student_id = u.id AND NOT c.archived ORDER BY (current_date BETWEEN y.starts_on AND y.ends_on) DESC, y.starts_on DESC LIMIT 1`
+      : sql`SELECT c.id, c.name, c.section, c.grade_id FROM class_teachers ct JOIN classes c ON c.id = ct.class_id
+          WHERE ct.user_id = u.id AND NOT c.archived ORDER BY (c.grade_id = ANY(${want}::uuid[])) DESC NULLS LAST, c.name`;
+    const { rows } = await this.q.execute(sql`SELECT u.id, u.display_name AS "displayName", u.username::text AS username,
+        (SELECT string_agg(trim(x.name || ' ' || x.section), ', ') FROM (${classesOf}) x) AS "className",
+        (SELECT string_agg(DISTINCT gr.name, ', ') FROM (${classesOf}) x JOIN grades gr ON gr.id = x.grade_id) AS "gradeName",
+        coalesce((SELECT bool_or(x.grade_id = ANY(${want}::uuid[])) FROM (${classesOf}) x), false) AS match
+      FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role = ${student ? 'STUDENT' : 'TEACHER'}
+      WHERE u.school_id = ${pool.schoolId} AND u.status = 'ACTIVE'
+        AND NOT EXISTS (SELECT 1 FROM license_assignments a WHERE a.pool_id = ${pool.id} AND a.user_id = u.id AND a.status IN ('ACTIVE','SUSPENDED'))
+      ORDER BY match DESC, "className" NULLS LAST, u.display_name`);
+    return rows;
   }
 
   // ---------- core: atomic seat assignment ----------

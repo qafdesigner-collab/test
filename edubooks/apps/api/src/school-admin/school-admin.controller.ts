@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsOptional, IsString, IsUUID, Length, MaxLength, ValidateNested } from 'class-validator';
@@ -40,6 +40,7 @@ class UpdateUserDto {
 }
 class LoginsQuery { @IsIn(['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PARENT']) role!: 'STUDENT' | 'TEACHER' | 'SCHOOL_ADMIN' | 'PARENT'; @IsOptional() @IsUUID() classId?: string; }
 export class ResetLoginsDto { @IsIn(['STUDENT', 'TEACHER']) role!: 'STUDENT' | 'TEACHER'; @IsOptional() @IsUUID() classId?: string; @IsOptional() @IsArray() @ArrayMaxSize(600) @IsUUID('all', { each: true }) userIds?: string[]; }
+class PoolGradesDto { @IsArray() @ArrayMaxSize(30) @IsUUID('all', { each: true }) gradeIds!: string[]; }
 class AssignDto { @IsArray() @ArrayMinSize(1) @ArrayMaxSize(1000) @IsUUID('all', { each: true }) userIds: string[]; }
 class TransferDto { @IsUUID() assignmentId: string; @IsUUID() toUserId: string; @IsString() @Length(3, 500) reason: string; }
 class ReasonDto { @IsOptional() @IsString() @MaxLength(500) reason?: string; }
@@ -93,6 +94,8 @@ export class SchoolAdminController {
   @Get('pools') pools(@Ctx() c: TenantCtx) { return this.licensing.listPools({ schoolId: this.sid(c) }); }
   @Get('pools/:id') pool(@Param('id', Id()) id: string) { return this.licensing.getPool(id); }
   @Get('pools/:id/eligible') eligible(@Param('id', Id()) id: string) { return this.licensing.eligibleUsers(id); }
+  @Get('pools/:id/grades') poolGrades(@Param('id', Id()) id: string) { return this.licensing.poolGrades(id); }
+  @Put('pools/:id/grades') setPoolGrades(@Param('id', Id()) id: string, @Body() d: PoolGradesDto) { return this.licensing.setPoolGrades(id, d.gradeIds); }
   @Post('pools/:id/assign') assign(@Param('id', Id()) id: string, @Body() d: AssignDto) { return this.licensing.assign(id, d.userIds); }
   @Post('assignments/:id/release') release(@Param('id', Id()) id: string, @Body() d: ReasonDto) { return this.licensing.release(id, d.reason ?? ''); }
 

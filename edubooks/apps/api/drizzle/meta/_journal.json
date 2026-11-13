@@ -281,6 +281,13 @@
       "when": 1794810000000,
       "tag": "0039_mail_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794840000000,
+      "tag": "0040_book_grades",
+      "breakpoints": true
     }
   ]
 }
