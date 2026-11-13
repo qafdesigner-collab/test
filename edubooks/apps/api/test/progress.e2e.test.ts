@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { createApp, login } from './helpers';
 
-describe('Pupil progress across terms', () => {
+describe('Student progress across terms', () => {
   let app: INestApplication; let teacher: any; let principal: any; let classId: string; let pupils: any[];
   beforeAll(async () => {
     app = await createApp();

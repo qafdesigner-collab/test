@@ -355,7 +355,7 @@ export class LmsService {
     const late = !!a.dueAt && a.dueAt < new Date();
     if (late && !a.allowLate) throw new ConflictException('The due date has passed.');
     const items = await this.q.select().from(assessmentItems).where(eq(assessmentItems.assessmentId, id));
-    // Read-aloud answers are recordings: they must be this pupil's own reading clips.
+    // Read-aloud answers are recordings: they must be this student's own reading clips.
     const clipIds = items.filter((it) => it.type === 'READING').map((it) => d.answers.find((x) => x.itemId === it.id)?.response).filter((v): v is string => typeof v === 'string' && /^[0-9a-f-]{36}$/.test(v));
     const okClips = new Set(clipIds.length ? ((await this.q.execute(sql`SELECT id FROM audio_clips WHERE owner_id = ${this.ctx.userId} AND kind = 'READING' AND id = ANY(${`{${clipIds.join(',')}}`}::uuid[])`)).rows as any[]).map((r) => r.id) : []);
     const answers = items.map((it) => {

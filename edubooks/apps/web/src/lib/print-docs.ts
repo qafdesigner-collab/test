@@ -192,8 +192,8 @@ export function printResultSheet(r: ResultSheet, brand: Branding) {
     tr{break-inside:avoid}`;
   const body = `<section class="sheet"><div class="top">${brandHead(brand)}<div><h1>${esc(r.school ?? brand.name)}</h1><div class="sub">${esc([r.term, r.subject].filter(Boolean).join(' · '))}</div></div><div class="kind">RESULT SHEET<br><small>${esc(r.kind)}</small></div></div>
     <div class="meta"><div>${esc(r.kind)}<b>${esc(r.title)}</b></div><div>Class<b>${esc(r.className ?? '')}</b></div><div>Date<b>${r.date ? esc(new Date(r.date.length === 10 ? r.date + 'T12:00:00' : r.date).toLocaleDateString()) : '—'}</b></div><div>Total marks<b>${r.total}</b></div><div>Pass mark<b>${r.passPercent}%</b></div></div>
-    ${st ? `<div class="sum"><div><b>${r.rows.length}</b>Pupils</div><div><b>${st.passed}</b>Passed</div><div><b>${st.failed}</b>Failed</div><div><b>${st.absent}</b>Absent</div><div><b>${st.average ?? '—'}</b>Average</div><div><b>${st.highest ?? '—'}</b>Highest</div></div>` : ''}
-    <table><thead><tr><th>#</th><th>Pupil</th><th>Marks</th><th>%</th><th>Grade</th><th>Result</th><th>Position</th><th>Remark</th></tr></thead><tbody>${rows}</tbody></table>
+    ${st ? `<div class="sum"><div><b>${r.rows.length}</b>Students</div><div><b>${st.passed}</b>Passed</div><div><b>${st.failed}</b>Failed</div><div><b>${st.absent}</b>Absent</div><div><b>${st.average ?? '—'}</b>Average</div><div><b>${st.highest ?? '—'}</b>Highest</div></div>` : ''}
+    <table><thead><tr><th>#</th><th>Student</th><th>Marks</th><th>%</th><th>Grade</th><th>Result</th><th>Position</th><th>Remark</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="sign"><div>Class teacher</div><div>Principal</div><div>Date</div></div></section>`;
   return openDoc(`${r.title} — result sheet`, css, body);
 }

@@ -12,7 +12,7 @@ describe('Live whiteboard', () => {
   });
   afterAll(async () => { await owner.end(); await app.close(); });
 
-  it('a teacher starts a board for their class; pupils of the class see it live', async () => {
+  it('a teacher starts a board for their class; students of the class see it live', async () => {
     const r = await teacher.post('/api/whiteboards').send({ classId, title: 'Letter B' });
     expect(r.status).toBe(201); expect(r.body.live).toBe(true);
     boardId = r.body.id;
@@ -20,7 +20,7 @@ describe('Live whiteboard', () => {
     expect(live.map((b: any) => b.id)).toContain(boardId);
   });
 
-  it('strokes written by the teacher reach the pupil in order, from any point', async () => {
+  it('strokes written by the teacher reach the student in order, from any point', async () => {
     const w = await teacher.post(`/api/whiteboards/${boardId}/ops`).send({ ops: [
       { kind: 'pts', data: { id: 's1', c: '#2563eb', w: 4, t: 'pen', p: [[0.1, 0.1], [0.2, 0.25]] } },
       { kind: 'pts', data: { id: 's1', c: '#2563eb', w: 4, t: 'pen', p: [[0.3, 0.4]] } },
@@ -35,13 +35,13 @@ describe('Live whiteboard', () => {
     expect(fresh.ops).toEqual([{ seq: 4, kind: 'undo', data: { id: 't1' } }]);
   });
 
-  it('rejects bad drawing data and writes by pupils', async () => {
+  it('rejects bad drawing data and writes by students', async () => {
     expect((await teacher.post(`/api/whiteboards/${boardId}/ops`).send({ ops: [{ kind: 'pts', data: { id: 's2', p: [[5, 5]] } }] })).status).toBe(400);
     expect((await teacher.post(`/api/whiteboards/${boardId}/ops`).send({ ops: [{ kind: 'script', data: {} }] })).status).toBe(400);
     expect((await student.post(`/api/whiteboards/${boardId}/ops`).send({ ops: [{ kind: 'clear', data: {} }] })).status).toBe(403);
   });
 
-  it('other schools cannot see it; ending it hides it from pupils', async () => {
+  it('other schools cannot see it; ending it hides it from students', async () => {
     const other = await login(app, 'principal', 'School@12345', 'GVS02');
     expect((await other.get(`/api/whiteboards/${boardId}`)).status).toBe(404);
     expect((await teacher.post(`/api/whiteboards/${boardId}/end`)).body.live).toBe(false);

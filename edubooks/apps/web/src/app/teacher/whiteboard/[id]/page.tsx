@@ -14,7 +14,7 @@ export default function BoardPage() {
   if (q.error) return <ErrorBox error={q.error} />;
   if (!q.data) return <PageLoader />;
   const b = q.data;
-  const end = async () => { if (!confirm('End the live lesson? Pupils can still look at the board, but you can no longer write on it.')) return; await api.post(`/whiteboards/${id}/end`); qc.invalidateQueries({ queryKey: ['whiteboards'] }); router.push('/teacher/whiteboard'); };
+  const end = async () => { if (!confirm('End the live lesson? Students can still look at the board, but you can no longer write on it.')) return; await api.post(`/whiteboards/${id}/end`); qc.invalidateQueries({ queryKey: ['whiteboards'] }); router.push('/teacher/whiteboard'); };
   const resume = async () => { try { await api.post(`/whiteboards/${id}/resume`); q.refetch(); } catch (e: any) { toast(e.message, 'err'); } };
   return (
     <div className="space-y-3">
@@ -23,7 +23,7 @@ export default function BoardPage() {
         <h1 className="text-xl font-semibold text-slate-900">{b.title}</h1><span className="text-sm text-slate-500">{b.className}</span>
       </div>
       {b.live ? <WhiteboardWriter board={b} onEnd={end} />
-        : <Card className="flex flex-wrap items-center justify-between gap-3 p-5"><span className="text-slate-600">This whiteboard has ended. Go live again to keep writing; pupils see it on their home page.</span><Button onClick={resume}>Go live again</Button></Card>}
+        : <Card className="flex flex-wrap items-center justify-between gap-3 p-5"><span className="text-slate-600">This whiteboard has ended. Go live again to keep writing; students see it on their home page.</span><Button onClick={resume}>Go live again</Button></Card>}
     </div>
   );
 }

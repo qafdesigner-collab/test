@@ -83,14 +83,14 @@ export class MessagingService {
         FROM enrolments e JOIN users k ON k.id = e.student_id JOIN parent_students ps ON ps.student_id = k.id JOIN users p ON p.id = ps.parent_id AND p.status = 'ACTIVE'
         WHERE ${where}
         UNION
-        SELECT DISTINCT k.id, k.display_name, k.id, k.display_name, 'Pupil'
+        SELECT DISTINCT k.id, k.display_name, k.id, k.display_name, 'Student'
         FROM enrolments e JOIN users k ON k.id = e.student_id AND k.status = 'ACTIVE' WHERE ${where}
-      ) t ORDER BY "studentName", (role = 'Pupil') DESC, "displayName"`);
+      ) t ORDER BY "studentName", (role = 'Student') DESC, "displayName"`);
   }
 
   async start(d: StartDto) {
     const ok = (await this.contacts()).some((c: any) => c.studentId === d.studentId && c.id === d.withId);
-    if (!ok) throw new ForbiddenException('You can only message your pupils and their parents, or your (child’s) teachers and school office');
+    if (!ok) throw new ForbiddenException('You can only message your students and their parents, or your (child’s) teachers and school office');
     // "parent_id" is the family side of the chat: a parent, or the pupil themself.
     const [parentId, staffId] = this.isParent() || this.isPupil() ? [this.ctx.userId, d.withId] : [d.withId, this.ctx.userId];
     const c = await this.one(sql`INSERT INTO conversations (publisher_id, school_id, parent_id, staff_id, student_id) VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${parentId}, ${staffId}, ${d.studentId})

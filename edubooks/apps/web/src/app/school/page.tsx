@@ -58,14 +58,14 @@ export default function SchoolOverview() {
       {s.isDemo && <div className="rounded-3xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800">This is a <b>demo school</b>. It stops working on {fmtDay(s.demoExpiresAt)} ({daysLeft(s.demoExpiresAt)} days left).</div>}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatTile icon="🎒" bg="#ede9fe" value={q.data.students} label={`pupils · ${L.students.assigned} with a book`} href="/school/students" />
+        <StatTile icon="🎒" bg="#ede9fe" value={q.data.students} label={`students · ${L.students.assigned} with a book`} href="/school/students" />
         <StatTile icon="🧑‍🏫" bg="#fce7f3" value={q.data.teachers} label={`teachers · ${L.teachers.assigned} with a seat`} href="/school/teachers" />
         <StatTile icon="✅" bg="#dcfce7" value={attendance} label={T?.marked ? 'attendance today' : 'no register taken yet'} href="/school/attendance" />
-        <StatTile icon="🎟️" bg="#fef3c7" value={L.students.available} label="free pupil seats" href="/school/licences" />
+        <StatTile icon="🎟️" bg="#fef3c7" value={L.students.available} label="free student seats" href="/school/licences" />
       </div>
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-        <ActionTile href="/school/students" icon="🎒" label="Add pupils" gradient="from-[#45b483] to-[#2f9468]" />
+        <ActionTile href="/school/students" icon="🎒" label="Add students" gradient="from-[#45b483] to-[#2f9468]" />
         <ActionTile href="/school/teachers" icon="🧑‍🏫" label="Add teachers" gradient="from-[#ec9a5c] to-[#cf7840]" />
         <ActionTile href="/school/licences" icon="📚" label="Give books" gradient="from-[#8b7be0] to-[#6a5acb]" />
         <ActionTile href="/school/messages" icon="💬" label="Send a message" gradient="from-[#e07aa3] to-[#c45886]" />
@@ -80,7 +80,7 @@ export default function SchoolOverview() {
               {classes.map((c, i) => (
                 <GradientCard key={c.id} href={`/school/classes/${c.id}`} gradient={GRADIENTS[i % GRADIENTS.length]}>
                   <b className="text-xl">{cname(c)}</b>
-                  <small className="block opacity-90">{c.students} pupil{c.students === 1 ? '' : 's'} · {c.active7} active this week</small>
+                  <small className="block opacity-90">{c.students} student{c.students === 1 ? '' : 's'} · {c.active7} active this week</small>
                   <Faces n={c.students} color={HEX[i % HEX.length]} />
                   <Bar pct={c.average} />
                   <small className="mt-1 block opacity-90">{c.average === null ? 'No marked work yet' : `Average ${c.average}%`}{c.homeworkRate !== null ? ` · homework ${c.homeworkRate}%` : ''}</small>
@@ -109,18 +109,18 @@ export default function SchoolOverview() {
           <Panel title="Needs your attention">
             {unmarked.map((c: any) => (
               <Link key={c.id} href="/school/attendance" className="flex items-center gap-3 border-b border-slate-100 py-2.5 last:border-0 hover:bg-slate-50/60">
-                <Ring tone="amber">📋</Ring><span className="min-w-0 flex-1"><b className="block truncate text-slate-900">{cname(c)}</b><small className="text-slate-500">register not taken today · {c.students} pupils</small></span><Pill tone="amber">today</Pill></Link>
+                <Ring tone="amber">📋</Ring><span className="min-w-0 flex-1"><b className="block truncate text-slate-900">{cname(c)}</b><small className="text-slate-500">register not taken today · {c.students} students</small></span><Pill tone="amber">today</Pill></Link>
             ))}
             {quiet.slice(0, 4).map((c) => (
               <Link key={c.id} href={`/school/classes/${c.id}`} className="flex items-center gap-3 border-b border-slate-100 py-2.5 last:border-0 hover:bg-slate-50/60">
-                <Ring tone="red">{c.students ? Math.round((c.active7 / c.students) * 100) : 0}%</Ring><span className="min-w-0 flex-1"><b className="block truncate text-slate-900">{cname(c)}</b><small className="text-slate-500">only {c.active7} of {c.students} pupils active this week</small></span><Pill>View</Pill></Link>
+                <Ring tone="red">{c.students ? Math.round((c.active7 / c.students) * 100) : 0}%</Ring><span className="min-w-0 flex-1"><b className="block truncate text-slate-900">{cname(c)}</b><small className="text-slate-500">only {c.active7} of {c.students} students active this week</small></span><Pill>View</Pill></Link>
             ))}
             {expiring.map((p: any) => (
               <Link key={p.id} href={`/school/licences/${p.id}`} className="flex items-center gap-3 border-b border-slate-100 py-2.5 last:border-0 hover:bg-slate-50/60">
                 <Ring tone="pink">{daysLeft(p.validUntil)}d</Ring><span className="min-w-0 flex-1"><b className="block truncate text-slate-900">{p.productName}</b><small className="text-slate-500">licence ends {fmtDay(p.validUntil)}</small></span><Pill tone="red">renew</Pill></Link>
             ))}
             {L.students.available === 0 && L.students.assigned > 0 && (
-              <Link href="/school/licences" className="flex items-center gap-3 py-2.5 hover:bg-slate-50/60"><Ring tone="violet">0</Ring><span className="flex-1"><b className="block text-slate-900">No free pupil seats</b><small className="text-slate-500">ask your publisher for more seats before new pupils join</small></span></Link>
+              <Link href="/school/licences" className="flex items-center gap-3 py-2.5 hover:bg-slate-50/60"><Ring tone="violet">0</Ring><span className="flex-1"><b className="block text-slate-900">No free student seats</b><small className="text-slate-500">ask your publisher for more seats before new students join</small></span></Link>
             )}
             {!unmarked.length && !quiet.length && !expiring.length && !(L.students.available === 0 && L.students.assigned > 0) &&
               <p className="py-4 text-center text-sm text-slate-500">{att.isLoading || an.isLoading ? 'Checking…' : '🌟 All good — nothing needs you right now.'}</p>}
@@ -130,7 +130,7 @@ export default function SchoolOverview() {
             <div className="flex flex-wrap gap-2">{q.data.academicYears.map((y: any) => <span key={y.id} className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-800">{y.name}: {fmtDay(y.startsOn)} – {fmtDay(y.endsOn)}</span>)}</div>
             <div className="mt-4 flex items-center gap-3 rounded-2xl bg-gradient-to-r from-violet-100 to-pink-100 p-3.5 text-sm">
               <span className="text-3xl" aria-hidden>🦉</span>
-              <div><b className="text-slate-900">See how pupils are learning</b><small className="block text-slate-600"><Link className="font-semibold text-violet-700 hover:underline" href="/school/insights">Open insights</Link> for reading, homework and games by class.</small></div>
+              <div><b className="text-slate-900">See how students are learning</b><small className="block text-slate-600"><Link className="font-semibold text-violet-700 hover:underline" href="/school/insights">Open insights</Link> for reading, homework and games by class.</small></div>
             </div>
           </Panel>
         </div>

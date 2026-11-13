@@ -78,7 +78,7 @@ describe('Built-in mail: inbox, groups, meeting invites and email copies', () =>
     expect(mail.data).toMatch(/text\/calendar/); expect(mail.data).toMatch(/lms\.example\.ae\/mail\?m=/);
   });
 
-  it('teachers mail the office and their own classes; pupils and parents can only reply', async () => {
+  it('teachers mail the office and their own classes; students and parents can only reply', async () => {
     const g = (await teacher.get('/api/mail/groups')).body.map((x: any) => x.key);
     expect(g).toContain('office'); expect(g.some((k: string) => /^class:.*:parents$/.test(k))).toBe(true);
     expect(g).not.toContain('students'); // not the whole school

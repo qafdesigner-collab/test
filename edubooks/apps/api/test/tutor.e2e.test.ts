@@ -21,7 +21,7 @@ beforeAll(async () => {
 });
 afterAll(() => server.close());
 
-describe('AI tutor for pupils', () => {
+describe('AI tutor for students', () => {
   let app: any; let student: any; let principal: any; let teacher: any; let ed: string; let part1: string;
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   beforeAll(async () => {

@@ -29,7 +29,7 @@ describe('Covers, CD / mobile-app parts and content protection', () => {
     expect((await http().get(up.body.coverUrl)).status).toBe(401);
   });
 
-  it('adds a mobile-app part; licensed pupils get a QR download link for the app only', async () => {
+  it('adds a mobile-app part; licensed students get a QR download link for the app only', async () => {
     // a draft edition is needed to add parts: use the builder of a fresh package
     const subjects = (await admin.get('/api/catalog/subjects')).body; const grades = (await admin.get('/api/catalog/grades')).body;
     const pkg = (await admin.post('/api/publishing/packages').send({ title: 'App test book', gradeId: grades[0].id, subjectId: subjects[0].id, editionLabel: '2026 Edition', editionYear: 2026, standardStructure: true })).body;

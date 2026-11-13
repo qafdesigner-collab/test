@@ -16,7 +16,7 @@ class RemoveDto { @Equals('REMOVE', { message: 'Type REMOVE to confirm' }) confi
 export const DEMO_LOGINS = [
   { who: 'School admin', school: 'DEMO1', username: 'principal', password: 'School@12345' },
   { who: 'Teacher', school: 'DEMO1', username: 'teacher1', password: 'Teacher@12345' },
-  { who: 'Pupil', school: 'DEMO1', username: 'student1', password: 'Student@123' },
+  { who: 'Student', school: 'DEMO1', username: 'student1', password: 'Student@123' },
   { who: 'Parent', school: 'DEMO1', username: 'parent1', password: 'Parent@123' },
   { who: 'Other demo schools', school: 'DEMO2 / DEMO3', username: 'principal, teacher1, student1–3', password: 'as above' },
 ];

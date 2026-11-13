@@ -13,7 +13,7 @@ describe('Exam result sheets and downloadable logins', () => {
   });
   afterAll(async () => { await app.close(); });
 
-  it('the teacher sees pass/fail, grade and position for every pupil, against the exam pass mark', async () => {
+  it('the teacher sees pass/fail, grade and position for every student, against the exam pass mark', async () => {
     const e = (await teacher.post('/api/exams').send({ classId, title: 'Unit test — results', durationMin: 40, passPercent: 50 })).body;
     await teacher.put(`/api/exams/${e.id}/items`).send({ items: [{ type: 'SHORT', prompt: 'Write the word', marks: 10 }, { type: 'SHORT', prompt: 'Read', marks: 10 }] });
     const roster = (await teacher.get(`/api/exams/${e.id}/marks`)).body.roster;

@@ -91,7 +91,7 @@ export class ProgressService {
   async pupil(classId: string, studentId: string) {
     const all = await this.classProgress(classId);
     const pu = all.pupils.find((p) => p.id === studentId);
-    if (!pu) throw new NotFoundException('This pupil is not in the class');
+    if (!pu) throw new NotFoundException('This student is not in the class');
     const rows = all.periods.map((p) => ({ ...p, ...all.table[studentId][p.key as Period] }));
     const done = rows.filter((r) => r.key !== 'FINAL' && r.score !== null);
     const trend = done.length >= 2 ? round1(done[done.length - 1].score - done[0].score) : null;
@@ -101,7 +101,7 @@ export class ProgressService {
   async override(classId: string, studentId: string, d: OverrideDto) {
     await this.access.assertTeaches(classId);
     const [e] = await this.rows(sql`SELECT 1 FROM enrolments WHERE class_id = ${classId} AND student_id = ${studentId}`);
-    if (!e) throw new ForbiddenException('This pupil is not in the class');
+    if (!e) throw new ForbiddenException('This student is not in the class');
     const ctx = this.db.ctx;
     if ((d.score === null || d.score === undefined) && !d.comment?.trim()) {
       await this.db.q.execute(sql`DELETE FROM progress_overrides WHERE class_id = ${classId} AND student_id = ${studentId} AND period = ${d.period}`);

@@ -5,7 +5,7 @@ import { createApp, login, ownerPool } from './helpers';
 const WEBM = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.alloc(400, 7)]);
 const M4A = Buffer.concat([Buffer.from([0, 0, 0, 0x20]), Buffer.from('ftypM4A '), Buffer.alloc(300, 3)]);
 
-describe('Voice notes, pupil chat and read-aloud homework', () => {
+describe('Voice notes, student chat and read-aloud homework', () => {
   let app: INestApplication; const owner = ownerPool();
   let teacher: any; let parent: any; let student: any; let principal: any; let other: any; let classId: string;
   beforeAll(async () => {
@@ -23,7 +23,7 @@ describe('Voice notes, pupil chat and read-aloud homework', () => {
     agent.post('/api/messages/audio').field('kind', kind).field('durationMs', '2400').attach('file', buf, name);
 
   it('a teacher sends a voice note to a parent; only the people in the chat (and the school) can play it', async () => {
-    const c = (await teacher.get('/api/messages/contacts')).body.find((x: any) => x.role !== 'Pupil');
+    const c = (await teacher.get('/api/messages/contacts')).body.find((x: any) => x.role !== 'Student');
     const conv = (await teacher.post('/api/messages/conversations').send({ studentId: c.studentId, withId: c.id })).body;
     const up = await upload(teacher, WEBM, 'MESSAGE');
     expect(up.status).toBe(201); expect(up.body.mime).toBe('audio/webm');
@@ -49,7 +49,7 @@ describe('Voice notes, pupil chat and read-aloud homework', () => {
     expect((await upload(teacher, WEBM, 'VIDEO')).status).toBe(400);
   });
 
-  it('pupils can chat with their own teacher (text and voice), and the teacher can start a chat with a pupil', async () => {
+  it('students can chat with their own teacher (text and voice), and the teacher can start a chat with a student', async () => {
     const contacts = (await student.get('/api/messages/contacts')).body;
     const t = contacts.find((x: any) => x.displayName === 'Sample Teacher');
     expect(t).toBeTruthy();
@@ -64,10 +64,10 @@ describe('Voice notes, pupil chat and read-aloud homework', () => {
     expect((await teacher.get(`/api/messages/audio/${v.body.id}`)).status).toBe(200);
     expect((await parent.get(`/api/messages/audio/${v.body.id}`)).status).toBe(403);
     // teacher side lists pupils as contacts too
-    expect((await teacher.get('/api/messages/contacts')).body.some((x: any) => x.role === 'Pupil')).toBe(true);
+    expect((await teacher.get('/api/messages/contacts')).body.some((x: any) => x.role === 'Student')).toBe(true);
   });
 
-  it('read-aloud homework: the pupil records, the teacher listens and marks', async () => {
+  it('read-aloud homework: the student records, the teacher listens and marks', async () => {
     const a = (await teacher.post('/api/teacher/assessments').send({ classId, kind: 'HOMEWORK', title: 'Read page 3 aloud', items: [
       { type: 'READING', prompt: 'Read page 3 of your book aloud', options: [], answer: [], points: 5 },
       { type: 'TRUE_FALSE', prompt: 'B is for ball', options: [], answer: [true], points: 1 },
@@ -93,7 +93,7 @@ describe('Voice notes, pupil chat and read-aloud homework', () => {
     expect(g.status).toBe(200);
   });
 
-  it('erasing a pupil also deletes their recordings', async () => {
+  it('erasing a student also deletes their recordings', async () => {
     const { rows: [k] } = await owner.query(`SELECT u.id FROM users u JOIN schools s ON s.id = u.school_id WHERE s.code = 'SUN01' AND u.username = 'student1'`);
     const before = Number((await owner.query(`SELECT count(*) n FROM audio_clips WHERE owner_id = $1`, [k.id])).rows[0].n);
     expect(before).toBeGreaterThan(0);

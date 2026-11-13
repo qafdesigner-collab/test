@@ -131,7 +131,7 @@ const TIPS = [
   'Turn a worksheet into a game: assign it in Games and watch the stars roll in.',
   'Mix movement into phonics: jump for vowels, clap for consonants.',
   'Call parents with good news too — a quick message makes a big difference.',
-  'Let pupils choose between two tasks. A little choice brings a lot of energy.',
+  'Let students choose between two tasks. A little choice brings a lot of energy.',
   'Model your thinking out loud: “First I look at…, then I…”.',
   'Use the AI assistant for three warm-up questions on today’s lesson.',
   'Pair a confident reader with a shy one for buddy reading.',

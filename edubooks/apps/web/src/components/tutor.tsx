@@ -86,18 +86,18 @@ export function TutorSettings() {
   useEffect(() => { if (q.data) setLimit(q.data.dailyLimit); }, [q.data]);
   if (q.error) return <ErrorBox error={q.error} />;
   if (!q.data) return <PageLoader />;
-  const save = async (enabled: boolean) => { try { qc.setQueryData(['tutorSettings'], await api.put('/tutor/settings', { enabled, dailyLimit: Number(limit) })); toast(enabled ? 'Ask Owl is on for your pupils' : 'Ask Owl is off'); } catch (e: any) { toast(e.message, 'err'); } };
+  const save = async (enabled: boolean) => { try { qc.setQueryData(['tutorSettings'], await api.put('/tutor/settings', { enabled, dailyLimit: Number(limit) })); toast(enabled ? 'Ask Owl is on for your students' : 'Ask Owl is off'); } catch (e: any) { toast(e.message, 'err'); } };
   return (
     <Card className="space-y-4 p-5">
       <div className="flex items-start gap-3"><span className="text-4xl">🦉</span><div className="flex-1">
-        <h2 className="font-semibold text-slate-900">Ask Owl — AI reading helper for pupils</h2>
-        <p className="text-sm text-slate-600">In the book reader, pupils can ask Owl to explain the page, answer a question about their book, or give a short quiz. Owl only uses the book’s own pages, refuses unsafe topics, never asks for personal details, and every question is shown to teachers below.
+        <h2 className="font-semibold text-slate-900">Ask Owl — AI reading helper for students</h2>
+        <p className="text-sm text-slate-600">In the book reader, students can ask Owl to explain the page, answer a question about their book, or give a short quiz. Owl only uses the book’s own pages, refuses unsafe topics, never asks for personal details, and every question is shown to teachers below.
           {!q.data.live && ' No AI model is set up yet, so Owl answers by showing the matching sentences from the book.'}</p></div>
         <Badge tone={q.data.enabled ? 'PUBLISHED' : 'DRAFT'}>{q.data.enabled ? 'On' : 'Off'}</Badge></div>
       {!q.data.available ? <p className="text-sm text-amber-800">Your publisher has turned this feature off.</p> : (
         <div className="flex flex-wrap items-end gap-3">
-          <Field label="Questions per pupil per day"><Input type="number" min={1} max={200} className="w-28" value={limit} onChange={(e) => setLimit(Number(e.target.value))} /></Field>
-          {q.data.enabled ? <><Button variant="secondary" onClick={() => save(true)}>Save limit</Button><Button variant="ghost" onClick={() => save(false)}>Turn off</Button></> : <Button onClick={() => save(true)}>Turn on for pupils</Button>}
+          <Field label="Questions per student per day"><Input type="number" min={1} max={200} className="w-28" value={limit} onChange={(e) => setLimit(Number(e.target.value))} /></Field>
+          {q.data.enabled ? <><Button variant="secondary" onClick={() => save(true)}>Save limit</Button><Button variant="ghost" onClick={() => save(false)}>Turn off</Button></> : <Button onClick={() => save(true)}>Turn on for students</Button>}
         </div>)}
     </Card>
   );
@@ -109,14 +109,14 @@ export function TutorLog({ classes }: { classes?: { id: string; label: string }[
   const q = useQuery({ queryKey: ['tutorLog', cls, flagged], queryFn: () => api.get<any[]>(`/tutor/log?${new URLSearchParams({ ...(cls ? { classId: cls } : {}), ...(flagged ? { flagged: '1' } : {}) })}`) });
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-3"><h2 className="font-semibold text-slate-900">Questions pupils asked</h2>
+      <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-3"><h2 className="font-semibold text-slate-900">Questions students asked</h2>
         {classes && <select aria-label="Class" className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm" value={cls} onChange={(e) => setCls(e.target.value)}><option value="">All my classes</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select>}
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={flagged} onChange={(e) => setFlagged(e.target.checked)} />Only flagged</label></div>
       {q.error ? <div className="p-4"><ErrorBox error={q.error} /></div> : !q.data ? <PageLoader /> : !q.data.length ? <p className="p-6 text-center text-sm text-slate-600">No questions yet.</p> : (
         <ul className="divide-y divide-slate-100">{q.data.map((x) => (
           <li key={x.id} className={cn('px-5 py-3 text-sm', x.flagged && 'bg-red-50')}>
             <div className="flex flex-wrap items-center gap-2"><b>{x.student}</b><span className="text-xs text-slate-600">{x.book} · page {x.page} · {fmtDate(x.createdAt)}</span>
-              {x.flagged && <Badge tone="danger">Flagged — please check in with this pupil</Badge>}</div>
+              {x.flagged && <Badge tone="danger">Flagged — please check in with this student</Badge>}</div>
             <p className="mt-1 text-slate-800"><span className="text-slate-500">{{ EXPLAIN: 'Explain this page', QUIZ: 'Quiz me', ASK: 'Asked:' }[x.mode as string]}</span> {x.question}</p>
             <p className="mt-0.5 text-slate-600">🦉 {x.answer}</p></li>))}</ul>)}
     </Card>

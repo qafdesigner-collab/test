@@ -72,10 +72,10 @@ export default function TeacherHome() {
       </Hero>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatTile icon="👥" bg="#ede9fe" value={pupils} label={`pupils in ${classes.data.length} class${classes.data.length === 1 ? '' : 'es'}`} href="/teacher/classes" />
+        <StatTile icon="👥" bg="#ede9fe" value={pupils} label={`students in ${classes.data.length} class${classes.data.length === 1 ? '' : 'es'}`} href="/teacher/classes" />
         <StatTile icon="✏️" bg="#fce7f3" value={toMarkCount} label="to mark" href="/teacher/assessments" />
         <StatTile icon="✅" bg="#dcfce7" value={attendance} label={regs.length ? 'attendance today' : 'register not taken yet'} href="/teacher/attendance" />
-        <StatTile icon="⭐" bg="#fef3c7" value={stars} label="stars earned by my pupils" href="/teacher/insights" />
+        <StatTile icon="⭐" bg="#fef3c7" value={stars} label="stars earned by my students" href="/teacher/insights" />
       </div>
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
@@ -107,7 +107,7 @@ export default function TeacherHome() {
                 return (
                   <GradientCard key={c.id} href={`/teacher/classes/${c.id}`} gradient={GRADIENTS[i % GRADIENTS.length]}>
                     <b className="text-xl">{className(c)}</b>
-                    <small className="block opacity-90">{c.students} pupil{c.students === 1 ? '' : 's'} · {c.academicYear}</small>
+                    <small className="block opacity-90">{c.students} student{c.students === 1 ? '' : 's'} · {c.academicYear}</small>
                     <Faces n={c.students ?? 0} color={HEX[i % HEX.length]} />
                     <Bar pct={avg} />
                     <small className="mt-1 block opacity-90">{avg === null ? 'No marked work yet' : `Average ${avg}%`}{help ? ` · ${help} need${help === 1 ? 's' : ''} help` : ' · everyone on track'}</small>
@@ -136,7 +136,7 @@ export default function TeacherHome() {
         </div>
 
         <div className="space-y-5">
-          <Panel title="Pupils who need a little help" link={{ href: '/teacher/insights', label: 'Insights' }}>
+          <Panel title="Students who need a little help" link={{ href: '/teacher/insights', label: 'Insights' }}>
             {needHelp.map((s: any) => (
               <div key={`${s.cls}-${s.id}`} className="flex items-center gap-3 border-b border-slate-100 py-2.5 last:border-0">
                 <Ring tone={s.average === null ? 'amber' : 'red'}>{s.average === null ? '—' : `${s.average}%`}</Ring>

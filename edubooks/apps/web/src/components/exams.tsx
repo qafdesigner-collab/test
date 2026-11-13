@@ -231,7 +231,7 @@ function MarksEntry({ examId }: { examId: string }) {
       qc.setQueryData(['examMarks', examId], await api.put(`/exams/${examId}/marks`, { marks })); qc.invalidateQueries({ queryKey: ['exams'] }); toast('Marks saved');
     } catch (e) { setErr(e); } finally { setBusy(false); }
   };
-  const publish = async (on: boolean) => { try { await save(); await api.post(`/exams/${examId}/${on ? 'publish' : 'unpublish'}`, {}); ['exam', 'examMarks', 'exams'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); toast(on ? 'Results published — pupils and parents have been told' : 'Results withdrawn'); } catch (e: any) { toast(e.message, 'err'); } };
+  const publish = async (on: boolean) => { try { await save(); await api.post(`/exams/${examId}/${on ? 'publish' : 'unpublish'}`, {}); ['exam', 'examMarks', 'exams'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); toast(on ? 'Results published — students and parents have been told' : 'Results withdrawn'); } catch (e: any) { toast(e.message, 'err'); } };
   const entered = d.roster.filter((r: any) => rows[r.id]?.marks !== '' || rows[r.id]?.absent).length;
   return (
     <Card className="overflow-hidden">
@@ -239,7 +239,7 @@ function MarksEntry({ examId }: { examId: string }) {
         <span>Out of <b>{d.total}</b></span><span>Entered <b>{entered} / {d.roster.length}</b></span>
         {d.stats && <span className="text-slate-600">Average <b>{d.stats.average}</b> · highest {d.stats.highest} · lowest {d.stats.lowest}</span>}
       </div>
-      <table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs text-slate-600"><tr><th className="px-4 py-2">Pupil</th><th className="px-4 py-2">Marks</th><th className="px-4 py-2">%</th><th className="px-4 py-2">Absent</th><th className="px-4 py-2">Remark</th></tr></thead>
+      <table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs text-slate-600"><tr><th className="px-4 py-2">Student</th><th className="px-4 py-2">Marks</th><th className="px-4 py-2">%</th><th className="px-4 py-2">Absent</th><th className="px-4 py-2">Remark</th></tr></thead>
         <tbody className="divide-y divide-slate-100">{d.roster.map((r: any, i: number) => { const v = rows[r.id] ?? { marks: '', absent: false, remarks: '' }; const pc = v.marks !== '' && d.total ? Math.round((Number(v.marks) / d.total) * 100) : null;
           return (<tr key={r.id}><td className="px-4 py-1.5 font-medium">{r.displayName}</td>
             <td className="px-4 py-1.5"><Input ref={(el) => { refs.current[i] = el; }} aria-label={`Marks for ${r.displayName}`} type="number" min={0} max={d.total} step={0.5} disabled={v.absent} className={cn('h-8 w-24', v.marks !== '' && Number(v.marks) > d.total && 'border-red-500')}
@@ -249,7 +249,7 @@ function MarksEntry({ examId }: { examId: string }) {
             <td className="px-4 py-1.5"><Input aria-label={`Remark for ${r.displayName}`} maxLength={300} className="h-8" value={v.remarks} onChange={(e) => setRows({ ...rows, [r.id]: { ...v, remarks: e.target.value } })} /></td></tr>); })}</tbody></table>
       <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-5 py-3">
         {err ? <div className="w-full"><ErrorBox error={err} /></div> : null}
-        <span className="text-xs text-slate-600">{pub ? 'Results are visible on report cards and to pupils and parents.' : 'Pupils and parents see results only after you publish them.'}</span>
+        <span className="text-xs text-slate-600">{pub ? 'Results are visible on report cards and to students and parents.' : 'Students and parents see results only after you publish them.'}</span>
         <span className="flex-1" />
         <Button variant="secondary" loading={busy} onClick={save}>Save marks</Button>
         {pub ? <Button variant="secondary" onClick={() => publish(false)}>Withdraw results</Button> : <Button onClick={() => publish(true)} disabled={!entered}>Publish results</Button>}
@@ -275,11 +275,11 @@ function ExamResults({ examId }: { examId: string }) {
   const rows = d.roster.filter((r: any) => filter === 'ALL' || r.result === filter);
   const print = () => printResultSheet({ title: d.title, kind: 'Exam', school: d.school, className: cls, subject: d.subject, term: d.term, date: d.examDate, total: d.total, passPercent: d.passPercent,
     rows: d.roster.map((r: any) => ({ name: r.displayName, username: r.username, marks: r.absent ? null : r.marks, percent: r.percent, grade: r.grade, result: r.result, rank: r.rank, remarks: r.remarks })), stats: st }, brand);
-  const save = () => downloadCsv(`${d.title.replace(/[^\w -]+/g, '')} - results.csv`, d.roster.map((r: any, i: number) => ({ no: i + 1, pupil: r.displayName, login: r.username, marks: r.absent ? 'absent' : r.marks ?? '', outOf: d.total, percent: r.percent ?? '', grade: r.grade ?? '', result: RES_LABEL[r.result], position: r.rank ?? '', remark: r.remarks ?? '' })));
+  const save = () => downloadCsv(`${d.title.replace(/[^\w -]+/g, '')} - results.csv`, d.roster.map((r: any, i: number) => ({ no: i + 1, student: r.displayName, login: r.username, marks: r.absent ? 'absent' : r.marks ?? '', outOf: d.total, percent: r.percent ?? '', grade: r.grade ?? '', result: RES_LABEL[r.result], position: r.rank ?? '', remark: r.remarks ?? '' })));
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {[['Pupils', d.roster.length, 'text-slate-900'], ['Passed', st?.passed ?? 0, 'text-emerald-700'], ['Failed', st?.failed ?? 0, 'text-red-600'], ['Absent', st?.absent ?? 0, 'text-slate-600'], ['Average', st ? `${st.average} / ${d.total}` : '—', 'text-violet-700']].map(([l, v, c]) => (
+        {[['Students', d.roster.length, 'text-slate-900'], ['Passed', st?.passed ?? 0, 'text-emerald-700'], ['Failed', st?.failed ?? 0, 'text-red-600'], ['Absent', st?.absent ?? 0, 'text-slate-600'], ['Average', st ? `${st.average} / ${d.total}` : '—', 'text-violet-700']].map(([l, v, c]) => (
           <Card key={l as string} className="p-4"><div className="text-xs font-medium text-slate-500">{l}</div><div className={cn('mt-1 text-2xl font-bold', c as string)}>{v}</div></Card>))}
       </div>
       <Card className="flex flex-wrap items-end gap-3 p-4">
@@ -291,7 +291,7 @@ function ExamResults({ examId }: { examId: string }) {
         <Button onClick={print}><Printer className="size-4" />Print result sheet</Button>
       </Card>
       <Card className="overflow-x-auto">
-        <table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs text-slate-600"><tr><th className="px-4 py-2">#</th><th className="px-4 py-2">Pupil</th><th className="px-4 py-2">Marks</th><th className="px-4 py-2">%</th><th className="px-4 py-2">Grade</th><th className="px-4 py-2">Result</th><th className="px-4 py-2">Position</th><th className="px-4 py-2">Remark</th></tr></thead>
+        <table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs text-slate-600"><tr><th className="px-4 py-2">#</th><th className="px-4 py-2">Student</th><th className="px-4 py-2">Marks</th><th className="px-4 py-2">%</th><th className="px-4 py-2">Grade</th><th className="px-4 py-2">Result</th><th className="px-4 py-2">Position</th><th className="px-4 py-2">Remark</th></tr></thead>
           <tbody className="divide-y divide-slate-100">{rows.map((r: any, i: number) => (
             <tr key={r.id}><td className="px-4 py-2 text-slate-500">{i + 1}</td><td className="px-4 py-2 font-medium">{r.displayName}</td>
               <td className="px-4 py-2 tabular-nums">{r.absent ? '—' : r.marks ?? '—'}<span className="text-slate-400"> / {d.total}</span></td>
@@ -300,7 +300,7 @@ function ExamResults({ examId }: { examId: string }) {
               <td className="px-4 py-2 tabular-nums">{r.rank ?? '—'}</td><td className="px-4 py-2 text-slate-600">{r.remarks}</td></tr>))}
             {!rows.length && <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Nobody here.</td></tr>}</tbody></table>
       </Card>
-      <p className="text-xs text-slate-500">Results stay here in your account. Print the sheet (or choose “Save as PDF” in the print window), or save it for Excel. {d.status !== 'PUBLISHED' && 'Pupils and parents see their results after you publish them on the Enter marks tab.'}</p>
+      <p className="text-xs text-slate-500">Results stay here in your account. Print the sheet (or choose “Save as PDF” in the print window), or save it for Excel. {d.status !== 'PUBLISHED' && 'Students and parents see their results after you publish them on the Enter marks tab.'}</p>
     </div>
   );
 }

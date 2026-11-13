@@ -22,14 +22,14 @@ export default function DemoDataPage() {
   };
   return (
     <div className="space-y-6">
-      <PageHeader title="Demo data" sub="Fill the system with sample schools, books, pupils and activity to try everything out — then remove it all with one click before you go live." />
+      <PageHeader title="Demo data" sub="Fill the system with sample schools, books, students and activity to try everything out — then remove it all with one click before you go live." />
       <Card className="space-y-4 p-5">
         <div className="flex items-start gap-3">
           <FlaskConical className="mt-0.5 size-6 text-brand-600" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2"><h2 className="font-semibold text-slate-900">Status</h2><Badge tone={d.loaded ? 'info' : 'neutral'}>{d.loaded ? 'Demo data is loaded' : 'No demo data'}</Badge></div>
-            {d.loaded ? <p className="mt-1 text-sm text-slate-700">Loaded {fmtDate(d.loadedAt)}: {Object.entries(d.counts).map(([k, n]) => `${n} ${LABELS[k] ?? k}`).join(', ')}, plus everything inside the demo schools (classes, pupils, parents, homework, attendance, exams, messages…).</p>
-              : <p className="mt-1 text-sm text-slate-700">Loading adds 3 demo schools (codes <b>DEMO1</b>, <b>DEMO2</b>, <b>DEMO3</b>) with teachers, pupils and a parent, 5 sample books marked “(Demo)”, products and licences, games, a class with homework, attendance, a timetable, an exam with results, messages, announcements, a live lesson and a training course. Your real schools, books and settings are not changed.</p>}
+            {d.loaded ? <p className="mt-1 text-sm text-slate-700">Loaded {fmtDate(d.loadedAt)}: {Object.entries(d.counts).map(([k, n]) => `${n} ${LABELS[k] ?? k}`).join(', ')}, plus everything inside the demo schools (classes, students, parents, homework, attendance, exams, messages…).</p>
+              : <p className="mt-1 text-sm text-slate-700">Loading adds 3 demo schools (codes <b>DEMO1</b>, <b>DEMO2</b>, <b>DEMO3</b>) with teachers, students and a parent, 5 sample books marked “(Demo)”, products and licences, games, a class with homework, attendance, a timetable, an exam with results, messages, announcements, a live lesson and a training course. Your real schools, books and settings are not changed.</p>}
           </div>
         </div>
         {err ? <ErrorBox error={err} /> : null}

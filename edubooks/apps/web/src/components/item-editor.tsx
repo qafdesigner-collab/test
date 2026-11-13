@@ -45,7 +45,7 @@ export function ItemEditor({ item, index, onChange, onRemove, onMove, count }: {
           <p className="mt-1 text-xs text-slate-500">Marked automatically; capital letters and extra spaces are ignored.</p></div>
       )}
       {item.type === 'READING' && (
-        <p className="rounded-lg bg-violet-50 p-2 text-xs text-violet-800">🎤 Pupils record themselves reading (in the app, with the microphone) and hand in the recording. You listen and give the points. Write above what to read, e.g. “Read page 12 aloud”.</p>
+        <p className="rounded-lg bg-violet-50 p-2 text-xs text-violet-800">🎤 Students record themselves reading (in the app, with the microphone) and hand in the recording. You listen and give the points. Write above what to read, e.g. “Read page 12 aloud”.</p>
       )}
       {item.type === 'SHORT' && (
         <div><Input aria-label="Model answer" placeholder="Model answer for you (optional)" value={item.answer[0] ?? ''} onChange={(e) => set({ answer: e.target.value ? [e.target.value] : [] })} />

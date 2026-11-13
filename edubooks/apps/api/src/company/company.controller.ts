@@ -100,7 +100,7 @@ export class CompanyService implements OnModuleInit {
   async saveProtection(d: ProtectionDto) {
     const before = await this.protectionSettings();
     await this.db.q.execute(sql`SELECT set_publisher_setting('protection', ${JSON.stringify(d)}::jsonb)`);
-    await this.audit.log('company.protection.update', 'publisher', this.ctx.publisherId, `Content protection ${d.enabled ? `on${d.teachers ? ' (also for teachers)' : ' (pupils and parents)'}` : 'off'}`, before, d);
+    await this.audit.log('company.protection.update', 'publisher', this.ctx.publisherId, `Content protection ${d.enabled ? `on${d.teachers ? ' (also for teachers)' : ' (students and parents)'}` : 'off'}`, before, d);
     return this.protectionSettings();
   }
   saveCompany(d: CompanyDto) {

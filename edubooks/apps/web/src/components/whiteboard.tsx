@@ -221,7 +221,7 @@ export function WhiteboardWriter({ board, onEnd }: { board: any; onEnd: () => vo
           {!ready && <div className="absolute inset-0 grid place-items-center bg-white/60 text-sm text-slate-500">Loading the board…</div>}
         </div>
       </div>
-      <p className="text-center text-xs text-slate-500">Pupils of {board.className} see everything you write, live. Turning the page starts fresh ink on the new page.</p>
+      <p className="text-center text-xs text-slate-500">Students of {board.className} see everything you write, live. Turning the page starts fresh ink on the new page.</p>
     </div>
   );
 }

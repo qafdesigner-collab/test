@@ -180,7 +180,7 @@ function EraseDialog({ student, onClose }: { student: any; onClose: () => void }
           <ul className="list-disc pl-5">
             <li>Deleted: homework answers and marks, reading progress, bookmarks, games, stars, badges, teacher comments, messages and parent links.</li>
             <li>The account is anonymised (“Deleted student”) and can no longer sign in; the name is removed from earlier log entries.</li>
-            <li>The child's book seats are freed for another pupil.</li>
+            <li>The child's book seats are freed for another student.</li>
           </ul>
         </div>
         <Field label={`Type the username “${student.username}” to confirm`}><Input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" autoFocus /></Field>

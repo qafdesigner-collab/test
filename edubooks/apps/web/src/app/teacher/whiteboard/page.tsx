@@ -21,7 +21,7 @@ function Whiteboards() {
   const del = async (b: any) => { if (!confirm(`Delete “${b.title}”?`)) return; try { await api.del(`/whiteboards/${b.id}`); qc.invalidateQueries({ queryKey: ['whiteboards'] }); } catch (e: any) { toast(e.message, 'err'); } };
   return (
     <div className="space-y-6">
-      <PageHeader title="Whiteboard" sub="Teach live: whatever you write appears on your pupils' screens straight away. Write on a blank board or on a page of your book.">
+      <PageHeader title="Whiteboard" sub="Teach live: whatever you write appears on your students' screens straight away. Write on a blank board or on a page of your book.">
         <Button onClick={() => setOpen(true)}><Plus className="size-4" />Start a whiteboard</Button>
       </PageHeader>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -42,7 +42,7 @@ function Whiteboards() {
           </Card>
         ))}
       </div>
-      {!q.data.length && <Card className="p-10 text-center text-slate-500"><Presentation className="mx-auto mb-2 size-10 text-violet-400" />No whiteboards yet. Start one for your class — pupils see it on their home page while it is live.</Card>}
+      {!q.data.length && <Card className="p-10 text-center text-slate-500"><Presentation className="mx-auto mb-2 size-10 text-violet-400" />No whiteboards yet. Start one for your class — students see it on their home page while it is live.</Card>}
       {open && <StartBoard onClose={() => setOpen(false)} />}
     </div>
   );
@@ -64,7 +64,7 @@ function StartBoard({ onClose }: { onClose: () => void }) {
     } catch (e: any) { toast(e.message, 'err'); setBusy(false); }
   };
   return (
-    <Dialog open onOpenChange={onClose} title="Start a live whiteboard" description="Your pupils see it on their home page straight away, and follow every line you write.">
+    <Dialog open onOpenChange={onClose} title="Start a live whiteboard" description="Your students see it on their home page straight away, and follow every line you write.">
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); start(); }}>
         <Field label="Class"><Select required value={f.classId} onChange={(e) => setF({ ...f, classId: e.target.value })}>
           {classes.data?.map((c) => <option key={c.id} value={c.id}>{className(c)}</option>)}</Select></Field>

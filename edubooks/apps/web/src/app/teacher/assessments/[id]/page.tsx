@@ -97,7 +97,7 @@ function AiQuestions({ editionId, lessonId, onClose, onAdd }: { editionId?: stri
   const toItem = (it: any): Item => ({ type: it.type, prompt: it.prompt ?? '', options: it.type === 'MCQ' ? (it.options ?? []) : [], answer: it.answer ?? (it.type === 'TRUE_FALSE' ? [true] : it.type === 'MCQ' ? [0] : []), points: 1 });
   return (
     <Dialog open onOpenChange={onClose} wide title="✨ Ask AI for questions" description="The AI reads the chosen lesson of your book and suggests questions. Check each one before you use it.">
-      {!editionId ? <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Choose the book and lesson (the topic) above first, so the questions match what your pupils have read.</p> : (
+      {!editionId ? <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Choose the book and lesson (the topic) above first, so the questions match what your students have read.</p> : (
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-4">
             <Field label="Kind"><Select value={o.task} onChange={(e) => setO({ ...o, task: e.target.value })}><option value="ASSESSMENT">Assessment (mixed)</option><option value="WORKSHEET">Worksheet (write-in)</option><option value="HOMEWORK">Homework</option></Select></Field>

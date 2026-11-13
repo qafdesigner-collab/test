@@ -76,7 +76,7 @@ export class MailService {
     if (this.is('SCHOOL_ADMIN')) {
       await add('school-staff', 'All staff (admins and teachers)', sql`SELECT DISTINCT u.id FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role IN ('SCHOOL_ADMIN','TEACHER') WHERE u.school_id = ${school} AND u.status = 'ACTIVE' AND u.id <> ${me}`);
       await add('teachers', 'All teachers', this.schoolRole(school, 'TEACHER'));
-      await add('students', 'All pupils', this.schoolRole(school, 'STUDENT'));
+      await add('students', 'All students', this.schoolRole(school, 'STUDENT'));
       await add('parents', 'All parents', this.schoolRole(school, 'PARENT'));
       await add('publisher', 'Our publisher (super admin)', sql`SELECT id FROM publisher_mail_contacts()`);
     } else if (this.is('TEACHER')) {
@@ -88,7 +88,7 @@ export class MailService {
       : await this.rows(sql`SELECT c.id, c.name, c.section FROM classes c WHERE c.id = ANY(${arr((await this.access.teacherClassIds()).concat('00000000-0000-0000-0000-000000000000'))}::uuid[]) AND NOT c.archived ORDER BY c.name, c.section`);
     for (const c of classes) {
       const n = `${c.name}${c.section ? ` ${c.section}` : ''}`;
-      await add(`class:${c.id}:students`, `${n} — pupils`, this.classPupils(c.id));
+      await add(`class:${c.id}:students`, `${n} — students`, this.classPupils(c.id));
       await add(`class:${c.id}:parents`, `${n} — parents`, sql`SELECT DISTINCT ps.parent_id AS id FROM parent_students ps JOIN enrolments e ON e.student_id = ps.student_id AND e.class_id = ${c.id} JOIN users u ON u.id = ps.parent_id AND u.status = 'ACTIVE'`);
     }
     return out;
@@ -125,7 +125,7 @@ export class MailService {
             OR (r.role = 'PARENT' AND EXISTS (SELECT 1 FROM parent_students ps JOIN enrolments e ON e.student_id = ps.student_id WHERE ps.parent_id = u.id AND e.class_id = ANY(${arr(cls)}::uuid[]))))
         GROUP BY u.id ORDER BY u.display_name LIMIT 40`);
     }
-    const label: Record<string, string> = { PUBLISHER_ADMIN: 'Super admin', PUBLISHER_EDITOR: 'Publisher editor', PUBLISHER_SALES: 'Sales', SCHOOL_ADMIN: 'School admin', TEACHER: 'Teacher', STUDENT: 'Pupil', PARENT: 'Parent' };
+    const label: Record<string, string> = { PUBLISHER_ADMIN: 'Super admin', PUBLISHER_EDITOR: 'Publisher editor', PUBLISHER_SALES: 'Sales', SCHOOL_ADMIN: 'School admin', TEACHER: 'Teacher', STUDENT: 'Student', PARENT: 'Parent' };
     return rows.map((r) => ({ id: r.id, name: r.name, school: r.school, role: String(r.roles ?? '').split(',').map((x) => label[x] ?? x).join(', ') }));
   }
 

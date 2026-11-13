@@ -152,7 +152,7 @@ function Protection() {
       <p className="text-sm text-slate-700">When on, book pages, flipbooks, CDs, flashcards and resources can only be <b>viewed inside the platform</b>: no downloading, no right-click, no copying or selecting, no printing, and Print Screen covers the page.
         Each page shows a faint watermark with the reader’s name and school, so any photo or screenshot can be traced. The book’s mobile app (QR code) stays downloadable.</p>
       <p className="text-xs text-slate-600">Please note: no website can completely stop screenshots or a phone camera. These measures make copying hard and traceable.</p>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={d.enabled} onChange={(e) => save({ ...d, enabled: e.target.checked })} />Protect book content for pupils and parents</label>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={d.enabled} onChange={(e) => save({ ...d, enabled: e.target.checked })} />Protect book content for students and parents</label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!d.enabled} checked={d.enabled && d.teachers} onChange={(e) => save({ ...d, teachers: e.target.checked })} />Also for teachers and school admins (they cannot download teaching resources either)</label>
     </Card>
   );

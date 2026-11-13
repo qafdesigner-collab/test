@@ -36,7 +36,7 @@ export default function EmailSettings() {
           <Field label="Sender name"><Input value={f.fromName} onChange={(e) => setF({ ...f, fromName: e.target.value })} placeholder="Knowledge Gate" /></Field>
           <Field label="Sender address" hint="Leave empty to use the username"><Input value={f.fromEmail} onChange={(e) => setF({ ...f, fromEmail: e.target.value })} placeholder="noreply@wepublishingbooks.com" /></Field>
         </div>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.notifyStudents} onChange={(e) => setF({ ...f, notifyStudents: e.target.checked })} />Also email notifications (homework, results, messages, announcements…) to pupils, parents and teachers who have an email address</label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.notifyStudents} onChange={(e) => setF({ ...f, notifyStudents: e.target.checked })} />Also email notifications (homework, results, messages, announcements…) to students, parents and teachers who have an email address</label>
         {f.siteUrl && <p className="text-xs text-slate-500">Links in emails open <b>{f.siteUrl}</b> (taken from the address you are using now).</p>}
         <div className="flex justify-end"><Button onClick={save} loading={busy}><Save className="size-4" />Save</Button></div>
       </Card>

@@ -12,7 +12,7 @@ import { useT } from '@/lib/i18n';
 
 const time = (d: string) => new Date(d).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-/** Two-pane inbox. Parents talk to their children's teachers; staff to their pupils' parents. */
+/** Two-pane inbox. Parents talk to their children's teachers; staff to their students' parents. */
 export function Inbox({ parent, canOversee, pupil }: { parent?: boolean; canOversee?: boolean; pupil?: boolean }) {
   parent = parent || pupil;
   const { t } = useT(); const params = useSearchParams();
@@ -31,7 +31,7 @@ export function Inbox({ parent, canOversee, pupil }: { parent?: boolean; canOver
             <li key={c.id}><button onClick={() => setSel(c.id)} aria-current={sel === c.id ? 'true' : undefined}
               className={cn('flex w-full flex-col items-start px-4 py-3 text-start text-sm', sel === c.id ? 'bg-brand-50' : 'hover:bg-slate-50')}>
               <span className="flex w-full items-center gap-2"><b className="min-w-0 flex-1 truncate text-slate-900">{other(c)}</b>{c.unread > 0 && <span className="rounded-full bg-brand-600 px-2 text-xs font-bold text-white">{c.unread}</span>}</span>
-              <span className="text-xs text-slate-600">{c.withPupil ? (pupil ? t('Your teacher') : `🎒 ${t('Pupil')}`) : t('About {name}', { name: c.studentName })} · {time(c.lastMessageAt)}</span>
+              <span className="text-xs text-slate-600">{c.withPupil ? (pupil ? t('Your teacher') : `🎒 ${t('Student')}`) : t('About {name}', { name: c.studentName })} · {time(c.lastMessageAt)}</span>
               <span className="w-full truncate text-xs text-slate-600">{c.lastMessage ?? '—'}</span></button></li>))}
           {list.data && !list.data.length && <li className="p-6 text-center text-sm text-slate-600">{t('No messages yet.')}</li>}
         </ul>
@@ -57,7 +57,7 @@ function Thread({ id, parent, pupil }: { id: string; parent?: boolean; pupil?: b
   };
   return (
     <div className="flex min-h-0 flex-col">
-      <div className="border-b border-slate-100 px-4 py-3 text-sm"><b>{parent ? d.staffName : d.readOnly ? `${d.staffName} ↔ ${d.parentName}` : d.parentName}</b> <span className="text-slate-600">· {d.withPupil ? (pupil ? t('Your teacher') : t('Pupil')) : t('About {name}', { name: d.studentName })}</span></div>
+      <div className="border-b border-slate-100 px-4 py-3 text-sm"><b>{parent ? d.staffName : d.readOnly ? `${d.staffName} ↔ ${d.parentName}` : d.parentName}</b> <span className="text-slate-600">· {d.withPupil ? (pupil ? t('Your teacher') : t('Student')) : t('About {name}', { name: d.studentName })}</span></div>
       <div className="max-h-[55vh] min-h-64 flex-1 space-y-2 overflow-y-auto bg-slate-50 p-4" aria-live="polite">
         {d.messages.map((m: any) => { const mine = m.senderId === d.me; return (
           <div key={m.id} className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
@@ -87,12 +87,12 @@ function StartDialog({ parent, pupil, onClose, onStarted }: { parent?: boolean; 
   const go = async (c: any) => { try { const r = await api.post<any>('/messages/conversations', { studentId: c.studentId, withId: c.id }); onStarted(r.id); } catch (e: any) { toast(e.message, 'err'); } };
   const list = (q.data ?? []).filter((c) => !filter || `${c.displayName} ${c.studentName}`.toLowerCase().includes(filter.toLowerCase()));
   return (
-    <Dialog open onOpenChange={onClose} title={t('New message')} description={pupil ? t('Your teachers and the school office.') : parent ? t('Your child’s teachers and the school office.') : 'Your pupils, and the parents of the pupils in your classes.'}>
-      {!parent && <Input aria-label="Search" placeholder="Search a parent or pupil" className="mb-2" value={filter} onChange={(e) => setFilter(e.target.value)} />}
-      {!q.data ? <PageLoader /> : !list.length ? <p className="text-sm text-slate-600">{pupil ? t('No teachers found yet.') : parent ? t('No teachers found for your child yet.') : 'No pupils or parent accounts in your classes yet.'}</p> : (
+    <Dialog open onOpenChange={onClose} title={t('New message')} description={pupil ? t('Your teachers and the school office.') : parent ? t('Your child’s teachers and the school office.') : 'Your students, and the parents of the students in your classes.'}>
+      {!parent && <Input aria-label="Search" placeholder="Search a parent or student" className="mb-2" value={filter} onChange={(e) => setFilter(e.target.value)} />}
+      {!q.data ? <PageLoader /> : !list.length ? <p className="text-sm text-slate-600">{pupil ? t('No teachers found yet.') : parent ? t('No teachers found for your child yet.') : 'No students or parent accounts in your classes yet.'}</p> : (
         <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">{list.map((c, i) => (
           <li key={i}><button onClick={() => go(c)} className="flex w-full items-center gap-3 px-3 py-2 text-start text-sm hover:bg-slate-50">
-            <span className="min-w-0 flex-1"><b className="block text-slate-900">{c.displayName}</b><span className="text-xs text-slate-600">{c.role === 'Pupil' ? `🎒 ${t('Pupil')}` : pupil ? t(c.role) : `${c.role} · ${t('About {name}', { name: c.studentName })}`}</span></span>
+            <span className="min-w-0 flex-1"><b className="block text-slate-900">{c.displayName}</b><span className="text-xs text-slate-600">{c.role === 'Student' ? `🎒 ${t('Student')}` : pupil ? t(c.role) : `${c.role} · ${t('About {name}', { name: c.studentName })}`}</span></span>
             <Send className="size-4 text-brand-600 rtl:-scale-x-100" /></button></li>))}</ul>)}
     </Dialog>
   );
@@ -115,7 +115,7 @@ export function Announcements({ canPost, classes, playful, limit }: { canPost?: 
             <div className={cn('font-semibold text-slate-900', playful && 'text-lg')}>{a.pinned && <Pin className="me-1 inline size-4 text-amber-600" />}{a.title}</div>
             {a.body && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{a.body}</p>}
             <p className="mt-1 text-xs text-slate-600">{[a.author, a.classId ? clsName({ name: a.className, section: a.section }) : t('Whole school'), fmtDate(a.createdAt)].filter(Boolean).join(' · ')}
-              {canPost && <> · {{ BOTH: 'pupils and parents', STUDENTS: 'pupils', PARENTS: 'parents' }[a.audience as string]}</>}</p></div>
+              {canPost && <> · {{ BOTH: 'students and parents', STUDENTS: 'students', PARENTS: 'parents' }[a.audience as string]}</>}</p></div>
             {canPost && a.mine && <button aria-label={`Remove ${a.title}`} onClick={async () => { await api.del(`/announcements/${a.id}`); qc.invalidateQueries({ queryKey: ['announcements'] }); toast('Removed'); }} className="text-slate-400 hover:text-red-600"><Trash2 className="size-4" /></button>}</div>
         </Card>))}
         {canPost && !items.length && <p className="text-sm text-slate-600">No announcements yet.</p>}</div>
@@ -129,11 +129,11 @@ function AnnounceDialog({ classes, onClose }: { classes: { id: string; label: st
   const qc = useQueryClient(); const toast = useToast(); const [busy, setBusy] = useState(false); const [err, setErr] = useState<unknown>(null);
   const save = async () => { setBusy(true); setErr(null); try { await api.post('/announcements', { ...f, classId: f.classId || null }); qc.invalidateQueries({ queryKey: ['announcements'] }); toast('Announcement sent'); onClose(); } catch (e) { setErr(e); } finally { setBusy(false); } };
   return (
-    <Dialog open onOpenChange={onClose} title="New announcement" description="Pupils see it in their portal; parents also get it on WhatsApp/SMS when that is set up.">
+    <Dialog open onOpenChange={onClose} title="New announcement" description="Students see it in their portal; parents also get it on WhatsApp/SMS when that is set up.">
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save(); }}>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="To"><Select value={f.classId} onChange={(e) => setF({ ...f, classId: e.target.value })}>{classes.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</Select></Field>
-          <Field label="Who"><Select value={f.audience} onChange={(e) => setF({ ...f, audience: e.target.value })}><option value="BOTH">Pupils and parents</option><option value="PARENTS">Parents only</option><option value="STUDENTS">Pupils only</option></Select></Field>
+          <Field label="Who"><Select value={f.audience} onChange={(e) => setF({ ...f, audience: e.target.value })}><option value="BOTH">Students and parents</option><option value="PARENTS">Parents only</option><option value="STUDENTS">Students only</option></Select></Field>
         </div>
         <Field label="Title"><Input required minLength={2} maxLength={160} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></Field>
         <Field label="Message"><Textarea rows={4} maxLength={4000} value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} /></Field>
@@ -175,7 +175,7 @@ function LiveDialog({ classes, onClose }: { classes: { id: string; label: string
   const local = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
   const [f, setF] = useState({ classId: classes[0]?.id ?? '', title: '', startsAt: local(soon), durationMin: 40, url: '', notes: '' });
   const qc = useQueryClient(); const toast = useToast(); const [busy, setBusy] = useState(false); const [err, setErr] = useState<unknown>(null);
-  const save = async () => { setBusy(true); setErr(null); try { await api.post('/live', { ...f, startsAt: new Date(f.startsAt).toISOString(), durationMin: Number(f.durationMin) }); qc.invalidateQueries({ queryKey: ['live'] }); toast('Live lesson scheduled — pupils and parents have been told'); onClose(); } catch (e) { setErr(e); } finally { setBusy(false); } };
+  const save = async () => { setBusy(true); setErr(null); try { await api.post('/live', { ...f, startsAt: new Date(f.startsAt).toISOString(), durationMin: Number(f.durationMin) }); qc.invalidateQueries({ queryKey: ['live'] }); toast('Live lesson scheduled — students and parents have been told'); onClose(); } catch (e) { setErr(e); } finally { setBusy(false); } };
   return (
     <Dialog open onOpenChange={onClose} title="Schedule a live lesson" description="Create the meeting in Zoom, Google Meet or Teams first, then paste its link here.">
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save(); }}>

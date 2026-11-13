@@ -138,10 +138,10 @@ export function StructureTab({ tree }: { tree: EditionTree }) {
 function RemovePartDialog({ comp, published, loading, onCancel, onConfirm }: { comp: Component; published: boolean; loading: boolean; onCancel: () => void; onConfirm: () => void }) {
   const lessons = comp.units.reduce((n, u) => n + u.lessons.length, 0);
   return (
-    <Dialog open onOpenChange={onCancel} title={`Remove “${comp.title}”?`} description="The part disappears from this edition for publisher, teachers and pupils.">
+    <Dialog open onOpenChange={onCancel} title={`Remove “${comp.title}”?`} description="The part disappears from this edition for publisher, teachers and students.">
       <div className="space-y-3 text-sm text-slate-700">
         {(comp.units.length > 0 || lessons > 0) && <p>It has <b>{comp.units.length} units</b> and <b>{lessons} lessons</b>; these and the files linked to them go too.</p>}
-        {published && <p className="rounded-lg bg-amber-50 p-3 text-amber-900">This edition is published. Pupils lose their reading place and bookmarks in this part. Licences for the edition stay valid.</p>}
+        {published && <p className="rounded-lg bg-amber-50 p-3 text-amber-900">This edition is published. Students lose their reading place and bookmarks in this part. Licences for the edition stay valid.</p>}
         <p>You can add the part again later with “Add part”, but its contents would need uploading again.</p>
         <div className="flex justify-end gap-2"><Button variant="secondary" onClick={onCancel}>Keep it</Button>
           <Button variant="danger" loading={loading} onClick={onConfirm}><Trash2 className="size-4" />Remove part</Button></div>
@@ -583,7 +583,7 @@ function MobileAppRow({ comp, readOnly }: { comp: Component; readOnly: boolean }
     <div className="space-y-3 rounded-lg border border-dashed border-emerald-300 bg-emerald-50/60 p-4 text-sm">
       <div className="flex flex-wrap items-center gap-3"><span className="text-xl" aria-hidden>📱</span>
         <div className="min-w-[14rem] flex-1">{q.data.apkName ? <><b>Android app:</b> {q.data.apkName} · {fmtBytes(q.data.apkSize)}</> : <span className="text-slate-700">No Android app file yet. Upload the <b>.apk</b>, and/or add store links below.</span>}
-          <span className="block text-xs text-slate-600">Pupils with a licence see a QR code in the book to install the app on a phone. The app is the only thing pupils can download.</span></div>
+          <span className="block text-xs text-slate-600">Students with a licence see a QR code in the book to install the app on a phone. The app is the only thing students can download.</span></div>
         {pct !== null && <span className="text-xs">{pct}%</span>}
         {!readOnly && <><input ref={input} type="file" accept=".apk,application/vnd.android.package-archive" hidden onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ''; }} />
           <Button size="sm" variant="secondary" loading={pct !== null} onClick={() => input.current?.click()}><UploadCloud className="size-4" />{q.data.apkName ? 'Replace .apk' : 'Upload .apk'}</Button>
@@ -593,7 +593,7 @@ function MobileAppRow({ comp, readOnly }: { comp: Component; readOnly: boolean }
         <Field label="Google Play link (optional)"><Input disabled={readOnly} placeholder="https://play.google.com/store/apps/…" value={f.androidUrl} onChange={(e) => setF({ ...f, androidUrl: e.target.value })} /></Field>
         <Field label="App Store link for iPhone (optional)"><Input disabled={readOnly} placeholder="https://apps.apple.com/…" value={f.iosUrl} onChange={(e) => setF({ ...f, iosUrl: e.target.value })} /></Field>
         <Field label="Version"><Input disabled={readOnly} maxLength={40} value={f.version} onChange={(e) => setF({ ...f, version: e.target.value })} /></Field>
-        <Field label="Note for pupils"><Input disabled={readOnly} maxLength={1000} placeholder="e.g. Scan the pictures in your book with the app" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
+        <Field label="Note for students"><Input disabled={readOnly} maxLength={1000} placeholder="e.g. Scan the pictures in your book with the app" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
       </div>
       {!readOnly && <div className="flex justify-end"><Button size="sm" onClick={async () => { try { set(await api.put(`/publishing/components/${comp.id}/app`, f)); toast('Saved'); } catch (e: any) { toast(e.message, 'err'); } }}>Save app details</Button></div>}
     </div>
