@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, Injectable, Module, NotFoundException, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Length, Min, ValidateNested } from 'class-validator';
 import { sql } from 'drizzle-orm';
@@ -10,7 +11,7 @@ import { LmsModule } from '../lms/lms.module';
 
 const Id = () => new ParseUUIDPipe();
 const arr = (ids: string[]) => `{${ids.join(',')}}`;
-const KINDS = ['pts', 'undo', 'clear', 'bg', 'text'] as const;
+const KINDS = ['pts', 'undo', 'clear', 'bg', 'text', 'shape'] as const;
 type Kind = (typeof KINDS)[number];
 
 class CreateBoardDto {
@@ -44,9 +45,16 @@ function clean(kind: Kind, d: Record<string, any>): Record<string, any> {
       const s = String(d.s ?? '').slice(0, 300); if (!s.trim()) throw new BadRequestException('Empty text');
       return { id, x: d.x, y: d.y, s, c: color(d.c), w: Math.min(120, Math.max(8, Number(d.w) || 28)) };
     }
+    case 'shape': {
+      const id = sid(d.id); if (!id) throw new BadRequestException('Shape id missing');
+      if (!['line', 'arrow', 'rect', 'ellipse'].includes(d.s)) throw new BadRequestException('Unknown shape');
+      const pt = (q: any) => { if (!Array.isArray(q) || !n01(q[0]) || !n01(q[1])) throw new BadRequestException('Bad point'); return [Math.round(q[0] * 1e4) / 1e4, Math.round(q[1] * 1e4) / 1e4]; };
+      return { id, s: d.s, a: pt(d.a), b: pt(d.b), c: color(d.c), w: Math.min(40, Math.max(1, Number(d.w) || 3)), f: d.f === true };
+    }
     case 'undo': { const id = sid(d.id); if (!id) throw new BadRequestException('Nothing to undo'); return { id }; }
     case 'clear': return {};
-    case 'bg': return { componentId: typeof d.componentId === 'string' && /^[0-9a-f-]{36}$/.test(d.componentId) ? d.componentId : null, page: Number.isInteger(d.page) && d.page > 0 ? d.page : null };
+    case 'bg': return { componentId: typeof d.componentId === 'string' && /^[0-9a-f-]{36}$/.test(d.componentId) ? d.componentId : null, page: Number.isInteger(d.page) && d.page > 0 && d.page < 100000 ? d.page : null,
+      ...(['plain', 'dots', 'grid', 'lines', 'kg'].includes(d.paper) ? { paper: d.paper } : {}) };
   }
 }
 
@@ -117,6 +125,11 @@ export class WhiteboardService {
 
   async ops(id: string, after = 0) {
     const b = await this.board(id); await this.canSee(b);
+    // Students following a live board count as "watching" (refreshed at most every few seconds).
+    if (b.live && this.access.is('STUDENT') && !this.access.is('TEACHER')) {
+      await this.db.q.execute(sql`INSERT INTO whiteboard_viewers (board_id, user_id, publisher_id, school_id) VALUES (${id}, ${this.ctx.userId}, ${b.publisher_id}, ${b.school_id})
+        ON CONFLICT (board_id, user_id) DO UPDATE SET last_seen = now() WHERE whiteboard_viewers.last_seen < now() - interval '5 seconds'`);
+    }
     const ops = await this.rows(sql`SELECT seq::int AS seq, kind, data FROM whiteboard_ops WHERE board_id = ${id} AND seq > ${after} ORDER BY seq LIMIT 3000`);
     return { live: b.live, seq: Number(b.seq), componentId: b.component_id, page: b.page, ops };
   }
@@ -129,13 +142,22 @@ export class WhiteboardService {
     const bg = [...ops].reverse().find((o) => o.kind === 'bg');
     // Reserve sequence numbers on the board row (serialises concurrent writers).
     const [r] = await this.rows(sql`UPDATE whiteboards SET seq = seq + ${ops.length}, updated_at = now()
-      ${bg ? sql`, component_id = ${bg.data.componentId}, page = ${bg.data.page}` : sql``} WHERE id = ${id} RETURNING seq::int AS seq`);
+      ${bg?.data.componentId ? sql`, component_id = ${bg.data.componentId}, page = ${bg.data.page}` : sql``} WHERE id = ${id} RETURNING seq::int AS seq`);
     const first = r.seq - ops.length + 1;
     for (const [i, o] of ops.entries()) {
       await this.db.q.execute(sql`INSERT INTO whiteboard_ops (board_id, seq, publisher_id, school_id, kind, data)
         VALUES (${id}, ${first + i}, ${b.publisher_id}, ${b.school_id}, ${o.kind}, ${JSON.stringify(o.data)}::jsonb)`);
     }
     return { seq: r.seq };
+  }
+
+  /** Students who looked at the live board in the last 20 seconds. */
+  async watchers(id: string) {
+    const b = await this.board(id); await this.canWrite(b);
+    const rows = await this.rows(sql`SELECT u.display_name AS name FROM whiteboard_viewers v JOIN users u ON u.id = v.user_id
+      WHERE v.board_id = ${id} AND v.last_seen > now() - interval '20 seconds' ORDER BY u.display_name`);
+    const [{ n }] = await this.rows(sql`SELECT count(*)::int AS n FROM enrolments WHERE class_id = ${b.class_id}`);
+    return { watching: rows.length, classSize: n, names: rows.map((r) => r.name) };
   }
 
   async setLive(id: string, live: boolean) {
@@ -158,8 +180,10 @@ export class WhiteboardController {
   @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT') @Get() list(@Query() q: ListQuery) { return this.svc.list(!!q.live); }
   @Roles('SCHOOL_ADMIN', 'TEACHER') @Post() create(@Body() d: CreateBoardDto) { return this.svc.create(d); }
   @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT') @Get(':id') get(@Param('id', Id()) id: string) { return this.svc.get(id); }
-  @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT') @Get(':id/ops') ops(@Param('id', Id()) id: string, @Query() q: OpsQuery) { return this.svc.ops(id, q.after ?? 0); }
+  /** Polled about once a second by every watching student, so it is not rate limited like other calls. */
+  @SkipThrottle() @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT') @Get(':id/ops') ops(@Param('id', Id()) id: string, @Query() q: OpsQuery) { return this.svc.ops(id, q.after ?? 0); }
   @Roles('SCHOOL_ADMIN', 'TEACHER') @Post(':id/ops') @HttpCode(200) write(@Param('id', Id()) id: string, @Body() d: OpsDto) { return this.svc.write(id, d); }
+  @Roles('SCHOOL_ADMIN', 'TEACHER') @Get(':id/watchers') watchers(@Param('id', Id()) id: string) { return this.svc.watchers(id); }
   @Roles('SCHOOL_ADMIN', 'TEACHER') @Post(':id/end') @HttpCode(200) end(@Param('id', Id()) id: string) { return this.svc.setLive(id, false); }
   @Roles('SCHOOL_ADMIN', 'TEACHER') @Post(':id/resume') @HttpCode(200) resume(@Param('id', Id()) id: string) { return this.svc.setLive(id, true); }
   @Roles('SCHOOL_ADMIN', 'TEACHER') @Delete(':id') remove(@Param('id', Id()) id: string) { return this.svc.remove(id); }

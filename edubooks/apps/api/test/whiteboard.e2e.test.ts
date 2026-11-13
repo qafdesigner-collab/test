@@ -35,6 +35,22 @@ describe('Live whiteboard', () => {
     expect(fresh.ops).toEqual([{ seq: 4, kind: 'undo', data: { id: 't1' } }]);
   });
 
+  it('shapes and blank pages; the teacher sees who is watching', async () => {
+    const w = await teacher.post(`/api/whiteboards/${boardId}/ops`).send({ ops: [
+      { kind: 'shape', data: { id: 'sh1', s: 'arrow', a: [0.1, 0.1], b: [0.5, 0.4], c: '#16a34a', w: 4 } },
+      { kind: 'bg', data: { componentId: null, page: 2 } },
+      { kind: 'shape', data: { id: 'sh2', s: 'ellipse', a: [0.2, 0.2], b: [0.3, 0.3], c: '#dc2626', w: 3, f: true } },
+    ] });
+    expect(w.status).toBe(200);
+    expect((await teacher.post(`/api/whiteboards/${boardId}/ops`).send({ ops: [{ kind: 'shape', data: { id: 'x', s: 'star', a: [0, 0], b: [1, 1] } }] })).status).toBe(400);
+    const got = (await student.get(`/api/whiteboards/${boardId}/ops?after=4`)).body.ops;
+    expect(got.map((o: any) => o.kind)).toEqual(['shape', 'bg', 'shape']);
+    expect(got[2].data).toMatchObject({ s: 'ellipse', f: true });
+    const wt = (await teacher.get(`/api/whiteboards/${boardId}/watchers`)).body;
+    expect(wt.watching).toBeGreaterThanOrEqual(1); expect(wt.names).toContain('Sample Student 1');
+    expect((await student.get(`/api/whiteboards/${boardId}/watchers`)).status).toBe(403);
+  });
+
   it('rejects bad drawing data and writes by students', async () => {
     expect((await teacher.post(`/api/whiteboards/${boardId}/ops`).send({ ops: [{ kind: 'pts', data: { id: 's2', p: [[5, 5]] } }] })).status).toBe(400);
     expect((await teacher.post(`/api/whiteboards/${boardId}/ops`).send({ ops: [{ kind: 'script', data: {} }] })).status).toBe(400);

@@ -288,6 +288,13 @@
       "when": 1794840000000,
       "tag": "0040_book_grades",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794870000000,
+      "tag": "0041_whiteboard_v2",
+      "breakpoints": true
     }
   ]
 }
