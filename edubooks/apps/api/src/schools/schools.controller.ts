@@ -5,6 +5,7 @@ import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsIn, IsInt, IsOptio
 import { Roles } from '../common/decorators';
 import { PageQuery } from '../common/pagination';
 import { SchoolsService } from './schools.service';
+import { SchoolUsersService } from './school-users.service';
 import { LicensingService } from '../licensing/licensing.service';
 
 class EraseDto { @IsString() @MaxLength(60) confirmUsername: string }
@@ -50,9 +51,12 @@ const Id = () => new ParseUUIDPipe();
 const SALES = ['PUBLISHER_ADMIN', 'PUBLISHER_SALES'];
 
 @ApiTags('schools (publisher)')
+class SchoolLoginsQuery { @IsIn(['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PARENT']) role!: 'STUDENT' | 'TEACHER' | 'SCHOOL_ADMIN' | 'PARENT'; @IsOptional() @IsUUID() classId?: string; }
+class SchoolResetDto { @IsIn(['STUDENT', 'TEACHER']) role!: 'STUDENT' | 'TEACHER'; @IsOptional() @IsUUID() classId?: string; @IsOptional() @IsArray() @ArrayMaxSize(600) @IsUUID('all', { each: true }) userIds?: string[]; }
+
 @Controller('schools')
 export class SchoolsController {
-  constructor(private readonly svc: SchoolsService, private readonly licensing: LicensingService) {}
+  constructor(private readonly svc: SchoolsService, private readonly licensing: LicensingService, private readonly users: SchoolUsersService) {}
   @Roles('PUBLISHER_ADMIN') @Post(':id/students/:studentId/erase') erase(@Param('id', ParseUUIDPipe) id: string, @Param('studentId', ParseUUIDPipe) studentId: string, @Body() d: EraseDto) {
     return this.licensing.eraseStudent(id, studentId, d.confirmUsername);
   }
@@ -64,7 +68,9 @@ export class SchoolsController {
   @Roles('PUBLISHER_ADMIN') @Post(':id/suspend') suspend(@Param('id', Id()) id: string, @Body() d: ReasonDto) { return this.svc.setStatus(id, 'SUSPENDED', d.reason); }
   @Roles('PUBLISHER_ADMIN') @Post(':id/reactivate') reactivate(@Param('id', Id()) id: string) { return this.svc.setStatus(id, 'ACTIVE'); }
   @Roles(...SALES) @Post(':id/academic-years') addYear(@Param('id', Id()) id: string, @Body() d: AcademicYearDto) { return this.svc.addAcademicYear(id, d); }
-  @Roles('PUBLISHER_ADMIN') @Post(':id/admins/:userId/reset-password') reset(@Param('id', Id()) id: string, @Param('userId', Id()) userId: string) { return this.svc.resetAdminPassword(id, userId); }
+  @Roles('PUBLISHER_ADMIN') @Get(':id/logins') logins(@Param('id', Id()) id: string, @Query() q: SchoolLoginsQuery) { return this.users.loginList(id, q.role, q.classId); }
+  @Roles('PUBLISHER_ADMIN') @Post(':id/logins/reset') resetLogins(@Param('id', Id()) id: string, @Body() d: SchoolResetDto) { return this.users.resetMany(id, d.role, d); }
+    @Roles('PUBLISHER_ADMIN') @Post(':id/admins/:userId/reset-password') reset(@Param('id', Id()) id: string, @Param('userId', Id()) userId: string) { return this.svc.resetAdminPassword(id, userId); }
   @Roles('PUBLISHER_ADMIN') @Post(':id/convert-demo') convert(@Param('id', Id()) id: string) { return this.svc.convertDemo(id); }
   @Roles(...SALES) @Post(':id/extend-demo') extend(@Param('id', Id()) id: string, @Body() d: ExtendDto) { return this.svc.extendDemo(id, d.days); }
 }

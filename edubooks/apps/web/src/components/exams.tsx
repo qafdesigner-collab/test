@@ -3,11 +3,11 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, FileKey, Plus, Printer, Shuffle, Sparkles, Trash2 } from 'lucide-react';
-import { api, fmtDay } from '@/lib/api';
+import { ArrowDown, ArrowUp, Download, FileKey, Plus, Printer, Shuffle, Sparkles, Trash2 } from 'lucide-react';
+import { api, downloadCsv, fmtDay } from '@/lib/api';
 import { className as clsName } from '@/lib/lms';
 import { useBranding } from '@/lib/branding';
-import { printExamPaper } from '@/lib/print-docs';
+import { printExamPaper, printResultSheet } from '@/lib/print-docs';
 import { Badge, Button, Card, Dialog, ErrorBox, Field, Input, PageLoader, Select, Textarea, cn } from '@/components/ui';
 import { PageHeader } from '@/components/common';
 import { useToast } from '@/components/ui/toast';
@@ -66,7 +66,7 @@ type Item = { section: string; type: string; prompt: string; options: string[]; 
 /** One exam: paper editor, printing, and marks. */
 export function ExamWorkspace({ id, back }: { id: string; back: string }) {
   const q = useQuery({ queryKey: ['exam', id], queryFn: () => api.get<any>(`/exams/${id}`) });
-  const [tab, setTab] = useState<'paper' | 'marks'>('paper');
+  const [tab, setTab] = useState<'paper' | 'marks' | 'results'>('paper');
   const brand = useBranding(); const qc = useQueryClient(); const toast = useToast(); const router = useRouter();
   if (q.error) return <ErrorBox error={q.error} />;
   if (!q.data) return <PageLoader />;
@@ -89,9 +89,9 @@ export function ExamWorkspace({ id, back }: { id: string; back: string }) {
         {!locked && e.marked === undefined && null}
         {!locked && <Button variant="ghost" onClick={() => confirm('Delete this exam?') && act(async () => { await api.del(`/exams/${id}`); router.push(back); }, 'Exam deleted')}><Trash2 className="size-4" />Delete</Button>}
       </div>
-      <div role="tablist" className="flex w-fit rounded-lg bg-slate-100 p-1 text-sm">{([['paper', 'Question paper'], ['marks', 'Marks & results']] as const).map(([k, l]) => (
+      <div role="tablist" className="flex w-fit rounded-lg bg-slate-100 p-1 text-sm">{([['paper', 'Question paper'], ['marks', 'Enter marks'], ['results', 'Results']] as const).map(([k, l]) => (
         <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={cn('rounded-md px-3 py-1.5 font-medium', tab === k ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600')}>{l}</button>))}</div>
-      {tab === 'paper' ? <PaperEditor exam={e} locked={locked} /> : <MarksEntry examId={id} />}
+      {tab === 'paper' ? <PaperEditor exam={e} locked={locked} /> : tab === 'marks' ? <MarksEntry examId={id} /> : <ExamResults examId={id} />}
     </div>
   );
 }
@@ -255,5 +255,52 @@ function MarksEntry({ examId }: { examId: string }) {
         {pub ? <Button variant="secondary" onClick={() => publish(false)}>Withdraw results</Button> : <Button onClick={() => publish(true)} disabled={!entered}>Publish results</Button>}
       </div>
     </Card>
+  );
+}
+
+const RES_CLS: Record<string, string> = { PASS: 'bg-emerald-100 text-emerald-800', FAIL: 'bg-red-100 text-red-700', ABSENT: 'bg-slate-100 text-slate-600', PENDING: 'bg-amber-50 text-amber-700' };
+const RES_LABEL: Record<string, string> = { PASS: 'Pass', FAIL: 'Fail', ABSENT: 'Absent', PENDING: 'No marks yet' };
+
+/** Class result sheet: pass/fail against the pass mark, grade and position; print it or save it. */
+function ExamResults({ examId }: { examId: string }) {
+  const q = useQuery({ queryKey: ['examMarks', examId], queryFn: () => api.get<any>(`/exams/${examId}/marks`) });
+  const qc = useQueryClient(); const toast = useToast(); const brand = useBranding();
+  const [pass, setPass] = useState<string>(''); const [filter, setFilter] = useState<'ALL' | 'PASS' | 'FAIL' | 'ABSENT'>('ALL');
+  useEffect(() => { if (q.data) setPass(String(q.data.passPercent)); }, [q.data?.passPercent]); // eslint-disable-line
+  if (q.error) return <ErrorBox error={q.error} />;
+  if (!q.data) return <PageLoader />;
+  const d = q.data; const st = d.stats;
+  const savePass = async () => { const n = Math.min(100, Math.max(0, Number(pass) || 0)); try { await api.patch(`/exams/${examId}`, { passPercent: n }); qc.invalidateQueries({ queryKey: ['examMarks', examId] }); toast(`Pass mark set to ${n}%`); } catch (e: any) { toast(e.message, 'err'); } };
+  const cls = [d.className, d.classSection].filter(Boolean).join(' ');
+  const rows = d.roster.filter((r: any) => filter === 'ALL' || r.result === filter);
+  const print = () => printResultSheet({ title: d.title, kind: 'Exam', school: d.school, className: cls, subject: d.subject, term: d.term, date: d.examDate, total: d.total, passPercent: d.passPercent,
+    rows: d.roster.map((r: any) => ({ name: r.displayName, username: r.username, marks: r.absent ? null : r.marks, percent: r.percent, grade: r.grade, result: r.result, rank: r.rank, remarks: r.remarks })), stats: st }, brand);
+  const save = () => downloadCsv(`${d.title.replace(/[^\w -]+/g, '')} - results.csv`, d.roster.map((r: any, i: number) => ({ no: i + 1, pupil: r.displayName, login: r.username, marks: r.absent ? 'absent' : r.marks ?? '', outOf: d.total, percent: r.percent ?? '', grade: r.grade ?? '', result: RES_LABEL[r.result], position: r.rank ?? '', remark: r.remarks ?? '' })));
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {[['Pupils', d.roster.length, 'text-slate-900'], ['Passed', st?.passed ?? 0, 'text-emerald-700'], ['Failed', st?.failed ?? 0, 'text-red-600'], ['Absent', st?.absent ?? 0, 'text-slate-600'], ['Average', st ? `${st.average} / ${d.total}` : '—', 'text-violet-700']].map(([l, v, c]) => (
+          <Card key={l as string} className="p-4"><div className="text-xs font-medium text-slate-500">{l}</div><div className={cn('mt-1 text-2xl font-bold', c as string)}>{v}</div></Card>))}
+      </div>
+      <Card className="flex flex-wrap items-end gap-3 p-4">
+        <label className="text-sm text-slate-700">Pass mark (%)<div className="mt-1 flex gap-2"><Input type="number" min={0} max={100} className="h-9 w-24" value={pass} onChange={(e) => setPass(e.target.value)} /><Button size="sm" variant="secondary" onClick={savePass}>Apply</Button></div></label>
+        <div className="flex gap-1 rounded-lg bg-slate-100 p-1 text-sm" role="tablist">{(['ALL', 'PASS', 'FAIL', 'ABSENT'] as const).map((k) => (
+          <button key={k} role="tab" aria-selected={filter === k} onClick={() => setFilter(k)} className={cn('rounded-md px-3 py-1 font-medium', filter === k ? 'bg-white shadow-sm' : 'text-slate-600')}>{k === 'ALL' ? 'Everyone' : RES_LABEL[k]}</button>))}</div>
+        <span className="flex-1" />
+        <Button variant="secondary" onClick={save}><Download className="size-4" />Save (Excel / CSV)</Button>
+        <Button onClick={print}><Printer className="size-4" />Print result sheet</Button>
+      </Card>
+      <Card className="overflow-x-auto">
+        <table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs text-slate-600"><tr><th className="px-4 py-2">#</th><th className="px-4 py-2">Pupil</th><th className="px-4 py-2">Marks</th><th className="px-4 py-2">%</th><th className="px-4 py-2">Grade</th><th className="px-4 py-2">Result</th><th className="px-4 py-2">Position</th><th className="px-4 py-2">Remark</th></tr></thead>
+          <tbody className="divide-y divide-slate-100">{rows.map((r: any, i: number) => (
+            <tr key={r.id}><td className="px-4 py-2 text-slate-500">{i + 1}</td><td className="px-4 py-2 font-medium">{r.displayName}</td>
+              <td className="px-4 py-2 tabular-nums">{r.absent ? '—' : r.marks ?? '—'}<span className="text-slate-400"> / {d.total}</span></td>
+              <td className="px-4 py-2 tabular-nums">{r.percent === null ? '—' : `${r.percent}%`}</td><td className="px-4 py-2 font-semibold">{r.grade ?? '—'}</td>
+              <td className="px-4 py-2"><span className={cn('rounded-full px-2.5 py-0.5 text-xs font-bold', RES_CLS[r.result])}>{RES_LABEL[r.result]}</span></td>
+              <td className="px-4 py-2 tabular-nums">{r.rank ?? '—'}</td><td className="px-4 py-2 text-slate-600">{r.remarks}</td></tr>))}
+            {!rows.length && <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Nobody here.</td></tr>}</tbody></table>
+      </Card>
+      <p className="text-xs text-slate-500">Results stay here in your account. Print the sheet (or choose “Save as PDF” in the print window), or save it for Excel. {d.status !== 'PUBLISHED' && 'Pupils and parents see their results after you publish them on the Enter marks tab.'}</p>
+    </div>
   );
 }

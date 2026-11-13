@@ -122,6 +122,35 @@ export class SchoolUsersService {
     return { ok: true };
   }
 
+  /** Login details for a whole role (optionally one class). Passwords are stored only as hashes, so they are never in this list. */
+  async loginList(schoolId: string, role: 'STUDENT' | 'TEACHER' | 'SCHOOL_ADMIN' | 'PARENT', classId?: string) {
+    const { rows: [school] } = await this.q.execute(sql`SELECT name, code::text AS code FROM schools WHERE id = ${schoolId}`) as any;
+    if (!school) throw new NotFoundException('School not found');
+    const { rows } = await this.q.execute(sql`SELECT u.id, u.display_name AS "displayName", u.username::text AS username, u.email::text AS email, u.designation, u.status, u.last_login_at AS "lastLoginAt",
+        (SELECT string_agg(c.name || CASE WHEN c.section <> '' THEN ' ' || c.section ELSE '' END, ', ') FROM enrolments e JOIN classes c ON c.id = e.class_id AND NOT c.archived WHERE e.student_id = u.id) AS "className"
+      FROM users u WHERE u.school_id = ${schoolId} AND EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role = ${role})
+        ${classId ? sql`AND EXISTS (SELECT 1 FROM enrolments e WHERE e.student_id = u.id AND e.class_id = ${classId})` : sql``}
+      ORDER BY "className" NULLS LAST, u.display_name`);
+    return { school: { name: school.name, code: school.code }, role, items: rows };
+  }
+
+  /** New passwords for many accounts at once (e.g. a class at the start of term). Returned once, for printing login cards. */
+  async resetMany(schoolId: string, role: 'STUDENT' | 'TEACHER', opts: { classId?: string; userIds?: string[] }) {
+    const list = (await this.loginList(schoolId, role, opts.classId)).items as any[];
+    const chosen = (opts.userIds?.length ? list.filter((u) => opts.userIds!.includes(u.id)) : list).filter((u) => u.status === 'ACTIVE');
+    if (!chosen.length) throw new BadRequestException('Nobody to give new passwords to');
+    if (chosen.length > 600) throw new BadRequestException('At most 600 accounts at a time — choose one class');
+    const out: { id: string; displayName: string; username: string; password: string; className: string | null; role: string }[] = [];
+    for (const u of chosen) {
+      const password = friendlyPassword();
+      await this.q.update(users).set({ passwordHash: await hashPassword(password), mustChangePassword: role === 'TEACHER', failedLogins: 0, lockedUntil: null, updatedAt: new Date() }).where(eq(users.id, u.id));
+      await this.q.update(sessions).set({ revokedAt: new Date() }).where(and(eq(sessions.userId, u.id), sql`revoked_at IS NULL`));
+      out.push({ id: u.id, displayName: u.displayName, username: u.username, password, className: u.className, role: role === 'TEACHER' ? 'Teacher' : 'Student' });
+    }
+    await this.audit.log('school.user.reset_passwords', 'school', schoolId, `New passwords for ${out.length} ${role.toLowerCase()} account(s)${opts.classId ? ' in one class' : ''}`, undefined, out.map((o) => ({ id: o.id, username: o.username })), schoolId);
+    return out;
+  }
+
   async resetPassword(schoolId: string, id: string) {
     const u = await this.user(schoolId, id);
     const password = friendlyPassword();

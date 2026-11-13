@@ -38,6 +38,8 @@ class UpdateUserDto {
   @IsOptional() @IsString() @MaxLength(200) email?: string;
   @IsOptional() @IsString() @MaxLength(80) designation?: string;
 }
+class LoginsQuery { @IsIn(['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PARENT']) role!: 'STUDENT' | 'TEACHER' | 'SCHOOL_ADMIN' | 'PARENT'; @IsOptional() @IsUUID() classId?: string; }
+export class ResetLoginsDto { @IsIn(['STUDENT', 'TEACHER']) role!: 'STUDENT' | 'TEACHER'; @IsOptional() @IsUUID() classId?: string; @IsOptional() @IsArray() @ArrayMaxSize(600) @IsUUID('all', { each: true }) userIds?: string[]; }
 class AssignDto { @IsArray() @ArrayMinSize(1) @ArrayMaxSize(1000) @IsUUID('all', { each: true }) userIds: string[]; }
 class TransferDto { @IsUUID() assignmentId: string; @IsUUID() toUserId: string; @IsString() @Length(3, 500) reason: string; }
 class ReasonDto { @IsOptional() @IsString() @MaxLength(500) reason?: string; }
@@ -81,7 +83,9 @@ export class SchoolAdminController {
   @Post('users') create(@Ctx() c: TenantCtx, @Body() d: CreateUsersDto) { return this.users.create(this.sid(c), d.role, d.users); }
   @Post('users/import') import(@Ctx() c: TenantCtx, @Body() d: ImportDto) { return this.users.create(this.sid(c), d.role, this.users.parseCsv(d.csv)); }
   @Patch('users/:id') update(@Ctx() c: TenantCtx, @Param('id', Id()) id: string, @Body() d: UpdateUserDto) { return this.users.update(this.sid(c), id, d); }
-  @Post('users/:id/reset-password') reset(@Ctx() c: TenantCtx, @Param('id', Id()) id: string) { return this.users.resetPassword(this.sid(c), id); }
+  @Get('logins') logins(@Ctx() c: TenantCtx, @Query() q: LoginsQuery) { return this.users.loginList(this.sid(c), q.role, q.classId); }
+  @Post('logins/reset') resetLogins(@Ctx() c: TenantCtx, @Body() d: ResetLoginsDto) { return this.users.resetMany(this.sid(c), d.role, d); }
+    @Post('users/:id/reset-password') reset(@Ctx() c: TenantCtx, @Param('id', Id()) id: string) { return this.users.resetPassword(this.sid(c), id); }
 
   @Get('pools') pools(@Ctx() c: TenantCtx) { return this.licensing.listPools({ schoolId: this.sid(c) }); }
   @Get('pools/:id') pool(@Param('id', Id()) id: string) { return this.licensing.getPool(id); }

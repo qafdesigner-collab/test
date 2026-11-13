@@ -58,11 +58,11 @@ export const Td = ({ children, className }: { children?: React.ReactNode; classN
 
 export interface Credential { role?: string; displayName: string; username: string; password: string; className?: string | null }
 /** Shows freshly generated logins ONCE, with print / CSV / copy. */
-export function CredentialsDialog({ title, schoolCode, creds, onClose, note }: { title: string; schoolCode?: string; creds: Credential[]; onClose: () => void; note?: string }) {
+export function CredentialsDialog({ title, schoolCode, schoolName, creds, onClose, note }: { title: string; schoolCode?: string; schoolName?: string; creds: Credential[]; onClose: () => void; note?: string }) {
   const toast = useToast();
   const { data: me } = useMe();
   const brand = useBranding();
-  const print = () => printLoginCards(creds, { code: schoolCode, name: me?.school?.name }, brand).catch((e) => toast(e.message, 'err'));
+  const print = () => printLoginCards(creds, { code: schoolCode, name: schoolName ?? me?.school?.name }, brand).catch((e) => toast(e.message, 'err'));
   const text = creds.map((c) => `${c.displayName}${c.role ? ` (${c.role})` : ''} — school code ${schoolCode ?? ''}, username ${c.username}, password ${c.password}`).join('\n');
   return (
     <Dialog open onOpenChange={onClose} title={title} description={note ?? 'Passwords are shown only now. Print or download them before closing.'} wide>
@@ -74,7 +74,7 @@ export function CredentialsDialog({ title, schoolCode, creds, onClose, note }: {
       {schoolCode && <p className="mt-3 text-sm text-slate-600">School code: <b className="font-mono">{schoolCode}</b></p>}
       <div className="mt-4 flex flex-wrap justify-end gap-2">
         <Button variant="secondary" onClick={() => navigator.clipboard.writeText(text).then(() => toast('Copied'))}><Copy className="size-4" />Copy</Button>
-        <Button variant="secondary" onClick={() => downloadCsv('logins.csv', creds.map((c) => ({ name: c.displayName, role: c.role ?? '', schoolCode: schoolCode ?? '', username: c.username, password: c.password })))}><Download className="size-4" />CSV</Button>
+        <Button variant="secondary" onClick={() => downloadCsv('logins.csv', creds.map((c) => ({ name: c.displayName, role: c.role ?? '', class: c.className ?? '', schoolCode: schoolCode ?? '', username: c.username, password: c.password })))}><Download className="size-4" />CSV</Button>
         <Button onClick={print}><Printer className="size-4" />Print login cards</Button>
       </div>
     </Dialog>

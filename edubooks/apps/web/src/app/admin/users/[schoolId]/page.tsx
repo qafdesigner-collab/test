@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, FolderOpen, GraduationCap, HeartHandshake, LogIn, ShieldCheck, Users } from 'lucide-react';
+import { ArrowLeft, FolderOpen, GraduationCap, HeartHandshake, KeyRound, LogIn, ShieldCheck, Users } from 'lucide-react';
+import { LoginsDialog } from '@/components/logins-download';
 import { api, fmtDay, qs } from '@/lib/api';
 import { useToast } from '@/components/ui/toast';
 import { Button, Card, ErrorBox, Input, PageLoader, Pagination } from '@/components/ui';
@@ -23,7 +24,7 @@ export default function SchoolUsers() {
   const q = useQuery({ queryKey: ['schoolUsersAdmin', schoolId, f], queryFn: () => api.get<any>(`/admin/users${qs({ schoolId, ...f, pageSize: 50 })}`), placeholderData: keepPreviousData });
   const schools = useQuery({ queryKey: ['userSchools'], queryFn: () => api.get<any[]>('/admin/users/schools') });
   const counts = schools.data?.find((s) => s.id === schoolId);
-  const toast = useToast(); const qc = useQueryClient(); const [busy, setBusy] = useState<string | null>(null);
+  const toast = useToast(); const qc = useQueryClient(); const [busy, setBusy] = useState<string | null>(null); const [logins, setLogins] = useState(false);
   const tab = TABS.find((t) => t.role === f.role)!;
   const loginAs = async (u: any) => {
     setBusy(u.id);
@@ -50,6 +51,8 @@ export default function SchoolUsers() {
           );
         })}
       </div>
+      <div className="flex flex-wrap items-center gap-2"><Button variant="secondary" onClick={() => setLogins(true)}><KeyRound className="size-4" />Download {tab.label.toLowerCase()} logins</Button></div>
+      {logins && <LoginsDialog base={`/schools/${schoolId}`} role={f.role as any} onClose={() => setLogins(false)} />}
       <Input className="max-w-xs" placeholder="Search name, login ID or email…" aria-label="Search" value={f.search} onChange={(e) => setF({ ...f, search: e.target.value, page: 1 })} />
       <Table head={['Name', 'Login ID', f.role === 'STUDENT' ? 'Class' : f.role === 'TEACHER' ? 'Designation / email' : 'Email', 'Last sign-in', 'Status', '']} empty={!q.data.items.length}>
         {q.data.items.map((u: any) => (

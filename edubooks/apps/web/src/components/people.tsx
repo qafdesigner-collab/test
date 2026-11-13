@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Download, Eraser, FileSpreadsheet, FileUp, KeyRound, Pencil, Plus, Trash2, UserCheck, UserX, Users } from 'lucide-react';
 import { ParentsDialog } from '@/components/parents';
 import { readFile, StudentImport } from '@/components/student-import';
+import { LoginsDialog } from '@/components/logins-download';
 import { api, fmtDay, qs } from '@/lib/api';
 import { useAction } from '@/lib/hooks';
 import { useMe } from '@/lib/session';
@@ -17,13 +18,14 @@ export function PeoplePage({ role }: { role: 'TEACHER' | 'STUDENT' }) {
   const [f, setF] = useState({ search: '', page: 1 });
   const q = useQuery({ queryKey: ['people', role, f], queryFn: () => api.get(`/school/users${qs({ role, ...f, pageSize: 50 })}`), placeholderData: keepPreviousData });
   const [dlg, setDlg] = useState<'' | 'add' | 'import'>(''); const [creds, setCreds] = useState<Credential[] | null>(null);
-  const [parentsFor, setParentsFor] = useState<any>(null); const [eraseFor, setEraseFor] = useState<any>(null); const [editFor, setEditFor] = useState<any>(null);
+  const [parentsFor, setParentsFor] = useState<any>(null); const [eraseFor, setEraseFor] = useState<any>(null); const [editFor, setEditFor] = useState<any>(null); const [logins, setLogins] = useState(false);
   const keys = ['people', 'schoolOverview', 'eligible'];
   const status = useAction((v: { id: string; status: string }) => api.patch(`/school/users/${v.id}`, { status: v.status }), { ok: 'Saved', keys });
   const reset = useAction((id: string) => api.post(`/school/users/${id}/reset-password`), { after: (r) => setCreds([{ displayName: r.username, username: r.username, password: r.password }]) });
   return (
     <div className="space-y-6">
       <PageHeader title={role === 'TEACHER' ? 'Teachers' : 'Students'} sub={`Only a name is needed: each ${noun} gets a login ID and password. If you add an email, they can sign in with that too.`}>
+        <Button variant="secondary" onClick={() => setLogins(true)}><KeyRound className="size-4" />Download logins</Button>
         <Button variant="secondary" onClick={() => setDlg('import')}><FileUp className="size-4" />Bulk import (Excel)</Button>
         <Button onClick={() => setDlg('add')}><Plus className="size-4" />Add {noun}s</Button>
       </PageHeader>
@@ -52,6 +54,7 @@ export function PeoplePage({ role }: { role: 'TEACHER' | 'STUDENT' }) {
       )}
       {dlg === 'add' && <AddPeople role={role} onClose={() => setDlg('')} onCreated={setCreds} />}
       {dlg === 'import' && (role === 'STUDENT' ? <StudentImport onClose={() => setDlg('')} onCreated={setCreds} /> : <ImportPeople role={role} onClose={() => setDlg('')} onCreated={setCreds} />)}
+      {logins && <LoginsDialog base="/school" role={role} onClose={() => setLogins(false)} />}
       {editFor && <EditPerson role={role} person={editFor} onClose={() => setEditFor(null)} />}
       {eraseFor && <EraseDialog student={eraseFor} onClose={() => setEraseFor(null)} />}
       {parentsFor && <ParentsDialog student={parentsFor} onClose={() => setParentsFor(null)} />}

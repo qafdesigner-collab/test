@@ -13,6 +13,8 @@ import { LmsModule } from '../lms/lms.module';
 const Id = () => new ParseUUIDPipe();
 const TYPES = ['MCQ', 'TRUE_FALSE', 'FILL_BLANK', 'SHORT', 'LONG'] as const;
 const arr = (ids: string[]) => `{${ids.join(',')}}`;
+/** Same grade bands as the printed report cards. */
+const gradeOf = (p: number) => (p >= 90 ? 'A*' : p >= 80 ? 'A' : p >= 70 ? 'B' : p >= 60 ? 'C' : p >= 50 ? 'D' : 'E');
 
 class ExamDto {
   @IsUUID() classId!: string;
@@ -23,6 +25,7 @@ class ExamDto {
   @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) examDate?: string | null;
   @IsOptional() @IsInt() @Min(5) @Max(600) durationMin?: number;
   @IsOptional() @IsString() @MaxLength(2000) instructions?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100) passPercent?: number;
 }
 class UpdateExamDto extends PartialType(ExamDto) { @IsOptional() @IsIn(['DRAFT', 'READY']) status?: 'DRAFT' | 'READY'; }
 class ItemDto {
@@ -83,9 +86,9 @@ export class ExamsService {
 
   async create(d: ExamDto) {
     await this.access.assertTeaches(d.classId);
-    const e = await this.one(sql`INSERT INTO exams (publisher_id, school_id, class_id, subject_id, edition_id, created_by, title, term, exam_date, duration_min, instructions)
+    const e = await this.one(sql`INSERT INTO exams (publisher_id, school_id, class_id, subject_id, edition_id, created_by, title, term, exam_date, duration_min, instructions, pass_percent)
       VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${d.classId}, ${d.subjectId ?? null}, ${d.editionId ?? null}, ${this.ctx.userId}, ${d.title.trim()}, ${d.term ?? ''},
-        ${d.examDate ?? null}, ${d.durationMin ?? 60}, ${d.instructions ?? 'Answer all questions. Write neatly.'}) RETURNING id`);
+        ${d.examDate ?? null}, ${d.durationMin ?? 60}, ${d.instructions ?? 'Answer all questions. Write neatly.'}, ${d.passPercent ?? 40}) RETURNING id`);
     await this.audit.log('school.exam.create', 'exam', e.id, `Created exam ${d.title.trim()}`);
     return e;
   }
@@ -96,7 +99,7 @@ export class ExamsService {
     const meta = await this.one(sql`SELECT c.name AS "className", c.section AS "classSection", s.name AS subject, sc.name AS school, y.name AS "academicYear"
       FROM classes c JOIN schools sc ON sc.id = c.school_id JOIN academic_years y ON y.id = c.academic_year_id LEFT JOIN subjects s ON s.id = ${e.subject_id} WHERE c.id = ${e.class_id}`);
     return { id: e.id, classId: e.class_id, subjectId: e.subject_id, editionId: e.edition_id, title: e.title, term: e.term, examDate: e.exam_date, durationMin: e.duration_min,
-      instructions: e.instructions, status: e.status, total: e.total, ...meta, items };
+      instructions: e.instructions, status: e.status, total: e.total, passPercent: e.pass_percent, ...meta, items };
   }
 
   async update(id: string, d: UpdateExamDto) {
@@ -106,7 +109,8 @@ export class ExamsService {
     await this.db.q.execute(sql`UPDATE exams SET class_id = coalesce(${d.classId ?? null}, class_id), title = coalesce(${d.title?.trim() ?? null}, title),
       subject_id = ${d.subjectId !== undefined ? d.subjectId : e.subject_id}, edition_id = ${d.editionId !== undefined ? d.editionId : e.edition_id},
       term = coalesce(${d.term ?? null}, term), exam_date = ${d.examDate !== undefined ? d.examDate : e.exam_date}, duration_min = coalesce(${d.durationMin ?? null}::int, duration_min),
-      instructions = coalesce(${d.instructions ?? null}, instructions), status = coalesce(${d.status ?? null}, status), updated_at = now() WHERE id = ${id}`);
+      instructions = coalesce(${d.instructions ?? null}, instructions), status = coalesce(${d.status ?? null}, status),
+      pass_percent = coalesce(${d.passPercent ?? null}::int, pass_percent), updated_at = now() WHERE id = ${id}`);
     return this.get(id);
   }
 
@@ -184,8 +188,19 @@ export class ExamsService {
       FROM enrolments en JOIN users u ON u.id = en.student_id LEFT JOIN exam_marks m ON m.exam_id = ${id} AND m.student_id = u.id
       WHERE en.class_id = ${e.class_id} AND u.status = 'ACTIVE' ORDER BY u.display_name`);
     const got = roster.filter((r) => r.marks !== null && !r.absent).map((r) => r.marks);
-    return { id: e.id, title: e.title, total: e.total, status: e.status, roster,
-      stats: got.length ? { count: got.length, average: Math.round((got.reduce((a, b) => a + b, 0) / got.length) * 10) / 10, highest: Math.max(...got), lowest: Math.min(...got) } : null };
+    // Result sheet: percentage, grade, pass/fail against the exam's pass mark, and position in class.
+    const pass = e.pass_percent ?? 40;
+    const scored = roster.filter((r) => r.marks !== null && !r.absent).sort((a, b) => b.marks - a.marks);
+    const results = roster.map((r) => {
+      const pct = r.marks !== null && !r.absent && e.total ? Math.round((r.marks / e.total) * 1000) / 10 : null;
+      const rank = pct === null ? null : scored.findIndex((x) => x.marks === r.marks) + 1;
+      return { ...r, percent: pct, grade: pct === null ? null : gradeOf(pct), result: r.absent ? 'ABSENT' : pct === null ? 'PENDING' : pct >= pass ? 'PASS' : 'FAIL', rank };
+    });
+    const meta = await this.one(sql`SELECT c.name AS "className", c.section AS "classSection", s.name AS subject, sc.name AS school, sc.code::text AS "schoolCode"
+      FROM classes c JOIN schools sc ON sc.id = c.school_id LEFT JOIN subjects s ON s.id = ${e.subject_id} WHERE c.id = ${e.class_id}`);
+    return { id: e.id, title: e.title, term: e.term, examDate: e.exam_date, total: e.total, status: e.status, passPercent: pass, ...meta, roster: results,
+      stats: got.length ? { count: got.length, average: Math.round((got.reduce((a, b) => a + b, 0) / got.length) * 10) / 10, highest: Math.max(...got), lowest: Math.min(...got),
+        passed: results.filter((r) => r.result === 'PASS').length, failed: results.filter((r) => r.result === 'FAIL').length, absent: results.filter((r) => r.result === 'ABSENT').length } : null };
   }
 
   async saveMarks(id: string, d: MarksDto) {

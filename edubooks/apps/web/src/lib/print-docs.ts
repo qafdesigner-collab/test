@@ -169,6 +169,35 @@ export function printExamPaper(e: ExamPrint, brand: Branding, o: { key?: boolean
   return openDoc(`${e.title}${o.key ? ' — answer key' : ''}${o.version ? ` (Version ${o.version})` : ''}`, css, `<section class="sheet">${head}${body}<div class="end">— End of paper —</div></section>`);
 }
 
+/** A4 class result sheet for an exam or an assessment: marks, %, grade, pass/fail, position, with signature lines. */
+export interface ResultSheet { title: string; kind: string; school?: string; className?: string; subject?: string | null; term?: string | null; date?: string | null; total: number; passPercent: number;
+  rows: { name: string; username?: string; marks: number | null; percent: number | null; grade: string | null; result: string; rank: number | null; remarks?: string }[];
+  stats?: { average?: number | null; highest?: number | null; lowest?: number | null; passed: number; failed: number; absent: number } | null }
+export function printResultSheet(r: ResultSheet, brand: Branding) {
+  const p = palette(brand.primaryColor);
+  const label: Record<string, string> = { PASS: 'Pass', FAIL: 'Fail', ABSENT: 'Absent', PENDING: '—' };
+  const rows = r.rows.map((x, i) => `<tr class="${x.result.toLowerCase()}"><td>${i + 1}</td><td>${esc(x.name)}${x.username ? `<div class="u">${esc(x.username)}</div>` : ''}</td>
+    <td class="n">${x.marks === null ? '—' : x.marks}</td><td class="n">${x.percent === null ? '—' : `${x.percent}%`}</td><td class="n">${esc(x.grade ?? '—')}</td>
+    <td><span class="b">${label[x.result] ?? x.result}</span></td><td class="n">${x.rank ?? '—'}</td><td class="rm">${esc(x.remarks ?? '')}</td></tr>`).join('');
+  const st = r.stats;
+  const css = `.sheet{height:auto;min-height:297mm;padding:14mm 14mm;font-size:12px}
+    .top{display:flex;align-items:center;gap:4mm;border-bottom:2.5px solid ${p[600]};padding-bottom:3mm} .logo{height:14mm;max-width:40mm;object-fit:contain} .logo-txt{font-size:30px}
+    .top h1{margin:0;font-size:18px;color:${p[800]}} .top .sub{color:#475569} .kind{margin-left:auto;font-weight:800;color:${p[700]};text-align:right}
+    .meta{display:grid;grid-template-columns:repeat(5,1fr);gap:2mm;margin:3mm 0} .meta b{display:block;font-size:13px}
+    .sum{display:flex;gap:3mm;margin:2mm 0 4mm} .sum div{flex:1;border:1px solid #e2e8f0;border-radius:2mm;padding:2mm;text-align:center} .sum b{display:block;font-size:16px;color:${p[700]}}
+    table{width:100%;border-collapse:collapse} th{background:${p[50]};text-align:left;font-size:11px;color:#334155;padding:1.6mm 2mm;border-bottom:1.5px solid ${p[500]}}
+    td{padding:1.5mm 2mm;border-bottom:1px solid #e2e8f0;vertical-align:top} td.n{text-align:center;font-variant-numeric:tabular-nums} .u{color:#64748b;font-size:10px}
+    .b{display:inline-block;border-radius:9px;padding:0.4mm 2.4mm;font-weight:700;font-size:11px} .pass .b{background:#dcfce7;color:#166534} .fail .b{background:#fee2e2;color:#b91c1c} .absent .b{background:#f1f5f9;color:#475569}
+    .rm{color:#475569;font-size:11px} .sign{display:flex;justify-content:space-between;margin-top:14mm} .sign div{width:55mm;border-top:1px solid #334155;padding-top:1mm;text-align:center;color:#475569}
+    tr{break-inside:avoid}`;
+  const body = `<section class="sheet"><div class="top">${brandHead(brand)}<div><h1>${esc(r.school ?? brand.name)}</h1><div class="sub">${esc([r.term, r.subject].filter(Boolean).join(' · '))}</div></div><div class="kind">RESULT SHEET<br><small>${esc(r.kind)}</small></div></div>
+    <div class="meta"><div>${esc(r.kind)}<b>${esc(r.title)}</b></div><div>Class<b>${esc(r.className ?? '')}</b></div><div>Date<b>${r.date ? esc(new Date(r.date.length === 10 ? r.date + 'T12:00:00' : r.date).toLocaleDateString()) : '—'}</b></div><div>Total marks<b>${r.total}</b></div><div>Pass mark<b>${r.passPercent}%</b></div></div>
+    ${st ? `<div class="sum"><div><b>${r.rows.length}</b>Pupils</div><div><b>${st.passed}</b>Passed</div><div><b>${st.failed}</b>Failed</div><div><b>${st.absent}</b>Absent</div><div><b>${st.average ?? '—'}</b>Average</div><div><b>${st.highest ?? '—'}</b>Highest</div></div>` : ''}
+    <table><thead><tr><th>#</th><th>Pupil</th><th>Marks</th><th>%</th><th>Grade</th><th>Result</th><th>Position</th><th>Remark</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="sign"><div>Class teacher</div><div>Principal</div><div>Date</div></div></section>`;
+  return openDoc(`${r.title} — result sheet`, css, body);
+}
+
 import type { CompanyInfo } from '@/lib/company';
 import { formatMoney } from '@/lib/company';
 

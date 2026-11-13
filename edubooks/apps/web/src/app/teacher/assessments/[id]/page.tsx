@@ -3,10 +3,10 @@ import Link from 'next/link';
 import { Suspense, use, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, BookMarked, CheckCircle2, Download, KeyRound, Plus, Printer, Send, Sparkles, Trash2, XCircle } from 'lucide-react';
+import { ArrowLeft, BookMarked, CheckCircle2, Download, KeyRound, PenLine, Plus, Printer, Send, Sparkles, Trash2, XCircle } from 'lucide-react';
 import { useBranding } from '@/lib/branding';
 import { useMe } from '@/lib/session';
-import { printExamPaper } from '@/lib/print-docs';
+import { gradeFor, printExamPaper, printResultSheet } from '@/lib/print-docs';
 import { useToast } from '@/components/ui/toast';
 import { VoicePlayer } from '@/components/voice';
 import { api, downloadCsv, fmtDate, fmtDay } from '@/lib/api';
@@ -145,12 +145,12 @@ function BankPicker({ assessmentId, editionId, onClose, beforeAdd }: { assessmen
   );
 }
 
-function MarkDialog({ a, student, onClose }: { a: any; student: any; onClose: () => void }) {
+function MarkDialog({ a, student, onClose, onNext, left }: { a: any; student: any; onClose: () => void; onNext?: () => void; left?: number }) {
   const s = student.submission;
   const [scores, setScores] = useState<Record<string, number>>(Object.fromEntries((s.answers as any[]).filter((x) => x.awarded !== null).map((x) => [x.itemId, x.awarded])));
   const [feedback, setFeedback] = useState(s.feedback ?? '');
   const save = useAction((ret: boolean) => api.patch(`/teacher/submissions/${s.id}`, { itemScores: Object.entries(scores).map(([itemId, awarded]) => ({ itemId, awarded })), feedback, returnToStudent: ret }),
-    { ok: (r) => (r.status === 'RETURNED' ? 'Returned to the student' : 'Marks saved'), keys: ['assessment', 'assessments'], after: onClose });
+    { ok: (r) => (r.status === 'RETURNED' ? 'Returned to the student' : 'Marks saved'), keys: ['assessment', 'assessments'], after: () => (onNext ? onNext() : onClose()) });
   const shown = (it: any, resp: any) => it.type === 'MCQ' ? it.options[resp] ?? '—' : it.type === 'TRUE_FALSE' ? (resp === true ? 'True' : resp === false ? 'False' : '—') : resp || '—';
   const total = a.items.reduce((n: number, it: any) => n + (scores[it.id] ?? 0), 0);
   return (
@@ -170,7 +170,7 @@ function MarkDialog({ a, student, onClose }: { a: any; student: any; onClose: ()
         })}
         <Field label="Feedback for the student"><Textarea rows={2} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Well done! …" /></Field>
         <div className="flex items-center justify-between"><span className="text-sm">Total: <b>{total} / {s.maxScore}</b></span>
-          <div className="flex gap-2"><Button variant="secondary" loading={save.isPending} onClick={() => save.mutate(false)}>Save marks</Button><Button loading={save.isPending} onClick={() => save.mutate(true)}>Return to student</Button></div></div>
+          <div className="flex gap-2"><Button variant="secondary" loading={save.isPending} onClick={() => save.mutate(false)}>Save marks</Button><Button loading={save.isPending} onClick={() => save.mutate(true)}>{onNext && left ? `Return & mark next (${left})` : 'Return to student'}</Button></div></div>
       </div>
     </Dialog>
   );
@@ -179,12 +179,34 @@ function MarkDialog({ a, student, onClose }: { a: any; student: any; onClose: ()
 function Results({ a }: { a: any }) {
   const [tab, setTab] = useState<'students' | 'questions'>('students'); const [mark, setMark] = useState<any>(null); const [closeAsk, setCloseAsk] = useState(false);
   const close = useAction(() => api.post(`/teacher/assessments/${a.id}/close`), { ok: 'Closed', keys: ['assessment', 'assessments'], after: () => setCloseAsk(false) });
-  const exportCsv = () => downloadCsv(`${a.title}.csv`, a.students.map((s: any) => ({ student: s.displayName, username: s.username, status: s.submission?.status ?? 'NOT SUBMITTED', score: s.submission?.score ?? '', max: a.maxScore, late: s.submission?.late ? 'yes' : '' })));
+  const brand = useBranding(); const me = useMe().data; const classes = useMyClasses();
+  const [pass, setPass] = useState(40);
+  const res = (s: any) => {
+    const sc = s.submission?.score; const pct = sc === null || sc === undefined || !a.maxScore ? null : Math.round((sc / a.maxScore) * 1000) / 10;
+    const g = pct === null ? null : gradeFor(pct)?.[1] ?? null;
+    return { pct, grade: g, result: !s.submission ? 'ABSENT' : pct === null ? 'PENDING' : pct >= pass ? 'PASS' : 'FAIL' };
+  };
+  const scored = a.students.filter((s: any) => res(s).pct !== null).sort((x: any, y: any) => (y.submission.score ?? 0) - (x.submission.score ?? 0));
+  const rankOf = (s: any) => { const i = scored.findIndex((x: any) => x.submission.score === s.submission?.score); return i < 0 ? null : i + 1; };
+  const waiting = a.students.filter((s: any) => s.submission?.status === 'SUBMITTED');
+  const nextAfter = (cur: any) => { const rest = waiting.filter((s: any) => s.id !== cur?.id); setMark(rest[0] ?? null); };
+  const exportCsv = () => downloadCsv(`${a.title}.csv`, a.students.map((s: any, i: number) => { const r = res(s); return { no: i + 1, student: s.displayName, username: s.username, status: s.submission?.status ?? 'NOT HANDED IN', score: s.submission?.score ?? '', outOf: a.maxScore, percent: r.pct ?? '', grade: r.grade ?? '', result: r.result === 'ABSENT' ? 'not handed in' : r.result.toLowerCase(), position: rankOf(s) ?? '', late: s.submission?.late ? 'yes' : '' }; }));
+  const printResults = () => {
+    const cls = classes.data?.find((c) => c.id === a.classId);
+    const rows = a.students.map((s: any) => { const r = res(s); return { name: s.displayName, username: s.username, marks: s.submission?.score ?? null, percent: r.pct, grade: r.grade, result: r.result, rank: rankOf(s), remarks: s.submission?.feedback ?? '' }; });
+    const got = scored.map((s: any) => s.submission.score as number);
+    printResultSheet({ title: a.title, kind: KIND_LABEL[a.kind] ?? 'Assessment', school: me?.school?.name, className: cls ? `${cls.name}${cls.section ? ` ${cls.section}` : ''}` : a.className, subject: a.bookTitle ?? null, date: a.dueAt ?? a.publishedAt ?? null, total: a.maxScore, passPercent: pass, rows,
+      stats: { passed: rows.filter((r: any) => r.result === 'PASS').length, failed: rows.filter((r: any) => r.result === 'FAIL').length, absent: rows.filter((r: any) => r.result === 'ABSENT').length,
+        average: got.length ? Math.round((got.reduce((x: number, y: number) => x + y, 0) / got.length) * 10) / 10 : null, highest: got.length ? Math.max(...got) : null, lowest: got.length ? Math.min(...got) : null } }, brand);
+  };
   return (
     <div className="space-y-6">
       <Link href="/teacher/assessments" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"><ArrowLeft className="size-4" />Assessments</Link>
       <PageHeader title={a.title} sub={`${KIND_LABEL[a.kind]} · ${a.items.length} questions · ${a.maxScore} points${a.dueAt ? ` · due ${fmtDate(a.dueAt)}` : ''}`}>
-        <Status s={a.status} /><Button variant="secondary" onClick={exportCsv}><Download className="size-4" />CSV</Button>
+        <Status s={a.status} />
+        {waiting.length > 0 && <Button onClick={() => setMark(waiting[0])}><PenLine className="size-4" />Mark next ({waiting.length})</Button>}
+        <Button variant="secondary" onClick={printResults}><Printer className="size-4" />Print results</Button>
+        <Button variant="secondary" onClick={exportCsv}><Download className="size-4" />Save (Excel / CSV)</Button>
         {a.status === 'PUBLISHED' && <Button variant="ghost" onClick={() => setCloseAsk(true)}>Close</Button>}
       </PageHeader>
       <div className="grid gap-4 sm:grid-cols-3">
@@ -194,14 +216,20 @@ function Results({ a }: { a: any }) {
       </div>
       <Tabs value={tab} onChange={setTab} tabs={[{ id: 'students', label: 'Students', count: a.students.length }, { id: 'questions', label: 'Questions', count: a.items.length }]} />
       {tab === 'students' ? (
-        <Table head={['Student', 'Status', 'Score', 'Handed in', '']}>
+        <>
+        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">Pass mark <Input type="number" min={0} max={100} className="h-8 w-20" value={pass} onChange={(e) => setPass(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} aria-label="Pass mark (%)" />%
+          <span className="text-xs text-slate-500">— used for Pass / Fail on this page and on the printed sheet.</span></div>
+        <Table head={['Student', 'Status', 'Score', '%', 'Grade', 'Result', 'Handed in', '']}>
           {a.students.map((s: any) => (
             <tr key={s.id}><Td className="font-medium">{s.displayName}</Td>
               <Td>{s.submission ? <><Status s={s.submission.status} />{s.submission.late && <Badge tone="danger" className="ml-1">late</Badge>}</> : <span className="text-xs text-slate-500">not handed in</span>}</Td>
               <Td className="tabular-nums">{s.submission?.score ?? (s.submission ? '…' : '')}{s.submission && ` / ${a.maxScore}`}</Td>
+              {(() => { const r = res(s); return <><Td className="tabular-nums">{r.pct === null ? '' : `${r.pct}%`}</Td><Td className="font-semibold">{r.grade ?? ''}</Td>
+                <Td>{r.result === 'PASS' ? <Badge tone="PUBLISHED">Pass</Badge> : r.result === 'FAIL' ? <Badge tone="danger">Fail</Badge> : r.result === 'PENDING' ? <span className="text-xs text-amber-700">to mark</span> : ''}</Td></>; })()}
               <Td className="text-slate-500">{s.submission ? fmtDate(s.submission.submittedAt) : ''}</Td>
               <Td className="text-right">{s.submission && <Button size="sm" variant={s.submission.status === 'SUBMITTED' ? 'primary' : 'ghost'} onClick={() => setMark(s)}>{s.submission.status === 'SUBMITTED' ? 'Mark' : 'View'}</Button>}</Td></tr>))}
         </Table>
+        </>
       ) : (
         <div className="space-y-2">{a.items.map((it: any, i: number) => {
           const st = a.itemStats.find((x: any) => x.itemId === it.id);
@@ -209,7 +237,7 @@ function Results({ a }: { a: any }) {
             {st?.correctRate !== null && st?.correctRate !== undefined && <span className={`font-semibold ${st.correctRate < 0.5 ? 'text-red-600' : 'text-emerald-600'}`}>{Math.round(st.correctRate * 100)}% correct</span>}</Card>;
         })}</div>
       )}
-      {mark && <MarkDialog a={a} student={mark} onClose={() => setMark(null)} />}
+      {mark && <MarkDialog key={mark.id} a={a} student={mark} onClose={() => setMark(null)} onNext={mark.submission?.status === 'SUBMITTED' ? () => nextAfter(mark) : undefined} left={waiting.filter((s: any) => s.id !== mark.id).length} />}
       <Confirm open={closeAsk} onOpenChange={setCloseAsk} title="Close this work?" confirmLabel="Close" loading={close.isPending} onConfirm={() => close.mutate()} body="Students can no longer hand it in. Marks stay visible." />
     </div>
   );
