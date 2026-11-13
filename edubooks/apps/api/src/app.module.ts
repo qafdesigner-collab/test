@@ -33,6 +33,7 @@ import { MessagingModule } from './messaging/messaging.controller';
 import { WhiteboardModule } from './whiteboard/whiteboard.controller';
 import { AudioModule } from './audio/audio.controller';
 import { MailModule } from './mail/mail.controller';
+import { MailAccountsModule } from './mail/accounts.controller';
 import { ProgressModule } from './progress/progress.controller';
 import { SchoolBrandModule } from './schools/school-brand.controller';
 import { DemoModule } from './demo/demo.controller';
@@ -56,7 +57,7 @@ function sessionOrIp(req: any) {
       { name: 'ip', ttl: 60_000, limit: Number(process.env.RATE_LIMIT_PER_IP_PER_MIN || 5000), getTracker: (req: any) => req.ip },
     ]),
     DbModule, AuditModule, AuthModule, StorageModule, CatalogModule, PublishingModule,
-    CommerceModule, LicensingModule, SchoolsModule, SchoolAdminModule, LmsModule, AiModule, GamesModule, SystemModule, CalendarModule, FlipbookModule, NotificationsModule, ParentsModule, BrandingModule, SalesModule, AttendanceModule, TrainingModule, AnalyticsModule, ExamsModule, MessagingModule, WhiteboardModule, AudioModule, MailModule, ProgressModule, SchoolBrandModule, DemoModule, CompanyModule, CoversModule, AppsModule,
+    CommerceModule, LicensingModule, SchoolsModule, SchoolAdminModule, LmsModule, AiModule, GamesModule, SystemModule, CalendarModule, FlipbookModule, NotificationsModule, ParentsModule, BrandingModule, SalesModule, AttendanceModule, TrainingModule, AnalyticsModule, ExamsModule, MessagingModule, WhiteboardModule, AudioModule, MailModule, MailAccountsModule, ProgressModule, SchoolBrandModule, DemoModule, CompanyModule, CoversModule, AppsModule,
   ],
   controllers: [HealthController],
   providers: [

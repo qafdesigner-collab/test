@@ -2,11 +2,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArchiveRestore, CalendarDays, Inbox as InboxIcon, Mail, MapPin, PenSquare, Reply, Search, Send, Users, Video, X } from 'lucide-react';
+import { Archive, ArchiveRestore, AtSign, CalendarDays, Inbox as InboxIcon, Mail, Megaphone, Settings2, MapPin, PenSquare, Reply, Search, Send, Users, Video, X } from 'lucide-react';
 import { api, fmtDate } from '@/lib/api';
 import { Button, Card, Dialog, ErrorBox, Field, Input, PageLoader, Textarea, cn } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 import { useT } from '@/lib/i18n';
+import { Campaigns, EmailAccountDialog, EmailInbox } from '@/components/mailbox';
 
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const RSVP: Record<string, { label: string; cls: string }> = { YES: { label: 'Going', cls: 'bg-emerald-100 text-emerald-800' }, MAYBE: { label: 'Maybe', cls: 'bg-amber-100 text-amber-800' }, NO: { label: 'Not going', cls: 'bg-red-100 text-red-700' } };
@@ -14,10 +15,12 @@ const RSVP: Record<string, { label: string; cls: string }> = { YES: { label: 'Go
 /** Inbox / Sent / Archived with a reading pane. Staff can write new mail and meeting invites; pupils and parents read and reply. */
 export function MailCenter({ canCompose, playful }: { canCompose?: boolean; playful?: boolean }) {
   const { t } = useT(); const params = useSearchParams();
-  const [folder, setFolder] = useState<'inbox' | 'sent' | 'archived'>('inbox'); const [q, setQ] = useState(''); const [sel, setSel] = useState<string | null>(params.get('m'));
+  const [folder, setFolder] = useState<'inbox' | 'sent' | 'archived' | 'email' | 'campaigns'>('inbox'); const [setup, setSetup] = useState(false); const [q, setQ] = useState(''); const [sel, setSel] = useState<string | null>(params.get('m'));
   const [compose, setCompose] = useState(false);
-  const list = useQuery({ queryKey: ['mail', folder, q], queryFn: () => api.get<any[]>(`/mail?folder=${folder}${q ? `&q=${encodeURIComponent(q)}` : ''}`), refetchInterval: 30_000 });
-  const folders = [['inbox', t('Inbox'), InboxIcon], ...(canCompose ? [['sent', t('Sent'), Send]] : []), ['archived', t('Archived'), Archive]] as [typeof folder, string, any][];
+  const own = folder === 'email' || folder === 'campaigns';
+  const list = useQuery({ queryKey: ['mail', folder, q], queryFn: () => api.get<any[]>(`/mail?folder=${folder}${q ? `&q=${encodeURIComponent(q)}` : ''}`), refetchInterval: 30_000, enabled: !own });
+  const folders = [['inbox', t('Inbox'), InboxIcon], ...(canCompose ? [['sent', t('Sent'), Send]] : []), ['archived', t('Archived'), Archive],
+    ...(canCompose ? [['email', t('My email'), AtSign], ['campaigns', t('Campaigns'), Megaphone]] : [])] as [typeof folder, string, any][];
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -27,10 +30,12 @@ export function MailCenter({ canCompose, playful }: { canCompose?: boolean; play
             <button key={k} role="tab" aria-selected={folder === k} onClick={() => { setFolder(k); setSel(null); }}
               className={cn('inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium', folder === k ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50')}><Icon className="size-4" />{label}</button>))}
         </div>
-        <div className="relative ms-auto w-full sm:w-64"><Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <Input className="ps-9" placeholder={t('Search mail…')} aria-label={t('Search mail')} value={q} onChange={(e) => setQ(e.target.value)} /></div>
+        {canCompose && <Button variant="ghost" size="sm" onClick={() => setSetup(true)}><Settings2 className="size-4" />{t('My email account')}</Button>}
+        {!own && <div className="relative ms-auto w-full sm:w-64"><Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <Input className="ps-9" placeholder={t('Search mail…')} aria-label={t('Search mail')} value={q} onChange={(e) => setQ(e.target.value)} /></div>}
       </div>
-      <Card className={cn('grid min-h-[520px] overflow-hidden md:grid-cols-[340px_1fr]', playful && 'rounded-[2rem]')}>
+      {setup && <EmailAccountDialog onClose={() => setSetup(false)} />}
+      {folder === 'email' ? <EmailInbox onSetup={() => setSetup(true)} /> : folder === 'campaigns' ? <Campaigns /> : <Card className={cn('grid min-h-[520px] overflow-hidden md:grid-cols-[340px_1fr]', playful && 'rounded-[2rem]')}>
         <ul className={cn('max-h-[72vh] divide-y divide-slate-100 overflow-y-auto border-slate-100 md:border-e', sel && 'hidden md:block')} aria-label={t('Mail')}>
           {list.data?.map((m) => (
             <li key={m.id}><button onClick={() => setSel(m.id)} aria-current={sel === m.id ? 'true' : undefined}
@@ -47,7 +52,7 @@ export function MailCenter({ canCompose, playful }: { canCompose?: boolean; play
           {!list.data && <li className="p-6"><PageLoader /></li>}
         </ul>
         {sel ? <Reader id={sel} onBack={() => setSel(null)} /> : <div className="hidden place-items-center p-6 text-sm text-slate-500 md:grid"><span className="text-center"><Mail className="mx-auto mb-2 size-10 text-slate-300" />{t('Choose a mail to read.')}</span></div>}
-      </Card>
+      </Card>}
       {compose && <Compose onClose={() => setCompose(false)} onSent={(id) => { setCompose(false); setFolder('sent'); setSel(id); }} />}
     </div>
   );
@@ -118,6 +123,8 @@ function Compose({ onClose, onSent }: { onClose: () => void; onSent: (id: string
   const groups = useQuery({ queryKey: ['mailGroups'], queryFn: () => api.get<any[]>('/mail/groups') });
   const [search, setSearch] = useState(''); const people = useQuery({ queryKey: ['mailPeople', search], queryFn: () => api.get<any[]>(`/mail/people?q=${encodeURIComponent(search)}`), enabled: search.trim().length >= 2 });
   const [to, setTo] = useState<{ key: string; label: string }[]>([]);
+  const [ext, setExt] = useState('');
+  const external = ext.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
   const [f, setF] = useState({ subject: '', body: '', meeting: false, date: '', time: '09:00', durationMin: 45, location: '', url: '' });
   const [busy, setBusy] = useState(false);
   const add = (key: string, label: string) => { if (!to.some((x) => x.key === key)) setTo([...to, { key, label }]); };
@@ -126,11 +133,11 @@ function Compose({ onClose, onSent }: { onClose: () => void; onSent: (id: string
     setBusy(true);
     try {
       const meeting = f.meeting ? { startsAt: new Date(`${f.date}T${f.time}`).toISOString(), durationMin: f.durationMin, location: f.location || undefined, url: f.url || undefined } : undefined;
-      const r = await api.post<any>('/mail', { to: to.map((x) => x.key), subject: f.subject, body: f.body, meeting });
-      toast(`Sent to ${r.recipients} ${r.recipients === 1 ? 'person' : 'people'}`); qc.invalidateQueries({ queryKey: ['mail'] }); onSent(r.id);
+      const r = await api.post<any>('/mail', { to: to.map((x) => x.key), external: external.length ? external : undefined, subject: f.subject, body: f.body, meeting });
+      const n = r.recipients + external.length; toast(`Sent to ${n} ${n === 1 ? 'person' : 'people'}`); qc.invalidateQueries({ queryKey: ['mail'] }); onSent(r.id);
     } catch (e: any) { toast(e.message, 'err'); } finally { setBusy(false); }
   };
-  const valid = to.length && f.subject.trim() && (!f.meeting || f.date);
+  const valid = (to.length || external.length) && f.subject.trim() && (!f.meeting || f.date);
   return (
     <Dialog open onOpenChange={onClose} wide title={f.meeting ? 'New meeting invitation' : 'New mail'} description="Everyone gets it in their inbox here (and a notification). People with an email address also get a copy by email.">
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (valid) send(); }}>
@@ -152,7 +159,8 @@ function Compose({ onClose, onSent }: { onClose: () => void; onSent: (id: string
               {(people.data ?? []).map((p) => <li key={p.id}><button type="button" onClick={() => { add(`u:${p.id}`, p.name); setSearch(''); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-start text-sm hover:bg-slate-50">
                 <b className="min-w-0 flex-1 truncate">{p.name}</b><span className="text-xs text-slate-500">{[p.role, p.school].filter(Boolean).join(' · ')}</span></button></li>)}
               {people.data && !people.data.length && <li className="px-3 py-2 text-sm text-slate-500">Nobody found.</li>}</ul>}
-            {to.length > 0 && <p className="text-xs text-slate-500">Reaches about {reach} {reach === 1 ? 'person' : 'people'}.</p>}
+            <Input value={ext} onChange={(e) => setExt(e.target.value)} aria-label="Outside email addresses" placeholder="Outside email addresses (optional): parent@gmail.com, office@supplier.ae" />
+            {(to.length > 0 || external.length > 0) && <p className="text-xs text-slate-500">Reaches about {reach + external.length} {reach + external.length === 1 ? 'person' : 'people'}.{external.length > 0 && ' Outside addresses get it by email, from your own email account when connected.'}</p>}
           </div>
         </Field>
         <Field label="Subject"><Input required maxLength={200} value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })} placeholder={f.meeting ? 'e.g. Staff meeting — exams week' : 'e.g. Sports day on Thursday'} /></Field>

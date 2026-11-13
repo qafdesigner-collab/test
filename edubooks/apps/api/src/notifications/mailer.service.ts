@@ -57,6 +57,15 @@ export class MailerService {
     }
   }
 
+  /** Checks that the server accepts the login (used when a user connects their own mailbox). */
+  async verify(c: SmtpConfig) { await this.transport(c).verify(); }
+
+  /** One personal message (campaigns, replies to outside email). Throws on failure. */
+  async sendOne(c: SmtpConfig, m: { to: string; subject: string; text: string; html?: string; replyTo?: string; inReplyTo?: string; headers?: Record<string, string> }) {
+    const from = c.from_name ? `"${c.from_name.replace(/"/g, '')}" <${c.from_email}>` : c.from_email;
+    await this.transport(c).sendMail({ from, to: m.to, replyTo: m.replyTo, subject: m.subject, text: m.text, html: m.html, inReplyTo: m.inReplyTo, references: m.inReplyTo, headers: m.headers });
+  }
+
   /** Fire-and-forget after the current request. Returns immediately. */
   later(c: SmtpConfig | null, m: OutMail, after?: () => Promise<void>) {
     if (!c || !m.to.length) return;

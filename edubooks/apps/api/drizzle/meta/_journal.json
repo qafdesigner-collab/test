@@ -274,6 +274,13 @@
       "when": 1794780000000,
       "tag": "0038_school_brand",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794810000000,
+      "tag": "0039_mail_accounts",
+      "breakpoints": true
     }
   ]
 }

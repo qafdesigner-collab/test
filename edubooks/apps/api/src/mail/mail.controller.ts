@@ -8,7 +8,8 @@ import { Roles } from '../common/decorators';
 import { AccessService } from '../lms/access.service';
 import { LmsModule } from '../lms/lms.module';
 import { NotificationsService } from '../notifications/notifications.service';
-import { MailerService } from '../notifications/mailer.service';
+import { MailerService, SmtpConfig } from '../notifications/mailer.service';
+import { open as openSecret } from '../common/secret-box';
 import { timezone } from '../common/region';
 
 const Id = () => new ParseUUIDPipe();
@@ -24,10 +25,12 @@ class MeetingDto {
   @IsOptional() @IsString() @MaxLength(500) @Matches(/^https:\/\//, { message: 'The online meeting link must start with https://' }) url?: string;
 }
 class ComposeDto {
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(200) @IsString({ each: true }) @MaxLength(120, { each: true }) to!: string[];
+  @IsArray() @ArrayMaxSize(200) @IsString({ each: true }) @MaxLength(120, { each: true }) to!: string[];
   @IsString() @Length(1, 200) subject!: string;
   @IsOptional() @IsString() @MaxLength(20000) body?: string;
   @IsOptional() @ValidateNested() @Type(() => MeetingDto) meeting?: MeetingDto;
+  /** Outside email addresses (sent by email only, from the user's own account when connected). */
+  @IsOptional() @IsArray() @ArrayMaxSize(50) @IsEmail({}, { each: true }) external?: string[];
 }
 class ReplyDto { @IsString() @Length(1, 20000) body!: string; }
 class RsvpDto { @IsIn(['YES', 'NO', 'MAYBE']) answer!: 'YES' | 'NO' | 'MAYBE'; }
@@ -130,7 +133,7 @@ export class MailService {
   }
 
   /** Turns the "to" list (group keys and u:<id>) into user ids, checking each one is allowed. */
-  private async resolve(to: string[]) {
+  async resolve(to: string[], max = 5000) {
     const groups = await this.groups(); const ids = new Set<string>(); const labels: string[] = [];
     for (const key of [...new Set(to)]) {
       if (key.startsWith('u:')) {
@@ -146,7 +149,7 @@ export class MailService {
       labels.push(g.label);
     }
     ids.delete(this.ctx.userId);
-    if (ids.size > 5000) throw new BadRequestException('Too many recipients at once (max 5000)');
+    if (ids.size > max) throw new BadRequestException(`Too many recipients at once (max ${max})`);
     return { ids: [...ids], label: labels.join(', ').slice(0, 300) };
   }
   /** People search is capped at 40 rows; this checks one id directly with the same rules. */
@@ -178,16 +181,27 @@ export class MailService {
   // ------------------------------------------------------------------ sending
   async compose(d: ComposeDto) {
     if (!this.is(...SENDERS)) throw new ForbiddenException('Only staff can start a new mail; you can reply to mail you received.');
-    const { ids, label } = await this.resolve(d.to);
-    if (!ids.length) throw new BadRequestException('Nobody to send to: the chosen groups are empty.');
+    const external = [...new Set((d.external ?? []).map((e) => e.trim().toLowerCase()))];
+    const { ids, label } = d.to.length ? await this.resolve(d.to) : { ids: [] as string[], label: '' };
+    if (!ids.length && !external.length) throw new BadRequestException(d.to.length ? 'Nobody to send to: the chosen groups are empty.' : 'Choose who to send to');
     const meeting = d.meeting ? { startsAt: new Date(d.meeting.startsAt).toISOString(), durationMin: d.meeting.durationMin, location: d.meeting.location?.trim() || '', url: d.meeting.url?.trim() || '' } : null;
-    return this.store({ subject: d.subject.trim(), body: d.body ?? '', meeting, ids, label });
+    if (external.length && !(await this.ownSmtp()) && !(await this.mailer.config())) throw new BadRequestException('To write to outside email addresses, connect your email account first (Mail → My email account).');
+    return this.store({ subject: d.subject.trim(), body: d.body ?? '', meeting, ids, label: [label, ...external].filter(Boolean).join(', ').slice(0, 300), external });
   }
 
-  private async store(m: { subject: string; body: string; meeting: any; ids: string[]; label: string; replyTo?: string }) {
+  /** The signed-in user's own mailbox (when connected), for sending as themselves. */
+  async ownSmtp(): Promise<SmtpConfig | null> {
+    const [a] = await this.rows(sql`SELECT * FROM user_mail_accounts WHERE user_id = ${this.ctx.userId}`);
+    if (!a?.smtp_host) return null;
+    const site = (await this.rows(sql`SELECT site_url FROM mail_smtp_config()`))[0]?.site_url ?? '';
+    return { enabled: true, host: a.smtp_host, port: a.smtp_port, secure: a.smtp_secure, username: a.username || a.email, password: openSecret(a.password_enc), from_name: a.from_name, from_email: a.email, notify_students: false, site_url: site };
+  }
+
+  private async store(m: { subject: string; body: string; meeting: any; ids: string[]; label: string; replyTo?: string; external?: string[] }) {
     const me = (await this.rows(sql`SELECT display_name, email::text AS email FROM users WHERE id = ${this.ctx.userId}`))[0];
     const [row] = await this.rows(sql`INSERT INTO mail_messages (publisher_id, school_id, sender_id, sender_name, subject, body, kind, meeting, to_label, reply_to)
       VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId ?? null}, ${this.ctx.userId}, ${me.display_name}, ${m.subject}, ${m.body}, ${m.meeting ? 'MEETING' : 'MAIL'}, ${m.meeting ? JSON.stringify(m.meeting) : null}::jsonb, ${m.label}, ${m.replyTo ?? null}) RETURNING id`);
+    if (m.external?.length) await this.db.q.execute(sql`UPDATE mail_messages SET external_to = ${`{${m.external.map((e) => `"${e}"`).join(',')}}`}::text[] WHERE id = ${row.id}`);
     for (let i = 0; i < m.ids.length; i += 500) {
       const chunk = m.ids.slice(i, i + 500);
       await this.db.q.execute(sql`INSERT INTO mail_recipients (message_id, user_id, publisher_id, school_id)
@@ -197,13 +211,16 @@ export class MailService {
     const title = m.meeting ? `📅 Meeting: ${m.subject}` : `✉️ ${m.subject}`;
     const when = m.meeting ? new Date(m.meeting.startsAt).toLocaleString('en-GB', { timeZone: timezone(), dateStyle: 'medium', timeStyle: 'short' }) : '';
     const snippet = m.meeting ? `${when}${m.meeting.location ? ` · ${m.meeting.location}` : ''} — from ${me.display_name}` : `From ${me.display_name}: ${m.body.slice(0, 140)}`;
-    await this.notifications.notify(m.ids.map((id) => ({ id })), { kind: 'MAIL', title: title.slice(0, 200), body: snippet, link: `/mail?m=${row.id}` }, { email: false, schoolId: this.ctx.schoolId ?? null });
-    const c = await this.mailer.config();
+    if (m.ids.length) await this.notifications.notify(m.ids.map((id) => ({ id })), { kind: 'MAIL', title: title.slice(0, 200), body: snippet, link: `/mail?m=${row.id}` }, { email: false, schoolId: this.ctx.schoolId ?? null });
+    const internal = m.ids.length ? (await this.rows(sql`SELECT DISTINCT email::text AS email FROM users WHERE id = ANY(${arr(m.ids)}::uuid[]) AND email IS NOT NULL AND status = 'ACTIVE'`)).map((r) => r.email as string) : [];
+    // From the sender's own mailbox when connected (big school-wide sends use the platform's account, which allows more per day).
+    const own = await this.ownSmtp();
+    const c = own && internal.length + (m.external?.length ?? 0) <= 100 ? own : (await this.mailer.config()) ?? own;
     if (c) {
-      const emails = (await this.rows(sql`SELECT DISTINCT email::text AS email FROM users WHERE id = ANY(${arr(m.ids)}::uuid[]) AND email IS NOT NULL AND status = 'ACTIVE'`)).map((r) => r.email);
+      const emails = [...new Set([...internal, ...(m.external ?? [])])];
       const text = `${m.meeting ? `${when}${m.meeting.location ? `\nWhere: ${m.meeting.location}` : ''}${m.meeting.url ? `\nJoin: ${m.meeting.url}` : ''}\n\n` : ''}${m.body}\n\n— ${me.display_name}`;
       const ids = m.ids;
-      this.mailer.later(c, { to: emails, subject: title, text, html: this.mailer.html(c, title, text, `/mail?m=${row.id}`), replyTo: me.email ?? undefined, ics: m.meeting ? ics(row.id, m.subject, m.body, m.meeting, me.display_name, c.from_email) : undefined },
+      this.mailer.later(c, { to: emails, subject: title, text, html: this.mailer.html(c, title, text, `/mail?m=${row.id}`), replyTo: c === own ? undefined : (own?.from_email ?? me.email ?? undefined), ics: m.meeting ? ics(row.id, m.subject, m.body, m.meeting, me.display_name, c.from_email) : undefined },
         () => this.db.withContext({ ...this.ctx }, async () => { await this.db.q.execute(sql`UPDATE mail_recipients SET emailed_at = now() WHERE message_id = ${row.id} AND user_id = ANY(${arr(ids)}::uuid[])`); }));
     }
     return { id: row.id, recipients: m.ids.length };
@@ -334,5 +351,5 @@ export class MailController {
 /** The site address as the super admin uses it (for links in emails). */
 const siteOf = (req: any) => { const host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? '').split(',')[0].trim(); const proto = String(req.headers['x-forwarded-proto'] ?? req.protocol ?? 'https').split(',')[0].trim(); return host ? `${proto}://${host}` : ''; };
 
-@Module({ imports: [LmsModule], controllers: [MailController], providers: [MailService] })
+@Module({ imports: [LmsModule], controllers: [MailController], providers: [MailService], exports: [MailService] })
 export class MailModule {}
