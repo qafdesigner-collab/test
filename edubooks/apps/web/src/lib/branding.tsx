@@ -46,3 +46,12 @@ export function BrandMark({ className = '', iconClass = 'size-5 text-brand-600',
     </span>
   );
 }
+
+export interface SchoolBrand { id: string; name: string; code: string; email: string | null; phone: string | null; address: string | null; city: string | null; logoUrl: string | null }
+/** The signed-in user's school (name, logo, contacts); null for publisher staff. */
+export const useSchoolBrand = () => useQuery<SchoolBrand | null>({ queryKey: ['schoolBrand'], queryFn: () => api.get<SchoolBrand | null>('/auth/school-brand'), staleTime: 5 * 60_000, retry: false });
+/** Branding for printed documents: a school account prints with its school's name and logo, not the platform's. */
+export function usePrintBrand(): Branding {
+  const b = useBranding(); const s = useSchoolBrand().data;
+  return s ? { ...b, name: s.name, logoUrl: s.logoUrl } : b;
+}

@@ -14,7 +14,7 @@ export async function printLoginCards(cards: CardInfo[], school: { code?: string
   const items = await Promise.all(cards.map(async (c) => {
     const url = `${location.origin}/login?${new URLSearchParams({ ...(school.code ? { school: school.code } : {}), u: c.username }).toString()}`;
     const qr = await QRCode.toDataURL(url, { margin: 1, width: 220, errorCorrectionLevel: 'M' });
-    return `<div class="card"><div class="top"><span class="logo">${brand.logoUrl ? `<img class="lg" src="${esc(location.origin + brand.logoUrl)}" alt="">` : '📚'} ${esc(brand.name)}</span><span class="school">${esc(school.name ?? '')}</span></div>
+    return `<div class="card"><div class="top"><span class="logo">${brand.logoUrl ? `<img class="lg" src="${esc(location.origin + brand.logoUrl)}" alt="">` : '📚'} ${esc(brand.name)}</span><span class="school">${school.name && school.name !== brand.name ? esc(school.name) : ''}</span></div>
       <div class="body"><div class="info"><div class="name">${esc(c.displayName)}</div>${c.className || c.role ? `<div class="meta">${esc([c.role, c.className].filter(Boolean).join(' · '))}</div>` : ''}
         <table>${school.code ? `<tr><td>School code</td><td><b>${esc(school.code)}</b></td></tr>` : ''}<tr><td>Username</td><td><b>${esc(c.username)}</b></td></tr><tr><td>Password</td><td><b>${esc(c.password)}</b></td></tr></table></div>
         <div class="qr"><img src="${qr}" alt=""><small>Scan to sign in</small></div></div>

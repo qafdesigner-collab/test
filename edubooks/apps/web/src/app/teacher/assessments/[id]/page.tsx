@@ -4,7 +4,7 @@ import { Suspense, use, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, BookMarked, CheckCircle2, Download, KeyRound, PenLine, Plus, Printer, Send, Sparkles, Trash2, XCircle } from 'lucide-react';
-import { useBranding } from '@/lib/branding';
+import { usePrintBrand } from '@/lib/branding';
 import { useMe } from '@/lib/session';
 import { gradeFor, printExamPaper, printResultSheet } from '@/lib/print-docs';
 import { useToast } from '@/components/ui/toast';
@@ -22,7 +22,7 @@ function Builder({ initial, id }: { initial: any; id: string | null }) {
   const [f, setF] = useState<any>(initial); const [items, setItems] = useState<Item[]>(initial.items ?? [newItem()]);
   const roster = useQuery({ queryKey: ['class', f.classId], queryFn: () => api.get(`/classes/${f.classId}`), enabled: !!f.classId });
   const [bank, setBank] = useState(false); const [publishAsk, setPublishAsk] = useState(false); const [ai, setAi] = useState(false);
-  const brand = useBranding(); const me = useMe().data;
+  const brand = usePrintBrand(); const me = useMe().data;
   const printSheet = (key: boolean) => {
     const cls = classes.data?.find((c) => c.id === f.classId);
     const list = items.filter((i) => i.prompt.trim());
@@ -179,7 +179,7 @@ function MarkDialog({ a, student, onClose, onNext, left }: { a: any; student: an
 function Results({ a }: { a: any }) {
   const [tab, setTab] = useState<'students' | 'questions'>('students'); const [mark, setMark] = useState<any>(null); const [closeAsk, setCloseAsk] = useState(false);
   const close = useAction(() => api.post(`/teacher/assessments/${a.id}/close`), { ok: 'Closed', keys: ['assessment', 'assessments'], after: () => setCloseAsk(false) });
-  const brand = useBranding(); const me = useMe().data; const classes = useMyClasses();
+  const brand = usePrintBrand(); const me = useMe().data; const classes = useMyClasses();
   const [pass, setPass] = useState(40);
   const res = (s: any) => {
     const sc = s.submission?.score; const pct = sc === null || sc === undefined || !a.maxScore ? null : Math.round((sc / a.maxScore) * 1000) / 10;

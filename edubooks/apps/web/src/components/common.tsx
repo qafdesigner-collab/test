@@ -5,7 +5,7 @@ import { Badge, Button, Card, Dialog, cn } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 import { printLoginCards } from '@/lib/login-cards';
 import { useMe } from '@/lib/session';
-import { useBranding } from '@/lib/branding';
+import { usePrintBrand } from '@/lib/branding';
 
 export function PageHeader({ title, sub, children }: { title: string; sub?: string; children?: React.ReactNode }) {
   return (
@@ -61,7 +61,7 @@ export interface Credential { role?: string; displayName: string; username: stri
 export function CredentialsDialog({ title, schoolCode, schoolName, creds, onClose, note }: { title: string; schoolCode?: string; schoolName?: string; creds: Credential[]; onClose: () => void; note?: string }) {
   const toast = useToast();
   const { data: me } = useMe();
-  const brand = useBranding();
+  const brand = usePrintBrand();
   const print = () => printLoginCards(creds, { code: schoolCode, name: schoolName ?? me?.school?.name }, brand).catch((e) => toast(e.message, 'err'));
   const text = creds.map((c) => `${c.displayName}${c.role ? ` (${c.role})` : ''} — school code ${schoolCode ?? ''}, username ${c.username}, password ${c.password}`).join('\n');
   return (

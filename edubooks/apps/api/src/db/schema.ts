@@ -44,6 +44,10 @@ export const schools = pgTable('schools', {
   city: text('city'),
   address: text('address'),
   phone: text('phone'),
+  email: text('email'),
+  logoKey: text('logo_key'),
+  logoMime: text('logo_mime'),
+  logoVersion: integer('logo_version'),
   isDemo: boolean('is_demo').notNull().default(false),
   notifySettings: jsonb('notify_settings').notNull().default({}),
   curriculumId: uuid('curriculum_id'), // FK to curricula (declared in SQL; curricula is defined further down)

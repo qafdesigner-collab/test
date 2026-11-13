@@ -59,7 +59,7 @@ export function printReportCards(reports: any[], brand: Branding, o: ReportOptio
     const cls = r.class ? [r.class.name, r.class.section].filter(Boolean).join(' — ') : '—';
     const comment = o.comments?.[r.student.id] ?? o.comment ?? '';
     return `<section class="sheet">
-      <div class="top">${brandHead(brand)}<div><h1>${esc(r.school?.name ?? brand.name)}</h1><div class="sub">${esc(brand.name)}${r.class?.academicYear ? ` · Academic year ${esc(r.class.academicYear)}` : ''}</div></div>
+      <div class="top">${brandHead(brand)}<div><h1>${esc(r.school?.name ?? brand.name)}</h1><div class="sub">${r.school?.name && r.school.name !== brand.name ? esc(brand.name) : ''}${r.class?.academicYear ? `${r.school?.name && r.school.name !== brand.name ? ' · ' : ''}Academic year ${esc(r.class.academicYear)}` : ''}</div></div>
         <div class="doc"><b>Progress report</b>${esc(o.term)}</div></div>
       <div class="who"><div><span>Student</span><b>${esc(r.student.displayName)}</b></div><div><span>Class</span><b>${esc(cls)}</b></div>
         <div><span>Class teacher</span><b>${esc(r.class?.teachers ?? '—')}</b></div><div><span>Date</span><b>${today()}</b></div></div>

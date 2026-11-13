@@ -8,7 +8,7 @@ import { MyTimetable } from '@/components/timetable';
 import { Announcements, LiveLessons } from '@/components/messaging';
 import { useT } from '@/lib/i18n';
 import { Printer } from 'lucide-react';
-import { useBranding } from '@/lib/branding';
+import { usePrintBrand } from '@/lib/branding';
 import { printReportCards } from '@/lib/print-docs';
 
 const pct = (s: number | null, m: number) => (s === null || s === undefined || !m ? null : Math.round((s / m) * 100));
@@ -40,7 +40,7 @@ export default function ParentHome() {
 
 function Child({ id }: { id: string }) {
   const q = useQuery({ queryKey: ['parentChild', id], queryFn: () => api.get<any>(`/parent/children/${id}`) });
-  const brand = useBranding(); const { t } = useT();
+  const brand = usePrintBrand(); const { t } = useT();
   if (q.error) return <ErrorBox error={q.error} />;
   if (!q.data) return <PageLoader />;
   const d = q.data;

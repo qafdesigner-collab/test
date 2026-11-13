@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsOptional, IsString, IsUUID, Length, MaxLength, ValidateNested } from 'class-validator';
@@ -44,6 +44,8 @@ class AssignDto { @IsArray() @ArrayMinSize(1) @ArrayMaxSize(1000) @IsUUID('all',
 class TransferDto { @IsUUID() assignmentId: string; @IsUUID() toUserId: string; @IsString() @Length(3, 500) reason: string; }
 class ReasonDto { @IsOptional() @IsString() @MaxLength(500) reason?: string; }
 class ProfileDto {
+  @IsOptional() @IsString() @Length(2, 160) name?: string;
+  @IsOptional() @IsString() @MaxLength(200) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
   @IsOptional() @IsString() @MaxLength(300) address?: string;
   @IsOptional() @IsString() @MaxLength(80) city?: string;
@@ -73,9 +75,10 @@ export class SchoolAdminController {
   }
   @Patch('profile')
   async profile(@Ctx() c: TenantCtx, @Body() d: ProfileDto) {
-    // Contact details only — name, code and status are managed by the publisher (narrow SECURITY DEFINER function).
-    await this.db.q.execute(sql`SELECT school_update_profile(${d.city ?? null}, ${d.phone ?? null}, ${d.address ?? null})`);
-    await this.audit.log('school.profile.update', 'school', this.sid(c), 'Updated school contact details', undefined, d);
+    // Name and contact details; the school code and status stay with the publisher (narrow SECURITY DEFINER function).
+    if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email.trim())) throw new BadRequestException('Enter a valid email address');
+    await this.db.q.execute(sql`SELECT school_update_details(${d.name ?? null}, ${d.email ?? null}, ${d.city ?? null}, ${d.phone ?? null}, ${d.address ?? null})`);
+    await this.audit.log('school.profile.update', 'school', this.sid(c), 'Updated school details', undefined, d);
     return { ok: true };
   }
 

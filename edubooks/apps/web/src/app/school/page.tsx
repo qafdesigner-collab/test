@@ -1,10 +1,12 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
 import { api, daysLeft, fmtDay } from '@/lib/api';
 import { useAction } from '@/lib/hooks';
+import { useSchoolBrand } from '@/lib/branding';
+import { useToast } from '@/components/ui/toast';
 import { useMe } from '@/lib/session';
 import { Badge, Button, Dialog, ErrorBox, Field, Input, PageLoader } from '@/components/ui';
 import { SeatBar } from '@/components/common';
@@ -21,7 +23,14 @@ export default function SchoolOverview() {
   const an = useQuery({ queryKey: ['insights', 'school'], queryFn: () => api.get<any>('/analytics/school') });
   const att = useQuery({ queryKey: ['attendance', 'school', 'today'], queryFn: () => api.get<any>('/attendance/school') });
   const [edit, setEdit] = useState<any>(null);
-  const save = useAction(() => api.patch('/school/profile', { city: edit.city, phone: edit.phone, address: edit.address }), { ok: 'Profile saved', keys: ['schoolOverview'], after: () => setEdit(null) });
+  const save = useAction(() => api.patch('/school/profile', { name: edit.name, email: edit.email, city: edit.city, phone: edit.phone, address: edit.address }), { ok: 'School details saved', keys: ['schoolOverview', 'schoolBrand', 'me'], after: () => setEdit(null) });
+  const brandQ = useSchoolBrand(); const qc = useQueryClient(); const toast = useToast(); const [logoBusy, setLogoBusy] = useState(false);
+  const uploadLogo = async (file?: File) => {
+    if (!file) return; setLogoBusy(true);
+    try { const f = new FormData(); f.append('file', file); await api.upload('/school/logo', f); qc.invalidateQueries({ queryKey: ['schoolBrand'] }); toast('Logo saved — it now appears on everything you print'); }
+    catch (e: any) { toast(e.message, 'err'); } finally { setLogoBusy(false); }
+  };
+  const removeLogo = async () => { try { await api.del('/school/logo'); qc.invalidateQueries({ queryKey: ['schoolBrand'] }); toast('Logo removed'); } catch (e: any) { toast(e.message, 'err'); } };
   if (q.isLoading) return <PageLoader />;
   if (q.error) return <ErrorBox error={q.error} />;
   const { school: s, licences: L } = q.data;
@@ -39,9 +48,9 @@ export default function SchoolOverview() {
       <Hero>
         <Doodles items={['🏫', '📚', '🎒', '⭐', '🗓️', '✏️']} />
         <p className="font-medium opacity-95">{g.icon} {g.text}, {(me?.displayName ?? '').split(' ')[0]}</p>
-        <h1 className="mb-1.5 mt-1 text-3xl font-extrabold sm:text-[32px]">{s.name} 🏫</h1>
-        <p className="font-medium opacity-95">{[s.city, s.phone, s.address].filter(Boolean).join(' · ') || 'Add your contact details'}
-          <button onClick={() => setEdit({ city: s.city ?? '', phone: s.phone ?? '', address: s.address ?? '' })} className="ml-2 inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold hover:bg-white/30"><Pencil className="size-3" />Edit</button></p>
+        <h1 className="mb-1.5 mt-1 flex items-center gap-3 text-3xl font-extrabold sm:text-[32px]">{brandQ.data?.logoUrl && <img src={brandQ.data.logoUrl} alt="" className="size-12 rounded-xl bg-white object-contain p-1 shadow" />}{s.name}{!brandQ.data?.logoUrl && ' 🏫'}</h1>
+        <p className="font-medium opacity-95">{[s.city, s.phone, s.email, s.address].filter(Boolean).join(' · ') || 'Add your contact details'}
+          <button onClick={() => setEdit({ name: s.name ?? '', email: s.email ?? '', city: s.city ?? '', phone: s.phone ?? '', address: s.address ?? '' })} className="ml-2 inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold hover:bg-white/30"><Pencil className="size-3" />Edit</button></p>
         <div className="mt-4 flex flex-wrap gap-2.5">
           <Link href="/school/attendance" className={unmarked.length ? 'min-w-[150px] rounded-2xl bg-white px-3.5 py-2.5 text-violet-700 shadow' : 'min-w-[150px] rounded-2xl bg-white/20 px-3.5 py-2.5 backdrop-blur-sm hover:bg-white/30'}>
             <small className={unmarked.length ? 'font-semibold text-slate-500' : 'opacity-85'}>TODAY · register</small>
@@ -139,10 +148,21 @@ export default function SchoolOverview() {
       <UpcomingEvents />
 
       {edit && (
-        <Dialog open onOpenChange={() => setEdit(null)} title="Contact details" description="The school name and code are managed by your publisher.">
+        <Dialog open onOpenChange={() => setEdit(null)} title="School details" description="Your school's name, contacts and logo appear on everything printed from your school: report cards, certificates, exam papers, result sheets and login cards. The school code is set by your publisher.">
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+            <div className="flex items-center gap-4 rounded-xl border border-slate-200 p-3">
+              <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-50">{brandQ.data?.logoUrl ? <img src={brandQ.data.logoUrl} alt="School logo" className="size-full object-contain" /> : <span className="text-3xl">🏫</span>}</span>
+              <div className="flex-1 text-sm"><b className="block">School logo</b><span className="text-slate-500">PNG, JPG or WebP, up to 2 MB. A square logo looks best.</span></div>
+              <label className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">{logoBusy ? 'Uploading…' : brandQ.data?.logoUrl ? 'Change' : 'Upload'}
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => { uploadLogo(e.target.files?.[0]); e.target.value = ''; }} /></label>
+              {brandQ.data?.logoUrl && <Button type="button" variant="ghost" size="sm" onClick={removeLogo}>Remove</Button>}
+            </div>
+            <Field label="School name"><Input required minLength={2} maxLength={160} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Email"><Input type="email" value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} placeholder="info@yourschool.ae" /></Field>
+              <Field label="Phone"><Input value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} placeholder="04 123 4567" /></Field>
+            </div>
             <Field label="City"><Input value={edit.city} onChange={(e) => setEdit({ ...edit, city: e.target.value })} /></Field>
-            <Field label="Phone"><Input value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} /></Field>
             <Field label="Address"><Input value={edit.address} onChange={(e) => setEdit({ ...edit, address: e.target.value })} /></Field>
             <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setEdit(null)}>Cancel</Button><Button loading={save.isPending}>Save</Button></div>
           </form>

@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { Award, Printer } from 'lucide-react';
 import { api } from '@/lib/api';
-import { useBranding } from '@/lib/branding';
+import { usePrintBrand } from '@/lib/branding';
 import { CERTIFICATE_TEMPLATES, gradeFor, printCertificates, printReportCards } from '@/lib/print-docs';
 import { Button, Dialog, Field, Input, PageLoader, Select, Textarea } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
@@ -13,7 +13,7 @@ const TERMS = ['Term 1', 'Term 2', 'Term 3', 'Mid-year', 'Final'];
 
 /** Choose a term, write comments and print branded report cards for one or more students. */
 export function ReportCardsDialog({ studentIds, onClose }: { studentIds: string[]; onClose: () => void }) {
-  const brand = useBranding(); const toast = useToast();
+  const brand = usePrintBrand(); const toast = useToast();
   const qs = useQueries({ queries: studentIds.map((id) => ({ queryKey: ['report', id], queryFn: () => api.get<any>(`/teacher/students/${id}/report`) })) });
   const ready = qs.every((q) => q.data); const reports = qs.map((q) => q.data).filter(Boolean) as any[];
   const terms = useMemo(() => [...new Set([...reports.flatMap((r) => r.evaluations.map((e: any) => e.term).filter(Boolean)), ...TERMS])], [ready]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -52,7 +52,7 @@ export function ReportCardsDialog({ studentIds, onClose }: { studentIds: string[
 
 /** Pick students and a certificate design, then print landscape certificates. */
 export function CertificatesDialog({ students, onClose }: { students: { id: string; displayName: string }[]; onClose: () => void }) {
-  const brand = useBranding(); const toast = useToast(); const me = useMe().data as any;
+  const brand = usePrintBrand(); const toast = useToast(); const me = useMe().data as any;
   const [ids, setIds] = useState<string[]>([]);
   const [tpl, setTpl] = useState(CERTIFICATE_TEMPLATES[0].id);
   const t = CERTIFICATE_TEMPLATES.find((x) => x.id === tpl)!;

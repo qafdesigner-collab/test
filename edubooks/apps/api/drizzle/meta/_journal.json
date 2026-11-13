@@ -267,6 +267,13 @@
       "when": 1794750000000,
       "tag": "0037_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794780000000,
+      "tag": "0038_school_brand",
+      "breakpoints": true
     }
   ]
 }

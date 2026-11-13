@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, Download, FileKey, Plus, Printer, Shuffle, Sparkles, Trash2 } from 'lucide-react';
 import { api, downloadCsv, fmtDay } from '@/lib/api';
 import { className as clsName } from '@/lib/lms';
-import { useBranding } from '@/lib/branding';
+import { usePrintBrand } from '@/lib/branding';
 import { printExamPaper, printResultSheet } from '@/lib/print-docs';
 import { Badge, Button, Card, Dialog, ErrorBox, Field, Input, PageLoader, Select, Textarea, cn } from '@/components/ui';
 import { PageHeader } from '@/components/common';
@@ -67,7 +67,7 @@ type Item = { section: string; type: string; prompt: string; options: string[]; 
 export function ExamWorkspace({ id, back }: { id: string; back: string }) {
   const q = useQuery({ queryKey: ['exam', id], queryFn: () => api.get<any>(`/exams/${id}`) });
   const [tab, setTab] = useState<'paper' | 'marks' | 'results'>('paper');
-  const brand = useBranding(); const qc = useQueryClient(); const toast = useToast(); const router = useRouter();
+  const brand = usePrintBrand(); const qc = useQueryClient(); const toast = useToast(); const router = useRouter();
   if (q.error) return <ErrorBox error={q.error} />;
   if (!q.data) return <PageLoader />;
   const e = q.data; const locked = e.status === 'PUBLISHED';
@@ -264,7 +264,7 @@ const RES_LABEL: Record<string, string> = { PASS: 'Pass', FAIL: 'Fail', ABSENT: 
 /** Class result sheet: pass/fail against the pass mark, grade and position; print it or save it. */
 function ExamResults({ examId }: { examId: string }) {
   const q = useQuery({ queryKey: ['examMarks', examId], queryFn: () => api.get<any>(`/exams/${examId}/marks`) });
-  const qc = useQueryClient(); const toast = useToast(); const brand = useBranding();
+  const qc = useQueryClient(); const toast = useToast(); const brand = usePrintBrand();
   const [pass, setPass] = useState<string>(''); const [filter, setFilter] = useState<'ALL' | 'PASS' | 'FAIL' | 'ABSENT'>('ALL');
   useEffect(() => { if (q.data) setPass(String(q.data.passPercent)); }, [q.data?.passPercent]); // eslint-disable-line
   if (q.error) return <ErrorBox error={q.error} />;
