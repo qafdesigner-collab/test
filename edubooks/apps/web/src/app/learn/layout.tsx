@@ -1,0 +1,76 @@
+'use client';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import { hasRole, useMe } from '@/lib/session';
+import { cn, PageLoader } from '@/components/ui';
+import { NotificationBell } from '@/components/notifications';
+import { useBranding } from '@/lib/branding';
+import { LangScope, LangSwitch, useT } from '@/lib/i18n';
+import { KidSky, LevelBadge } from '@/components/kid-ui';
+
+const NAV = [
+  { href: '/learn', label: 'Home', emoji: '🏠', color: 'bg-gradient-to-br from-[#e47aa5] to-[#cc5a8a]', exact: true },
+  { href: '/learn/books', label: 'My Books', emoji: '📚', color: 'bg-gradient-to-br from-[#4f9fdc] to-[#2f7cbf]' },
+  { href: '/learn/games', label: 'Play', emoji: '🎮', color: 'bg-gradient-to-br from-[#3fae86] to-[#24895f]' },
+  { href: '/learn/timetable', label: 'Timetable', emoji: '🗓️', color: 'bg-gradient-to-br from-[#8f7fe3] to-[#6a58c9]' },
+  { href: '/learn/me', label: 'My Stars', emoji: '⭐', color: 'bg-gradient-to-br from-[#e3a24e] to-[#c27a22]' },
+];
+
+/** Playful student shell: big tiles, bright colours, minimal reading. */
+export default function LearnLayout({ children }: { children: React.ReactNode }) { return <LangScope><LearnShell>{children}</LearnShell></LangScope>; }
+
+function LearnShell({ children }: { children: React.ReactNode }) {
+  const { data: me, isLoading, isError } = useMe(); const router = useRouter(); const path = usePathname(); const qc = useQueryClient();
+  const { t } = useT();
+  const ach = useQuery({ queryKey: ['achievements'], queryFn: () => api.get('/student/achievements'), enabled: hasRole(me, 'STUDENT') });
+  useEffect(() => { if (isError) router.replace('/login'); else if (me && !hasRole(me, 'STUDENT')) router.replace('/'); }, [isError, me, router]);
+  if (isLoading || !me || !hasRole(me, 'STUDENT')) return <PageLoader />;
+  return (
+    <div className="relative isolate min-h-screen pb-28 sm:pb-8"
+      style={{ fontFamily: '"Nunito", "Baloo 2", system-ui, sans-serif' }}>
+      <KidSky />
+      <header className="mx-auto flex max-w-5xl items-center gap-2 px-4 pt-4 sm:gap-3 sm:px-6">
+        <Link href="/learn" className="flex items-center gap-2 text-2xl font-black text-violet-600">🦉 <span className="hidden sm:inline"><KidBrand /></span></Link>
+        <div className="flex-1" />
+        <Link href="/learn/me"><LevelBadge stars={ach.data?.stars ?? 0} /></Link>
+        <Link href="/learn/me" className="hidden items-center gap-1 rounded-full bg-white px-4 py-2 text-xl font-black text-amber-600 shadow sm:flex">⭐ {ach.data?.stars ?? '…'}</Link>
+        {ach.data?.streak > 0 && <span className="hidden items-center gap-1 rounded-full bg-white px-4 py-2 text-xl font-black text-orange-600 shadow sm:flex" title={t('Days in a row')}>🔥 {ach.data.streak}</span>}
+        <PupilMessagesButton />
+        <LangSwitch className="bg-white text-violet-700 shadow" />
+        <NotificationBell playful />
+        <button onClick={async () => { await api.post('/auth/logout'); qc.clear(); router.replace('/login'); }} className="focus-ring rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-500 shadow" aria-label={t('Sign out')}>👋 {t('Bye')}</button>
+      </header>
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 gap-2 bg-white/90 p-2 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur sm:static sm:mx-auto sm:mt-4 sm:max-w-5xl sm:bg-transparent sm:px-6 sm:shadow-none">
+        {NAV.map((n) => {
+          const on = n.exact ? path === n.href : path.startsWith(n.href);
+          return <Link key={n.href} href={n.href} aria-current={on ? 'page' : undefined}
+            className={cn('focus-ring flex flex-col items-center rounded-3xl py-2 text-sm font-black text-white shadow-[0_5px_0_rgba(0,0,0,0.12)] transition sm:flex-row sm:justify-center sm:gap-2 sm:py-3 sm:text-lg', n.color, on ? 'ring-4 ring-white sm:scale-105' : '')}>
+            <span className="text-3xl sm:text-2xl">{n.emoji}</span>{t(n.label)}</Link>;
+        })}
+      </nav>
+      <OfflineNote />
+      <main className="mx-auto max-w-5xl px-4 pt-6 sm:px-6">{children}</main>
+    </div>
+  );
+}
+
+function OfflineNote() {
+  const { t } = useT(); const [off, setOff] = useState(false);
+  useEffect(() => { const f = () => setOff(!navigator.onLine); f(); window.addEventListener('online', f); window.addEventListener('offline', f); return () => { window.removeEventListener('online', f); window.removeEventListener('offline', f); }; }, []);
+  return off ? <p role="status" className="mx-auto mt-4 max-w-5xl rounded-2xl bg-slate-800 px-4 py-2 text-center font-bold text-white">📶 {t('You are offline. Saved books still open.')}</p> : null;
+}
+
+function PupilMessagesButton() {
+  const { t } = useT();
+  const q = useQuery({ queryKey: ['unread'], queryFn: () => api.get<{ unread: number }>('/messages/unread'), refetchInterval: 30_000 });
+  return (
+    <Link href="/learn/messages" className="focus-ring relative grid size-11 place-items-center rounded-full bg-white text-xl shadow" aria-label={t('Messages')} title={t('Messages')}>
+      💬{(q.data?.unread ?? 0) > 0 && <span className="absolute -end-1 -top-1 grid min-w-5 place-items-center rounded-full bg-red-500 px-1 text-xs font-black text-white">{q.data!.unread}</span>}
+    </Link>
+  );
+}
+
+function KidBrand() { return <>{useBranding().name}</>; }

@@ -160,3 +160,9 @@ These are reasonable places to start testing. They are **not** shown to be profi
 | News | enter the times of CPI, NFP, FOMC and other high-impact releases manually for the period you test |
 
 Keep the baseline as it is. Only adopt a change if it improves the **validation** period after costs, and confirm it once on the untouched **test** period. Don't call any version "better" until that evidence exists.
+
+---
+
+## Kids LMS projects in this repository
+- [`edubooks/`](edubooks/README.md) — **EduBooks LMS**, the production platform (NestJS + Next.js + PostgreSQL). Built in phases; see `edubooks/docs/ARCHITECTURE.md`.
+- [`lms/`](lms/README.md) — *Bright Books* clickable prototype (Node + SQLite) used for demos and UX.

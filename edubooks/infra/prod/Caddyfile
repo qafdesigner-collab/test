@@ -1,0 +1,26 @@
+# Automatic HTTPS (Let's Encrypt) for {$DOMAIN}. /api goes straight to the API, everything else to the web app.
+{$DOMAIN} {
+	encode zstd gzip
+	request_body {
+		max_size {$MAX_UPLOAD_MB:300}MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+	handle /api/* {
+		reverse_proxy api:4000 {
+			transport http {
+				read_timeout 10m
+				write_timeout 10m
+			}
+		}
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+	log {
+		output stdout
+		format json
+	}
+}
