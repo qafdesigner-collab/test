@@ -71,7 +71,8 @@ describe('Phase 4 — classes, reader, assessments, reports', () => {
       expect(r.assessments.map((a: any) => a.title)).toContain('Sample homework (placeholder questions)');
       const link = (await s1.get(`/api/reader/components/${part1}/pdf`)).body;
       const f = await request(app.getHttpServer()).get(link.url).buffer(true);
-      expect(f.status).toBe(200); expect(f.headers['content-type']).toMatch(/pdf/);
+      // students read protected books: the file arrives encrypted, with the key in the link answer
+      expect(f.status).toBe(200); expect(f.headers['content-type']).toBe('application/octet-stream'); expect(link.enc?.alg).toBe('AES-CTR');
       await s1.put('/api/reader/progress').send({ componentId: part1, page: 7 });
       await s1.put('/api/reader/progress').send({ componentId: part1, page: 3 });
       await s1.post('/api/reader/bookmarks').send({ componentId: part1, page: 5, note: 'Letter B' });
