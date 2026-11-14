@@ -1,3 +1,9 @@
+# What's new in Knowledge Gate 1.3.10
+
+## Install and save books on any device
+- **Phone, tablet or computer:** the **📲 Install app** window now gives the right steps for each device — Android, iPhone, iPad, Windows / Mac in Chrome or Edge (opens from the desktop, Start menu or Dock), and Safari on a Mac (File → Add to Dock).
+- **Save my books on this phone / tablet / computer:** students, teachers and school admins can keep their books on every device they use; each device keeps its own encrypted copy that opens without internet.
+
 # What's new in Knowledge Gate 1.3.9
 
 ## Install the platform as an app, with your logo

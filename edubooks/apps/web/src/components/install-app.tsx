@@ -19,11 +19,15 @@ const subscribe = (f: () => void) => { subs.add(f); return () => subs.delete(f);
 /** Is the app installed / running as an app, can the browser install it with one tap, and is this an iPhone or iPad? */
 export function useInstall() {
   const canPrompt = useSyncExternalStore(subscribe, () => !!deferred, () => false);
-  const [env, setEnv] = useState({ standalone: false, ios: false, ready: false });
+  const [env, setEnv] = useState({ standalone: false, ios: false, macSafari: false, device: 'computer' as 'phone' | 'tablet' | 'computer', ready: false });
   useEffect(() => {
+    const ua = navigator.userAgent;
     const standalone = window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone === true;
-    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    setEnv({ standalone, ios, ready: true });
+    const ipadOs = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+    const ios = /iphone|ipad|ipod/i.test(ua) || ipadOs;
+    const device = /ipad|tablet|playbook|silk/i.test(ua) || ipadOs || (/android/i.test(ua) && !/mobile/i.test(ua)) ? 'tablet' : /iphone|ipod|android|mobile/i.test(ua) ? 'phone' : 'computer';
+    const macSafari = !ios && /macintosh/i.test(ua) && /safari/i.test(ua) && !/chrome|chromium|edg|firefox/i.test(ua);
+    setEnv({ standalone, ios, macSafari, device, ready: true });
   }, []);
   const prompt = async () => { if (!deferred) return false; deferred.prompt(); const r = await deferred.userChoice.catch(() => null); deferred = null; emit(); return r?.outcome === 'accepted'; };
   return { ...env, canPrompt, prompt };
@@ -73,7 +77,8 @@ function InstallDialog({ onClose, canSaveBooks }: { onClose: () => void; canSave
         if (!already.includes(id)) { await saveBook(id); n++; }
       }
       await warmPages(['/portal', '/learn', '/learn/books', '/teacher', '/teacher/books']);
-      setSave({ state: 'done', text: eds.length ? t('{n} book(s) are on this phone — they open even without internet.', { n: eds.length }) : t('You have no books yet.') });
+      const where = ins.device === 'phone' ? t('this phone') : ins.device === 'tablet' ? t('this tablet') : t('this computer');
+      setSave({ state: 'done', text: eds.length ? t('{n} book(s) are on {where} — they open even without internet.', { n: eds.length, where }) : t('You have no books yet.') });
       void n;
     } catch (e: any) { setSave({ state: 'error', text: e?.message || t('Could not save the books') }); }
   };
@@ -82,7 +87,7 @@ function InstallDialog({ onClose, canSaveBooks }: { onClose: () => void; canSave
       <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="relative flex items-center gap-4 bg-gradient-to-br from-violet-600 to-indigo-600 p-5 text-white">
           <img src={b.appIcon ?? '/icon-192.png'} alt="" className="size-16 rounded-2xl bg-white shadow-lg" />
-          <div><p className="text-lg font-bold">{t('Install {name}', { name: b.name })}</p><p className="text-sm text-white/85">{t('Opens like an app from your home screen — with your books ready offline.')}</p></div>
+          <div><p className="text-lg font-bold">{t('Install {name}', { name: b.name })}</p><p className="text-sm text-white/85">{ins.device === 'computer' ? t('Opens like a program from your desktop — with your books ready offline.') : t('Opens like an app from your home screen — with your books ready offline.')}</p></div>
           <button onClick={onClose} aria-label={t('Close')} className="absolute end-3 top-3 rounded-full p-1 text-white/80 hover:bg-white/15"><X className="size-5" /></button>
         </div>
         <div className="space-y-4 p-5">
@@ -94,11 +99,13 @@ function InstallDialog({ onClose, canSaveBooks }: { onClose: () => void; canSave
                 <li className="flex items-center gap-2"><span className="grid size-6 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">2</span>{t('Tap the Share button')} <Share className="size-4 text-sky-600" /></li>
                 <li className="flex items-center gap-2"><span className="grid size-6 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">3</span>{t('Choose “Add to Home Screen”')} <SquarePlus className="size-4" /></li>
               </ol>)
-            : <p className="text-sm text-slate-700">{t('Open your browser menu (⋮ or ⋯) and choose “Install app” or “Add to Home screen”. In Chrome or Edge on a computer you can also click the install icon at the right of the address bar.')}</p>}
+            : ins.macSafari ? <p className="text-sm text-slate-700">{t('In Safari on a Mac: open the File menu and choose “Add to Dock”.')}</p>
+            : ins.device === 'computer' ? <p className="text-sm text-slate-700">{t('Use Chrome or Edge: click the install icon at the right of the address bar, or open the menu (⋮ or ⋯) → “Install {name}” / “Apps → Install this site as an app”. It then opens from your desktop and Start menu or Dock.', { name: b.name })}</p>
+            : <p className="text-sm text-slate-700">{t('Open your browser menu (⋮ or ⋯) and choose “Install app” or “Add to Home screen”.')}</p>}
           {canSaveBooks && offlineSupported() && (
             <div className="rounded-2xl border border-slate-200 p-4">
-              <p className="font-semibold text-slate-800">📚 {t('Save my books on this phone')}</p>
-              <p className="mt-0.5 text-xs text-slate-600">{t('Your books are kept (encrypted) on this device, so they open without internet. Signing out removes them.')}</p>
+              <p className="font-semibold text-slate-800">📚 {ins.device === 'phone' ? t('Save my books on this phone') : ins.device === 'tablet' ? t('Save my books on this tablet') : t('Save my books on this computer')}</p>
+              <p className="mt-0.5 text-xs text-slate-600">{t('Your books are kept (encrypted) on this device, so they open without internet. Save them on each phone, tablet or computer you use. Signing out removes them.')}</p>
               {save.text && <p className={cn('mt-2 text-sm', save.state === 'error' ? 'text-red-600' : save.state === 'done' ? 'text-emerald-700' : 'text-slate-600')}>{save.text}</p>}
               {save.state !== 'done' && <button onClick={saveAll} disabled={save.state === 'busy'} className="mt-3 w-full rounded-xl bg-slate-900 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{save.state === 'busy' ? t('Saving…') : t('Save my books')}</button>}
             </div>
