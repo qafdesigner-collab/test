@@ -40,6 +40,8 @@ export class FilesController {
     if (kind?.active) res.setHeader('Content-Security-Policy', 'sandbox allow-scripts allow-popups allow-forms allow-modals');
     const safeName = asset.originalName.replace(/[^\w.\- ]+/g, '_');
     res.setHeader('Content-Disposition', `${t.d && !t.v ? 'attachment' : 'inline'}; filename="${safeName}"`);
-    (await this.assets.driver.read(asset.storageKey)).on('error', () => res.destroy()).pipe(res);
+    const stream = (await this.assets.driver.read(asset.storageKey)).on('error', () => res.destroy());
+    if (t.x) { res.setHeader('Content-Type', 'application/octet-stream'); res.setHeader('Content-Disposition', 'inline; filename="protected.bin"'); stream.pipe(this.assets.encryptor(t.x)).pipe(res); return; }
+    stream.pipe(res);
   }
 }

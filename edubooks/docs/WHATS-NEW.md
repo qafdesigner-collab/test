@@ -1,3 +1,13 @@
+# What's new in Knowledge Gate 1.3.8
+
+## Stronger book protection
+- **One logo instead of many names:** each book page shows **your logo once, faintly, in the centre**, with the reader's name and school in small letters under it (so a photo of the screen can still be traced). Upload your logo under Super admin → Branding.
+- **Encrypted books:** book PDFs are now sent **encrypted** with a one-time key that only the platform's reader receives. A copied link, or a file saved from the browser, cannot be opened in any PDF program. Books saved for offline reading also stay encrypted on the device.
+- **Hidden when you leave:** the book is covered as soon as the reader switches to another tab, window or app (or presses Print Screen), until they click to continue.
+- **No printing, downloading, right-click, copying, saving or developer tools (F12)** on book pages, flipbooks, CDs and resources.
+- Publisher staff still see and download the original files.
+- Note: no website can completely stop a phone camera or every screenshot tool; the name under the logo is there for that case.
+
 # What's new in Knowledge Gate 1.3.7
 
 ## Easier whiteboard

@@ -94,7 +94,7 @@ export class BrandingController {
     const l = await this.svc.logo();
     res.setHeader('Content-Type', l.mime);
     res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'); // public logo; also shown inside sandboxed book frames
     l.stream.on('error', () => res.destroy()).pipe(res);
   }
   @Roles('PUBLISHER_ADMIN') @Patch() update(@Body() d: BrandingDto) { return this.svc.update(d); }

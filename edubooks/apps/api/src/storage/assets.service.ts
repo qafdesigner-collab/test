@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { createHash, createHmac, timingSafeEqual } from 'crypto';
+import { createCipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import * as fs from 'fs';
 import { and, eq } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
@@ -11,6 +11,14 @@ import { extOf, FILE_TYPES } from './file-types';
 import { scanFile } from './scanner';
 
 export interface UploadedTemp { path: string; originalname: string; size: number }
+
+/** Key and counter block for one protected link, derived from the link's random nonce and the server secret. */
+function streamKey(nonce: string) {
+  const key = createHmac('sha256', config.fileUrlSecret).update(`pdf-key:${nonce}`).digest();
+  const iv = createHmac('sha256', config.fileUrlSecret).update(`pdf-iv:${nonce}`).digest().subarray(0, 16);
+  iv[15] = 0; iv[14] = 0; iv[13] = 0; iv[12] = 0; // room for the block counter (as WebCrypto AES-CTR with length 32 expects)
+  return { key, iv };
+}
 
 @Injectable()
 export class AssetsService {
@@ -69,15 +77,23 @@ export class AssetsService {
     const { protect } = await protectionFor(this.db);
     if (protect && download) throw new ForbiddenException('Book content can only be viewed inside the platform');
     const exp = Math.floor(Date.now() / 1000) + config.fileUrlTtlSec;
-    const payload = Buffer.from(JSON.stringify({ a: a.id, p: a.publisherId, e: exp, d: download ? 1 : 0, ...(protect ? { v: 1 } : {}) })).toString('base64url');
-    return { url: `/api/files/${payload}.${this.sign(payload)}`, expiresAt: new Date(exp * 1000), viewOnly: protect };
+    // Protected PDFs are sent encrypted with a one-time key that only the platform's own reader receives:
+    // a copied link, or a file saved from the browser's network tools, is not a readable PDF.
+    const x = protect && a.ext === 'pdf' ? randomBytes(12).toString('base64url') : undefined;
+    const payload = Buffer.from(JSON.stringify({ a: a.id, p: a.publisherId, e: exp, d: download ? 1 : 0, ...(protect ? { v: 1 } : {}), ...(x ? { x } : {}) })).toString('base64url');
+    const enc = x ? streamKey(x) : null;
+    return { url: `/api/files/${payload}.${this.sign(payload)}`, expiresAt: new Date(exp * 1000), viewOnly: protect,
+      ...(enc ? { enc: { alg: 'AES-CTR', key: enc.key.toString('base64'), iv: enc.iv.toString('base64') } } : {}) };
   }
 
   /** Set by the licensing module: decides access for school users from their licence entitlements. */
   private accessChecker?: (assetId: string) => Promise<boolean>;
   setAccessChecker(fn: (assetId: string) => Promise<boolean>) { this.accessChecker = fn; }
 
-  verifyToken(token: string): { a: string; p: string; d: number; v?: number } {
+  /** Encrypts a file stream for a protected link (AES-256-CTR keeps the length, so the size header stays right). */
+  encryptor(nonce: string) { const k = streamKey(nonce); return createCipheriv('aes-256-ctr', k.key, k.iv); }
+
+  verifyToken(token: string): { a: string; p: string; d: number; v?: number; x?: string } {
     const [payload, sig] = token.split('.');
     if (!payload || !sig) throw new ForbiddenException('Invalid link');
     const expected = Buffer.from(this.sign(payload)); const got = Buffer.from(sig);

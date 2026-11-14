@@ -1,4 +1,5 @@
 'use client';
+import { decryptPdf, type FileLink } from '@/lib/protected-pdf';
 import { api } from '@/lib/api';
 
 /**
@@ -30,10 +31,13 @@ export async function saveBook(editionId: string, onProgress?: (done: number, to
   const parts = (ed.components as any[]).filter((x) => x.hasPdf);
   let done = 0; onProgress?.(0, parts.length);
   for (const p of parts) {
-    const { url } = await api.get<{ url: string }>(`/reader/components/${p.id}/pdf`);
-    const res = await fetch(url, { credentials: 'include' });
+    const link = await api.get<FileLink>(`/reader/components/${p.id}/pdf`);
+    const res = await fetch(link.url, { credentials: 'include' });
     if (!res.ok) throw new Error(`Could not download ${p.title}`);
-    await c.put(pdfKey(p.id), new Response(await res.blob(), { headers: { 'content-type': 'application/pdf' } }));
+    // Protected books stay encrypted on the device; the key is kept beside them and only used by the reader.
+    const headers: Record<string, string> = { 'content-type': 'application/octet-stream' };
+    if (link.enc) { headers['x-kg-key'] = link.enc.key; headers['x-kg-iv'] = link.enc.iv; }
+    await c.put(pdfKey(p.id), new Response(await res.blob(), { headers }));
     onProgress?.(++done, parts.length);
   }
   await c.put(markKey(editionId), new Response(JSON.stringify({ title: ed.title, parts: parts.map((x) => x.id), savedAt: new Date().toISOString() }), { headers: { 'content-type': 'application/json' } }));
@@ -50,5 +54,8 @@ export async function removeBook(editionId: string) {
 export async function offlinePdf(componentId: string): Promise<ArrayBuffer | null> {
   if (!offlineSupported()) return null;
   const hit = await (await caches.open(BOOKS)).match(pdfKey(componentId));
-  return hit ? hit.arrayBuffer() : null;
+  if (!hit) return null;
+  const key = hit.headers.get('x-kg-key'); const iv = hit.headers.get('x-kg-iv');
+  const data = await hit.arrayBuffer();
+  return key && iv ? decryptPdf(data, { alg: 'AES-CTR', key, iv }) : data;
 }

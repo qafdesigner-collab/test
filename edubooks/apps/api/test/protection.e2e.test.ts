@@ -56,7 +56,15 @@ describe('Covers, CD / mobile-app parts and content protection', () => {
     expect((await admin.get('/api/company/my-protection')).body.protect).toBe(false);
     const link = (await student.get(`/api/reader/components/${part1}/pdf`)).body;
     expect(link.viewOnly).toBe(true);
-    expect((await http().get(link.url).set('Sec-Fetch-Dest', 'empty')).status).toBe(200); // the reader's own fetch
+    const got = await http().get(link.url).set('Sec-Fetch-Dest', 'empty').buffer(true).parse((res: any, cb: any) => { const c: Buffer[] = []; res.on('data', (d: Buffer) => c.push(d)); res.on('end', () => cb(null, Buffer.concat(c))); });
+    expect(got.status).toBe(200); // the reader's own fetch…
+    // …gets the PDF encrypted; only the key handed to the reader turns it back into the book
+    expect(link.enc).toMatchObject({ alg: 'AES-CTR' });
+    expect(got.body.subarray(0, 5).toString()).not.toBe('%PDF-');
+    const { createDecipheriv } = require('crypto');
+    const d = createDecipheriv('aes-256-ctr', Buffer.from(link.enc.key, 'base64'), Buffer.from(link.enc.iv, 'base64'));
+    expect(Buffer.concat([d.update(got.body), d.final()]).subarray(0, 5).toString()).toBe('%PDF-');
+    expect((await admin.get(`/api/reader/components/${part1}/pdf`)).body.enc).toBeUndefined(); // publisher staff get the plain file
     expect((await http().get(link.url).set('Sec-Fetch-Dest', 'document')).status).toBe(403); // opened as a page to save it
     const res = (await teacher.get(`/api/reader/editions/${ed}`)).body.resources[0];
     expect((await teacher.get(`/api/assets/${res.assetId}/link?download=1`)).status).toBe(403);

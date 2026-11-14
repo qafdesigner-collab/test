@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { cn } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 import { loadPdf } from '@/components/reader';
+import type { FileLink } from '@/lib/protected-pdf';
 import { useT } from '@/lib/i18n';
 
 type Stroke = { id: string; c: string; w: number; t: 'pen' | 'hl' | 'er'; p: number[][] };
@@ -138,8 +139,8 @@ function useBackground(bg: Bg, paper: Paper, canvas: React.RefObject<HTMLCanvasE
       }
       try {
         if (doc.current?.id !== bg.componentId) {
-          const { url } = await api.get<{ url: string }>(`/reader/components/${bg.componentId}/pdf`);
-          doc.current = { id: bg.componentId, d: await loadPdf(url) };
+          const link = await api.get<FileLink>(`/reader/components/${bg.componentId}/pdf`);
+          doc.current = { id: bg.componentId, d: await loadPdf(link) };
         }
         const d = doc.current.d; const page = await d.getPage(Math.min(Math.max(1, bg.page ?? 1), d.numPages));
         const vp1 = page.getViewport({ scale: 1 });
