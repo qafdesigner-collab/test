@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { hasRole, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
 import { NotificationBell } from '@/components/notifications';
+import { InstallAppButton } from '@/components/install-app';
 import { useBranding } from '@/lib/branding';
 import { LangScope, LangSwitch, useT } from '@/lib/i18n';
 import { KidSky, LevelBadge } from '@/components/kid-ui';
@@ -40,6 +41,7 @@ function LearnShell({ children }: { children: React.ReactNode }) {
         {ach.data?.streak > 0 && <span className="hidden items-center gap-1 rounded-full bg-white px-4 py-2 text-xl font-black text-orange-600 shadow sm:flex" title={t('Days in a row')}>🔥 {ach.data.streak}</span>}
         <PupilMessagesButton />
         <LangSwitch className="bg-white text-violet-700 shadow" />
+        <InstallAppButton variant="playful" canSaveBooks />
         <NotificationBell playful />
         <button onClick={async () => { await api.post('/auth/logout'); qc.clear(); router.replace('/login'); }} className="focus-ring rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-500 shadow" aria-label={t('Sign out')}>👋 {t('Bye')}</button>
       </header>

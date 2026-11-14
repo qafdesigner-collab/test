@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { hasRole, useMe } from '@/lib/session';
 import { PageLoader } from '@/components/ui';
 import { NotificationBell } from '@/components/notifications';
+import { InstallAppButton } from '@/components/install-app';
 import { BrandMark } from '@/lib/branding';
 import { LangScope, LangSwitch, useT } from '@/lib/i18n';
 import Link from 'next/link';
@@ -27,6 +28,7 @@ function ParentShell({ children }: { children: React.ReactNode }) {
           <MessagesLink />
           <MailLink />
           <LangSwitch className="border border-slate-300 text-slate-700 hover:bg-slate-50" />
+          <InstallAppButton className="ring-1 ring-slate-200" />
           <NotificationBell />
           <button onClick={async () => { await api.post('/auth/logout'); qc.clear(); router.replace('/login'); }} className="focus-ring rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100">{t('Sign out')}</button>
         </div>

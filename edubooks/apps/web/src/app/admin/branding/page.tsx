@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ImagePlus, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { palette, useBranding } from '@/lib/branding';
+import { makeAppIcons } from '@/lib/app-icons';
 import { Button, Card, ErrorBox, Field, Input } from '@/components/ui';
 import { PageHeader } from '@/components/common';
 import { useToast } from '@/components/ui/toast';
@@ -20,8 +21,19 @@ export default function BrandingPage() {
   const upload = async (fl?: File) => {
     if (!fl) return; setErr(null);
     const fd = new FormData(); fd.append('file', fl);
-    try { refresh(await api.upload('/branding/logo', fd)); toast('Logo updated'); } catch (e) { setErr(e); }
+    try {
+      const nb = await api.upload<any>('/branding/logo', fd); refresh(nb); toast('Logo updated');
+      if (nb.logoUrl) await makeIcon(nb.logoUrl, true);
+    } catch (e) { setErr(e); }
   };
+  const [iconBusy, setIconBusy] = useState(false);
+  /** The installed app's home-screen icon, made from the logo. */
+  const makeIcon = async (logoUrl = b.logoUrl, quiet = false) => {
+    if (!logoUrl) return; setIconBusy(true);
+    try { refresh(await api.upload('/branding/app-icons', await makeAppIcons(logoUrl, iconBg))); if (!quiet) toast('App icon updated — new installs show your logo'); }
+    catch (e) { setErr(e); } finally { setIconBusy(false); }
+  };
+  const [iconBg, setIconBg] = useState('#ffffff');
   const p = palette(f.primaryColor);
   return (
     <div className="space-y-6">
@@ -61,6 +73,23 @@ export default function BrandingPage() {
               <span className="rounded-lg px-4 py-2 text-sm font-medium text-white" style={{ background: p[600] }}>Button</span>
               <span className="rounded-lg px-4 py-2 text-sm font-medium" style={{ background: p[50], color: p[700] }}>Selected menu item</span>
               <span className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: p[500], color: p[700] }}>Link</span>
+            </div>
+          </div>
+        </Card>
+        <Card className="space-y-4 p-5 lg:col-span-2">
+          <div><p className="font-semibold text-slate-800">📲 App icon (home screen)</p>
+            <p className="text-sm text-slate-600">Teachers, students and parents can install the platform as an app (the “Install app” button at the top of every page). The icon on their home screen is made from your logo, with your name under it.</p></div>
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="flex flex-col items-center gap-1.5"><img src={(b as any).appIcon ?? '/icon-192.png'} alt="App icon" className="size-20 rounded-[1.4rem] shadow-md ring-1 ring-slate-200" /><span className="max-w-24 truncate text-xs font-medium text-slate-700">{b.name}</span></div>
+            <div className="flex flex-col items-center gap-1.5"><img src={(b as any).appIcon ? (b as any).appIcon.replace('/192', '/maskable') : '/icon-maskable-512.png'} alt="Round app icon" className="size-20 rounded-full shadow-md ring-1 ring-slate-200" /><span className="text-xs text-slate-500">Android round</span></div>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm text-slate-700">Background <Input type="color" aria-label="Icon background" className="h-8 w-12 p-1" value={iconBg} onChange={(e) => setIconBg(e.target.value)} /></label>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" disabled={!b.logoUrl} loading={iconBusy} onClick={() => makeIcon()}>{(b as any).appIcon ? 'Make it again from the logo' : 'Use my logo as the app icon'}</Button>
+                {(b as any).appIcon && <Button size="sm" variant="ghost" onClick={async () => refresh(await api.del('/branding/app-icons'))}>Use the default icon</Button>}
+              </div>
+              {!b.logoUrl && <p className="text-xs text-amber-700">Upload your logo first.</p>}
+              <p className="text-xs text-slate-500">Phones that already installed the app pick up a new icon after some days (or when they install it again).</p>
             </div>
           </div>
         </Card>

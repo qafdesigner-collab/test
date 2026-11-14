@@ -6,6 +6,7 @@ import { BookOpen, Building2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { homeFor, Me } from '@/lib/session';
 import { BrandMark, useBranding } from '@/lib/branding';
+import { InstallAppButton } from '@/components/install-app';
 import { Button, ErrorBox, Field, Input } from '@/components/ui';
 import { LangScope, LangSwitch, useT } from '@/lib/i18n';
 import { LoginContact } from '@/components/company-card';
@@ -55,6 +56,7 @@ function LoginScreen() {
           <h2 className="text-2xl font-semibold text-slate-900">{t('Sign in')}</h2>
           <p className="mb-6 mt-1 text-sm text-slate-500">{t('Use the login your school or publisher gave you.')}</p>
           <Suspense><LoginForm /></Suspense>
+          <div className="mt-5 flex justify-center"><InstallAppButton className="ring-1 ring-slate-200" /></div>
           <div className="mt-8 lg:hidden"><LoginContact /></div>
         </div>
       </div>

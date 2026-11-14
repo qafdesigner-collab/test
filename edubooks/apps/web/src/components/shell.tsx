@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { hasRole, Me, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
 import { NotificationBell } from '@/components/notifications';
+import { InstallAppButton } from '@/components/install-app';
 import { useBranding } from '@/lib/branding';
 
 export interface NavItem { href: string; label: string; icon: React.ComponentType<{ className?: string }>; exact?: boolean; color?: string; roles?: string[] }
@@ -64,6 +65,7 @@ export function Shell({ role, roleLabel, nav, children, deny, theme = 'teacher',
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 px-4 backdrop-blur lg:px-8" style={{ background: `color-mix(in srgb, ${T.page} 85%, transparent)` }}>
           <button className="focus-ring rounded-xl bg-white p-2 shadow-sm lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="size-5" /></button>
           <div className="flex-1" />
+          <InstallAppButton canSaveBooks={me.roles.includes('TEACHER')} />
           <span className="rounded-2xl bg-white shadow-sm"><NotificationBell /></span>
           <div className="hidden text-right text-sm leading-tight sm:block"><div className="font-semibold text-slate-800">{me.displayName}</div><div className="text-xs text-slate-500">{typeof roleLabel === 'function' ? roleLabel(me) : roleLabel}</div></div>
           <span className="grid size-10 place-items-center rounded-full text-sm font-extrabold text-white shadow" style={{ background: T.hero }} aria-hidden>{initials(me.displayName)}</span>

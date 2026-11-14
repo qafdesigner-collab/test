@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { BookOpen } from 'lucide-react';
 import { api } from './api';
 
-export interface Branding { name: string; tagline: string; primaryColor: string; logoUrl: string | null }
+export interface Branding { name: string; tagline: string; primaryColor: string; logoUrl: string | null; appIcon?: string | null }
 const DEFAULT: Branding = { name: 'Knowledge Gate', tagline: 'Books, licences and learning — in one place.', primaryColor: '#4f46e5', logoUrl: null };
 const Ctx = createContext<Branding>(DEFAULT);
 export const useBranding = () => useContext(Ctx);

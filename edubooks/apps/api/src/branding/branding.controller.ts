@@ -1,6 +1,6 @@
-import { BadRequestException, Body, Controller, Delete, Get, Injectable, Module, NotFoundException, Patch, Post, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Injectable, Module, NotFoundException, Param, Patch, Post, Req, Res, UploadedFile, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
 import { IsHexColor, IsOptional, IsString, MaxLength } from 'class-validator';
 import { diskStorage } from 'multer';
@@ -40,7 +40,50 @@ export class BrandingService {
     return {
       name: b.name || DEFAULTS.name, tagline: b.tagline || DEFAULTS.tagline,
       primaryColor: b.primaryColor || DEFAULTS.primaryColor, logoUrl: b.logo ? `/api/branding/logo?v=${b.logo.v}` : null, publisher: r?.name ?? null,
+      appIcon: b.appIcons ? `/api/branding/app-icon/192?v=${b.appIcons.v}` : null,
     };
+  }
+
+  /** Web-app manifest: the installed app carries the publisher's name, colour and logo icon. */
+  async manifest() {
+    const { rows } = await this.db.root.execute(sql`SELECT * FROM public_branding(${process.env.BRANDING_PUBLISHER_SLUG ?? ''})`);
+    const b = (rows[0] as any)?.branding ?? {}; const name = b.name || DEFAULTS.name; const ic = b.appIcons;
+    const icon = (size: string, file: string, purpose?: string) => ({ src: ic ? `/api/branding/app-icon/${size}?v=${ic.v}` : file, sizes: size === 'maskable' ? '512x512' : `${size}x${size}`, type: 'image/png', ...(purpose ? { purpose } : {}) });
+    return {
+      id: '/portal', name, short_name: name.length > 14 ? name.split(/\s+/)[0].slice(0, 14) : name, description: b.tagline || DEFAULTS.tagline,
+      start_url: '/portal', scope: '/', display: 'standalone', orientation: 'any', background_color: '#ffffff', theme_color: b.primaryColor || DEFAULTS.primaryColor,
+      icons: [icon('192', '/icon-192.png'), icon('512', '/icon-512.png'), icon('maskable', '/icon-maskable-512.png', 'maskable')],
+    };
+  }
+
+  /** The home-screen icon in one size, or null when the default icon applies. */
+  async appIcon(size: string) {
+    const { rows } = await this.db.root.execute(sql`SELECT * FROM public_branding(${process.env.BRANDING_PUBLISHER_SLUG ?? ''})`);
+    const k = (rows[0] as any)?.branding?.appIcons?.[size];
+    return k ? this.assets.driver.read(k) : null;
+  }
+
+  /** Icons made in the browser from the logo (square PNGs), so no image tools are needed on the server. */
+  async setAppIcons(files: Record<string, Express.Multer.File[] | undefined>) {
+    const out: Record<string, string> = {}; const v = randomBytes(4).toString('hex');
+    for (const [field, size] of [['icon192', 192], ['icon512', 512], ['maskable', 512], ['apple', 180]] as const) {
+      const f = files[field]?.[0];
+      if (!f) throw new BadRequestException(`Missing the ${field} icon`);
+      if (!LOGO_TYPES.png.magic(f.buffer) || f.buffer.readUInt32BE(16) !== size || f.buffer.readUInt32BE(20) !== size) throw new BadRequestException(`The ${field} icon must be a ${size}×${size} PNG`);
+      const key = `${this.db.ctx.publisherId}/branding/app-${field}-${v}.png`;
+      const tmp = `${appTmp('uploads')}/${randomBytes(8).toString('hex')}.png`;
+      fs.writeFileSync(tmp, f.buffer);
+      try { await this.assets.driver.putFile(key, tmp, 'image/png'); } finally { fs.rmSync(tmp, { force: true }); }
+      out[field === 'icon192' ? '192' : field === 'icon512' ? '512' : field === 'apple' ? '180' : 'maskable'] = key;
+    }
+    const before = await this.current();
+    await this.save({ ...before, appIcons: { ...out, v } }, 'Made the home-screen app icon from the logo', before);
+    return this.publicBranding(true);
+  }
+  async removeAppIcons() {
+    const before = await this.current(); const { appIcons, ...rest } = before;
+    await this.save(rest, 'Back to the default app icon', before);
+    return this.publicBranding(true);
   }
   async logo() {
     const { rows } = await this.db.root.execute(sql`SELECT * FROM public_branding(${process.env.BRANDING_PUBLISHER_SLUG ?? ''})`);
@@ -105,6 +148,27 @@ export class BrandingController {
     return this.db.withContext(req.ctx, () => this.svc.setLogo(file));
   }
   @Roles('PUBLISHER_ADMIN') @Delete('logo') remove() { return this.svc.removeLogo(); }
+
+  @Public() @SkipThrottle() @ManualTx() @Get('manifest')
+  async manifest(@Res() res: Response) {
+    res.setHeader('Content-Type', 'application/manifest+json'); res.setHeader('Cache-Control', 'public, max-age=300');
+    res.send(JSON.stringify(await this.svc.manifest()));
+  }
+  @Public() @SkipThrottle() @ManualTx() @Get('app-icon/:size')
+  async appIcon(@Param('size') size: string, @Res() res: Response) {
+    const defaults: Record<string, string> = { '192': '/icon-192.png', '512': '/icon-512.png', maskable: '/icon-maskable-512.png', '180': '/apple-touch-icon.png' };
+    if (!defaults[size]) throw new NotFoundException();
+    const s = await this.svc.appIcon(size);
+    if (!s) { res.redirect(302, defaults[size]); return; }
+    res.setHeader('Content-Type', 'image/png'); res.setHeader('Cache-Control', 'public, max-age=86400');
+    s.on('error', () => res.destroy()).pipe(res);
+  }
+  @Roles('PUBLISHER_ADMIN') @ManualTx() @Post('app-icons')
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'icon192', maxCount: 1 }, { name: 'icon512', maxCount: 1 }, { name: 'maskable', maxCount: 1 }, { name: 'apple', maxCount: 1 }], { limits: { fileSize: 1048576, files: 4 } }))
+  appIcons(@UploadedFiles() files: Record<string, Express.Multer.File[]>, @Req() req: any) {
+    return this.db.withContext(req.ctx, () => this.svc.setAppIcons(files ?? {}));
+  }
+  @Roles('PUBLISHER_ADMIN') @Delete('app-icons') removeAppIcons() { return this.svc.removeAppIcons(); }
 }
 
 @Module({ imports: [StorageModule], controllers: [BrandingController], providers: [BrandingService] })

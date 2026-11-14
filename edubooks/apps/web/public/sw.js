@@ -3,9 +3,9 @@
  * - Pages and a few read-only API answers are network-first, with the last copy kept for offline use.
  * - Books saved for offline use live in their own cache (written by the page, see lib/offline.ts).
  * - Signing out removes every cached answer and saved book from this device. */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const STATIC = `kg-static-${VERSION}`, PAGES = 'kg-pages', API = 'kg-api', BOOKS = 'kg-books';
-const API_KEEP = [/^\/api\/auth\/me$/, /^\/api\/branding$/, /^\/api\/library$/, /^\/api\/reader\/editions\/[0-9a-f-]+$/, /^\/api\/reader\/components\/[0-9a-f-]+\/hotspots$/, /^\/api\/timetable\/me$/, /^\/api\/student\/(home|achievements)$/];
+const API_KEEP = [/^\/api\/auth\/me$/, /^\/api\/branding$/, /^\/api\/company\/my-protection$/, /^\/api\/library$/, /^\/api\/reader\/editions\/[0-9a-f-]+$/, /^\/api\/reader\/components\/[0-9a-f-]+\/hotspots$/, /^\/api\/timetable\/me$/, /^\/api\/student\/(home|achievements)$/];
 
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(STATIC).then((c) => c.addAll(['/offline.html', '/icon-192.png', '/pdf.worker.min.mjs']))); self.skipWaiting(); });
 self.addEventListener('activate', (e) => {
@@ -33,7 +33,7 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== self.location.origin) return;
   if (req.method === 'POST' && url.pathname === '/api/auth/logout') { e.waitUntil(wipe()); return; }
   if (req.method !== 'GET') return;
-  if (url.pathname.startsWith('/_next/static/') || /^\/(icon|apple-touch-icon|pdf\.worker)/.test(url.pathname)) {
+  if (url.pathname.startsWith('/_next/static/') || /^\/(icon|apple-touch-icon|pdf\.worker)/.test(url.pathname) || /^\/api\/branding\/(logo|app-icon\/)/.test(url.pathname)) {
     e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => { if (res.ok) caches.open(STATIC).then((c) => c.put(req, res.clone())); return res; })));
     return;
   }

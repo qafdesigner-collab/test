@@ -1,3 +1,12 @@
+# What's new in Knowledge Gate 1.3.9
+
+## Install the platform as an app, with your logo
+- **📲 Install app** button at the top of every portal (super admin, school, teacher, student, parent) and on the sign-in page.
+  - **Android and computers (Chrome / Edge):** one tap on **Install now**.
+  - **iPhone / iPad:** the window shows the 3 steps (Safari → Share → Add to Home Screen).
+- **Your logo is the app icon:** Super admin → **Branding** → upload your logo, and the home-screen icon is made from it automatically (choose the icon's background colour, or press **Make it again from the logo**). The app also carries your **name** and **main colour**.
+- **Save my books on this phone:** in the install window, students and teachers press **Save my books**. All their books are kept on the device — **still encrypted** — and open **without internet**, together with the screens needed to read them. Signing out removes them from the device.
+
 # What's new in Knowledge Gate 1.3.8
 
 ## Stronger book protection
