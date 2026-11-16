@@ -75,7 +75,8 @@ describe('Phase 2 — Book Package Management', () => {
     const tree = (await admin.get(`/api/publishing/editions/${edId}`)).body;
     const link = await admin.get(`/api/assets/${tree.resources[0].asset.id}/link`);
     expect(link.body.url).toMatch(/^\/api\/files\//);
-    const f = await request(app.getHttpServer()).get(link.body.url).buffer(true);
+    const f = await admin.get(link.body.url).buffer(true);
+    expect((await request(app.getHttpServer()).get(link.body.url)).status).toBe(401); // a link without the sign-in it was made for
     expect(f.status).toBe(200);
     expect(f.headers['content-type']).toMatch(/pdf/);
     const tampered = link.body.url.replace(/.$/, (c: string) => (c === 'A' ? 'B' : 'A'));
@@ -85,7 +86,7 @@ describe('Phase 2 — Book Package Management', () => {
     const kgTree = (await admin.get(`/api/publishing/editions/${(await admin.get(`/api/publishing/packages/${kg.id}`)).body.editions[0].id}`)).body;
     const html = kgTree.resources.find((r: any) => r.asset.ext === 'html');
     const hl = await admin.get(`/api/assets/${html.asset.id}/link`);
-    const hf = await request(app.getHttpServer()).get(hl.body.url);
+    const hf = await admin.get(hl.body.url);
     expect(hf.headers['content-security-policy']).toMatch(/sandbox/);
   });
 

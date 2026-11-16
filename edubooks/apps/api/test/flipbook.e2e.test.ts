@@ -44,8 +44,15 @@ describe('Flipbooks (HTML zip and Flash/SWF)', () => {
     expect((await teacher.post(`/api/publishing/components/${comp}/flipbook`).attach('file', zip, 'x.zip')).status).toBe(403);
     const link = (await teacher.get(`/api/reader/components/${comp}/flipbook`)).body;
     expect(link.url).toMatch(/^\/api\/flip\/[\w-]+\.[\w-]+\/MyBook\/index\.html$/);
-    const page = await http().get(link.url);   // no cookie needed: the signed link is the permission
+    // the reader's own frame (signed in as the teacher) opens it
+    const page = await teacher.get(link.url).set('Sec-Fetch-Dest', 'iframe');
     expect(page.status).toBe(200);
+    // the same link copied into another browser (no sign-in) goes to the login page…
+    const copied = await http().get(link.url).set('Sec-Fetch-Dest', 'document');
+    expect(copied.status).toBe(302); expect(copied.headers.location).toMatch(/^\/login/);
+    // …and nobody else's account can use it
+    const other = await login(app, 'student1', 'Student@123', 'SUN01');
+    expect((await other.get(link.url).set('Sec-Fetch-Dest', 'iframe')).status).toBe(401);
     expect(page.text).toContain('FLIPBOOK HOME');
     expect(page.headers['content-security-policy']).toMatch(/^sandbox allow-scripts/);
     expect(page.headers['content-security-policy']).toContain("frame-ancestors 'self'");
@@ -89,6 +96,33 @@ describe('Flipbooks (HTML zip and Flash/SWF)', () => {
     const tree = (await admin.get(`/api/reader/editions/${(await teacher.get('/api/teacher/books')).body.find((b: any) => b.title === 'KG English').editionId}`)).body;
     expect(tree.components[0].flipbook).toBe('SWF');
     expect((await admin.delete(`/api/publishing/components/${comp}/flipbook`)).status).toBe(200);
+    expect((await teacher.get(`/api/reader/components/${comp}/flipbook`)).status).toBe(404);
+  });
+
+  it('a CD can be uploaded unit by unit (one SWF per unit); readers choose the unit', async () => {
+    const swf = (n: number) => Buffer.concat([Buffer.from('FWS'), Buffer.from([10, 30, 0, 0, 0]), Buffer.alloc(22 + n)]);
+    const u1 = await admin.post(`/api/publishing/components/${comp}/flipbook?unit=${encodeURIComponent('Unit 1: Letters')}`).attach('file', swf(1), 'unit1.swf');
+    expect(u1.status).toBe(201); expect(u1.body).toMatchObject({ unitTitle: 'Unit 1: Letters', kind: 'SWF', sort: 1 });
+    const u2 = await admin.post(`/api/publishing/components/${comp}/flipbook?unit=${encodeURIComponent('Unit 2: Numbers')}`).attach('file', swf(2), 'unit2.swf');
+    expect(u2.body).toMatchObject({ unitTitle: 'Unit 2: Numbers', sort: 2 });
+    const list = (await admin.get(`/api/publishing/components/${comp}/flipbooks`)).body;
+    expect(list.map((x: any) => x.unitTitle)).toEqual(['Unit 1: Letters', 'Unit 2: Numbers']);
+    expect((await teacher.get(`/api/publishing/components/${comp}/flipbooks`)).status).toBe(403);
+    // readers see the units and open the one they pick
+    const first = (await teacher.get(`/api/reader/components/${comp}/flipbook`)).body;
+    expect(first.units.map((x: any) => x.title)).toEqual(['Unit 1: Letters', 'Unit 2: Numbers']); expect(first.id).toBe(u1.body.id);
+    const second = (await teacher.get(`/api/reader/components/${comp}/flipbook?unit=${u2.body.id}`)).body;
+    expect(second.id).toBe(u2.body.id);
+    expect((await teacher.get(second.url).set('Sec-Fetch-Dest', 'iframe')).text).toContain('unit2.swf');
+    // replace one unit's file (name and place stay), rename and reorder, remove
+    const rep = await admin.post(`/api/publishing/components/${comp}/flipbook?replace=${u1.body.id}`).attach('file', swf(3), 'unit1-new.swf');
+    expect(rep.body).toMatchObject({ unitTitle: 'Unit 1: Letters', sort: 1, originalName: 'unit1-new.swf' });
+    expect((await admin.patch(`/api/publishing/flipbooks/${u2.body.id}`).send({ unitTitle: 'Unit 2: Counting', sort: 0 })).body.unitTitle).toBe('Unit 2: Counting');
+    expect((await admin.get(`/api/publishing/components/${comp}/flipbooks`)).body[0].unitTitle).toBe('Unit 2: Counting');
+    const tree = (await admin.get(`/api/reader/editions/${(await teacher.get('/api/teacher/books')).body.find((b: any) => b.title === 'KG English').editionId}`)).body;
+    expect(tree.components[0]).toMatchObject({ flipbook: 'SWF', flipUnits: 2 });
+    expect((await admin.delete(`/api/publishing/flipbooks/${u2.body.id}`)).status).toBe(200);
+    expect((await admin.delete(`/api/publishing/flipbooks/${rep.body.id}`)).status).toBe(200);
     expect((await teacher.get(`/api/reader/components/${comp}/flipbook`)).status).toBe(404);
   });
 });

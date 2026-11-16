@@ -42,7 +42,7 @@ export function ContentGuard({ children, className, fixed }: { children: React.R
   }, [p.protect]);
   if (!p.protect) return <div className={className}>{children}</div>;
   return (
-    <div ref={box} className={cn('kg-guard relative select-none', className)} style={{ WebkitTouchCallout: 'none' } as any} onContextMenu={(e) => e.preventDefault()}>
+    <div ref={box} className={cn('kg-guard select-none', !/\b(absolute|fixed)\b/.test(className ?? '') && 'relative', className)} style={{ WebkitTouchCallout: 'none' } as any} onContextMenu={(e) => e.preventDefault()}>
       {children}
       <div aria-hidden className={cn('pointer-events-none z-20 flex flex-col items-center justify-center gap-2 opacity-[0.13]', fixed ? 'fixed inset-0' : 'absolute inset-0')}>
         {brand.logoUrl ? <img src={brand.logoUrl} alt="" draggable={false} className="max-h-[32%] w-[min(34%,260px)] object-contain grayscale" />

@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -34,7 +34,11 @@ export class FlipbookService {
   private get q() { return this.db.q; }
 
   // ---------------------------------------------------------------- upload (publisher staff)
-  async upload(componentId: string, file: { path: string; originalname: string; size: number }) {
+  /**
+   * Upload a flipbook / CD. With no unit: replaces the part's main upload. With `unitTitle`: adds a unit
+   * (e.g. one SWF per CD unit). With `replaceId`: replaces that one unit's files and keeps its name and place.
+   */
+  async upload(componentId: string, file: { path: string; originalname: string; size: number }, opts: { unitTitle?: string; replaceId?: string } = {}) {
     const tmp = fs.mkdtempSync(path.join(appTmp(), 'flip-'));
     try {
       const [c] = await this.q.select({ id: bookComponents.id, title: bookComponents.title, editionId: bookComponents.editionId, publisherId: bookComponents.publisherId })
@@ -86,18 +90,24 @@ export class FlipbookService {
       await Promise.all(Array.from({ length: 6 }, async () => {
         for (let f = queue.shift(); f; f = queue.shift()) await this.assets.driver.putFile(`${prefix}/${f.path}`, path.join(tmp, ...f.path.split('/')), FLIP_MIME[extOf(f.path)]);
       }));
-      const [old] = await this.q.select().from(flipbooks).where(eq(flipbooks.componentId, componentId));
+      const [old] = opts.replaceId
+        ? await this.q.select().from(flipbooks).where(and(eq(flipbooks.id, opts.replaceId), eq(flipbooks.componentId, componentId)))
+        : opts.unitTitle ? [] as (typeof flipbooks.$inferSelect)[]
+        : await this.q.select().from(flipbooks).where(and(eq(flipbooks.componentId, componentId), isNull(flipbooks.unitTitle)));
+      if (opts.replaceId && !old) throw new NotFoundException('That unit was not found');
+      const unitTitle = old ? old.unitTitle : opts.unitTitle?.trim() || null;
+      const sort = old ? old.sort : unitTitle ? Number(((await this.q.execute(sql`SELECT coalesce(max(sort), 0) + 1 AS n FROM flipbooks WHERE component_id = ${componentId}`)).rows[0] as any).n) : 0;
       const oldFiles = old ? await this.q.select({ path: flipbookFiles.path }).from(flipbookFiles).where(eq(flipbookFiles.flipbookId, old.id)) : [];
       if (old) await this.q.delete(flipbooks).where(eq(flipbooks.id, old.id));
       const total = files.reduce((n, f) => n + f.size, 0);
       const [row] = await this.q.insert(flipbooks).values({
         id, publisherId: c.publisherId, componentId, kind, storagePrefix: prefix, entry, fileCount: files.length, totalBytes: total,
-        originalName: file.originalname.slice(0, 200), skippedFiles: skipped, uploadedBy: this.db.ctx.userId,
+        originalName: file.originalname.slice(0, 200), skippedFiles: skipped, uploadedBy: this.db.ctx.userId, unitTitle, sort,
       }).returning();
       for (let i = 0; i < files.length; i += 1000) {
         await this.q.insert(flipbookFiles).values(files.slice(i, i + 1000).map((f) => ({ flipbookId: id, publisherId: c.publisherId, path: f.path, sizeBytes: f.size, mimeType: FLIP_MIME[extOf(f.path)] })));
       }
-      await this.audit.log('publishing.flipbook.upload', 'book_component', componentId, `Uploaded ${kind === 'SWF' ? 'Flash' : 'HTML'} flipbook for “${c.title}” (${files.length} files)`, old ? { entry: old.entry, files: old.fileCount } : undefined, { entry, files: files.length, skipped });
+      await this.audit.log('publishing.flipbook.upload', 'book_component', componentId, `Uploaded ${kind === 'SWF' ? 'Flash' : 'HTML'} ${unitTitle ? `unit “${unitTitle}”` : 'flipbook'} for “${c.title}” (${files.length} files)`, old ? { entry: old.entry, files: old.fileCount } : undefined, { entry, files: files.length, skipped });
       if (old) setTimeout(() => this.removeFiles(old.storagePrefix, oldFiles.map((f) => f.path)), 2000);
       return this.summary(row);
     } finally {
@@ -111,11 +121,36 @@ export class FlipbookService {
   }
 
   summary(f: typeof flipbooks.$inferSelect) {
-    return { id: f.id, kind: f.kind, entry: f.entry, fileCount: f.fileCount, totalBytes: f.totalBytes, originalName: f.originalName, skippedFiles: f.skippedFiles, createdAt: f.createdAt };
+    return { id: f.id, unitTitle: f.unitTitle, sort: f.sort, kind: f.kind, entry: f.entry, fileCount: f.fileCount, totalBytes: f.totalBytes, originalName: f.originalName, skippedFiles: f.skippedFiles, createdAt: f.createdAt };
+  }
+
+  /** All uploads of a part: the main one first, then the units in order. */
+  async list(componentId: string) {
+    const rows = await this.q.select().from(flipbooks).where(eq(flipbooks.componentId, componentId));
+    return rows.sort((a, b) => Number(!!a.unitTitle) - Number(!!b.unitTitle) || a.sort - b.sort || +a.createdAt - +b.createdAt).map((f) => this.summary(f));
+  }
+
+  async updateUnit(id: string, d: { unitTitle?: string; sort?: number }) {
+    const [f] = await this.q.select().from(flipbooks).where(eq(flipbooks.id, id));
+    if (!f) throw new NotFoundException('Unit not found');
+    const [row] = await this.q.update(flipbooks).set({ ...(d.unitTitle !== undefined ? { unitTitle: d.unitTitle.trim() || null } : {}), ...(d.sort !== undefined ? { sort: d.sort } : {}) })
+      .where(eq(flipbooks.id, id)).returning();
+    await this.audit.log('publishing.flipbook.unit', 'book_component', f.componentId, `Unit “${row.unitTitle ?? 'main'}” updated`);
+    return this.summary(row);
+  }
+
+  async removeOne(id: string) {
+    const [f] = await this.q.select().from(flipbooks).where(eq(flipbooks.id, id));
+    if (!f) throw new NotFoundException('Unit not found');
+    const files = await this.q.select({ path: flipbookFiles.path }).from(flipbookFiles).where(eq(flipbookFiles.flipbookId, f.id));
+    await this.q.delete(flipbooks).where(eq(flipbooks.id, f.id));
+    await this.audit.log('publishing.flipbook.remove', 'book_component', f.componentId, `Removed ${f.unitTitle ? `unit “${f.unitTitle}”` : 'the flipbook'}`, this.summary(f));
+    setTimeout(() => this.removeFiles(f.storagePrefix, files.map((x) => x.path)), 1000);
+    return { ok: true };
   }
 
   async remove(componentId: string) {
-    const [f] = await this.q.select().from(flipbooks).where(eq(flipbooks.componentId, componentId));
+    const [f] = await this.q.select().from(flipbooks).where(and(eq(flipbooks.componentId, componentId), isNull(flipbooks.unitTitle)));
     if (!f) throw new NotFoundException('This part has no flipbook');
     const files = await this.q.select({ path: flipbookFiles.path }).from(flipbookFiles).where(eq(flipbookFiles.flipbookId, f.id));
     await this.q.delete(flipbooks).where(eq(flipbooks.id, f.id));
@@ -126,22 +161,25 @@ export class FlipbookService {
 
   // ---------------------------------------------------------------- reading (licence checked)
   /** Signed, time-limited address of the flipbook; staff preview or a licensed reader only. */
-  async link(componentId: string) {
-    const [f] = await this.q.select().from(flipbooks).where(eq(flipbooks.componentId, componentId));
-    if (!f) throw new NotFoundException('No flipbook has been uploaded for this part');
+  async link(componentId: string, flipbookId?: string) {
+    const all = await this.list(componentId);
+    const pick = flipbookId ? all.find((x) => x.id === flipbookId) : all[0];
+    const [f] = pick ? await this.q.select().from(flipbooks).where(eq(flipbooks.id, pick.id)) : [];
+    if (!f) throw new NotFoundException(flipbookId ? 'That unit was not found' : 'No flipbook has been uploaded for this part');
     if (!this.db.ctx.staff) {
       const [c] = await this.q.select({ editionId: bookComponents.editionId }).from(bookComponents).where(eq(bookComponents.id, componentId));
       await this.access.assertEdition(c.editionId);
     }
     const exp = Math.floor(Date.now() / 1000) + TOKEN_HOURS * 3600;
     const prot = await protectionFor(this.db);
-    const token = this.sign(f.id, f.publisherId, exp, prot.protect ? prot.watermark || ' ' : '');
-    return { url: `/api/flip/${token}/${f.entry.split('/').map(encodeURIComponent).join('/')}`, kind: f.kind, expiresAt: new Date(exp * 1000) };
+    const token = this.sign(f.id, f.publisherId, exp, prot.protect ? prot.watermark || ' ' : '', this.db.ctx.userId);
+    return { url: `/api/flip/${token}/${f.entry.split('/').map(encodeURIComponent).join('/')}`, kind: f.kind, expiresAt: new Date(exp * 1000),
+      id: f.id, units: all.map((x) => ({ id: x.id, title: x.unitTitle })) };
   }
 
   private mac(payload: string) { return createHmac('sha256', config.fileUrlSecret).update(`flip:${payload}`).digest('base64url').slice(0, 32); }
-  private sign(id: string, pub: string, exp: number, watermark = '') {
-    const payload = Buffer.from(`${id}.${pub}.${exp}${watermark ? `.${Buffer.from(watermark).toString('base64url')}` : ''}`).toString('base64url');
+  private sign(id: string, pub: string, exp: number, watermark = '', userId = '') {
+    const payload = Buffer.from(`${id}.${pub}.${exp}.u:${userId}${watermark ? `.${Buffer.from(watermark).toString('base64url')}` : ''}`).toString('base64url');
     return `${payload}.${this.mac(payload)}`;
   }
   verify(token: string) {
@@ -149,9 +187,10 @@ export class FlipbookService {
     if (!payload || !sig) throw new NotFoundException();
     const a = Buffer.from(this.mac(payload)); const b = Buffer.from(sig);
     if (a.length !== b.length || !timingSafeEqual(a, b)) throw new NotFoundException();
-    const [id, pub, exp, wm] = Buffer.from(payload, 'base64url').toString().split('.');
+    const [id, pub, exp, ...rest] = Buffer.from(payload, 'base64url').toString().split('.');
     if (!id || !pub || Number(exp) < Date.now() / 1000) throw new NotFoundException('This link has expired. Reopen the book.');
-    return { id, pub, protect: wm !== undefined, watermark: wm ? Buffer.from(wm, 'base64url').toString().trim() : '' };
+    const user = rest[0]?.startsWith('u:') ? rest.shift()!.slice(2) : ''; const wm = rest[0];
+    return { id, pub, user, protect: wm !== undefined, watermark: wm ? Buffer.from(wm, 'base64url').toString().trim() : '' };
   }
 
   /** Finds one file of a flipbook (RLS: inside the flipbook's publisher). */

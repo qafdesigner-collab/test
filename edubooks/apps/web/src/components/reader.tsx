@@ -63,7 +63,10 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   // Flipbook (HTML / Flash) or PDF view of the selected part.
   const [view, setView] = useState<'flip' | 'pdf'>('pdf');
   useEffect(() => { setView(comp?.flipbook ? 'flip' : 'pdf'); }, [comp?.id, comp?.flipbook]);
-  const flip = useQuery({ queryKey: ['flipbook', comp?.id], queryFn: () => api.get(`/reader/components/${comp!.id}/flipbook`), enabled: !!comp?.flipbook && view === 'flip', staleTime: 5 * 3600_000 });
+  const [flipUnit, setFlipUnit] = useState<string>('');
+  useEffect(() => setFlipUnit(''), [comp?.id]);
+  const flip = useQuery({ queryKey: ['flipbook', comp?.id, flipUnit], queryFn: () => api.get(`/reader/components/${comp!.id}/flipbook${flipUnit ? `?unit=${flipUnit}` : ''}`), enabled: !!comp?.flipbook && view === 'flip', staleTime: 5 * 3600_000 , placeholderData: (prev: any) => (prev && flipUnit ? prev : undefined) });
+  const flipUnits: { id: string; title: string | null }[] = (flip.data as any)?.units ?? [];
   const flipMode = view === 'flip' && !!comp?.flipbook;
 
   // Default part: the first one with pages; resume at last page read.
@@ -168,6 +171,11 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
             <button role="tab" aria-selected={view === 'flip'} onClick={() => setView('flip')} className={cn('rounded-lg px-3 py-1', view === 'flip' ? 'bg-white shadow-sm' : 'text-slate-700')}>📖 Flipbook</button>
             <button role="tab" aria-selected={view === 'pdf'} disabled={!comp.hasPdf} onClick={() => setView('pdf')} className={cn('rounded-lg px-3 py-1 disabled:opacity-40', view === 'pdf' ? 'bg-white shadow-sm' : 'text-slate-700')}>📄 Pages</button>
           </div>)}
+        {flipMode && flipUnits.length > 1 && (
+          <select aria-label="Choose the unit" value={(flip.data as any)?.id ?? ''} onChange={(e) => setFlipUnit(e.target.value)}
+            className={cn('h-9 max-w-[14rem] rounded-xl border border-slate-300 bg-white px-2 text-sm font-medium text-slate-800', kid && 'h-11 text-base font-bold')}>
+            {flipUnits.map((u, i) => <option key={u.id} value={u.id}>{u.title ?? (comp?.type === 'CD' ? 'Main CD' : 'Main flipbook')}{u.title ? '' : ` (${i + 1})`}</option>)}
+          </select>)}
         {!flipMode && comp?.type !== 'MOBILE_APP' && <>
         <button className={btn} onClick={() => go(page - 1)} disabled={page <= 1} aria-label="Previous page"><ChevronLeft className="size-6" /></button>
         <label className="flex items-center gap-1 text-sm"><span className="sr-only">Page</span>

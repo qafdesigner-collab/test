@@ -733,8 +733,11 @@ export const flipbooks = pgTable('flipbooks', {
   originalName: text('original_name').notNull(),
   skippedFiles: integer('skipped_files').notNull().default(0),
   uploadedBy: uuid('uploaded_by').references(() => users.id, { onDelete: 'set null' }),
+  /** null = the part's main upload; otherwise one unit of a CD/flipbook uploaded on its own */
+  unitTitle: text('unit_title'),
+  sort: integer('sort').notNull().default(0),
   createdAt: createdAt(),
-}, (t) => [uniqueIndex('flipbooks_component_uq').on(t.componentId)]);
+}, (t) => [index('flipbooks_component_idx').on(t.componentId, t.sort)]);
 
 export const flipbookFiles = pgTable('flipbook_files', {
   flipbookId: uuid('flipbook_id').notNull().references(() => flipbooks.id, { onDelete: 'cascade' }),

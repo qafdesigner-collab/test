@@ -13,7 +13,8 @@ import { useToast } from '@/components/ui/toast';
 export interface Lesson { id: string; number: number; title: string; objectives: string; pageStart: number | null; pageEnd: number | null; unitId: string }
 export interface Unit { id: string; number: number; title: string; description: string; componentId: string; lessons: Lesson[] }
 export interface Flipbook { id: string; kind: 'HTML' | 'SWF'; entry: string; fileCount: number; totalBytes: number; originalName: string; skippedFiles: number; createdAt: string }
-export interface Component { id: string; type: string; title: string; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null; flipbook: Flipbook | null; indexStatus: string; indexedPages: number; indexError: string | null }
+export interface FlipUnit { id: string; unitTitle: string; sort: number; kind: 'HTML' | 'SWF'; fileCount: number; totalBytes: number; originalName: string; createdAt: string }
+export interface Component { id: string; type: string; title: string; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null; flipbook: Flipbook | null; flipUnits?: FlipUnit[]; indexStatus: string; indexedPages: number; indexError: string | null }
 export interface Resource {
   id: string; title: string; resourceType: string; audience: string; componentId: string | null; unitId: string | null; lessonId: string | null;
   createdAt: string; sharedWith: number; asset: { id: string; originalName: string; ext: string; sizeBytes: number; scanStatus: string };
@@ -209,7 +210,8 @@ function NodePanel({ tree, sel, setSel, onExpand }: { tree: EditionTree; sel: Se
             </div>
             {comp.type === 'MOBILE_APP' ? <MobileAppRow comp={comp} readOnly={readOnly} />
               : <>{comp.type !== 'CD' && <BookPdf comp={comp} editionId={tree.id} editionStatus={tree.status} readOnly={readOnly} />}
-                <FlipbookRow comp={comp} editionStatus={tree.status} readOnly={readOnly} /></>}
+                <FlipbookRow comp={comp} editionStatus={tree.status} readOnly={readOnly} />
+                <FlipUnits comp={comp} editionStatus={tree.status} readOnly={readOnly} /></>}
             {!locked && !['MOBILE_APP', 'CD'].includes(comp.type) && (
               <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (unitTitle.trim()) addUnit.mutate(unitTitle.trim()); }}>
                 <Input value={unitTitle} onChange={(e) => setUnitTitle(e.target.value)} placeholder={`New unit title, e.g. “Letters A–E”`} aria-label="New unit title" />
@@ -311,6 +313,89 @@ function FlipbookRow({ comp, editionStatus, readOnly }: { comp: Component; editi
       {!readOnly && editionStatus !== 'ARCHIVED' && <><input ref={input} type="file" accept=".zip,application/zip,.swf,application/x-shockwave-flash" hidden onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ''; }} />
         <Button size="sm" variant="secondary" loading={pct !== null} onClick={() => input.current?.click()}><UploadCloud className="size-4" />{f ? 'Replace flipbook' : 'Upload flipbook'}</Button></>}
       {f && !readOnly && editionStatus !== 'ARCHIVED' && <Button size="sm" variant="ghost" onClick={() => remove.mutate(undefined)} aria-label="Remove flipbook"><Trash2 className="size-4 text-red-500" /></Button>}
+    </div>
+  );
+}
+
+/** Units of a CD / flipbook uploaded one by one (e.g. one SWF per unit). Readers pick the unit they want. */
+function FlipUnits({ comp, editionStatus, readOnly }: { comp: Component; editionStatus: string; readOnly: boolean }) {
+  const qc = useQueryClient(); const toast = useToast(); const one = useRef<HTMLInputElement>(null); const many = useRef<HTMLInputElement>(null); const rep = useRef<HTMLInputElement>(null);
+  const units = comp.flipUnits ?? []; const canEdit = !readOnly && editionStatus !== 'ARCHIVED';
+  const [title, setTitle] = useState(''); const [busy, setBusy] = useState<string | null>(null); const [replaceId, setReplaceId] = useState<string | null>(null);
+  const refresh = () => ['edition', 'package'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+  const nextName = (n = units.length) => `Unit ${n + 1}`;
+  const nameFromFile = (f: File, i: number) => { const b = f.name.replace(/\.(swf|zip)$/i, '').replace(/[_-]+/g, ' ').replace(/([a-z])(\d)/gi, '$1 $2').replace(/\s+/g, ' ').trim(); return /unit|lesson|chapter/i.test(b) ? b.replace(/\b\w/g, (c) => c.toUpperCase()).slice(0, 120) : nextName(units.length + i); };
+  const send = async (file: File, q: string, label: string) => {
+    const fd = new FormData(); fd.append('file', file);
+    await api.upload(`/publishing/components/${comp.id}/flipbook?${q}`, fd, (p) => setBusy(`${label} — ${p}%`));
+  };
+  const addOne = async (file?: File) => {
+    if (!file) return; const t = title.trim() || nameFromFile(file, 0);
+    try { setBusy(t); await send(file, `unit=${encodeURIComponent(t)}`, t); toast(`“${t}” added`); setTitle(''); refresh(); } catch (e: any) { toast(e.message, 'err'); } finally { setBusy(null); }
+  };
+  const addMany = async (files: File[]) => {
+    files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    let ok = 0;
+    for (const [i, f] of files.entries()) {
+      const t = nameFromFile(f, i);
+      try { setBusy(`${t} (${i + 1}/${files.length})`); await send(f, `unit=${encodeURIComponent(t)}`, t); ok++; } catch (e: any) { toast(`${f.name}: ${e.message}`, 'err'); }
+    }
+    setBusy(null); if (ok) toast(`${ok} unit(s) added`); refresh();
+  };
+  const replace = async (file?: File) => {
+    const id = replaceId; setReplaceId(null); if (!file || !id) return;
+    try { setBusy('Replacing'); await send(file, `replace=${id}`, 'Replacing'); toast('Unit file replaced'); refresh(); } catch (e: any) { toast(e.message, 'err'); } finally { setBusy(null); }
+  };
+  const patch = async (id: string, d: any) => { try { await api.patch(`/publishing/flipbooks/${id}`, d); refresh(); } catch (e: any) { toast(e.message, 'err'); } };
+  const move = async (i: number, d: number) => {
+    const list = [...units]; const j = i + d; if (j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    await Promise.all(list.map((u, k) => (u.sort !== k + 1 ? api.patch(`/publishing/flipbooks/${u.id}`, { sort: k + 1 }) : null)));
+    refresh();
+  };
+  const del = async (u: FlipUnit) => { if (!confirm(`Remove “${u.unitTitle}”?`)) return; try { await api.del(`/publishing/flipbooks/${u.id}`); toast('Unit removed'); refresh(); } catch (e: any) { toast(e.message, 'err'); } };
+  const preview = async (id: string) => {
+    const w = window.open('', '_blank');
+    try { const { url } = await api.get<any>(`/reader/components/${comp.id}/flipbook?unit=${id}`); if (w) w.location.href = url; } catch (e: any) { w?.close(); toast(e.message, 'err'); }
+  };
+  if (!units.length && !canEdit) return null;
+  return (
+    <div className="space-y-2 rounded-lg border border-violet-200 bg-white p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-lg" aria-hidden>💿</span>
+        <b className="text-slate-800">{comp.type === 'CD' ? 'CD units' : 'Flipbook units'}</b>
+        <span className="text-xs text-slate-600">Upload each unit on its own (one .swf or .zip per unit). Students choose the unit they want.</span>
+      </div>
+      {units.length > 0 && (
+        <ol className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+          {units.map((u, i) => (
+            <li key={u.id} className="flex flex-wrap items-center gap-2 px-2 py-1.5">
+              <span className="w-6 text-center text-xs font-semibold text-slate-500">{i + 1}</span>
+              {canEdit ? <input defaultValue={u.unitTitle} aria-label="Unit name" maxLength={120} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== u.unitTitle) patch(u.id, { unitTitle: v }); }}
+                className="min-w-[10rem] flex-1 rounded-md border border-transparent px-2 py-1 font-medium hover:border-slate-200 focus:border-violet-400 focus:outline-none" />
+                : <span className="flex-1 font-medium">{u.unitTitle}</span>}
+              <span className="text-xs text-slate-500">{u.kind === 'SWF' ? 'Flash' : 'HTML'} · {u.originalName} · {fmtBytes(u.totalBytes)}</span>
+              <Button size="sm" variant="ghost" onClick={() => preview(u.id)} aria-label={`Preview ${u.unitTitle}`}><ExternalLink className="size-4" /></Button>
+              {canEdit && <>
+                <Button size="sm" variant="ghost" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up">↑</Button>
+                <Button size="sm" variant="ghost" disabled={i === units.length - 1} onClick={() => move(i, 1)} aria-label="Move down">↓</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setReplaceId(u.id); rep.current?.click(); }} aria-label={`Replace the file of ${u.unitTitle}`}><UploadCloud className="size-4" /></Button>
+                <Button size="sm" variant="ghost" onClick={() => del(u)} aria-label={`Remove ${u.unitTitle}`}><Trash2 className="size-4 text-red-500" /></Button></>}
+            </li>))}
+        </ol>
+      )}
+      {canEdit && (
+        <div className="flex flex-wrap items-center gap-2">
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`Unit name, e.g. ${nextName()}: Letters`} aria-label="New unit name" maxLength={120}
+            className="h-9 min-w-[14rem] flex-1 rounded-lg border border-slate-300 px-3" />
+          <input ref={one} type="file" accept=".swf,.zip,application/zip,application/x-shockwave-flash" hidden onChange={(e) => { addOne(e.target.files?.[0]); e.target.value = ''; }} />
+          <input ref={many} type="file" multiple accept=".swf,.zip,application/zip,application/x-shockwave-flash" hidden onChange={(e) => { addMany(Array.from(e.target.files ?? [])); e.target.value = ''; }} />
+          <input ref={rep} type="file" accept=".swf,.zip,application/zip,application/x-shockwave-flash" hidden onChange={(e) => { replace(e.target.files?.[0]); e.target.value = ''; }} />
+          <Button size="sm" variant="secondary" loading={!!busy} onClick={() => one.current?.click()}><UploadCloud className="size-4" />Add unit</Button>
+          <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => many.current?.click()}>Add several units at once…</Button>
+          {busy && <span className="text-xs text-slate-600">Uploading {busy}</span>}
+        </div>
+      )}
     </div>
   );
 }

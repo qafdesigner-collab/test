@@ -1,5 +1,8 @@
 import { guardScript } from '../common/protection';
-import { BadRequestException, Controller, Delete, Get, Module, NotFoundException, Param, ParseUUIDPipe, Post, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { denied, sameUser } from '../storage/files.controller';
+import { BadRequestException, Body, Controller, Delete, Get, Module, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
 import { ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -33,6 +36,10 @@ function flipHeaders(res: Response, mime: string) {
     : "frame-ancestors 'self'");
 }
 
+class UploadQuery { @IsOptional() @IsString() @Length(1, 120) unit?: string; @IsOptional() @IsUUID() replace?: string; }
+class LinkQuery { @IsOptional() @IsUUID() unit?: string; }
+class UnitDto { @IsOptional() @IsString() @Length(0, 120) unitTitle?: string; @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(10000) sort?: number; }
+
 @ApiTags('flipbooks')
 @Controller()
 export class FlipbookController {
@@ -45,10 +52,18 @@ export class FlipbookController {
     storage: diskStorage({ destination: TMP, filename: (_r: any, _f: any, cb: any) => cb(null, randomBytes(16).toString('hex')) }),
     limits: { fileSize: MAX_MB * 1048576, files: 1 },
   }))
-  upload(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File, @Req() req: any) {
+  upload(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File, @Req() req: any, @Query() q: UploadQuery) {
     if (!file) throw new BadRequestException('Choose the flipbook (.zip with index.html, or .swf)');
-    return this.db.withContext(req.ctx, () => this.svc.upload(id, file));
+    return this.db.withContext(req.ctx, () => this.svc.upload(id, file, { unitTitle: q.unit, replaceId: q.replace }));
   }
+
+  /** Every upload of a part: the main one and its units (e.g. one SWF per CD unit). */
+  @Roles(...PUBLISHER_STAFF) @Get('publishing/components/:id/flipbooks')
+  list(@Param('id', ParseUUIDPipe) id: string) { return this.svc.list(id); }
+  @Roles(...PUBLISHER_STAFF) @Patch('publishing/flipbooks/:fid')
+  updateUnit(@Param('fid', ParseUUIDPipe) fid: string, @Body() d: UnitDto) { return this.svc.updateUnit(fid, d); }
+  @Roles(...PUBLISHER_STAFF) @Delete('publishing/flipbooks/:fid')
+  removeOne(@Param('fid', ParseUUIDPipe) fid: string) { return this.svc.removeOne(fid); }
 
   @Roles(...PUBLISHER_STAFF)
   @Delete('publishing/components/:id/flipbook')
@@ -56,7 +71,7 @@ export class FlipbookController {
 
   /** Signed address for the reader (licence checked). */
   @Get('reader/components/:id/flipbook')
-  link(@Param('id', ParseUUIDPipe) id: string) { return this.svc.link(id); }
+  link(@Param('id', ParseUUIDPipe) id: string, @Query() q: LinkQuery) { return this.svc.link(id, q.unit); }
 
   @Public() @SkipThrottle() @ManualTx()
   @Get('flip/:token/*path')
@@ -73,6 +88,12 @@ export class FlipbookController {
       return fs.createReadStream(r.path).on('error', () => res.destroy()).pipe(res);
     }
     const t = this.svc.verify(token);
+    // The link belongs to the person it was made for. Opened as a page (copied into another browser, a private window
+    // or another device) it asks for that login. Parts of the book loaded by the book itself come from a sandboxed frame,
+    // which browsers send without the sign-in cookie, so those are checked by the signed link alone.
+    const dest = String(req.headers['sec-fetch-dest'] ?? (/text\/html/.test(String(req.headers.accept ?? '')) ? 'document' : ''));
+    if ((req as any).ctx && !sameUser(req, t.user)) { denied(req, res); return; }
+    if (!(req as any).ctx && dest === 'document') { denied(req, res); return; }
     // Protected readers: the flipbook works only inside the reader's frame, not opened as a page of its own.
     if (t.protect && String(req.headers['sec-fetch-dest'] ?? '') === 'document') { res.status(403).type('text/plain').send('This book can only be read inside the platform.'); return; }
     const f = await this.svc.file(token, segs.join('/'));

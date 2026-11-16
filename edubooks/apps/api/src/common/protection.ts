@@ -30,8 +30,8 @@ export function guardScript(watermark: string) {
 #kg-wm img{width:min(34vw,260px);max-height:34vh;object-fit:contain;filter:grayscale(1)}#kg-wm span{font:600 12px system-ui,sans-serif;color:#000;white-space:nowrap}
 #kg-sh{position:fixed;inset:0;z-index:2147483647;background:#0f172a;color:#fff;display:none;align-items:center;justify-content:center;font:600 18px system-ui,sans-serif;text-align:center;padding:20px;cursor:pointer}</style>
 <script>(function(){var W=${w};function show(){var h=document.getElementById('kg-sh');if(h)h.style.display='flex';}
-function wm(){if(document.getElementById('kg-wm')||!document.body)return;var d=document.createElement('div');d.id='kg-wm';var i=document.createElement('img');i.src='/api/branding/logo';i.alt='';i.onerror=function(){i.remove();};d.appendChild(i);
-if(W){var s=document.createElement('span');s.textContent=W;d.appendChild(s);}document.body.appendChild(d);
+// the reader page around this frame already shows the logo watermark, so only the cover is added here
+function wm(){if(document.getElementById('kg-sh')||!document.body)return;void W;
 var h=document.createElement('div');h.id='kg-sh';h.textContent='🔒 Protected book. Click here to continue reading.';h.onclick=function(){h.style.display='none'};document.body.appendChild(h);}
 document.addEventListener('DOMContentLoaded',wm);setTimeout(wm,500);
 ['contextmenu','copy','cut','dragstart','selectstart','beforeprint'].forEach(function(e){document.addEventListener(e,function(x){x.preventDefault();if(e==='beforeprint')show();},true);});

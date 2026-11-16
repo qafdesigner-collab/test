@@ -1,3 +1,17 @@
+# What's new in Knowledge Gate 1.3.13
+
+## Fixed: flipbooks and CDs showing only “protected”
+- For teachers and students, flipbooks and CDs could appear empty (only the faint watermark). They now fill the reading area and work normally, and clicking inside the book no longer hides it.
+
+## Links only work for the person who is signed in
+- Every link to a book page, flipbook, CD, PDF or resource belongs to the signed-in person. Copied into **another browser, a private window or another device**, it opens the **login page** instead of the book; another person's account cannot use it either.
+- The mobile-app QR download stays open, so phones can install the app.
+
+## CDs and flipbooks unit by unit
+- In Book Packages → a part → **CD units / Flipbook units**: **Add unit** (give it a name, e.g. “Unit 1: Letters”, and choose its .swf or .zip), or **Add several units at once** (each file becomes a unit, named from the file).
+- Rename, reorder (↑ ↓), preview, replace the file of one unit, or remove it — the other units stay as they are.
+- Students and teachers pick the unit from a list at the top of the reader.
+
 # What's new in Knowledge Gate 1.3.12
 
 - **Knowledge Gate Publishing logo** is now the built-in **app icon** (phones, tablets, computers) and the **browser-tab icon (favicon)**.

@@ -80,7 +80,7 @@ export class AssetsService {
     // Protected PDFs are sent encrypted with a one-time key that only the platform's own reader receives:
     // a copied link, or a file saved from the browser's network tools, is not a readable PDF.
     const x = protect && a.ext === 'pdf' ? randomBytes(12).toString('base64url') : undefined;
-    const payload = Buffer.from(JSON.stringify({ a: a.id, p: a.publisherId, e: exp, d: download ? 1 : 0, ...(protect ? { v: 1 } : {}), ...(x ? { x } : {}) })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify({ a: a.id, p: a.publisherId, u: ctx.userId, e: exp, d: download ? 1 : 0, ...(protect ? { v: 1 } : {}), ...(x ? { x } : {}) })).toString('base64url');
     const enc = x ? streamKey(x) : null;
     return { url: `/api/files/${payload}.${this.sign(payload)}`, expiresAt: new Date(exp * 1000), viewOnly: protect,
       ...(enc ? { enc: { alg: 'AES-CTR', key: enc.key.toString('base64'), iv: enc.iv.toString('base64') } } : {}) };
@@ -93,7 +93,7 @@ export class AssetsService {
   /** Encrypts a file stream for a protected link (AES-256-CTR keeps the length, so the size header stays right). */
   encryptor(nonce: string) { const k = streamKey(nonce); return createCipheriv('aes-256-ctr', k.key, k.iv); }
 
-  verifyToken(token: string): { a: string; p: string; d: number; v?: number; x?: string } {
+  verifyToken(token: string): { a: string; p: string; u?: string; d: number; v?: number; x?: string } {
     const [payload, sig] = token.split('.');
     if (!payload || !sig) throw new ForbiddenException('Invalid link');
     const expected = Buffer.from(this.sign(payload)); const got = Buffer.from(sig);

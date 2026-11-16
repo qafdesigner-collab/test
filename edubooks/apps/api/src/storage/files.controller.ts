@@ -25,6 +25,9 @@ export class FilesController {
   @Get('files/:token')
   async file(@Param('token') token: string, @Req() req: Request, @Res() res: Response) {
     const t = this.assets.verifyToken(token);
+    // Every link belongs to the person it was made for: it opens only where that person is signed in.
+    // Copied into another browser, a private window or another device, it asks for the login instead.
+    if (!sameUser(req, t.u)) { denied(req, res); return; }
     // View-only links work inside the platform's viewers (fetch, <img>, <video>, sandboxed frames) but not as a page of their own.
     const dest = String(req.headers['sec-fetch-dest'] ?? '');
     if (t.v && ['document', 'embed', 'object'].includes(dest)) { res.status(403).type('text/plain').send('This file can only be viewed inside the platform.'); return; }
@@ -44,4 +47,15 @@ export class FilesController {
     if (t.x) { res.setHeader('Content-Type', 'application/octet-stream'); res.setHeader('Content-Disposition', 'inline; filename="protected.bin"'); stream.pipe(this.assets.encryptor(t.x)).pipe(res); return; }
     stream.pipe(res);
   }
+}
+
+/** The signed-in user (from the session cookie) is the one the link was made for. */
+export function sameUser(req: any, userId?: string) { return !!userId && req.ctx?.userId === userId; }
+/** Opened as a page: send to the login page. Anything else: refuse. */
+export function denied(req: any, res: Response) {
+  res.setHeader('Cache-Control', 'no-store');
+  if (String(req.headers['sec-fetch-dest'] ?? '') === 'document' || /text\/html/.test(String(req.headers.accept ?? ''))) {
+    res.redirect(302, `/login?reason=link&next=${encodeURIComponent('/portal')}`); return;
+  }
+  res.status(401).type('text/plain').send('Please sign in to open this file.');
 }
