@@ -19,37 +19,34 @@ export function useProtection() {
  * `fixed` keeps the logo in the middle of the screen for long, scrolling content.
  */
 export function ContentGuard({ children, className, fixed }: { children: React.ReactNode; className?: string; fixed?: boolean }) {
-  const p = useProtection(); const brand = useBranding(); const box = useRef<HTMLDivElement>(null); const [shield, setShield] = useState(false);
+  const p = useProtection(); const brand = useBranding(); const box = useRef<HTMLDivElement>(null); const [shield, setShield] = useState<false | 'snap' | 'away'>(false);
   useEffect(() => {
     if (!p.protect) return;
     const stop = (e: Event) => { if (box.current?.contains(e.target as Node)) e.preventDefault(); };
     const key = (e: KeyboardEvent) => {
       const k = (e.key || '').toLowerCase(); const mod = e.ctrlKey || e.metaKey;
-      if (k === 'printscreen') { e.preventDefault(); setShield(true); try { navigator.clipboard.writeText(''); } catch { /* ignore */ } return; }
+      if (k === 'printscreen') { e.preventDefault(); setShield('snap'); try { navigator.clipboard.writeText(''); } catch { /* ignore */ } return; }
       if (k === 'f12' || (mod && ['s', 'p', 'c', 'x', 'u'].includes(k)) || (mod && e.shiftKey && ['i', 'j', 'c', 's', 'k'].includes(k)) || (e.metaKey && e.altKey && ['i', 'j', 'c', 'u'].includes(k))) {
         e.preventDefault(); e.stopPropagation();
       }
     };
-    // Focus moving into the book's own frame is fine; focus leaving the page (another tab, app or a screen-capture tool) is not.
-    const blur = () => setTimeout(() => { if (!document.hasFocus()) setShield(true); }, 0);
-    const hidden = () => { if (document.visibilityState === 'hidden') setShield(true); };
+    // Another tab or app: the book is hidden (so app-switcher pictures show nothing) and comes back by itself on return.
+    const hidden = () => { if (document.visibilityState === 'hidden') setShield((v) => v || 'away'); else setShield((v) => (v === 'away' ? false : v)); };
     const ev: [string, EventListener][] = [['contextmenu', stop], ['copy', stop], ['cut', stop], ['dragstart', stop], ['selectstart', stop]];
     ev.forEach(([n, f]) => document.addEventListener(n, f, true));
     // Screenshot shortcuts: Print Screen often reaches the page only when released; Win+Shift+S and ⌘+Shift+3/4/5
     // show as Shift together with the Windows/⌘ key, so the book is hidden as soon as those keys go down together.
     const snap = (e: KeyboardEvent) => {
       const k = (e.key || '').toLowerCase();
-      if (k === 'printscreen' || k === 'snapshot') { setShield(true); try { navigator.clipboard.writeText(''); } catch { /* ignore */ } return; }
-      if (e.shiftKey && (e.metaKey || k === 'meta' || k === 'os')) setShield(true);
+      if (k === 'printscreen' || k === 'snapshot') { setShield('snap'); try { navigator.clipboard.writeText(''); } catch { /* ignore */ } return; }
+      if (e.shiftKey && (e.metaKey || k === 'meta' || k === 'os')) setShield('snap');
     };
-    // Pointer leaving the window (to a snipping tool, the taskbar or another app) hides the book too.
-    const leave = (e: MouseEvent) => { if (!e.relatedTarget && (e.clientY <= 0 || e.clientX <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)) setShield(true); };
-    window.addEventListener('keydown', snap, true); window.addEventListener('keyup', snap, true); document.addEventListener('mouseout', leave);
-    window.addEventListener('keydown', key, true); window.addEventListener('blur', blur); document.addEventListener('visibilitychange', hidden);
-    const before = () => setShield(true); window.addEventListener('beforeprint', before);
+    window.addEventListener('keydown', snap, true); window.addEventListener('keyup', snap, true);
+    window.addEventListener('keydown', key, true); document.addEventListener('visibilitychange', hidden);
+    const before = () => setShield('snap'); window.addEventListener('beforeprint', before);
     const noPrint = window.print; window.print = () => undefined;
-    return () => { window.removeEventListener('keydown', snap, true); window.removeEventListener('keyup', snap, true); document.removeEventListener('mouseout', leave);
-      ev.forEach(([n, f]) => document.removeEventListener(n, f, true)); window.removeEventListener('keydown', key, true); window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', hidden); window.removeEventListener('beforeprint', before); window.print = noPrint; };
+    return () => { window.removeEventListener('keydown', snap, true); window.removeEventListener('keyup', snap, true);
+      ev.forEach(([n, f]) => document.removeEventListener(n, f, true)); window.removeEventListener('keydown', key, true); document.removeEventListener('visibilitychange', hidden); window.removeEventListener('beforeprint', before); window.print = noPrint; };
   }, [p.protect]);
   if (!p.protect) return <div className={className}>{children}</div>;
   return (
@@ -61,7 +58,8 @@ export function ContentGuard({ children, className, fixed }: { children: React.R
         {p.watermark && <span className="whitespace-nowrap text-xs font-semibold text-slate-900">{p.watermark}</span>}
       </div>
       {shield && <button onClick={() => setShield(false)} className={cn('z-30 grid place-items-center bg-slate-900 p-6 text-center text-lg font-semibold text-white', fixed ? 'fixed inset-0' : 'absolute inset-0')}>
-        <span>🔒 This book is protected.<br /><span className="text-sm font-normal text-white/80">Screenshots and other apps are not allowed while reading. Click to continue reading.</span></span></button>}
+        {shield === 'snap' ? <span>🔒 Screenshots are not allowed.<br /><span className="text-sm font-normal text-white/80">This book is protected. Click to continue reading.</span></span>
+          : <span>🔒 This book is protected.<br /><span className="text-sm font-normal text-white/80">Click to continue reading.</span></span>}</button>}
       <style>{'@media print { .kg-guard, .kg-guard * { display: none !important; } body::after { content: "Printing is not allowed for this book."; } }'}</style>
     </div>
   );

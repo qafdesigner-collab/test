@@ -1,4 +1,5 @@
 'use client';
+import { showPrintPreview } from '@/lib/print-preview';
 import Link from 'next/link';
 import { Suspense, use, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -64,7 +65,7 @@ function Editor({ id }: { id: string }) {
     + SECTIONS.slice(0, 3).map(([k, l]) => (c[k] ? `<h3>${l}</h3><p>${esc(String(c[k])).replace(/\n/g, '<br>')}</p>` : '')).join('')
     + `<h3>Teaching steps</h3><ol>${c.steps.map((s) => `<li><b>${esc(s.title)}</b> (${s.minutes} min)${s.detail ? `<br>${esc(s.detail).replace(/\n/g, '<br>')}` : ''}</li>`).join('')}</ol>`
     + SECTIONS.slice(3).map(([k, l]) => (c[k] ? `<h3>${l}</h3><p>${esc(String(c[k])).replace(/\n/g, '<br>')}</p>` : '')).join('');
-  const print = () => { const w = window.open('', '_blank'); if (!w) return; w.document.write(`<!doctype html><title>${esc(f.title)}</title><style>body{font-family:system-ui;max-width:760px;margin:24px auto;line-height:1.5}h3{margin-bottom:4px;color:#334155}</style>${html()}<script>print()</script>`); w.document.close(); };
+  const print = () => showPrintPreview(f.title || 'Lesson plan', `<!doctype html><html><head><meta charset="utf-8"><title>${esc(f.title)}</title><style>body{font-family:system-ui;max-width:760px;margin:24px auto;padding:0 16mm;line-height:1.5;background:#fff}h3{margin-bottom:4px;color:#334155}</style></head><body>${html()}</body></html>`);
   const download = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([`<html><head><meta charset="utf-8"></head><body>${html()}</body></html>`], { type: 'application/msword' })); a.download = `${f.title || 'lesson-plan'}.doc`; a.click(); };
 
   return (

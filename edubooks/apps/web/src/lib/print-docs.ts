@@ -1,5 +1,6 @@
 'use client';
 import { palette, type Branding } from '@/lib/branding';
+import { showPrintPreview } from '@/lib/print-preview';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const today = () => new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
@@ -9,17 +10,14 @@ export const GRADE_BANDS: [number, string, string][] = [[90, 'A*', 'Outstanding'
 export const gradeFor = (p: number | null | undefined) => (p === null || p === undefined ? null : GRADE_BANDS.find(([min]) => p >= min)!);
 
 function openDoc(title: string, css: string, body: string, landscape = false) {
-  const w = window.open('', '_blank'); if (!w) return false;
-  w.document.open();
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+  showPrintPreview(title, `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
     @page{size:A4 ${landscape ? 'landscape' : 'portrait'};margin:0} *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1e293b;background:#e2e8f0}
     .sheet{width:${landscape ? '297mm' : '210mm'};height:${landscape ? '210mm' : '297mm'};margin:8mm auto;background:#fff;position:relative;overflow:hidden;break-after:page}
     .sheet:last-child{break-after:auto}
     .bar{padding:10px;text-align:center} .bar button{font-size:16px;padding:8px 18px}
     @media print{body{background:#fff}.sheet{margin:0}.bar{display:none}}
-    ${css}</style></head><body><div class="bar"><button onclick="print()">Print / save as PDF</button></div>${body}<script>window.addEventListener('load',()=>setTimeout(()=>print(),500))</script></body></html>`);
-  w.document.close();
+    ${css}</style></head><body>${body}</body></html>`, { landscape });
   return true;
 }
 

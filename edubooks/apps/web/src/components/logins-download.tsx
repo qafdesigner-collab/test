@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download, KeyRound, Printer } from 'lucide-react';
+import { showPrintPreview } from '@/lib/print-preview';
 import { api, downloadCsv } from '@/lib/api';
 import { Button, Dialog, ErrorBox, PageLoader, Select } from '@/components/ui';
 import { Credential, CredentialsDialog } from '@/components/common';
@@ -26,12 +27,10 @@ export function LoginsDialog({ base, role, onClose }: { base: string; role: 'STU
   const school = q.data?.school;
   const save = () => downloadCsv(`${school?.code ?? 'school'} ${noun} logins${cls ? ` - ${cls}` : ''}.csv`, shown.map((u, i) => ({ no: i + 1, name: u.displayName, class: u.className ?? '', designation: u.designation ?? '', schoolCode: school?.code ?? '', loginId: u.username, email: u.email ?? '', status: u.status.toLowerCase() })));
   const print = () => {
-    const w = window.open('', '_blank'); if (!w) { toast('Allow pop-ups to print', 'err'); return; }
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(school?.name)} — ${noun} logins</title><style>body{font-family:Arial,sans-serif;margin:16mm;font-size:12px}h1{font-size:18px;margin:0}p{color:#475569}table{width:100%;border-collapse:collapse;margin-top:6mm}th,td{border-bottom:1px solid #e2e8f0;padding:2mm;text-align:left}th{background:#f1f5f9}td.m{font-family:monospace}</style></head><body>
+    showPrintPreview(`${school?.name ?? 'School'} — ${noun} logins`, `<!doctype html><html><head><meta charset="utf-8"><title>${esc(school?.name)} — ${noun} logins</title><style>body{font-family:Arial,sans-serif;margin:16mm;font-size:12px}h1{font-size:18px;margin:0}p{color:#475569}table{width:100%;border-collapse:collapse;margin-top:6mm}th,td{border-bottom:1px solid #e2e8f0;padding:2mm;text-align:left}th{background:#f1f5f9}td.m{font-family:monospace}</style></head><body>
       <h1>${esc(school?.name)}</h1><p>School code <b>${esc(school?.code)}</b> · ${esc(noun)}${cls ? ` · ${esc(cls)}` : ''} · sign in with the login ID (or email) and password</p>
       <table><thead><tr><th>#</th><th>Name</th><th>${role === 'STUDENT' ? 'Class' : 'Designation'}</th><th>Login ID</th><th>Email</th></tr></thead><tbody>${shown.map((u, i) => `<tr><td>${i + 1}</td><td>${esc(u.displayName)}</td><td>${esc(role === 'STUDENT' ? u.className : u.designation)}</td><td class="m">${esc(u.username)}</td><td>${esc(u.email)}</td></tr>`).join('')}</tbody></table>
-      <script>window.onload=()=>window.print()</script></body></html>`);
-    w.document.close();
+      </body></html>`);
   };
   const reset = async () => {
     setBusy(true);
