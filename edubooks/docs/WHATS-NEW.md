@@ -1,3 +1,7 @@
+# What's new in Knowledge Gate 1.3.11
+
+- The **Install app** window now opens centred over the whole page (before, it was cut off inside the top bar).
+
 # What's new in Knowledge Gate 1.3.10
 
 ## Install and save books on any device

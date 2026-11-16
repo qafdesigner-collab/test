@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { CheckCircle2, Download, Share, Smartphone, SquarePlus, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useBranding } from '@/lib/branding';
@@ -57,7 +58,8 @@ export function InstallAppButton({ variant = 'plain', className, canSaveBooks }:
       <button type="button" onClick={() => setOpen(true)} className={cn('focus-ring inline-flex items-center gap-1.5', cls, className)} title={t('Install the app on this device')}>
         <Smartphone className="size-4" /><span className="hidden sm:inline">{t('Install app')}</span>
       </button>
-      {open && <InstallDialog onClose={() => setOpen(false)} canSaveBooks={canSaveBooks} />}
+      {/* drawn on <body>: headers with a blur effect would otherwise trap the window inside the header */}
+      {open && createPortal(<InstallDialog onClose={() => setOpen(false)} canSaveBooks={canSaveBooks} />, document.body)}
     </>
   );
 }
@@ -83,7 +85,7 @@ function InstallDialog({ onClose, canSaveBooks }: { onClose: () => void; canSave
     } catch (e: any) { setSave({ state: 'error', text: e?.message || t('Could not save the books') }); }
   };
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-900/50 p-4" role="dialog" aria-modal="true" aria-label={t('Install the app')} onClick={onClose}>
+    <div className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-slate-900/50 p-4" role="dialog" aria-modal="true" aria-label={t('Install the app')} onClick={onClose}>
       <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="relative flex items-center gap-4 bg-gradient-to-br from-violet-600 to-indigo-600 p-5 text-white">
           <img src={b.appIcon ?? '/icon-192.png'} alt="" className="size-16 rounded-2xl bg-white shadow-lg" />
