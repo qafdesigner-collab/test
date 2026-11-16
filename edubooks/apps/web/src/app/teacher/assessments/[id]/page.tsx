@@ -16,6 +16,7 @@ import { Badge, Button, Card, Confirm, Dialog, ErrorBox, Field, Input, PageLoade
 import { PageHeader, Status, Table, Td } from '@/components/common';
 import { BookScope } from '@/components/book-scope';
 import { Item, ItemEditor, newItem } from '@/components/item-editor';
+import { PageQuestionsPanel } from '@/components/page-questions';
 
 function Builder({ initial, id }: { initial: any; id: string | null }) {
   const router = useRouter(); const classes = useMyClasses();
@@ -30,7 +31,7 @@ function Builder({ initial, id }: { initial: any; id: string | null }) {
       school: me?.school?.name, className: cls?.name, classSection: cls?.section, subject: f.bookTitle ?? null,
       items: list.map((i, n) => ({ id: String(n), section: 'A', type: i.type, prompt: i.prompt, options: i.options, answer: i.answer, marks: i.points || 0, lines: i.type === 'SHORT' ? 3 : 0 })) }, brand, { key });
   };
-  const body = () => ({ title: f.title, instructions: f.instructions, dueAt: f.dueAt ? new Date(f.dueAt).toISOString() : null, allowLate: f.allowLate, studentIds: f.studentIds ?? [],
+  const body = () => ({ title: f.title, instructions: f.instructions, bookComponentId: f.bookComponentId || null, bookPage: f.bookComponentId ? f.bookPage || null : null, dueAt: f.dueAt ? new Date(f.dueAt).toISOString() : null, allowLate: f.allowLate, studentIds: f.studentIds ?? [],
     // Send only question fields (server rows also carry ids/positions, which the API rightly rejects).
     items: items.map(({ type, prompt, options, answer, points }) => ({ type, prompt, options, points, answer: type === 'FILL_BLANK' ? answer.filter((x: string) => x) : answer })) });
   const save = useAction(() => (id ? api.patch(`/teacher/assessments/${id}`, body()) : api.post('/teacher/assessments', { ...body(), classId: f.classId, kind: f.kind, editionId: f.editionId || null, lessonId: f.lessonId || null })),
@@ -73,8 +74,10 @@ function Builder({ initial, id }: { initial: any; id: string | null }) {
         <span className="flex-1" />
         <Button variant="ghost" onClick={() => printSheet(false)} disabled={!items.some((i) => i.prompt.trim())}><Printer className="size-4" />Print sheet</Button>
         <Button variant="ghost" onClick={() => printSheet(true)} disabled={!items.some((i) => i.prompt.trim())}><KeyRound className="size-4" />Answer key</Button></div>
-      {ai && <AiQuestions editionId={f.editionId} lessonId={f.lessonId} onClose={() => setAi(false)}
-        onAdd={(add) => { setItems([...items.filter((i) => i.prompt.trim()), ...add]); setAi(false); }} />}
+      {f.bookComponentId && f.bookPage && <p className="flex flex-wrap items-center gap-2 text-sm text-slate-600"><span className="rounded-full bg-violet-50 px-3 py-1 font-medium text-violet-800">📖 Linked to book page {f.bookPage}</span> Students can open this page next to the questions.
+        <button className="text-xs text-slate-500 underline" onClick={() => setF({ ...f, bookComponentId: null, bookPage: null })}>Remove link</button></p>}
+      {ai && <AiQuestions editionId={f.editionId} lessonId={f.lessonId} pageRef={{ componentId: f.bookComponentId, page: f.bookPage }} onClose={() => setAi(false)}
+        onAdd={(add, ref) => { setItems([...items.filter((i) => i.prompt.trim()), ...add]); if (ref) setF({ ...f, bookComponentId: ref.componentId, bookPage: ref.page }); setAi(false); }} />}
       {bank && id && <BankPicker assessmentId={id} editionId={f.editionId} onClose={() => setBank(false)} beforeAdd={() => api.patch(`/teacher/assessments/${id}`, body())} />}
       <Confirm open={publishAsk} onOpenChange={setPublishAsk} title="Publish to the class?" confirmLabel="Publish" loading={publish.isPending} onConfirm={() => publish.mutate()}
         body={<p>Students can see and answer it straight away. Once someone has answered, the questions can no longer be changed.</p>} />
@@ -83,8 +86,8 @@ function Builder({ initial, id }: { initial: any; id: string | null }) {
 }
 
 /** Ask the AI for questions on the chosen book lesson, review them, then add the ones you want to the sheet. */
-function AiQuestions({ editionId, lessonId, onClose, onAdd }: { editionId?: string | null; lessonId?: string | null; onClose: () => void; onAdd: (items: Item[]) => void }) {
-  const toast = useToast();
+function AiQuestions({ editionId, lessonId, pageRef, onClose, onAdd }: { editionId?: string | null; lessonId?: string | null; pageRef?: { componentId?: string | null; page?: number | null }; onClose: () => void; onAdd: (items: Item[], ref?: { componentId: string; page: number } | null) => void }) {
+  const toast = useToast(); const [mode, setMode] = useState<'page' | 'lesson'>('page');
   const [o, setO] = useState({ task: 'ASSESSMENT', count: 5, difficulty: 'EASY', notes: '' });
   const [busy, setBusy] = useState(false); const [res, setRes] = useState<any>(null); const [pick, setPick] = useState<number[]>([]);
   const ask = async () => {
@@ -96,8 +99,13 @@ function AiQuestions({ editionId, lessonId, onClose, onAdd }: { editionId?: stri
   const items: any[] = res?.output?.items ?? [];
   const toItem = (it: any): Item => ({ type: it.type, prompt: it.prompt ?? '', options: it.type === 'MCQ' ? (it.options ?? []) : [], answer: it.answer ?? (it.type === 'TRUE_FALSE' ? [true] : it.type === 'MCQ' ? [0] : []), points: 1 });
   return (
-    <Dialog open onOpenChange={onClose} wide title="✨ Ask AI for questions" description="The AI reads the chosen lesson of your book and suggests questions. Check each one before you use it.">
-      {!editionId ? <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Choose the book and lesson (the topic) above first, so the questions match what your students have read.</p> : (
+    <Dialog open onOpenChange={onClose} wide title="✨ Questions from your book" description="Pick a page of the book (free and unlimited) or a lesson, and get questions to check and use.">
+      {editionId && <div role="tablist" className="mb-4 flex gap-1 rounded-xl bg-slate-100 p-1 text-sm font-medium">
+        <button role="tab" aria-selected={mode === 'page'} onClick={() => setMode('page')} className={`flex-1 rounded-lg px-3 py-1.5 ${mode === 'page' ? 'bg-white shadow-sm' : 'text-slate-600'}`}>📖 From a book page — free</button>
+        <button role="tab" aria-selected={mode === 'lesson'} onClick={() => setMode('lesson')} className={`flex-1 rounded-lg px-3 py-1.5 ${mode === 'lesson' ? 'bg-white shadow-sm' : 'text-slate-600'}`}>✨ From a lesson (AI)</button>
+      </div>}
+      {editionId && mode === 'page' ? <PageQuestionsPanel editionId={editionId} initial={{ componentId: pageRef?.componentId, page: pageRef?.page }} onAdd={(add, ref) => onAdd(add, ref)} />
+      : !editionId ? <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Choose the book and lesson (the topic) above first, so the questions match what your students have read.</p> : (
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-4">
             <Field label="Kind"><Select value={o.task} onChange={(e) => setO({ ...o, task: e.target.value })}><option value="ASSESSMENT">Assessment (mixed)</option><option value="WORKSHEET">Worksheet (write-in)</option><option value="HOMEWORK">Homework</option></Select></Field>
@@ -121,8 +129,9 @@ function AiQuestions({ editionId, lessonId, onClose, onAdd }: { editionId?: stri
           )}
         </div>
       )}
-      <div className="mt-4 flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button>
+      {mode === 'lesson' || !editionId ? <div className="mt-4 flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button disabled={!pick.length} onClick={() => onAdd(pick.sort((a, b) => a - b).map((i) => toItem(items[i])))}><Plus className="size-4" />Add {pick.length || ''} to the sheet</Button></div>
+        : <div className="mt-3 flex justify-start"><Button variant="ghost" onClick={onClose}>Close</Button></div>}
     </Dialog>
   );
 }

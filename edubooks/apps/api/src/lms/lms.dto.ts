@@ -46,6 +46,8 @@ export class AssessmentDto {
   @IsOptional() @IsBoolean() allowLate?: boolean;
   @IsOptional() @IsArray() @ArrayMaxSize(500) @IsUUID('all', { each: true }) studentIds?: string[];
   @IsOptional() @IsArray() @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => ItemDto) items?: ItemDto[];
+  @IsOptional() @IsUUID() bookComponentId?: string | null;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5000) bookPage?: number | null;
 }
 export class UpdateAssessmentDto {
   @IsOptional() @IsString() @Length(2, 200) title?: string;
@@ -54,6 +56,8 @@ export class UpdateAssessmentDto {
   @IsOptional() @IsBoolean() allowLate?: boolean;
   @IsOptional() @IsArray() @ArrayMaxSize(500) @IsUUID('all', { each: true }) studentIds?: string[];
   @IsOptional() @IsArray() @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => ItemDto) items?: ItemDto[];
+  @IsOptional() @IsUUID() bookComponentId?: string | null;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5000) bookPage?: number | null;
 }
 
 export class ResponseDto { @IsUUID() itemId: string; @IsDefined() response: string | number | boolean; }

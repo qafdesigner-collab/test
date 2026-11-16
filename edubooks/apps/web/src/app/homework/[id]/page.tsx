@@ -25,7 +25,10 @@ function HomeworkPage({ params }: { params: Promise<{ id: string }> }) {
   const shell = (children: React.ReactNode) => (
     <main className="min-h-screen bg-gradient-to-b from-sky-50 to-amber-50 p-4 sm:p-8"><div className="mx-auto max-w-2xl">
       <Link href="/learn" className="mb-4 inline-flex items-center gap-1 rounded-xl px-2 py-1 font-semibold text-slate-600 hover:bg-white"><ArrowLeft className="size-5 rtl:rotate-180" />{t('Home')}</Link>
-      <h1 className="text-2xl font-extrabold text-slate-800 sm:text-3xl">{h.title}</h1>{children}</div></main>);
+      <h1 className="text-2xl font-extrabold text-slate-800 sm:text-3xl">{h.title}</h1>
+      {h.editionId && h.bookComponentId && h.bookPage && <Link href={`/read/${h.editionId}?component=${h.bookComponentId}&page=${h.bookPage}`}
+        className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-2 text-base font-bold text-white shadow hover:bg-violet-700">📖 {t('Open page {n} of the book', { n: h.bookPage })}</Link>}
+      {children}</div></main>);
 
   if (sub) {
     const shown = (it: any, r: any) => (it.type === 'MCQ' ? it.options[r] : it.type === 'TRUE_FALSE' ? (r ? t('True') : t('False')) : r) ?? '—';

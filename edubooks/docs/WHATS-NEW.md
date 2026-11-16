@@ -1,3 +1,17 @@
+# What's new in Knowledge Gate 1.3.15
+
+## Questions from any book page — free and unlimited
+- In an assessment, **Ask AI for questions → 📖 From a book page — free**: choose the page number, **see the page**, choose the kinds of question (fill in the blank, multiple choice, true/false, short answer) and press **Make questions**. **Make new questions** gives a different set.
+- Made by the platform's **built-in question maker** from the words on that page: no outside AI service, no key, **no limits, no cost**. Picture pages with single words get letter and spelling questions.
+- **Link the page to the assignment:** students see **📖 Open page 12 of the book** on their homework, which opens the book at that page.
+- Pages that are only pictures (no text in the PDF) cannot give questions automatically — the preview still helps you write them.
+
+## Print preview with Back, Print and Download PDF
+- Every print (assessment sheets, answer keys, exam papers, result sheets, report cards, certificates, invoices, login cards, lesson plans) now opens **inside the app** with **← Back**, **🖨 Print** and **⬇ Download PDF** (a real PDF file, no print dialog needed). The phone's back button closes it too.
+
+## Book protection: fewer interruptions
+- The “protected” cover now appears only for **screenshot keys** (Print Screen, Win+Shift+S, ⌘+Shift+3/4/5) and while the student is in **another app or tab** — and it disappears by itself when they come back.
+
 # What's new in Knowledge Gate 1.3.14
 
 - **← Back button** at the top of every page in all portals (super admin, school, teacher, student, parent) — useful in the installed app, which has no browser back button. It goes to the previous page, or to the portal's home.

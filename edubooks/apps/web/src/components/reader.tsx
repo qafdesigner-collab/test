@@ -62,7 +62,8 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   const tutor = useTutorStatus(kid);
   // Flipbook (HTML / Flash) or PDF view of the selected part.
   const [view, setView] = useState<'flip' | 'pdf'>('pdf');
-  useEffect(() => { setView(comp?.flipbook ? 'flip' : 'pdf'); }, [comp?.id, comp?.flipbook]);
+  // a link to a page number (e.g. from homework) opens the page view; otherwise a flipbook is shown first
+  useEffect(() => { setView(comp?.flipbook && !(initial?.page && comp?.hasPdf && comp?.id === (initial?.componentId ?? comp?.id)) ? 'flip' : 'pdf'); }, [comp?.id, comp?.flipbook]); // eslint-disable-line react-hooks/exhaustive-deps
   const [flipUnit, setFlipUnit] = useState<string>('');
   useEffect(() => setFlipUnit(''), [comp?.id]);
   const flip = useQuery({ queryKey: ['flipbook', comp?.id, flipUnit], queryFn: () => api.get(`/reader/components/${comp!.id}/flipbook${flipUnit ? `?unit=${flipUnit}` : ''}`), enabled: !!comp?.flipbook && view === 'flip', staleTime: 5 * 3600_000 , placeholderData: (prev: any) => (prev && flipUnit ? prev : undefined) });

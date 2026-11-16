@@ -2,7 +2,11 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/commo
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { sql } from 'drizzle-orm';
+import { DbService } from '../db/db.service';
+import { AccessService } from '../lms/access.service';
+import { makePageQuestions, QType } from './page-questions';
 import { Roles } from '../common/decorators';
 import { AiService } from './ai.service';
 import { IndexerService } from './indexer.service';
@@ -26,11 +30,36 @@ class UseDto {
   @IsOptional() @IsObject() output?: Record<string, unknown>;
 }
 const Id = () => new ParseUUIDPipe();
+class PageQuestionsDto {
+  @IsUUID() editionId!: string;
+  @IsUUID() componentId!: string;
+  @Type(() => Number) @IsInt() @Min(1) @Max(5000) page!: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5000) pageTo?: number;
+  @Type(() => Number) @IsInt() @Min(1) @Max(30) count!: number;
+  @IsOptional() @IsArray() @ArrayMaxSize(4) @IsIn(['MCQ', 'TRUE_FALSE', 'FILL_BLANK', 'SHORT'], { each: true }) types?: QType[];
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) seed?: number;
+}
 
 @ApiTags('ai')
 @Controller('ai')
 export class AiController {
-  constructor(private readonly ai: AiService, private readonly indexer: IndexerService) {}
+  constructor(private readonly ai: AiService, private readonly indexer: IndexerService, private readonly db: DbService, private readonly access: AccessService) {}
+
+  /** Questions from a book page, made by the built-in question maker: free, unlimited, no outside AI service. */
+  @Roles('TEACHER', 'SCHOOL_ADMIN') @Post('page-questions')
+  async pageQuestions(@Body() d: PageQuestionsDto) {
+    await this.access.assertEdition(d.editionId);
+    const to = Math.min(Math.max(d.pageTo ?? d.page, d.page), d.page + 9);
+    const rows = (await this.db.q.execute(sql`SELECT p.page_number AS page, p.text_content AS text FROM book_pages p JOIN book_components c ON c.id = p.component_id
+      WHERE p.component_id = ${d.componentId} AND c.edition_id = ${d.editionId} AND p.page_number BETWEEN ${d.page} AND ${to} ORDER BY p.page_number`)).rows as { page: number; text: string }[];
+    const withText = rows.filter((x) => x.text.replace(/\s+/g, ' ').trim().split(' ').length >= 3);
+    const items = makePageQuestions(withText, { count: d.count, types: d.types ?? [], seed: d.seed ?? 0 });
+    const warnings: string[] = [];
+    if (!rows.length) warnings.push('The text of this part has not been read yet. Ask the publisher to press “Re-index” for this part, then try again.');
+    else if (!withText.length) warnings.push(`Page ${d.page}${to > d.page ? `–${to}` : ''} has no readable text (it is a picture page). Look at the preview and write the questions yourself, or choose a page with words.`);
+    else if (items.length < d.count) warnings.push(`This page has only enough text for ${items.length} question(s).`);
+    return { items, pages: rows.map((x) => ({ page: x.page, hasText: withText.some((w) => w.page === x.page) })), source: 'built-in', warnings };
+  }
   @Roles('TEACHER', 'SCHOOL_ADMIN', 'PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Get('status') status() { return this.ai.status(); }
   @Roles('TEACHER') @Throttle({ default: { limit: Number(process.env.AI_RATE_LIMIT_PER_MIN || 10), ttl: 60_000 } })
   @Post('generate') generate(@Body() d: GenerateDto) { return this.ai.generate(d); }

@@ -202,11 +202,20 @@ export class LmsService {
     const refs = await this.checkBookRefs(d);
     const studentIds = await this.targets(d.classId, d.studentIds);
     const [a] = await this.q.insert(assessments).values({ ...this.base(), teacherId: this.ctx.userId, classId: d.classId, kind: d.kind, title: d.title.trim(),
-      instructions: d.instructions ?? '', ...refs, dueAt: d.dueAt ? new Date(d.dueAt) : null, allowLate: d.allowLate ?? true }).returning();
+      instructions: d.instructions ?? '', ...refs, ...(await this.pageRef(refs.editionId, d)), dueAt: d.dueAt ? new Date(d.dueAt) : null, allowLate: d.allowLate ?? true }).returning();
     if (d.items?.length) await this.writeItems(a, d.items);
     if (studentIds.length) await this.q.insert(assessmentStudents).values(studentIds.map((studentId) => ({ ...this.base(), assessmentId: a.id, studentId })));
     await this.audit.log('lms.assessment.create', 'assessment', a.id, `Created ${d.kind.toLowerCase()} “${a.title}”`);
     return a;
+  }
+
+  /** The book page an assignment is about: the part must belong to the assignment's book. */
+  private async pageRef(editionId: string | null, d: { bookComponentId?: string | null; bookPage?: number | null }) {
+    if (!d.bookComponentId || !d.bookPage) return { bookComponentId: null, bookPage: null };
+    if (!editionId) throw new BadRequestException('Choose the book first');
+    const [c] = await this.q.select({ id: bookComponents.id }).from(bookComponents).where(and(eq(bookComponents.id, d.bookComponentId), eq(bookComponents.editionId, editionId)));
+    if (!c) throw new BadRequestException('That page is not in this book');
+    return { bookComponentId: d.bookComponentId, bookPage: d.bookPage };
   }
 
   async updateAssessment(id: string, d: UpdateAssessmentDto) {
@@ -221,6 +230,7 @@ export class LmsService {
     if (d.instructions !== undefined) patch.instructions = d.instructions;
     if (d.dueAt !== undefined) patch.dueAt = d.dueAt ? new Date(d.dueAt) : null;
     if (d.allowLate !== undefined) patch.allowLate = d.allowLate;
+    if (d.bookComponentId !== undefined || d.bookPage !== undefined) Object.assign(patch, await this.pageRef(a.editionId, { bookComponentId: d.bookComponentId ?? a.bookComponentId, bookPage: d.bookPage === undefined ? a.bookPage : d.bookPage }));
     await this.q.update(assessments).set(patch).where(eq(assessments.id, id));
     if (d.items) await this.writeItems(a, d.items);
     if (d.studentIds) {
@@ -341,6 +351,7 @@ export class LmsService {
     const reveal = sub && ['GRADED', 'RETURNED'].includes(sub.status);
     return {
       id: a.id, title: a.title, kind: a.kind, instructions: a.instructions, dueAt: a.dueAt, status: a.status, allowLate: a.allowLate,
+      editionId: a.editionId, bookComponentId: a.bookComponentId, bookPage: a.bookPage,
       // Answers are NEVER sent before the work is marked.
       items: items.map((i) => ({ id: i.id, type: i.type, prompt: i.prompt, options: i.options, points: i.points, ...(reveal && i.type !== 'SHORT' && i.type !== 'READING' ? { answer: i.answer } : {}) })),
       submission: sub ? { status: sub.status, submittedAt: sub.submittedAt, answers: reveal ? sub.answers : (sub.answers as any[]).map((x) => ({ itemId: x.itemId, response: x.response })),

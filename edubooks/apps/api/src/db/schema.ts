@@ -585,6 +585,9 @@ export const assessments = pgTable('assessments', {
   editionId: uuid('edition_id').references(() => bookEditions.id, { onDelete: 'set null' }),
   unitId: uuid('unit_id').references(() => bookUnits.id, { onDelete: 'set null' }),
   lessonId: uuid('lesson_id').references(() => bookLessons.id, { onDelete: 'set null' }),
+  /** The book page this assignment is about (students get an "Open page" button). */
+  bookComponentId: uuid('book_component_id').references(() => bookComponents.id, { onDelete: 'set null' }),
+  bookPage: integer('book_page'),
   kind: assessmentKindEnum('kind').notNull().default('HOMEWORK'),
   title: text('title').notNull(),
   instructions: text('instructions').notNull().default(''),
