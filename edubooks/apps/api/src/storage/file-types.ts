@@ -20,6 +20,8 @@ export const FILE_TYPES: Record<string, FileKind> = {
   html: { mime: 'text/html', resourceType: 'HTML5', sniff: isText, active: true },
   htm: { mime: 'text/html', resourceType: 'HTML5', sniff: isText, active: true },
   zip: { mime: 'application/zip', resourceType: 'HTML5', sniff: zip },
+  // Flash: played inside the platform with the built-in player (Ruffle)
+  swf: { mime: 'application/x-shockwave-flash', resourceType: 'HTML5', sniff: (h) => ['FWS', 'CWS', 'ZWS'].includes(h.subarray(0, 3).toString('latin1')) },
   png: { mime: 'image/png', resourceType: 'IMAGE', sniff: starts([0x89, 0x50, 0x4e, 0x47]) },
   jpg: { mime: 'image/jpeg', resourceType: 'IMAGE', sniff: starts([0xff, 0xd8, 0xff]) },
   jpeg: { mime: 'image/jpeg', resourceType: 'IMAGE', sniff: starts([0xff, 0xd8, 0xff]) },

@@ -581,7 +581,7 @@ export function UploadDialog({ tree, initial, onClose }: { tree: EditionTree; in
           <UploadCloud className="size-8 text-slate-500" />
           <p className="mt-2 text-sm text-slate-600">Drag files here or <button type="button" className="font-medium text-brand-600 underline" onClick={() => input.current?.click()}>browse</button></p>
           <input ref={input} type="file" multiple hidden onChange={(e) => { add(e.target.files); e.target.value = ''; }}
-            accept=".pdf,.ppt,.pptx,.ppsx,.doc,.docx,.xls,.xlsx,.html,.htm,.zip,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp3,.wav,.m4a,.mp4,.webm,.txt" />
+            accept=".pdf,.ppt,.pptx,.ppsx,.doc,.docx,.xls,.xlsx,.html,.htm,.zip,.swf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp3,.wav,.m4a,.mp4,.webm,.txt" />
         </div>
         {files.length > 0 && (
           <ul className="max-h-40 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200 text-sm">
@@ -656,12 +656,11 @@ export function LockBanner({ tree }: { tree: EditionTree }) {
 /** The "Mobile App" part: an Android .apk and/or store links. Pupils see a QR code to install it. */
 function MobileAppRow({ comp, readOnly }: { comp: Component; readOnly: boolean }) {
   const q = useQuery({ queryKey: ['bookApp', comp.id], queryFn: () => api.get<any>(`/publishing/components/${comp.id}/app`) });
-  const [f, setF] = useState<any>(null); const input = useRef<HTMLInputElement>(null); const [pct, setPct] = useState<number | null>(null);
+  const [f, setF] = useState<any>(null); const input = useRef<HTMLInputElement>(null); const [pct, setPct] = useState<number | null>(null); const [info, setInfo] = useState('');
   const qc = useQueryClient(); const toast = useToast();
   useEffect(() => { if (q.data) setF({ androidUrl: q.data.androidUrl ?? '', iosUrl: q.data.iosUrl ?? '', version: q.data.version ?? '', notes: q.data.notes ?? '' }); }, [q.data]);
   if (!q.data || !f) return null;
   const set = (d: any) => qc.setQueryData(['bookApp', comp.id], d);
-  const [info, setInfo] = useState('');
   // Sent in small pieces: big apps (hundreds of MB) are not cut off, dropped pieces are re-sent, and choosing the same file again continues.
   const upload = async (file?: File) => {
     if (!file) return; setPct(0); setInfo('');

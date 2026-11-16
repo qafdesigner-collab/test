@@ -75,7 +75,8 @@ export class AssetsService {
     const allowed = ctx.staff || (this.accessChecker ? await this.accessChecker(assetId) : false);
     if (!allowed) throw new ForbiddenException('You do not have access to this file');
     const { protect } = await protectionFor(this.db);
-    if (protect && download) throw new ForbiddenException('Book content can only be viewed inside the platform');
+    // Downloading book files is for the publisher's own staff only; teachers and students view or play them inside the platform.
+    if (download && !ctx.staff) throw new ForbiddenException('Book files can only be viewed inside the platform');
     const exp = Math.floor(Date.now() / 1000) + config.fileUrlTtlSec;
     // Protected PDFs are sent encrypted with a one-time key that only the platform's own reader receives:
     // a copied link, or a file saved from the browser's network tools, is not a readable PDF.

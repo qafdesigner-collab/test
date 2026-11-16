@@ -71,9 +71,11 @@ describe('Covers, CD / mobile-app parts and content protection', () => {
     expect((await teacher.get(link.url).set('Sec-Fetch-Dest', 'empty')).status).toBe(401); // someone else's sign-in
     const res = (await teacher.get(`/api/reader/editions/${ed}`)).body.resources[0];
     expect((await teacher.get(`/api/assets/${res.assetId}/link?download=1`)).status).toBe(403);
-    // the publisher can relax it for teachers
+    // only the publisher's staff can download book files — even when protection is relaxed for teachers
     expect((await admin.put('/api/company/protection').send({ enabled: true, teachers: false })).status).toBe(200);
-    expect((await teacher.get(`/api/assets/${res.assetId}/link?download=1`)).status).toBe(200);
+    expect((await teacher.get(`/api/assets/${res.assetId}/link?download=1`)).status).toBe(403);
+    expect((await admin.get(`/api/assets/${res.assetId}/link?download=1`)).status).toBe(200);
+    expect((await http().get('/api/ruffle/ruffle.js')).status).toBe(200);
     expect((await student.get('/api/company/my-protection')).body.protect).toBe(true);
     await admin.put('/api/company/protection').send({ enabled: true, teachers: true });
   });

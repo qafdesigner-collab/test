@@ -4,6 +4,15 @@
 - The Android app (.apk) of a **Mobile App** part is now sent in **small pieces**, so apps of **hundreds of MB** (up to 2 GB) upload without being cut off by the hosting's time or size limits.
 - A progress bar shows **how much is sent and the time left**. If the internet drops, pieces are **sent again automatically**; if the page was closed, **choose the same file again** and it continues where it stopped.
 
+## Resources play inside the platform — only the publisher can download
+- Teachers and students open every resource **inside the platform**: PDF, pictures, audio, video, HTML, and now also:
+  - **PowerPoint (.pptx)** — slides with text, pictures and colours (a simplified preview; animations and charts are not shown);
+  - **Word (.docx)** — headings, text, lists, tables and pictures;
+  - **Flash (.swf)** — played with the built-in Flash player (SWF can now be uploaded as a resource).
+- Old Office files (.ppt, .doc, .xls) cannot be shown in a browser — upload them as PPTX/DOCX or PDF.
+- **Downloading** resources and book files is for the **super admin / publisher staff only** (a Download button in the viewer). Teachers and students cannot download, whatever the protection settings.
+- Fixed: the Mobile App part of the book builder could crash while its details were loading.
+
 # What's new in Knowledge Gate 1.3.16
 
 ## Download logins with passwords — whole school or one group

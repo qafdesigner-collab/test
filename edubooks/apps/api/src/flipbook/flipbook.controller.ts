@@ -73,6 +73,14 @@ export class FlipbookController {
   @Get('reader/components/:id/flipbook')
   link(@Param('id', ParseUUIDPipe) id: string, @Query() q: LinkQuery) { return this.svc.link(id, q.unit); }
 
+  /** The Flash player (Ruffle) itself, for SWF resources opened in the platform's viewer. Open-source player files only. */
+  @Public() @SkipThrottle() @ManualTx() @Get('ruffle/:file')
+  ruffle(@Param('file') file: string, @Res() res: Response) {
+    const r = this.svc.ruffleFile(file);
+    res.setHeader('Content-Type', r.mime); res.setHeader('Cache-Control', 'public, max-age=604800'); res.setHeader('X-Content-Type-Options', 'nosniff');
+    fs.createReadStream(r.path).on('error', () => res.destroy()).pipe(res);
+  }
+
   @Public() @SkipThrottle() @ManualTx()
   @Get('flip/:token/*path')
   async serve(@Param('token') token: string, @Req() req: Request, @Res() res: Response) {

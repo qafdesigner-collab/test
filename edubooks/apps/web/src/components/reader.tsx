@@ -245,7 +245,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
               {lessonGames.map((g: any) => <Link key={g.id} href={kid ? `/learn/games/${g.id}` : `/teacher/games/${g.id}`} className="mb-1 block rounded-lg bg-emerald-50 px-3 py-2 font-medium text-emerald-900 hover:bg-emerald-100">{g.title}</Link>)}</>}
             {lessonResources.length > 0 && <><p className="pb-2 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Resources</p>
               {lessonResources.map((r: any) => (
-                <button key={r.id} onClick={async () => { if (protection.protect) return router.push(`/view/${r.assetId}?t=${encodeURIComponent(r.title)}&e=${r.ext}`); const w = window.open('', '_blank'); const { url } = await api.get(`/assets/${r.assetId}/link`); if (w) { w.opener = null; w.location.href = url; } }}
+                <button key={r.id} onClick={() => router.push(`/view/${r.assetId}?t=${encodeURIComponent(r.title)}&e=${r.ext}`)}
                   className="mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-slate-50">
                   <span className="grid size-7 shrink-0 place-items-center rounded bg-slate-100 text-[9px] font-bold uppercase">{r.ext}</span><span className="flex-1 truncate">{r.title}</span><ExternalLink className="size-3 text-slate-500" /></button>
               ))}</>}
