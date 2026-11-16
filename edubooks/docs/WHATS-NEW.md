@@ -1,3 +1,11 @@
+# What's new in Knowledge Gate 1.3.16
+
+## Download logins with passwords — whole school or one group
+- Super admin → **Users** → a school → **Download whole school logins (with passwords)**, or **Download teachers / students / … logins**. Inside, choose **Whole school, School admins, Teachers, Students or Parents**. School admins have the same window for their own school.
+- The list, the **Excel/CSV file** and the **Print / PDF** (grouped by school admins, teachers, students, parents) show the **login ID and password** for each person.
+- Passwords given out by an admin (new accounts, Excel imports, resets, parents) are now kept **encrypted** so they can be downloaded again. When someone **chooses their own password**, it is no longer readable (shown as “not on file”).
+- **Accounts made before this update** show “not on file”: press **New passwords for the N without one** — only those people get a new password, and it then appears in the list. Teachers and school admins choose their own password at their next sign-in.
+
 # What's new in Knowledge Gate 1.3.15
 
 ## Questions from any book page — free and unlimited

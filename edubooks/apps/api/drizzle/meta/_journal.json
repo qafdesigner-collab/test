@@ -309,6 +309,13 @@
       "when": 1794930000000,
       "tag": "0043_assessment_page",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1794960000000,
+      "tag": "0044_issued_password",
+      "breakpoints": true
     }
   ]
 }

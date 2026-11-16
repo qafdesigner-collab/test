@@ -50,7 +50,8 @@ export class AuthService {
     const [u] = await this.db.q.select().from(users).where(eq(users.id, ctx.userId));
     if (!u || !(await verifyPassword(u.passwordHash, current))) throw new BadRequestException('Current password is wrong');
     if (current === next) throw new BadRequestException('Choose a different password');
-    await this.db.q.update(users).set({ passwordHash: await hashPassword(next), mustChangePassword: false, updatedAt: new Date() }).where(eq(users.id, ctx.userId));
+    // the user's own password: no readable copy is kept
+    await this.db.q.update(users).set({ passwordHash: await hashPassword(next), issuedPassword: null, mustChangePassword: false, updatedAt: new Date() }).where(eq(users.id, ctx.userId));
     // Sign out every other device.
     await this.db.q.update(sessions).set({ revokedAt: new Date() })
       .where(and(eq(sessions.userId, ctx.userId), isNull(sessions.revokedAt), ne(sessions.id, ctx.sessionId ?? '00000000-0000-0000-0000-000000000000')));

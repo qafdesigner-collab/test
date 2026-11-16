@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, IsBoolean } from 'class-validator';
 import { Roles } from '../common/decorators';
 import { PageQuery } from '../common/pagination';
 import { SchoolsService } from './schools.service';
@@ -51,8 +51,8 @@ const Id = () => new ParseUUIDPipe();
 const SALES = ['PUBLISHER_ADMIN', 'PUBLISHER_SALES'];
 
 @ApiTags('schools (publisher)')
-class SchoolLoginsQuery { @IsIn(['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PARENT']) role!: 'STUDENT' | 'TEACHER' | 'SCHOOL_ADMIN' | 'PARENT'; @IsOptional() @IsUUID() classId?: string; }
-class SchoolResetDto { @IsIn(['STUDENT', 'TEACHER']) role!: 'STUDENT' | 'TEACHER'; @IsOptional() @IsUUID() classId?: string; @IsOptional() @IsArray() @ArrayMaxSize(600) @IsUUID('all', { each: true }) userIds?: string[]; }
+class SchoolLoginsQuery { @IsIn(['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PARENT', 'ALL']) role!: 'STUDENT' | 'TEACHER' | 'SCHOOL_ADMIN' | 'PARENT' | 'ALL'; @IsOptional() @IsUUID() classId?: string; }
+class SchoolResetDto { @IsIn(['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PARENT', 'ALL']) role!: 'STUDENT' | 'TEACHER' | 'SCHOOL_ADMIN' | 'PARENT' | 'ALL'; @IsOptional() @IsBoolean() onlyMissing?: boolean; @IsOptional() @IsUUID() classId?: string; @IsOptional() @IsArray() @ArrayMaxSize(600) @IsUUID('all', { each: true }) userIds?: string[]; }
 
 @Controller('schools')
 export class SchoolsController {

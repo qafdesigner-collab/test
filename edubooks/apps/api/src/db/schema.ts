@@ -68,6 +68,8 @@ export const users = pgTable('users', {
   phone: text('phone'),
   designation: text('designation').notNull().default(''),
   passwordHash: text('password_hash').notNull(),
+  /** Password given out by an admin, encrypted (secret-box); null once the user picks their own. */
+  issuedPassword: text('issued_password'),
   status: accountStatusEnum('status').notNull().default('ACTIVE'),
   mustChangePassword: boolean('must_change_password').notNull().default(false),
   failedLogins: integer('failed_logins').notNull().default(0),

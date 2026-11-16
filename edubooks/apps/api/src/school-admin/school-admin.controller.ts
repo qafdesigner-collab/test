@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsOptional, IsString, IsUUID, Length, MaxLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsOptional, IsString, IsUUID, Length, MaxLength, ValidateNested, IsBoolean } from 'class-validator';
 import { eq, desc, sql } from 'drizzle-orm';
 import { Ctx, Roles } from '../common/decorators';
 import { PageQuery } from '../common/pagination';
@@ -38,8 +38,8 @@ class UpdateUserDto {
   @IsOptional() @IsString() @MaxLength(200) email?: string;
   @IsOptional() @IsString() @MaxLength(80) designation?: string;
 }
-class LoginsQuery { @IsIn(['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PARENT']) role!: 'STUDENT' | 'TEACHER' | 'SCHOOL_ADMIN' | 'PARENT'; @IsOptional() @IsUUID() classId?: string; }
-export class ResetLoginsDto { @IsIn(['STUDENT', 'TEACHER']) role!: 'STUDENT' | 'TEACHER'; @IsOptional() @IsUUID() classId?: string; @IsOptional() @IsArray() @ArrayMaxSize(600) @IsUUID('all', { each: true }) userIds?: string[]; }
+class LoginsQuery { @IsIn(['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PARENT', 'ALL']) role!: 'STUDENT' | 'TEACHER' | 'SCHOOL_ADMIN' | 'PARENT' | 'ALL'; @IsOptional() @IsUUID() classId?: string; }
+export class ResetLoginsDto { @IsIn(['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PARENT', 'ALL']) role!: 'STUDENT' | 'TEACHER' | 'SCHOOL_ADMIN' | 'PARENT' | 'ALL'; @IsOptional() @IsBoolean() onlyMissing?: boolean; @IsOptional() @IsUUID() classId?: string; @IsOptional() @IsArray() @ArrayMaxSize(600) @IsUUID('all', { each: true }) userIds?: string[]; }
 class PoolGradesDto { @IsArray() @ArrayMaxSize(30) @IsUUID('all', { each: true }) gradeIds!: string[]; }
 class AssignDto { @IsArray() @ArrayMinSize(1) @ArrayMaxSize(1000) @IsUUID('all', { each: true }) userIds: string[]; }
 class TransferDto { @IsUUID() assignmentId: string; @IsUUID() toUserId: string; @IsString() @Length(3, 500) reason: string; }
