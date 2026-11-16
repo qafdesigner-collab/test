@@ -1,3 +1,8 @@
+# What's new in Knowledge Gate 1.3.12
+
+- **Knowledge Gate Publishing logo** is now the built-in **app icon** (phones, tablets, computers) and the **browser-tab icon (favicon)**.
+- An app icon made under Super admin → Branding still replaces it, and the browser-tab icon follows it.
+
 # What's new in Knowledge Gate 1.3.11
 
 - The **Install app** window now opens centred over the whole page (before, it was cut off inside the top bar).

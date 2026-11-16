@@ -41,7 +41,11 @@ export function AppMeta() {
     const set = (sel: string, make: () => HTMLElement, attr: string, val: string) => { let el = document.head.querySelector(sel) as HTMLElement | null; if (!el) { el = make(); document.head.appendChild(el); } el.setAttribute(attr, val); };
     set('meta[name="apple-mobile-web-app-title"]', () => Object.assign(document.createElement('meta'), { name: 'apple-mobile-web-app-title' }), 'content', b.name);
     set('meta[name="application-name"]', () => Object.assign(document.createElement('meta'), { name: 'application-name' }), 'content', b.name);
-    if (b.appIcon) set('link[rel="apple-touch-icon"]', () => Object.assign(document.createElement('link'), { rel: 'apple-touch-icon' }), 'href', b.appIcon.replace('/192', '/180'));
+    if (b.appIcon) {
+      set('link[rel="apple-touch-icon"]', () => Object.assign(document.createElement('link'), { rel: 'apple-touch-icon' }), 'href', b.appIcon.replace('/192', '/180'));
+      // the browser-tab icon follows an icon made under Branding too
+      document.head.querySelectorAll('link[rel="icon"]').forEach((l) => l.setAttribute('href', b.appIcon));
+    }
   }, [b.name, b.appIcon]);
   return null;
 }

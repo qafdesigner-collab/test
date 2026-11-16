@@ -3,7 +3,7 @@
  * - Pages and a few read-only API answers are network-first, with the last copy kept for offline use.
  * - Books saved for offline use live in their own cache (written by the page, see lib/offline.ts).
  * - Signing out removes every cached answer and saved book from this device. */
-const VERSION = 'v2';
+const VERSION = 'v3'; // new default icons
 const STATIC = `kg-static-${VERSION}`, PAGES = 'kg-pages', API = 'kg-api', BOOKS = 'kg-books';
 const API_KEEP = [/^\/api\/auth\/me$/, /^\/api\/branding$/, /^\/api\/company\/my-protection$/, /^\/api\/library$/, /^\/api\/reader\/editions\/[0-9a-f-]+$/, /^\/api\/reader\/components\/[0-9a-f-]+\/hotspots$/, /^\/api\/timetable\/me$/, /^\/api\/student\/(home|achievements)$/];
 
