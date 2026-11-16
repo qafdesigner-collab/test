@@ -1,3 +1,4 @@
+import { ChunkedUploads } from '../storage/chunked.controller';
 import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Injectable, Module, NotFoundException, Param, ParseUUIDPipe, Post, Put, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -45,7 +46,7 @@ export class AppsService {
     return c;
   }
   private async get(componentId: string) {
-    const [a] = await this.rows(sql`SELECT b.android_url AS "androidUrl", b.ios_url AS "iosUrl", b.version, b.notes, b.asset_id AS "assetId", d.original_name AS "apkName", d.size_bytes AS "apkSize"
+    const [a] = await this.rows(sql`SELECT b.android_url AS "androidUrl", b.ios_url AS "iosUrl", b.version, b.notes, b.asset_id AS "assetId", d.original_name AS "apkName", d.size_bytes::float8 AS "apkSize"
       FROM book_apps b LEFT JOIN digital_assets d ON d.id = b.asset_id WHERE b.component_id = ${componentId}`);
     return a ?? { androidUrl: null, iosUrl: null, version: '', notes: '', assetId: null, apkName: null, apkSize: null };
   }
@@ -57,7 +58,7 @@ export class AppsService {
       ON CONFLICT (component_id) DO UPDATE SET android_url = excluded.android_url, ios_url = excluded.ios_url, version = excluded.version, notes = excluded.notes, updated_at = now()`);
     return this.get(componentId);
   }
-  async uploadApk(componentId: string, file: Express.Multer.File) {
+  async uploadApk(componentId: string, file: { path: string; originalname: string; size: number }) {
     try {
       const c = await this.component(componentId, true);
       if (!file) throw new BadRequestException('Choose the .apk file');
@@ -109,15 +110,23 @@ export class AppsService {
   }
 }
 
+class FromUploadDto { @Matches(/^[a-f0-9]{32}$/) uploadId!: string; }
+
 @ApiTags('apps')
 @Controller()
 export class AppsController {
-  constructor(private readonly svc: AppsService, private readonly db: DbService) {}
+  constructor(private readonly svc: AppsService, private readonly db: DbService, private readonly chunks: ChunkedUploads) {}
   @Roles(...PUBLISHER_STAFF) @Get('publishing/components/:id/app') adminGet(@Param('id', new ParseUUIDPipe()) id: string) { return this.svc.adminGet(id); }
   @Roles(...PUBLISHER_STAFF) @Put('publishing/components/:id/app') save(@Param('id', new ParseUUIDPipe()) id: string, @Body() d: AppDto) { return this.svc.save(id, d); }
   @Roles(...PUBLISHER_STAFF) @ManualTx() @Post('publishing/components/:id/app/apk')
-  @UseInterceptors(FileInterceptor('file', { storage: diskStorage({ destination: appTmp('uploads'), filename: (_r: any, _f: any, cb: any) => cb(null, randomBytes(16).toString('hex')) }), limits: { fileSize: Number(process.env.MAX_UPLOAD_MB || 100) * 1048576, files: 1 } }))
+  @UseInterceptors(FileInterceptor('file', { storage: diskStorage({ destination: appTmp('uploads'), filename: (_r: any, _f: any, cb: any) => cb(null, randomBytes(16).toString('hex')) }), limits: { fileSize: Number(process.env.BIG_UPLOAD_MAX_MB || 2048) * 1048576, files: 1 } }))
   upload(@Param('id', new ParseUUIDPipe()) id: string, @UploadedFile() file: Express.Multer.File, @Req() req: any) { return this.db.withContext(req.ctx, () => this.svc.uploadApk(id, file)); }
+  /** A big app sent in pieces (see /uploads): the finished file becomes the part's app. */
+  @Roles(...PUBLISHER_STAFF) @ManualTx() @Post('publishing/components/:id/app/apk-from-upload')
+  fromUpload(@Param('id', new ParseUUIDPipe()) id: string, @Body() d: FromUploadDto, @Req() req: any) {
+    const f = this.chunks.take(req.ctx.userId, d.uploadId);
+    return this.db.withContext(req.ctx, () => this.svc.uploadApk(id, f)).finally(() => f.done());
+  }
   @Roles(...PUBLISHER_STAFF) @Delete('publishing/components/:id/app/apk') removeApk(@Param('id', new ParseUUIDPipe()) id: string) { return this.svc.removeApk(id); }
   @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Get('reader/components/:id/app') reader(@Param('id', new ParseUUIDPipe()) id: string) { return this.svc.forReader(id); }
   /** Opened from the QR code on a phone (usually not signed in), so the link itself is the permission. */

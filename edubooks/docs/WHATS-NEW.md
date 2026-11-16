@@ -1,3 +1,9 @@
+# What's new in Knowledge Gate 1.3.17
+
+## Big mobile apps upload reliably
+- The Android app (.apk) of a **Mobile App** part is now sent in **small pieces**, so apps of **hundreds of MB** (up to 2 GB) upload without being cut off by the hosting's time or size limits.
+- A progress bar shows **how much is sent and the time left**. If the internet drops, pieces are **sent again automatically**; if the page was closed, **choose the same file again** and it continues where it stopped.
+
 # What's new in Knowledge Gate 1.3.16
 
 ## Download logins with passwords — whole school or one group

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowDown, ArrowUp, BookOpen, Sparkles, ChevronRight, ExternalLink, FileUp, FolderOpen, GraduationCap, Layers, Lock, Pencil, Plus, Recycle, ShieldAlert, Trash2, UploadCloud,
 } from 'lucide-react';
+import { fmtDuration, uploadBig } from '@/lib/big-upload';
 import { api, fmtBytes, fmtDate, qs } from '@/lib/api';
 import { AUDIENCES, COMPONENT_TYPES, RESOURCE_TYPES } from '@/lib/catalog';
 import { Badge, Button, Card, Confirm, Dialog, EmptyState, ErrorBox, Field, Input, Select, Textarea, cn } from '@/components/ui';
@@ -660,16 +661,26 @@ function MobileAppRow({ comp, readOnly }: { comp: Component; readOnly: boolean }
   useEffect(() => { if (q.data) setF({ androidUrl: q.data.androidUrl ?? '', iosUrl: q.data.iosUrl ?? '', version: q.data.version ?? '', notes: q.data.notes ?? '' }); }, [q.data]);
   if (!q.data || !f) return null;
   const set = (d: any) => qc.setQueryData(['bookApp', comp.id], d);
+  const [info, setInfo] = useState('');
+  // Sent in small pieces: big apps (hundreds of MB) are not cut off, dropped pieces are re-sent, and choosing the same file again continues.
   const upload = async (file?: File) => {
-    if (!file) return; const fd = new FormData(); fd.append('file', file); setPct(0);
-    try { set(await api.upload(`/publishing/components/${comp.id}/app/apk`, fd, setPct)); toast('App uploaded'); } catch (e: any) { toast(e.message, 'err'); } finally { setPct(null); }
+    if (!file) return; setPct(0); setInfo('');
+    const stay = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', stay);
+    try {
+      const id = await uploadBig(file, (p) => { setPct(p.pct); setInfo(`${fmtBytes(p.sent)} of ${fmtBytes(p.total)}${p.secondsLeft !== null && p.pct < 100 ? ` · about ${fmtDuration(p.secondsLeft)} left` : ''}`); });
+      setInfo('Checking the app file…');
+      set(await api.post(`/publishing/components/${comp.id}/app/apk-from-upload`, { uploadId: id })); toast('App uploaded');
+    } catch (e: any) { toast(`${e.message} — choose the same file again to continue where it stopped.`, 'err'); }
+    finally { window.removeEventListener('beforeunload', stay); setPct(null); setInfo(''); }
   };
   return (
     <div className="space-y-3 rounded-lg border border-dashed border-emerald-300 bg-emerald-50/60 p-4 text-sm">
       <div className="flex flex-wrap items-center gap-3"><span className="text-xl" aria-hidden>📱</span>
         <div className="min-w-[14rem] flex-1">{q.data.apkName ? <><b>Android app:</b> {q.data.apkName} · {fmtBytes(q.data.apkSize)}</> : <span className="text-slate-700">No Android app file yet. Upload the <b>.apk</b>, and/or add store links below.</span>}
           <span className="block text-xs text-slate-600">Students with a licence see a QR code in the book to install the app on a phone. The app is the only thing students can download.</span></div>
-        {pct !== null && <span className="text-xs">{pct}%</span>}
+        {pct !== null && <span className="w-full space-y-1 sm:w-64"><span className="block h-2 overflow-hidden rounded-full bg-emerald-100"><span className="block h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} /></span>
+          <span className="block text-xs text-slate-700">{pct}% · {info || 'starting…'}</span><span className="block text-[11px] text-slate-500">Keep this page open. If the internet drops, it carries on by itself.</span></span>}
         {!readOnly && <><input ref={input} type="file" accept=".apk,application/vnd.android.package-archive" hidden onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ''; }} />
           <Button size="sm" variant="secondary" loading={pct !== null} onClick={() => input.current?.click()}><UploadCloud className="size-4" />{q.data.apkName ? 'Replace .apk' : 'Upload .apk'}</Button>
           {q.data.apkName && <Button size="sm" variant="ghost" aria-label="Remove the app file" onClick={async () => { set(await api.del(`/publishing/components/${comp.id}/app/apk`)); toast('App file removed'); }}><Trash2 className="size-4 text-red-500" /></Button>}</>}
