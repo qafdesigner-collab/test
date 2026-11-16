@@ -37,6 +37,6 @@ document.addEventListener('DOMContentLoaded',wm);setTimeout(wm,500);
 ['contextmenu','copy','cut','dragstart','selectstart','beforeprint'].forEach(function(e){document.addEventListener(e,function(x){x.preventDefault();if(e==='beforeprint')show();},true);});
 window.addEventListener('beforeprint',show);
 document.addEventListener('keydown',function(e){var k=(e.key||'').toLowerCase();var m=e.ctrlKey||e.metaKey;if(k==='printscreen'||k==='f12'||(m&&['s','p','c','x','a','u'].indexOf(k)>=0)||(m&&e.shiftKey&&['i','j','c','s','k'].indexOf(k)>=0)||(e.metaKey&&e.altKey&&['i','j','c','u'].indexOf(k)>=0)){e.preventDefault();e.stopPropagation();if(k==='printscreen'){try{navigator.clipboard.writeText('')}catch(_){}show();}}},true);
-document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')show();});
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')show();});document.addEventListener('keyup',function(e){var k=(e.key||'').toLowerCase();if(k==='printscreen'||k==='snapshot'){try{navigator.clipboard.writeText('')}catch(_){}show();}},true);document.addEventListener('keydown',function(e){var k=(e.key||'').toLowerCase();if(e.shiftKey&&(e.metaKey||k==='meta'||k==='os'))show();},true);
 window.print=function(){};})();</script>`;
 }

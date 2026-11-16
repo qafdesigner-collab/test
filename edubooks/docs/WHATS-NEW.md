@@ -1,3 +1,8 @@
+# What's new in Knowledge Gate 1.3.14
+
+- **← Back button** at the top of every page in all portals (super admin, school, teacher, student, parent) — useful in the installed app, which has no browser back button. It goes to the previous page, or to the portal's home.
+- **Screenshots hidden:** on book pages, flipbooks and CDs the book is covered when **Print Screen**, **Win+Shift+S** (Windows) or **⌘+Shift+3/4/5** (Mac) is pressed, when the pointer leaves the window, or when the reader switches to another tab or app. (No website can block every screenshot or a phone camera; the reader's name under the logo makes copies traceable.)
+
 # What's new in Knowledge Gate 1.3.13
 
 ## Fixed: flipbooks and CDs showing only “protected”

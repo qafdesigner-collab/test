@@ -9,6 +9,7 @@ import { hasRole, Me, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
 import { NotificationBell } from '@/components/notifications';
 import { InstallAppButton } from '@/components/install-app';
+import { BackButton } from '@/components/back-button';
 import { useBranding } from '@/lib/branding';
 
 export interface NavItem { href: string; label: string; icon: React.ComponentType<{ className?: string }>; exact?: boolean; color?: string; roles?: string[] }
@@ -64,6 +65,7 @@ export function Shell({ role, roleLabel, nav, children, deny, theme = 'teacher',
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 px-4 backdrop-blur lg:px-8" style={{ background: `color-mix(in srgb, ${T.page} 85%, transparent)` }}>
           <button className="focus-ring rounded-xl bg-white p-2 shadow-sm lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="size-5" /></button>
+          <BackButton />
           <div className="flex-1" />
           <InstallAppButton canSaveBooks={me.roles.includes('TEACHER') || me.roles.includes('SCHOOL_ADMIN')} />
           <span className="rounded-2xl bg-white shadow-sm"><NotificationBell /></span>

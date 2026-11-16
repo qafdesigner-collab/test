@@ -8,6 +8,7 @@ import { hasRole, useMe } from '@/lib/session';
 import { cn, PageLoader } from '@/components/ui';
 import { NotificationBell } from '@/components/notifications';
 import { InstallAppButton } from '@/components/install-app';
+import { BackButton } from '@/components/back-button';
 import { useBranding } from '@/lib/branding';
 import { LangScope, LangSwitch, useT } from '@/lib/i18n';
 import { KidSky, LevelBadge } from '@/components/kid-ui';
@@ -35,6 +36,7 @@ function LearnShell({ children }: { children: React.ReactNode }) {
       <KidSky />
       <header className="mx-auto flex max-w-5xl items-center gap-2 px-4 pt-4 sm:gap-3 sm:px-6">
         <Link href="/learn" className="flex items-center gap-2 text-2xl font-black text-violet-600">🦉 <span className="hidden sm:inline"><KidBrand /></span></Link>
+        <BackButton playful />
         <div className="flex-1" />
         <Link href="/learn/me"><LevelBadge stars={ach.data?.stars ?? 0} /></Link>
         <Link href="/learn/me" className="hidden items-center gap-1 rounded-full bg-white px-4 py-2 text-xl font-black text-amber-600 shadow sm:flex">⭐ {ach.data?.stars ?? '…'}</Link>

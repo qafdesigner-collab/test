@@ -7,6 +7,7 @@ import { hasRole, useMe } from '@/lib/session';
 import { PageLoader } from '@/components/ui';
 import { NotificationBell } from '@/components/notifications';
 import { InstallAppButton } from '@/components/install-app';
+import { BackButton } from '@/components/back-button';
 import { BrandMark } from '@/lib/branding';
 import { LangScope, LangSwitch, useT } from '@/lib/i18n';
 import Link from 'next/link';
@@ -24,6 +25,7 @@ function ParentShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-amber-50">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+          <BackButton className="ring-1 ring-slate-200" />
           <div className="min-w-0 flex-1"><div className="font-bold text-slate-900"><BrandMark /></div><div className="truncate text-xs text-slate-600">{me.school?.name} · {t('Parents')}</div></div>
           <MessagesLink />
           <MailLink />
