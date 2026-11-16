@@ -18,7 +18,7 @@ export const CHUNK = 8 * 1048576;
 const MAX_BYTES = Number(process.env.BIG_UPLOAD_MAX_MB || 2048) * 1048576;
 const KEEP_MS = 24 * 3600_000;
 
-interface Meta { id: string; userId: string; name: string; size: number; key: string; received: number[]; createdAt: number }
+interface Meta { id: string; userId: string; name: string; size: number; key: string; createdAt: number }
 class StartDto {
   @IsString() @Length(1, 250) name!: string;
   @Type(() => Number) @IsInt() @Min(1) @Max(MAX_BYTES) size!: number;
@@ -31,6 +31,16 @@ export class ChunkedUploads {
   private dir() { return appTmp('chunked'); }
   private metaPath(id: string) { return path.join(this.dir(), `${id}.json`); }
   private partPath(id: string) { return path.join(this.dir(), `${id}.part`); }
+  /**
+   * Each received piece leaves its own marker file. Hosts run several app processes, and pieces of one upload
+   * arrive at different processes at the same time — separate markers never overwrite each other.
+   */
+  private mark(id: string, i: number) { return path.join(this.dir(), `${id}.${i}.ok`); }
+  private received(id: string) {
+    const pre = `${id}.`;
+    return fs.readdirSync(this.dir()).filter((f) => f.startsWith(pre) && f.endsWith('.ok')).map((f) => Number(f.slice(pre.length, -3))).filter(Number.isInteger).sort((a, b) => a - b);
+  }
+  private clearMarks(id: string) { for (const i of this.received(id)) fs.rmSync(this.mark(id, i), { force: true }); }
   private read(id: string): Meta {
     if (!/^[a-f0-9]{32}$/.test(id)) throw new NotFoundException('Upload not found');
     try { return JSON.parse(fs.readFileSync(this.metaPath(id), 'utf8')); } catch { throw new NotFoundException('This upload has expired — choose the file again'); }
@@ -50,11 +60,12 @@ export class ChunkedUploads {
     let m: Meta | null = null;
     try { m = this.read(id); } catch { m = null; }
     if (!m || m.size !== d.size || !fs.existsSync(this.partPath(id))) {
-      m = { id, userId, name: d.name, size: d.size, key: d.key, received: [], createdAt: Date.now() };
+      this.clearMarks(id);
+      m = { id, userId, name: d.name, size: d.size, key: d.key, createdAt: Date.now() };
       fs.writeFileSync(this.partPath(id), Buffer.alloc(0)); fs.truncateSync(this.partPath(id), d.size);
       this.write(m);
     }
-    return { id, chunkSize: CHUNK, pieces: this.pieces(d.size), received: m.received };
+    return { id, chunkSize: CHUNK, pieces: this.pieces(d.size), received: this.received(id) };
   }
 
   async piece(userId: string, id: string, index: number, req: NodeJS.ReadableStream & { headers: any }) {
@@ -72,23 +83,21 @@ export class ChunkedUploads {
       out.on('finish', () => (got === expected ? ok() : fail(new BadRequestException('The piece did not arrive completely — it will be sent again'))));
       req.pipe(out);
     });
-    const fresh = this.read(id); // other pieces may have finished meanwhile
-    if (!fresh.received.includes(index)) fresh.received.push(index);
-    this.write(fresh);
-    return { received: fresh.received.length, pieces: n };
+    fs.writeFileSync(this.mark(id, index), '');
+    return { received: this.received(id).length, pieces: n };
   }
 
   status(userId: string, id: string) {
     const m = this.read(id); if (m.userId !== userId) throw new ForbiddenException();
-    return { id, received: m.received, pieces: this.pieces(m.size) };
+    return { id, received: this.received(id), pieces: this.pieces(m.size) };
   }
 
   /** The finished file (all pieces in place). The caller moves it into storage and then calls done(). */
   take(userId: string, id: string) {
     const m = this.read(id); if (m.userId !== userId) throw new ForbiddenException();
-    const missing = this.pieces(m.size) - new Set(m.received).size;
+    const missing = this.pieces(m.size) - this.received(id).length;
     if (missing > 0) throw new BadRequestException(`${missing} piece(s) are still missing — the upload will continue`);
-    return { path: this.partPath(id), originalname: m.name, size: m.size, done: () => { fs.rmSync(this.metaPath(id), { force: true }); fs.rmSync(this.partPath(id), { force: true }); } };
+    return { path: this.partPath(id), originalname: m.name, size: m.size, done: () => { this.clearMarks(id); fs.rmSync(this.metaPath(id), { force: true }); fs.rmSync(this.partPath(id), { force: true }); } };
   }
 }
 
