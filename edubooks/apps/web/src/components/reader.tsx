@@ -14,18 +14,19 @@ import { ContentGuard, useProtection } from '@/components/content-guard';
 import { AppPanel } from '@/components/app-panel';
 import { useRouter } from 'next/navigation';
 import { useMe } from '@/lib/session';
-import { fetchPdf, type FileLink } from '@/lib/protected-pdf';
+import { openPdf, type FileLink } from '@/lib/protected-pdf';
 import { isSaved, offlinePdf, offlineSupported, removeBook, saveBook } from '@/lib/offline';
 
 type PDFDoc = { numPages: number; getPage: (n: number) => Promise<any>; destroy: () => void };
 
 /** Loads pdf.js lazily (client only); the worker is served from /public. */
-export async function loadPdf(src: FileLink | ArrayBuffer): Promise<PDFDoc> {
-  const pdfjs = await import('pdfjs-dist');
-  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-  // Always fetched by us (protected books arrive encrypted and are decrypted in memory), then handed to pdf.js.
-  const data = src instanceof ArrayBuffer ? src : await fetchPdf(src);
-  return pdfjs.getDocument({ data: new Uint8Array(data), isEvalSupported: false }).promise as unknown as Promise<PDFDoc>;
+export async function loadPdf(src: FileLink | ArrayBuffer, refresh?: () => Promise<FileLink>): Promise<PDFDoc> {
+  // Saved (offline) books are in memory already; online books are fetched part by part (protected parts decrypted in memory).
+  if (src instanceof ArrayBuffer) {
+    const pdfjs = await import('pdfjs-dist'); pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+    return pdfjs.getDocument({ data: new Uint8Array(src), isEvalSupported: false }).promise as unknown as Promise<PDFDoc>;
+  }
+  return openPdf(src, refresh);
 }
 
 export function Reader({ editionId, backHref, initial }: { editionId: string; backHref: string; initial?: { componentId?: string; page?: number } }) {
@@ -84,7 +85,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
     setDoc(null); setDocError(null);
     if (!comp?.hasPdf) return;
     setLoadingDoc(true);
-    offlinePdf(comp.id).then((saved) => saved ? loadPdf(saved) : api.get<FileLink>(`/reader/components/${comp.id}/pdf`).then((link) => loadPdf(link))).then((d) => { loaded = d; if (!cancelled) setDoc(d); })
+    offlinePdf(comp.id).then((saved) => saved ? loadPdf(saved) : api.get<FileLink>(`/reader/components/${comp.id}/pdf`).then((link) => loadPdf(link, () => api.get<FileLink>(`/reader/components/${comp.id}/pdf`)))).then((d) => { loaded = d; if (!cancelled) setDoc(d); })
       .catch((e) => !cancelled && setDocError(e.message || 'Could not open the book')).finally(() => !cancelled && setLoadingDoc(false));
     return () => { cancelled = true; loaded?.destroy(); };
   }, [comp?.id, comp?.hasPdf]);

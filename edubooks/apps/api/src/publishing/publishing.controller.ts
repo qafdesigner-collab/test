@@ -12,6 +12,9 @@ import { DbService } from '../db/db.service';
 import { config } from '../config';
 import { PublishingService } from './publishing.service';
 import { IndexerService } from '../ai/indexer.service';
+import { ChunkedUploads } from '../storage/chunked.controller';
+import { ghostscript } from '../storage/pdf-compress';
+import { Matches } from 'class-validator';
 import {
   CreateComponentDto, CreateEditionDto, CreateLessonDto, CreatePackageDto, CreateUnitDto, PackageQuery, ReorderDto, UpdateUnitDto,
   UpdateComponentDto, UpdateEditionDto, UpdateLessonDto, UpdatePackageDto, UpdateResourceDto, UploadResourcesDto,
@@ -24,11 +27,14 @@ const uploadOpts = {
 };
 const Id = () => new ParseUUIDPipe();
 
+class FromUploadDto { @Matches(/^[a-f0-9]{32}$/) uploadId!: string; }
+class ResourceFromUploadDto extends UploadResourcesDto { @Matches(/^[a-f0-9]{32}$/) uploadId!: string; }
+
 @ApiTags('publishing')
 @Roles(...PUBLISHER_STAFF)
 @Controller('publishing')
 export class PublishingController {
-  constructor(private readonly svc: PublishingService, private readonly db: DbService, private readonly indexer: IndexerService) {}
+  constructor(private readonly svc: PublishingService, private readonly db: DbService, private readonly indexer: IndexerService, private readonly chunks: ChunkedUploads) {}
 
   @Get('stats') stats() { return this.svc.stats(); }
 
@@ -76,9 +82,23 @@ export class PublishingController {
   bookPdf(@Param('id', Id()) id: string, @UploadedFiles() files: Express.Multer.File[], @Req() req: any) {
     if (!files?.[0]) throw new BadRequestException('Choose a PDF file');
     // Upload, then (re)build the AI text index of this part in the background.
-    return this.db.withContext(req.ctx, async () => ({ ...(await this.svc.setBookPdf(id, files[0])), indexing: (await this.indexer.start(id)).started }));
+    return this.db.withContext(req.ctx, async () => ({ ...(await this.svc.setBookPdf(id, files[0])), indexing: (await this.indexer.start(id)).started, compressing: !!ghostscript() }));
+  }
+  /** Big files are sent in pieces first (see /uploads) — a dropped connection only re-sends one piece. */
+  @ManualTx()
+  @Post('components/:id/book-pdf-from-upload')
+  bookPdfFromUpload(@Param('id', Id()) id: string, @Body() d: FromUploadDto, @Req() req: any) {
+    const f = this.chunks.take(req.ctx.userId, d.uploadId);
+    return this.db.withContext(req.ctx, async () => ({ ...(await this.svc.setBookPdf(id, f)), indexing: (await this.indexer.start(id)).started, compressing: !!ghostscript() })).finally(() => f.done());
+  }
+  @ManualTx()
+  @Post('editions/:id/resources-from-upload')
+  resourceFromUpload(@Param('id', Id()) id: string, @Body() d: ResourceFromUploadDto, @Req() req: any) {
+    const f = this.chunks.take(req.ctx.userId, d.uploadId); const { uploadId: _u, ...dto } = d;
+    return this.db.withContext(req.ctx, () => this.svc.uploadResources(id, [f], dto)).finally(() => f.done());
   }
   @Delete('components/:id/book-pdf') delBookPdf(@Param('id', Id()) id: string) { return this.svc.removeBookPdf(id); }
   @Patch('resources/:id') updRes(@Param('id', Id()) id: string, @Body() d: UpdateResourceDto) { return this.svc.updateResource(id, d); }
   @Delete('resources/:id') delRes(@Param('id', Id()) id: string) { return this.svc.deleteResource(id); }
 }
+

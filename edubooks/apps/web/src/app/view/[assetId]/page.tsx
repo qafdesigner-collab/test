@@ -5,7 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { api } from '@/lib/api';
 import { ErrorBox, PageLoader, Spinner } from '@/components/ui';
 import { ContentGuard } from '@/components/content-guard';
-import { fetchPdf, type FileLink } from '@/lib/protected-pdf';
+import { openPdf, type FileLink } from '@/lib/protected-pdf';
 import { renderDocx, renderPptx } from '@/lib/office-view';
 import { useMe } from '@/lib/session';
 import { Download } from 'lucide-react';
@@ -27,7 +27,7 @@ function Viewer({ assetId }: { assetId: string }) {
       <main className="relative min-h-0 flex-1 overflow-auto">
         {err ? <div className="p-6"><ErrorBox error={err} /></div> : !url ? <PageLoader /> : (
           <ContentGuard className="min-h-full" fixed>
-            {ext === 'pdf' ? <PdfPages link={link!} />
+            {ext === 'pdf' ? <PdfPages link={link!} assetId={assetId} />
               : ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext) ? <div className="grid min-h-full place-items-center p-4"><img src={url!} alt={title} draggable={false} className="max-h-[85vh] max-w-full rounded shadow-lg" /></div>
               : ['mp3', 'wav', 'm4a', 'ogg'].includes(ext) ? <div className="grid min-h-full place-items-center p-6"><audio src={url} controls controlsList="nodownload noplaybackrate" className="w-full max-w-xl" /></div>
               : ['mp4', 'webm', 'mov'].includes(ext) ? <div className="grid min-h-full place-items-center p-4"><video src={url} controls controlsList="nodownload" disablePictureInPicture className="max-h-[85vh] max-w-full rounded bg-black" /></div>
@@ -47,7 +47,7 @@ function Viewer({ assetId }: { assetId: string }) {
  * cleared again. Phones and tablets (iPad/iPhone in particular) allow a web page only limited drawing memory —
  * drawing all pages at once left every page after the first blank there.
  */
-function PdfPages({ link }: { link: FileLink }) {
+function PdfPages({ link, assetId }: { link: FileLink; assetId: string }) {
   const host = useRef<HTMLDivElement>(null);
   const [err, setErr] = useState<string | null>(null); const [sizes, setSizes] = useState<{ w: number; h: number }[] | null>(null);
   const [width, setWidth] = useState(800); const [current, setCurrent] = useState(1);
@@ -55,13 +55,12 @@ function PdfPages({ link }: { link: FileLink }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const pdfjs = await import('pdfjs-dist'); pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-      const d = await pdfjs.getDocument({ data: new Uint8Array(await fetchPdf(link)), isEvalSupported: false }).promise;
+      const d = await openPdf(link, () => api.get<FileLink>(`/assets/${assetId}/link`));
       if (cancelled) { d.destroy(); return; }
       doc.current = d;
-      const out: { w: number; h: number }[] = [];
-      for (let i = 1; i <= d.numPages; i++) { const vp = (await d.getPage(i)).getViewport({ scale: 1 }); out.push({ w: vp.width, h: vp.height }); }
-      if (!cancelled) setSizes(out);
+      // every page takes the size of page 1 until it is drawn (asking each page first would download the whole file)
+      const vp = (await d.getPage(1)).getViewport({ scale: 1 });
+      if (!cancelled) setSizes(Array.from({ length: d.numPages }, () => ({ w: vp.width, h: vp.height })));
     })().catch((e) => { if (!cancelled) setErr(e?.message ?? 'Could not open the file'); });
     return () => { cancelled = true; doc.current?.destroy(); doc.current = null; };
   }, [link]);
@@ -78,6 +77,7 @@ function PdfPages({ link }: { link: FileLink }) {
       if (el.querySelector('canvas') || tasks.has(n) || !doc.current) return;
       const page = await doc.current.getPage(n); const base = page.getViewport({ scale: 1 });
       const scale = width / base.width; const css = page.getViewport({ scale });
+      el.style.height = `${Math.round(css.height)}px`; // its own shape
       const r = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(4_000_000 / (css.width * css.height))); // keep each page under ~4 million pixels
       const vp = page.getViewport({ scale: scale * r });
       const c = document.createElement('canvas'); c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);

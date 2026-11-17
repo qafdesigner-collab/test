@@ -255,10 +255,12 @@ function BookPdf({ comp, editionId, editionStatus, readOnly }: { comp: Component
   const canUpload = !readOnly && (editionStatus === 'DRAFT' || !comp.bookFile);
   const upload = async (file?: File) => {
     if (!file) return;
-    const fd = new FormData(); fd.append('file', file); setPct(0);
+    setPct(0);
     try {
-      const r = await api.upload<any>(`/publishing/components/${comp.id}/book-pdf`, fd, setPct);
-      toast(`Book PDF attached${r.pages ? ` — ${r.pages} pages` : ''}`);
+      // sent in pieces: big books do not time out, and an interrupted upload continues where it stopped
+      const uploadId = await uploadBig(file, (p) => setPct(Math.min(99, p.pct)));
+      const r = await api.post<any>(`/publishing/components/${comp.id}/book-pdf-from-upload`, { uploadId });
+      toast(`Book PDF attached${r.pages ? ` — ${r.pages} pages` : ''}${r.compressing && !r.reused ? '. It is being made smaller on the server — readers will get the light version in a few minutes.' : ''}`);
       ['edition', 'package', 'stats'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
     } catch (e: any) { toast(e.message, 'err'); } finally { setPct(null); }
   };
@@ -564,9 +566,19 @@ export function UploadDialog({ tree, initial, onClose }: { tree: EditionTree; in
     const s = scopeToBody(f.scope);
     Object.entries({ ...s, resourceType: f.resourceType || undefined, audience: f.audience, title: files.length === 1 ? f.title || undefined : undefined })
       .forEach(([k, v]) => v && fd.append(k, v));
-    files.forEach((file) => fd.append('files', file));
+    // big files (over 20 MB) are sent in pieces, one after another; small ones together in one request
+    const big = files.filter((x) => x.size > 20 * 1048576); const small = files.filter((x) => x.size <= 20 * 1048576);
+    small.forEach((file) => fd.append('files', file));
+    const total = files.reduce((n, x) => n + x.size, 0) || 1; let doneBytes = 0;
     try {
-      const r = await api.upload<any[]>(`/publishing/editions/${tree.id}/resources`, fd, setPct);
+      const r: any[] = [];
+      for (const file of big) {
+        const uploadId = await uploadBig(file, (p) => setPct(Math.min(99, Math.floor(((doneBytes + p.sent) / total) * 100))));
+        const body: Record<string, unknown> = { uploadId, ...s, resourceType: f.resourceType || undefined, audience: f.audience, title: files.length === 1 ? f.title || undefined : undefined };
+        r.push(...await api.post<any[]>(`/publishing/editions/${tree.id}/resources-from-upload`, Object.fromEntries(Object.entries(body).filter(([, v]) => v))));
+        doneBytes += file.size;
+      }
+      if (small.length) r.push(...await api.upload<any[]>(`/publishing/editions/${tree.id}/resources`, fd, (p) => setPct(Math.min(99, Math.floor(((doneBytes + (p / 100) * (total - doneBytes)) / total) * 100)))));
       const reused = r.filter((x) => x.reusedExistingFile).length;
       toast(`${r.length} resource${r.length === 1 ? '' : 's'} attached${reused ? ` (${reused} existing file${reused === 1 ? '' : 's'} reused — no duplicate storage)` : ''}`);
       ['edition', 'package', 'packages', 'stats', 'audit'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));

@@ -22,7 +22,7 @@ function PagePreview({ componentId, page, onPages }: { componentId: string; page
       try {
         if (doc.current?.id !== componentId) {
           const link = await api.get<FileLink>(`/reader/components/${componentId}/pdf`);
-          doc.current = { id: componentId, d: await loadPdf(link) }; onPages(doc.current.d.numPages);
+          doc.current = { id: componentId, d: await loadPdf(link, () => api.get<FileLink>(`/reader/components/${componentId}/pdf`)) }; onPages(doc.current.d.numPages);
         }
         const d = doc.current.d; if (page < 1 || page > d.numPages) { if (!cancelled) setState('none'); return; }
         const pg = await d.getPage(page); const base = pg.getViewport({ scale: 1 }); const r = window.devicePixelRatio || 1;

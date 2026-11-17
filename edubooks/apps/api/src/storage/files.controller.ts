@@ -43,8 +43,17 @@ export class FilesController {
     if (kind?.active) res.setHeader('Content-Security-Policy', 'sandbox allow-scripts allow-popups allow-forms allow-modals');
     const safeName = asset.originalName.replace(/[^\w.\- ]+/g, '_');
     res.setHeader('Content-Disposition', `${t.d && !t.v ? 'attachment' : 'inline'}; filename="${safeName}"`);
-    const stream = (await this.assets.driver.read(asset.storageKey)).on('error', () => res.destroy());
-    if (t.x) { res.setHeader('Content-Type', 'application/octet-stream'); res.setHeader('Content-Disposition', 'inline; filename="protected.bin"'); stream.pipe(this.assets.encryptor(t.x)).pipe(res); return; }
+    // Parts of a file (Range): big PDFs open at once and load page by page; videos can jump ahead.
+    res.setHeader('Accept-Ranges', 'bytes');
+    const size = Number(asset.sizeBytes); let range: { start: number; end: number } | undefined;
+    const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));
+    if (m && (m[1] || m[2])) {
+      const start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2])); const end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+      if (start >= size || start > end) { res.status(416).setHeader('Content-Range', `bytes */${size}`); res.end(); return; }
+      range = { start, end }; res.status(206); res.setHeader('Content-Range', `bytes ${start}-${end}/${size}`); res.setHeader('Content-Length', String(end - start + 1));
+    }
+    const stream = (await this.assets.driver.read(asset.storageKey, range)).on('error', () => res.destroy());
+    if (t.x) { res.setHeader('Content-Type', 'application/octet-stream'); res.setHeader('Content-Disposition', 'inline; filename="protected.bin"'); stream.pipe(this.assets.encryptor(t.x, range?.start ?? 0)).pipe(res); return; }
     stream.pipe(res);
   }
 }

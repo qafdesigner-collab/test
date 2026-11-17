@@ -1,6 +1,8 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { createCipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import * as fs from 'fs';
+import * as path from 'path';
+import { pipeline } from 'stream/promises';
 import { and, eq } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
 import { digitalAssets } from '../db/schema';
@@ -9,6 +11,8 @@ import { protectionFor } from '../common/protection';
 import { createDriver } from './storage.driver';
 import { extOf, FILE_TYPES } from './file-types';
 import { scanFile } from './scanner';
+import { compressPdf, ghostscript } from './pdf-compress';
+import { appTmp } from '../common/tmp';
 
 export interface UploadedTemp { path: string; originalname: string; size: number }
 
@@ -59,10 +63,42 @@ export class AssetsService {
         publisherId: ctx.publisherId, sha256, storageKey, originalName: file.originalname.slice(0, 250), mimeType: kind.mime, ext,
         sizeBytes: file.size, scanStatus: scan, scannedAt: scan === 'CLEAN' ? new Date() : null, uploadedBy: ctx.userId,
       }).returning();
+      if (ext === 'pdf') this.compressLater(asset.id, storageKey, file.size);
       return { asset, reused: false, kind };
     } finally {
       fs.promises.rm(file.path, { force: true }).catch(() => undefined);
     }
+  }
+
+  private readonly log = new Logger('PdfCompress');
+  /**
+   * After a PDF is uploaded it is made smaller in the background (Ghostscript), and the stored file is replaced
+   * when that saved at least 10%. Uploading stays as fast as before; the smaller file is what readers download.
+   */
+  compressLater(assetId: string, storageKey: string, size: number) {
+    if (!ghostscript() || size < 1048576) return;
+    const ctx = { ...this.db.ctx };
+    setImmediate(async () => {
+      const id = randomBytes(8).toString('hex'); const src = path.join(appTmp(), `cmp-${id}.pdf`); const out = path.join(appTmp(), `cmp-${id}.out.pdf`);
+      try {
+        // the upload's own transaction must have committed first
+        let row: typeof digitalAssets.$inferSelect | undefined;
+        for (let i = 0; i < 120 && !row; i++) {
+          [row] = await this.db.detached(ctx, () => this.db.q.select().from(digitalAssets).where(eq(digitalAssets.id, assetId)));
+          if (!row) await new Promise((r) => setTimeout(r, 1000));
+        }
+        if (!row) return;
+        await pipeline(await this.driver.read(storageKey), fs.createWriteStream(src));
+        await compressPdf(src, out);
+        const small = (await fs.promises.stat(out)).size;
+        const head = Buffer.alloc(5); const fd = await fs.promises.open(out, 'r'); await fd.read(head, 0, 5, 0); await fd.close();
+        if (head.toString() !== '%PDF-' || small > size * 0.9) { this.log.log(`${row.originalName}: kept (${size} → ${small} bytes)`); return; }
+        await this.driver.putFile(storageKey, out, 'application/pdf');
+        await this.db.detached(ctx, () => this.db.q.update(digitalAssets).set({ sizeBytes: small }).where(eq(digitalAssets.id, assetId)));
+        this.log.log(`${row.originalName}: ${(size / 1048576).toFixed(1)} MB → ${(small / 1048576).toFixed(1)} MB`);
+      } catch (e: any) { this.log.warn(`${assetId}: not compressed (${e.message})`); }
+      finally { fs.rmSync(src, { force: true }); fs.rmSync(out, { force: true }); }
+    });
   }
 
   // ---------- short-lived signed URLs (no permanent public links) ----------
@@ -92,7 +128,14 @@ export class AssetsService {
   setAccessChecker(fn: (assetId: string) => Promise<boolean>) { this.accessChecker = fn; }
 
   /** Encrypts a file stream for a protected link (AES-256-CTR keeps the length, so the size header stays right). */
-  encryptor(nonce: string) { const k = streamKey(nonce); return createCipheriv('aes-256-ctr', k.key, k.iv); }
+  /** Encrypts a file stream for a protected link, starting at byte `start` (so a part of the file can be sent). */
+  encryptor(nonce: string, start = 0) {
+    const k = streamKey(nonce); const iv = Buffer.from(k.iv);
+    iv.writeUInt32BE((iv.readUInt32BE(12) + Math.floor(start / 16)) >>> 0, 12); // the counter block where `start` lies
+    const c = createCipheriv('aes-256-ctr', k.key, iv);
+    if (start % 16) c.update(Buffer.alloc(start % 16)); // skip into the block
+    return c;
+  }
 
   verifyToken(token: string): { a: string; p: string; u?: string; d: number; v?: number; x?: string } {
     const [payload, sig] = token.split('.');

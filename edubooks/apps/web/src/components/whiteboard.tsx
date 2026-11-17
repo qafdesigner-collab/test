@@ -140,7 +140,7 @@ function useBackground(bg: Bg, paper: Paper, canvas: React.RefObject<HTMLCanvasE
       try {
         if (doc.current?.id !== bg.componentId) {
           const link = await api.get<FileLink>(`/reader/components/${bg.componentId}/pdf`);
-          doc.current = { id: bg.componentId, d: await loadPdf(link) };
+          const cid = bg.componentId; doc.current = { id: cid, d: await loadPdf(link, () => api.get<FileLink>(`/reader/components/${cid}/pdf`)) };
         }
         const d = doc.current.d; const page = await d.getPage(Math.min(Math.max(1, bg.page ?? 1), d.numPages));
         const vp1 = page.getViewport({ scale: 1 });

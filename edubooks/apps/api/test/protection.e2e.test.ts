@@ -65,6 +65,14 @@ describe('Covers, CD / mobile-app parts and content protection', () => {
     const d = createDecipheriv('aes-256-ctr', Buffer.from(link.enc.key, 'base64'), Buffer.from(link.enc.iv, 'base64'));
     expect(Buffer.concat([d.update(got.body), d.final()]).subarray(0, 5).toString()).toBe('%PDF-');
     expect((await admin.get(`/api/reader/components/${part1}/pdf`)).body.enc).toBeUndefined(); // publisher staff get the plain file
+    // a part of the file (Range) — big books open at once and load page by page — decrypts from its own position
+    const plain = (() => { const dd = createDecipheriv('aes-256-ctr', Buffer.from(link.enc.key, 'base64'), Buffer.from(link.enc.iv, 'base64')); return Buffer.concat([dd.update(got.body), dd.final()]); })();
+    const bin = (res: any, cb: any) => { const c: Buffer[] = []; res.on('data', (d: Buffer) => c.push(d)); res.on('end', () => cb(null, Buffer.concat(c))); };
+    const part = await student.get(link.url).set('Range', 'bytes=1001-1500').buffer(true).parse(bin);
+    expect(part.status).toBe(206); expect(part.headers['content-range']).toBe(`bytes 1001-1500/${plain.length}`);
+    const iv = Buffer.from(link.enc.iv, 'base64'); iv.writeUInt32BE(iv.readUInt32BE(12) + Math.floor(1001 / 16), 12);
+    const d2 = createDecipheriv('aes-256-ctr', Buffer.from(link.enc.key, 'base64'), iv); d2.update(Buffer.alloc(1001 % 16));
+    expect(Buffer.concat([d2.update(part.body), d2.final()]).equals(plain.subarray(1001, 1501))).toBe(true);
     expect((await student.get(link.url).set('Sec-Fetch-Dest', 'document')).status).toBe(403); // opened as a page to save it
     const copied = await http().get(link.url).set('Sec-Fetch-Dest', 'document'); // copied into another browser
     expect(copied.status).toBe(302); expect(copied.headers.location).toMatch(/^\/login/);

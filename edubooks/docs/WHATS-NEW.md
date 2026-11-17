@@ -1,3 +1,16 @@
+# What's new in Knowledge Gate 1.3.19
+
+## Big PDFs (teacher guides, books) open at once
+- PDFs now open **part by part**: the first pages appear after a small download, and the rest of the file is fetched only when those pages are looked at. Before, the whole file (often 100–300 MB for a teacher guide) had to arrive before anything showed — on slow internet it looked like it never opened.
+- Works for protected books too (each part is still encrypted and only readable inside the platform), in the reader, the whiteboard, the page-question maker and the resource viewer.
+
+## PDFs are made smaller automatically
+- After a PDF is uploaded (book pages or a resource), the server **compresses it in the background**: pictures are reduced to screen quality (200 dpi), text stays real text, and the file is arranged for fast opening on the web. In a test, a 42 MB guide became 9 MB. The original is replaced only if this saves at least 10%.
+- This needs **Ghostscript** on the server (most cPanel servers have it; your host can install it). Without it, PDFs upload and open as before, just not compressed. Settings: `PDF_COMPRESS=0` turns it off, `PDF_COMPRESS_DPI` changes the picture quality, `GS_PATH` points to Ghostscript if it is not found.
+
+## Big uploads do not stop half-way
+- **Book PDFs** and **resources over 20 MB** are now sent in **small pieces**, like the mobile app: a dropped connection only re-sends one piece, and choosing the same file again after an interruption continues where it stopped.
+
 # What's new in Knowledge Gate 1.3.18
 
 - **PDF resources show every page** on phones and tablets (iPad / iPhone / Android). Before, only the first page appeared there, because all pages were drawn at once and those devices limit a page's drawing memory. Now only the pages near the screen are drawn (long PDFs open faster too), with a **Page x / n** counter.
