@@ -19,6 +19,7 @@ export class CommerceController {
   @Roles(...CATALOG_WRITE) @Post('products') create(@Body() d: CreateProductDto) { return this.svc.createProduct(d); }
   @Roles(...CATALOG_READ) @Get('products/:id') get(@Param('id', Id()) id: string) { return this.svc.getProduct(id); }
   @Roles(...CATALOG_WRITE) @Patch('products/:id') update(@Param('id', Id()) id: string, @Body() d: UpdateProductDto) { return this.svc.updateProduct(id, d); }
+  @Roles(...CATALOG_WRITE) @Delete('products/:id') remove(@Param('id', Id()) id: string) { return this.svc.deleteProduct(id); }
   @Roles(...CATALOG_WRITE) @Post('products/:id/versions') newVersion(@Param('id', Id()) id: string, @Body() d: NewVersionDto) { return this.svc.newVersion(id, d.copyFromVersionId); }
   @Roles(...CATALOG_WRITE) @Patch('versions/:id') updVersion(@Param('id', Id()) id: string, @Body() d: UpdateVersionDto) { return this.svc.updateVersion(id, d); }
   @Roles(...CATALOG_WRITE) @Post('versions/:id/activate') activate(@Param('id', Id()) id: string) { return this.svc.activateVersion(id); }

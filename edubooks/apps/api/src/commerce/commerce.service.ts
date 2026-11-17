@@ -3,7 +3,7 @@ import { and, asc, count, desc, eq, ilike, inArray, max, or, sql, SQL } from 'dr
 import { DbService } from '../db/db.service';
 import { qc } from '../db/qualify';
 import {
-  academicYears, bookEditions, bookPackages, bundleItems, fulfillments, grades, licensePools, licenseSeats, orderLines, orders,
+  academicYears, bookEditions, licenseAdjustments, bookPackages, bundleItems, fulfillments, grades, licensePools, licenseSeats, orderLines, orders,
   productVersions, products, schools,
 } from '../db/schema';
 import { AuditService } from '../audit/audit.service';
@@ -162,6 +162,23 @@ export class CommerceService {
     if (v.status !== 'DRAFT') throw new ConflictException('Only draft versions can be deleted.');
     await this.q.delete(productVersions).where(eq(productVersions.id, id));
     await this.audit.log('commerce.version.delete', 'product', v.productId, `Deleted draft v${v.versionNo} of ${sku}`);
+    return { ok: true };
+  }
+
+  /** Deletes a product that was never ordered or licensed. Sold products are kept (Stop selling hides them from new orders). */
+  async deleteProduct(id: string) {
+    const [p] = await this.q.select().from(products).where(eq(products.id, id));
+    if (!p) throw new NotFoundException('Product not found');
+    const vs = (await this.q.select({ id: productVersions.id }).from(productVersions).where(eq(productVersions.productId, id))).map((v) => v.id);
+    if (vs.length) {
+      const [{ o }] = await this.q.select({ o: count() }).from(orderLines).where(inArray(orderLines.productVersionId, vs));
+      const [{ l }] = await this.q.select({ l: count() }).from(licensePools).where(inArray(licensePools.productVersionId, vs));
+      const [{ a }] = await this.q.select({ a: count() }).from(licenseAdjustments).where(inArray(licenseAdjustments.productVersionId, vs));
+      if (o || l || a) throw new ConflictException(`"${p.name}" has been ordered or licensed to schools, so it cannot be deleted (their records must stay). Use Archive or “Stop selling” to remove it from new orders.`);
+      await this.q.delete(productVersions).where(inArray(productVersions.id, vs)); // its book list goes with it
+    }
+    await this.q.delete(products).where(eq(products.id, id));
+    await this.audit.log('commerce.product.delete', 'product', id, `Deleted the product ${p.sku} — ${p.name}`, p);
     return { ok: true };
   }
 

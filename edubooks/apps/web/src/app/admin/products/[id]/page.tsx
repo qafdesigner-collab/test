@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { use, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, CopyPlus, Lock, Rocket, Trash2 } from 'lucide-react';
 import { api, fmtDay } from '@/lib/api';
@@ -45,6 +46,8 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   const q = useQuery({ queryKey: ['product', id], queryFn: () => api.get(`/commerce/products/${id}`) });
   const newVersion = useAction(() => api.post(`/commerce/products/${id}/versions`, {}), { ok: 'New draft version created', keys: ['product', 'products'] });
   const retire = useAction((vid: string) => api.post(`/commerce/versions/${vid}/retire`), { ok: 'Version retired', keys: ['product', 'products'] });
+  const router = useRouter(); const [askDelete, setAskDelete] = useState(false);
+  const remove = useAction(() => api.del(`/commerce/products/${id}`), { ok: 'Product deleted', keys: ['products'], after: () => { setAskDelete(false); router.push('/admin/products'); } });
   const archive = useAction((archived: boolean) => api.patch(`/commerce/products/${id}`, { archived }), { ok: 'Saved', keys: ['product', 'products'] });
   if (q.isLoading) return <PageLoader />;
   if (q.error) return <ErrorBox error={q.error} />;
@@ -57,7 +60,11 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
           <p className="font-mono text-sm text-slate-500">{p.sku}</p>{p.description && <p className="mt-1 text-sm text-slate-600">{p.description}</p>}</div>
         {canEdit && <div className="flex gap-2">
           {!p.versions.some((v: any) => v.status === 'DRAFT') && <Button variant="secondary" loading={newVersion.isPending} onClick={() => newVersion.mutate()}><CopyPlus className="size-4" />New version</Button>}
-          <Button variant="ghost" onClick={() => archive.mutate(!p.archived)}>{p.archived ? 'Unarchive' : 'Archive'}</Button></div>}
+          <Button variant="ghost" onClick={() => archive.mutate(!p.archived)}>{p.archived ? 'Unarchive' : 'Archive'}</Button>
+          <Button variant="danger" onClick={() => setAskDelete(true)}><Trash2 className="size-4" />Delete</Button></div>}
+      <Confirm open={askDelete} onOpenChange={() => setAskDelete(false)} title={`Delete ${p.name}?`} danger confirmLabel="Delete product for ever" loading={remove.isPending} onConfirm={() => remove.mutate()}
+        body={<div className="space-y-2"><p>The product and all its versions are <b>removed for ever</b>. The books themselves are not deleted.</p>
+          <p className="text-sm text-slate-600">A product that was ordered or licensed to a school cannot be deleted (those records must stay) — use <b>Archive</b> or <b>Stop selling</b> instead.</p></div>} />
       </div>
       <div className="space-y-4">
         {p.versions.map((v: any) => (

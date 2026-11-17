@@ -45,6 +45,7 @@ export class PublishingController {
   @Patch('packages/:id') update(@Param('id', Id()) id: string, @Body() d: UpdatePackageDto) { return this.svc.updatePackage(id, d); }
   @Post('packages/:id/archive') archive(@Param('id', Id()) id: string) { return this.svc.setPackageArchived(id, true); }
   @Post('packages/:id/restore') restore(@Param('id', Id()) id: string) { return this.svc.setPackageArchived(id, false); }
+  @Delete('packages/:id') delPackage(@Param('id', Id()) id: string) { return this.svc.deletePackage(id); }
 
   // editions
   @Get('packages/:id/editions') editions(@Param('id', Id()) id: string) { return this.svc.listEditions(id); }

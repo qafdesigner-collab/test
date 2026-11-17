@@ -1,3 +1,10 @@
+# What's new in Knowledge Gate 1.3.20
+
+## Delete books and products
+- **Book Packages → open a book → Delete**: removes the book with all its editions, parts, pages and resources (after you confirm).
+- **Products & Bundles → open a product → Delete**: removes the product and its versions. The books in it are not deleted.
+- To protect schools' records, a book that schools hold licences for, or a product that was ordered or licensed, cannot be deleted. The message says why. Use **Archive** (or **Stop selling** for a product) to hide it instead. A book that is in a product can be deleted after that product is deleted.
+
 # What's new in Knowledge Gate 1.3.19
 
 ## Big PDFs (teacher guides, books) open at once

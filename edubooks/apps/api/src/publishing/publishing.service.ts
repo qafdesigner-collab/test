@@ -3,7 +3,7 @@ import { and, asc, count, desc, eq, getTableColumns, ilike, inArray, max, or, sq
 import { DbService } from '../db/db.service';
 import { qc } from '../db/qualify';
 import {
-  bookComponents, bookEditions, bookLessons, bookPackages, bookPages, bookUnits, digitalAssets, grades, subjects, teachingResources,
+  accessEntitlements, bookComponents, bookEditions, bookLessons, bookPackages, bookPages, bookUnits, bundleItems, digitalAssets, grades, products, productVersions, subjects, teachingResources,
 } from '../db/schema';
 import { AuditService } from '../audit/audit.service';
 import { AssetsService, UploadedTemp } from '../storage/assets.service';
@@ -130,6 +130,27 @@ export class PublishingService {
     await this.audit.log(archived ? 'publishing.package.archive' : 'publishing.package.restore', 'book_package', id,
       `${archived ? 'Archived' : 'Restored'} "${before.title}"`, { status: before.status }, { status });
     return { status };
+  }
+
+  /**
+   * Deletes a book with all its editions, parts, pages and resources. Not possible while it is sold in a product or
+   * schools have licences for it — schools would lose a book they paid for (archive it instead, which hides it).
+   */
+  async deletePackage(id: string) {
+    const [p] = await this.q.select().from(bookPackages).where(eq(bookPackages.id, id));
+    if (!p) throw new NotFoundException('Book not found');
+    const eds = (await this.q.select({ id: bookEditions.id }).from(bookEditions).where(eq(bookEditions.packageId, id))).map((e) => e.id);
+    if (eds.length) {
+      const [{ n }] = await this.q.select({ n: count() }).from(accessEntitlements).where(inArray(accessEntitlements.editionId, eds));
+      if (n) throw new ConflictException(`Schools have licences for "${p.title}" (${n} user${n === 1 ? '' : 's'}), so it cannot be deleted. Use Archive to hide it instead.`);
+      const inProducts = await this.q.selectDistinct({ name: products.name }).from(bundleItems)
+        .innerJoin(productVersions, eq(productVersions.id, bundleItems.productVersionId)).innerJoin(products, eq(products.id, productVersions.productId))
+        .where(inArray(bundleItems.editionId, eds));
+      if (inProducts.length) throw new ConflictException(`"${p.title}" is part of the product${inProducts.length === 1 ? '' : 's'} ${inProducts.map((x) => `"${x.name}"`).join(', ')}. Delete ${inProducts.length === 1 ? 'that product' : 'those products'} first (Products page), then delete the book.`);
+    }
+    await this.q.delete(bookPackages).where(eq(bookPackages.id, id));
+    await this.audit.log('publishing.package.delete', 'book_package', id, `Deleted the book "${p.title}"`, p);
+    return { ok: true };
   }
 
   // =============== editions ===============

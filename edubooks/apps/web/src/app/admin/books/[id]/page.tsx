@@ -19,7 +19,7 @@ export default function PackageBuilder({ params }: { params: Promise<{ id: strin
   const pkg = useQuery({ queryKey: ['package', id], queryFn: () => api.get(`/publishing/packages/${id}`) });
   const [editionId, setEditionId] = useState<string>('');
   const [tab, setTab] = useState<Tab>('structure');
-  const [dialog, setDialog] = useState<'' | 'details' | 'edition' | 'publish' | 'archiveEd' | 'deleteEd' | 'archivePkg'>('');
+  const [dialog, setDialog] = useState<'' | 'details' | 'edition' | 'publish' | 'archiveEd' | 'deleteEd' | 'archivePkg' | 'deletePkg'>('');
 
   useEffect(() => {
     // Pick a default edition only when none is selected (initial load, or after deleting a draft).
@@ -33,6 +33,7 @@ export default function PackageBuilder({ params }: { params: Promise<{ id: strin
   const publish = useBuilderMutation(() => api.post(`/publishing/editions/${editionId}/publish`), 'Edition published 🎉', () => setDialog(''));
   const archiveEd = useBuilderMutation(() => api.post(`/publishing/editions/${editionId}/archive`), 'Edition archived', () => setDialog(''));
   const deleteEd = useBuilderMutation(() => api.del(`/publishing/editions/${editionId}`), 'Draft edition deleted', () => { setDialog(''); setEditionId(''); });
+  const deletePkg = useBuilderMutation(() => api.del(`/publishing/packages/${id}`), 'Book deleted', () => { setDialog(''); router.push('/admin/books'); });
   const archivePkg = useBuilderMutation((archive: boolean) => api.post(`/publishing/packages/${id}/${archive ? 'archive' : 'restore'}`), undefined, () => setDialog(''));
 
   if (pkg.isLoading) return <PageLoader />;
@@ -59,6 +60,7 @@ export default function PackageBuilder({ params }: { params: Promise<{ id: strin
             {!archived && <Button variant="secondary" size="sm" onClick={() => setDialog('details')}><Pencil className="size-4" />Edit details</Button>}
             <Button variant="secondary" size="sm" onClick={() => (archived ? archivePkg.mutate(false) : setDialog('archivePkg'))} loading={archivePkg.isPending}>
               {archived ? <><ArchiveRestore className="size-4" />Restore</> : <><Archive className="size-4" />Archive</>}</Button>
+            <Button variant="danger" size="sm" onClick={() => setDialog('deletePkg')}><Trash2 className="size-4" />Delete</Button>
           </div>
         </div>
 
@@ -102,6 +104,9 @@ export default function PackageBuilder({ params }: { params: Promise<{ id: strin
         body={<p>The draft edition and its structure are removed. Uploaded files remain available for other editions.</p>} />
       <Confirm open={dialog === 'archivePkg'} onOpenChange={() => setDialog('')} title={`Archive ${p.title}?`} confirmLabel="Archive package" danger loading={archivePkg.isPending} onConfirm={() => archivePkg.mutate(true)}
         body={<p>The whole package becomes read-only and is hidden from new sales. You can restore it later.</p>} />
+      <Confirm open={dialog === 'deletePkg'} onOpenChange={() => setDialog('')} title={`Delete ${p.title}?`} confirmLabel="Delete book for ever" danger loading={deletePkg.isPending} onConfirm={() => deletePkg.mutate(undefined)}
+        body={<div className="space-y-2"><p>The book, all its editions, parts, pages and resources are <b>removed for ever</b>. This cannot be undone.</p>
+          <p className="text-sm text-slate-600">A book that schools have licences for, or that is part of a product, cannot be deleted — delete the product first, or use <b>Archive</b> to hide the book.</p></div>} />
     </div>
   );
 }
