@@ -42,27 +42,71 @@ function Viewer({ assetId }: { assetId: string }) {
   );
 }
 
+/**
+ * PDF resources: every page has its place, but only the pages near the screen are drawn and pages far away are
+ * cleared again. Phones and tablets (iPad/iPhone in particular) allow a web page only limited drawing memory —
+ * drawing all pages at once left every page after the first blank there.
+ */
 function PdfPages({ link }: { link: FileLink }) {
-  const host = useRef<HTMLDivElement>(null); const [err, setErr] = useState<string | null>(null); const [loading, setLoading] = useState(true);
+  const host = useRef<HTMLDivElement>(null);
+  const [err, setErr] = useState<string | null>(null); const [sizes, setSizes] = useState<{ w: number; h: number }[] | null>(null);
+  const [width, setWidth] = useState(800); const [current, setCurrent] = useState(1);
+  const doc = useRef<any>(null);
   useEffect(() => {
-    let doc: any; let cancelled = false;
+    let cancelled = false;
     (async () => {
       const pdfjs = await import('pdfjs-dist'); pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-      doc = await pdfjs.getDocument({ data: new Uint8Array(await fetchPdf(link)), isEvalSupported: false }).promise;
-      const width = Math.min((host.current?.clientWidth ?? 900) - 32, 1000);
-      for (let i = 1; i <= doc.numPages && !cancelled; i++) {
-        const page = await doc.getPage(i); const base = page.getViewport({ scale: 1 }); const vp = page.getViewport({ scale: width / base.width });
-        const c = document.createElement('canvas'); const r = window.devicePixelRatio || 1;
-        c.width = vp.width * r; c.height = vp.height * r; c.style.width = `${vp.width}px`; c.style.height = `${vp.height}px`; c.className = 'mx-auto mb-4 block bg-white shadow';
-        host.current?.appendChild(c);
-        await page.render({ canvasContext: c.getContext('2d')!, viewport: vp, transform: r !== 1 ? [r, 0, 0, r, 0, 0] : undefined }).promise;
-        if (i === 1) setLoading(false);
-      }
-      setLoading(false);
-    })().catch((e) => { if (!cancelled) { setErr(e?.message ?? 'Could not open the file'); setLoading(false); } });
-    return () => { cancelled = true; doc?.destroy(); };
+      const d = await pdfjs.getDocument({ data: new Uint8Array(await fetchPdf(link)), isEvalSupported: false }).promise;
+      if (cancelled) { d.destroy(); return; }
+      doc.current = d;
+      const out: { w: number; h: number }[] = [];
+      for (let i = 1; i <= d.numPages; i++) { const vp = (await d.getPage(i)).getViewport({ scale: 1 }); out.push({ w: vp.width, h: vp.height }); }
+      if (!cancelled) setSizes(out);
+    })().catch((e) => { if (!cancelled) setErr(e?.message ?? 'Could not open the file'); });
+    return () => { cancelled = true; doc.current?.destroy(); doc.current = null; };
   }, [link]);
-  return <div ref={host} className="p-4">{loading && <Spinner className="mx-auto my-10 size-8" />}{err && <ErrorBox error={new Error(err)} />}</div>;
+  useEffect(() => {
+    const fit = () => setWidth(Math.min((host.current?.clientWidth ?? 900) - 32, 1000));
+    fit(); window.addEventListener('resize', fit); return () => window.removeEventListener('resize', fit);
+  }, []);
+  // draw pages as they come near the screen; clear pages that are far away
+  useEffect(() => {
+    if (!sizes || !host.current) return;
+    const root = host.current.closest('main');
+    const tasks = new Map<number, any>();
+    const draw = async (el: HTMLDivElement, n: number) => {
+      if (el.querySelector('canvas') || tasks.has(n) || !doc.current) return;
+      const page = await doc.current.getPage(n); const base = page.getViewport({ scale: 1 });
+      const scale = width / base.width; const css = page.getViewport({ scale });
+      const r = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(4_000_000 / (css.width * css.height))); // keep each page under ~4 million pixels
+      const vp = page.getViewport({ scale: scale * r });
+      const c = document.createElement('canvas'); c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+      c.style.width = '100%'; c.style.height = '100%'; c.style.display = 'block';
+      el.appendChild(c);
+      const task = page.render({ canvasContext: c.getContext('2d')!, viewport: vp }); tasks.set(n, task);
+      try { await task.promise; } catch { /* cleared while drawing */ } finally { tasks.delete(n); }
+    };
+    const clear = (el: HTMLDivElement, n: number) => { tasks.get(n)?.cancel?.(); const c = el.querySelector('canvas'); if (c) { c.width = 0; c.height = 0; c.remove(); } };
+    const near = new IntersectionObserver((entries) => {
+      for (const e of entries) { const el = e.target as HTMLDivElement; const n = Number(el.dataset.page); if (e.isIntersecting) draw(el, n); else clear(el, n); }
+    }, { root, rootMargin: '1200px 0px' });
+    const seen = new IntersectionObserver((entries) => {
+      const vis = entries.filter((e) => e.isIntersecting).map((e) => Number((e.target as HTMLElement).dataset.page));
+      if (vis.length) setCurrent(Math.min(...vis));
+    }, { root, threshold: 0.5 });
+    const els = Array.from(host.current.querySelectorAll<HTMLDivElement>('[data-page]'));
+    els.forEach((el) => { near.observe(el); seen.observe(el); });
+    return () => { near.disconnect(); seen.disconnect(); els.forEach((el, i) => clear(el, i + 1)); };
+  }, [sizes, width]);
+  if (err) return <div className="p-4"><ErrorBox error={new Error(err)} /></div>;
+  return (
+    <div ref={host} className="p-4">
+      {!sizes ? <Spinner className="mx-auto my-10 size-8" /> : sizes.map((sz, i) => (
+        <div key={i} data-page={i + 1} aria-label={`Page ${i + 1}`} className="mx-auto mb-4 bg-white shadow" style={{ width, height: Math.round((width * sz.h) / sz.w) }} />
+      ))}
+      {sizes && sizes.length > 1 && <div className="pointer-events-none sticky bottom-3 z-30 flex justify-center"><span className="rounded-full bg-slate-900/80 px-3 py-1 text-sm font-semibold text-white shadow">Page {current} / {sizes.length}</span></div>}
+    </div>
+  );
 }
 
 /** Flash (SWF) resources play with the built-in Flash player (Ruffle) — nothing to install, nothing to download. */

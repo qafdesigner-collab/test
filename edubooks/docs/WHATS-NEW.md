@@ -1,3 +1,8 @@
+# What's new in Knowledge Gate 1.3.18
+
+- **PDF resources show every page** on phones and tablets (iPad / iPhone / Android). Before, only the first page appeared there, because all pages were drawn at once and those devices limit a page's drawing memory. Now only the pages near the screen are drawn (long PDFs open faster too), with a **Page x / n** counter.
+- Checked: resources set to **“Visible to: Teachers only”** appear only in teacher accounts — students do not see them and cannot open them.
+
 # What's new in Knowledge Gate 1.3.17
 
 ## Big mobile apps upload reliably
