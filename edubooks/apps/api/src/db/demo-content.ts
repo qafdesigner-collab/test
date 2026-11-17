@@ -125,7 +125,7 @@ export async function demoContent(db: NodePgDatabase<typeof s>, P: string, admin
         { type: 'TEACHER_CARDS' as const, title: 'Teacher Cards', partNumber: null, pageCount: null },
         { type: 'DANGLERS' as const, title: 'Danglers', partNumber: null, pageCount: null },
       ];
-      const compRows = await db.insert(s.bookComponents).values(comps.map((c, i) => ({ publisherId: P, editionId: ed.id, sort: i, ...c }))).returning();
+      const compRows = await db.insert(s.bookComponents).values(comps.map((c, i) => ({ publisherId: P, editionId: ed.id, sort: i, visibleTo: (c.type === 'TEACHER_GUIDE' || c.type === 'TEACHER_CARDS' ? 'TEACHER' : 'ALL') as 'TEACHER' | 'ALL', ...c }))).returning();
       const part1 = compRows[0];
       // Placeholder digital pages for Part 1 so the reader can be tried. NOT real textbook content.
       const pagesPdf = samplePdf(Array.from({ length: 26 }, (_, i) => i === 0

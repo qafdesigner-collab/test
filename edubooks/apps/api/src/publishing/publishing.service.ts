@@ -28,6 +28,9 @@ const STANDARD_EXTRAS = [
   { type: 'MOBILE_APP', title: 'Mobile App' },
 ] as const;
 
+/** Teacher guides and teacher cards start hidden from students (the publisher can change it). */
+const teacherPart = (type: string) => type === 'TEACHER_GUIDE' || type === 'TEACHER_CARDS';
+
 @Injectable()
 export class PublishingService {
   constructor(private readonly db: DbService, private readonly audit: AuditService, private readonly assets: AssetsService) {}
@@ -90,7 +93,7 @@ export class PublishingService {
         ...Array.from({ length: parts }, (_, i) => ({ type: 'STUDENT_BOOK' as const, title: `Student Book Part ${i + 1}`, partNumber: i + 1 })),
         ...STANDARD_EXTRAS.filter((x) => !wanted || wanted.has(x.type)).map((x) => ({ ...x, partNumber: null })),
       ];
-      await this.q.insert(bookComponents).values(rows.map((r, i) => ({ publisherId: this.pub, editionId: edition.id, sort: i, ...r })));
+      await this.q.insert(bookComponents).values(rows.map((r, i) => ({ publisherId: this.pub, editionId: edition.id, sort: i, visibleTo: teacherPart(r.type) ? 'TEACHER' as const : 'ALL' as const, ...r })));
     }
     await this.audit.log('publishing.package.create', 'book_package', pkg.id, `Created book package "${pkg.title}" with ${edition.label}`, undefined, pkg);
     return { ...pkg, editionId: edition.id };
@@ -314,7 +317,7 @@ export class PublishingService {
   async addComponent(editionId: string, dto: CreateComponentDto) {
     await this.editable(editionId, 'part');
     const [{ m }] = await this.q.select({ m: max(bookComponents.sort) }).from(bookComponents).where(eq(bookComponents.editionId, editionId));
-    const [row] = await this.q.insert(bookComponents).values({ publisherId: this.pub, editionId, ...dto, sort: (m ?? -1) + 1 }).returning();
+    const [row] = await this.q.insert(bookComponents).values({ publisherId: this.pub, editionId, visibleTo: teacherPart(dto.type) ? 'TEACHER' : 'ALL', ...dto, sort: (m ?? -1) + 1 }).returning();
     await this.touch(editionId);
     await this.audit.log('publishing.component.create', 'book_component', row.id, `Added "${row.title}"`, undefined, row);
     return row;

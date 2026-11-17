@@ -1,4 +1,5 @@
 import { AssetsService } from '../storage/assets.service';
+import { visibleFor } from '../common/visibility';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, sql, SQL } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
@@ -469,10 +470,13 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
     const isSchoolAdmin = c.roles.includes('SCHOOL_ADMIN');
     const editions = await this.entitledEditionIds(c.userId, isSchoolAdmin ? c.schoolId : null);
     if (!editions.length) return false;
-    const audiences = c.roles.includes('STUDENT') ? ['ALL', 'STUDENT'] : ['ALL', 'TEACHER', 'STUDENT'];
-    const { rows } = await this.q.execute(sql`SELECT 1 FROM teaching_resources r WHERE r.asset_id = ${assetId}
-        AND r.edition_id IN ${editions} AND r.audience::text IN ${audiences}
-      UNION ALL SELECT 1 FROM book_components bc WHERE bc.book_asset_id = ${assetId} AND bc.edition_id IN ${editions} LIMIT 1`);
+    // parts, units and lessons can be hidden from teachers or from students ("Visible to"); their files with them
+    const vis = visibleFor(c) ?? ['ALL', 'TEACHER', 'STUDENT']; const audiences = vis; // "Students only" resources are hidden from teachers too
+    const { rows } = await this.q.execute(sql`SELECT 1 FROM teaching_resources r
+        LEFT JOIN book_components rc ON rc.id = r.component_id LEFT JOIN book_units ru ON ru.id = r.unit_id LEFT JOIN book_lessons rl ON rl.id = r.lesson_id
+        WHERE r.asset_id = ${assetId} AND r.edition_id IN ${editions} AND r.audience::text IN ${audiences}
+        AND COALESCE(rc.visible_to::text, 'ALL') IN ${vis} AND COALESCE(ru.visible_to::text, 'ALL') IN ${vis} AND COALESCE(rl.visible_to::text, 'ALL') IN ${vis}
+      UNION ALL SELECT 1 FROM book_components bc WHERE bc.book_asset_id = ${assetId} AND bc.edition_id IN ${editions} AND bc.visible_to::text IN ${vis} LIMIT 1`);
     return rows.length > 0;
   }
 }

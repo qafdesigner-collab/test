@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpException, HttpStatus, Injectable, Put, Post, Query, ParseUUIDPipe } from '@nestjs/common';
+import { visibleFor } from '../common/visibility';
 import { ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
@@ -66,7 +67,7 @@ export class TutorService {
     if (!s.enabled) throw new ForbiddenException('Ask Owl is not switched on for your school yet');
     await this.access.assertEdition(d.editionId);
     const comp = await this.one(sql`SELECT c.id, c.title, b.title AS book, g.name AS grade FROM book_components c JOIN book_editions e ON e.id = c.edition_id JOIN book_packages b ON b.id = e.package_id
-      LEFT JOIN grades g ON g.id = b.grade_id WHERE c.id = ${d.componentId} AND c.edition_id = ${d.editionId}`);
+      LEFT JOIN grades g ON g.id = b.grade_id WHERE c.id = ${d.componentId} AND c.edition_id = ${d.editionId} AND c.visible_to::text IN ${visibleFor(this.ctx) ?? ['ALL', 'TEACHER', 'STUDENT']}`);
     if (!comp) throw new BadRequestException('That page is not in this book');
     const used = await this.usedToday();
     if (used >= s.dailyLimit) throw new HttpException("You've asked lots of great questions today! Owl is resting now — try again tomorrow. 🦉", HttpStatus.TOO_MANY_REQUESTS);

@@ -224,6 +224,8 @@ export const bookComponents = pgTable('book_components', {
   indexedPages: integer('indexed_pages').notNull().default(0),
   indexedAt: timestamp('indexed_at', { withTimezone: true }),
   indexError: text('index_error'),
+  /** ALL, TEACHER (hidden from students) or STUDENT (hidden from teachers). */
+  visibleTo: audienceEnum('visible_to').notNull().default('ALL'),
 }, (t) => [index('components_edition_idx').on(t.editionId)]);
 
 export const bookUnits = pgTable('book_units', {
@@ -234,6 +236,7 @@ export const bookUnits = pgTable('book_units', {
   title: text('title').notNull(),
   description: text('description').notNull().default(''),
   sort: integer('sort').notNull().default(0),
+  visibleTo: audienceEnum('visible_to').notNull().default('ALL'),
 }, (t) => [index('units_component_idx').on(t.componentId)]);
 
 export const bookLessons = pgTable('book_lessons', {
@@ -246,6 +249,7 @@ export const bookLessons = pgTable('book_lessons', {
   pageStart: integer('page_start'),
   pageEnd: integer('page_end'),
   sort: integer('sort').notNull().default(0),
+  visibleTo: audienceEnum('visible_to').notNull().default('ALL'),
 }, (t) => [
   index('lessons_unit_idx').on(t.unitId),
   check('lessons_pages_ck', sql`${t.pageStart} IS NULL OR ${t.pageEnd} IS NULL OR ${t.pageEnd} >= ${t.pageStart}`),

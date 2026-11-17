@@ -1,4 +1,5 @@
 import { ChunkedUploads } from '../storage/chunked.controller';
+import { sees, visibleFor } from '../common/visibility';
 import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Injectable, Module, NotFoundException, Param, ParseUUIDPipe, Post, Put, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -39,10 +40,13 @@ export class AppsService {
   private sign(p: string) { return createHmac('sha256', config.fileUrlSecret).update(`app:${p}`).digest('base64url'); }
 
   private async component(id: string, staffOnly = false) {
-    const [c] = await this.rows(sql`SELECT id, edition_id, type, title FROM book_components WHERE id = ${id}`);
+    const [c] = await this.rows(sql`SELECT id, edition_id, type, title, visible_to FROM book_components WHERE id = ${id}`);
     if (!c) throw new NotFoundException('Book part not found');
     if (c.type !== 'MOBILE_APP') throw new BadRequestException('This book part is not a mobile app');
-    if (!staffOnly) await this.access.assertEdition(c.edition_id);
+    if (!staffOnly) {
+      await this.access.assertEdition(c.edition_id);
+      if (!sees(visibleFor(this.db.ctx), c.visible_to)) throw new ForbiddenException(`This part is for ${c.visible_to === 'TEACHER' ? 'teachers' : 'students'} only`);
+    }
     return c;
   }
   private async get(componentId: string) {

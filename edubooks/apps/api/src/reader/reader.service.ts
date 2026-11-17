@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { qc } from '../db/qualify';
 import { DbService } from '../db/db.service';
@@ -8,6 +8,7 @@ import {
 import { AccessService } from '../lms/access.service';
 import { AssetsService } from '../storage/assets.service';
 import { checkUrl } from '../common/urls';
+import { sees, visibleFor } from '../common/visibility';
 
 @Injectable()
 export class ReaderService {
@@ -20,7 +21,8 @@ export class ReaderService {
     const [ed] = await this.q.select({ id: bookEditions.id, label: bookEditions.label, title: bookPackages.title, coverUrl: sql<string | null>`CASE WHEN ${bookPackages.coverVersion} IS NOT NULL THEN '/api/covers/' || ${bookPackages.id} || '?v=' || ${bookPackages.coverVersion} END`, coverColor: bookPackages.coverColor })
       .from(bookEditions).innerJoin(bookPackages, eq(bookPackages.id, bookEditions.packageId)).where(eq(bookEditions.id, editionId));
     if (!ed) throw new NotFoundException('Book not found');
-    let comps = await this.q.select({ id: bookComponents.id, type: bookComponents.type, title: bookComponents.title, partNumber: bookComponents.partNumber,
+    const vis = visibleFor(this.db.ctx);
+    let comps = await this.q.select({ id: bookComponents.id, visibleTo: bookComponents.visibleTo, type: bookComponents.type, title: bookComponents.title, partNumber: bookComponents.partNumber,
       pageCount: bookComponents.pageCount, hasPdf: sql<boolean>`${bookComponents.bookAssetId} IS NOT NULL`,
       flipbook: sql<string | null>`(SELECT f.kind FROM flipbooks f WHERE f.component_id = ${qc(bookComponents.id)} ORDER BY (f.unit_title IS NOT NULL), f.sort LIMIT 1)`,
       flipUnits: sql<number>`(SELECT count(*)::int FROM flipbooks f WHERE f.component_id = ${qc(bookComponents.id)})`,
@@ -30,14 +32,21 @@ export class ReaderService {
     const resources = await this.q.select({ id: teachingResources.id, title: teachingResources.title, resourceType: teachingResources.resourceType, audience: teachingResources.audience,
       componentId: teachingResources.componentId, unitId: teachingResources.unitId, lessonId: teachingResources.lessonId, assetId: teachingResources.assetId, ext: digitalAssets.ext })
       .from(teachingResources).innerJoin(digitalAssets, eq(digitalAssets.id, teachingResources.assetId))
-      .where(and(eq(teachingResources.editionId, editionId), student ? sql`${teachingResources.audience} IN ('ALL','STUDENT')` : undefined))
+      .where(and(eq(teachingResources.editionId, editionId), vis ? inArray(teachingResources.audience, vis) : undefined))
       .orderBy(asc(teachingResources.sort));
+    // Parts, units and lessons the publisher hid from this kind of user ("Visible to") are left out, with their resources.
+    comps = comps.filter((c) => sees(vis, c.visibleTo));
+    const allUnits = comps.length ? await this.q.select().from(bookUnits).where(inArray(bookUnits.componentId, comps.map((c) => c.id))).orderBy(asc(bookUnits.sort)) : [];
+    const units = allUnits.filter((u) => sees(vis, u.visibleTo));
+    const allLessons = units.length ? await this.q.select().from(bookLessons).where(inArray(bookLessons.unitId, units.map((u) => u.id))).orderBy(asc(bookLessons.sort)) : [];
+    const lessons = allLessons.filter((l) => sees(vis, l.visibleTo));
+    const unitOk = new Set(units.map((u) => u.id)); const lessonOk = new Set(lessons.map((l) => l.id));
+    const compOk = new Set(comps.map((c) => c.id));
+    const shown = resources.filter((r) => (!r.componentId || compOk.has(r.componentId)) && (!r.unitId || unitOk.has(r.unitId)) && (!r.lessonId || lessonOk.has(r.lessonId)));
     // Only parts the publisher actually uploaded something for are shown (pages, flipbook/CD, app, or resources).
-    const withFiles = new Set(resources.map((r) => r.componentId).filter(Boolean));
+    const withFiles = new Set(shown.map((r) => r.componentId).filter(Boolean));
     comps = comps.filter((c) => c.hasPdf || c.flipbook || c.hasApp || withFiles.has(c.id));
     const ids = comps.map((c) => c.id);
-    const units = ids.length ? await this.q.select().from(bookUnits).where(inArray(bookUnits.componentId, ids)).orderBy(asc(bookUnits.sort)) : [];
-    const lessons = units.length ? await this.q.select().from(bookLessons).where(inArray(bookLessons.unitId, units.map((u) => u.id))).orderBy(asc(bookLessons.sort)) : [];
     const progress = ids.length && !this.db.ctx.staff ? await this.q.select().from(readerProgress).where(and(eq(readerProgress.userId, this.db.ctx.userId), inArray(readerProgress.componentId, ids))) : [];
     const marks = ids.length && !this.db.ctx.staff ? await this.q.select().from(bookmarks).where(and(eq(bookmarks.userId, this.db.ctx.userId), inArray(bookmarks.componentId, ids))).orderBy(asc(bookmarks.page)) : [];
     // Homework linked to this book for the current user's classes.
@@ -54,7 +63,7 @@ export class ReaderService {
         units: units.filter((u) => u.componentId === c.id).map((u) => ({ id: u.id, number: u.number, title: u.title,
           lessons: lessons.filter((l) => l.unitId === u.id).map((l) => ({ id: l.id, number: l.number, title: l.title, pageStart: l.pageStart, pageEnd: l.pageEnd })) })),
       })),
-      resources: resources.filter((r) => !r.componentId || ids.includes(r.componentId)), assessments: linked,
+      resources: shown.filter((r) => !r.componentId || ids.includes(r.componentId)), assessments: linked,
     };
   }
 
@@ -62,6 +71,7 @@ export class ReaderService {
     const [c] = await this.q.select().from(bookComponents).where(eq(bookComponents.id, id));
     if (!c) throw new NotFoundException('Book part not found');
     await this.access.assertEdition(c.editionId);
+    if (!sees(visibleFor(this.db.ctx), c.visibleTo)) throw new ForbiddenException(`This part is for ${c.visibleTo === 'TEACHER' ? 'teachers' : 'students'} only`);
     return c;
   }
 

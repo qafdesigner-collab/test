@@ -1,3 +1,14 @@
+# What's new in Knowledge Gate 1.3.21
+
+## Privacy for book parts, units and lessons: “Visible to”
+- In the book builder, every **part** (student book, teacher guide, posters, calendar, flashcards, CD, app…), **unit** and **lesson** now has **Visible to: 👥 Everyone · 👩‍🏫 Teachers only · 🎒 Students only**. Click one; it is saved at once and also works on published editions.
+- **Teachers only** hides it from students; **Students only** hides it from teachers. Hidden items disappear from the contents, and their pages, flipbook/CD, app, resources and AI answers (Ask Owl, the teacher AI) are blocked on the server too, not just hidden from view.
+- The structure list shows a small **Teachers only / Students only** tag on anything not shown to everyone.
+- The publisher and school admins always see everything.
+- **Teacher guides and teacher cards are now “Teachers only”** (existing ones too). Before, students could open them. Change it per part if you want.
+- Resources marked **“Students only”** are now really hidden from teachers too (before, teachers still saw them).
+- Note: hiding a unit or lesson hides it from the contents and its resources. Its pages stay inside the part's PDF. To hide pages completely, upload them as a separate part and hide that part.
+
 # What's new in Knowledge Gate 1.3.20
 
 ## Delete books and products

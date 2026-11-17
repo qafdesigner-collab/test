@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { visibleFor } from '../common/visibility';
 import { sql } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
 import { config } from '../config';
@@ -16,12 +17,16 @@ export class RetrievalService {
 
   async sources(o: { editionId: string; lessonId?: string | null; unitId?: string | null; query: string }): Promise<(Source & { componentId: string; lessonId: string | null })[]> {
     const budget = config.ai.maxSourceChars;
+    // only text from parts / units / lessons this user may see ("Visible to")
+    const vis = visibleFor(this.db.ctx);
+    const vf = vis ? sql`AND c.visible_to::text IN ${vis} AND COALESCE(l.visible_to::text, 'ALL') IN ${vis}
+      AND COALESCE((SELECT u.visible_to::text FROM book_units u WHERE u.id = l.unit_id), 'ALL') IN ${vis}` : sql``;
     const picked: any[] = [];
     if (o.lessonId || o.unitId) {
       const { rows } = await this.db.q.execute(sql`SELECT p.id, p.page_number AS page, p.text_content AS text, p.lesson_id AS "lessonId", c.id AS "componentId", c.title AS component,
           l.title AS lesson
         FROM book_pages p JOIN book_components c ON c.id = p.component_id LEFT JOIN book_lessons l ON l.id = p.lesson_id
-        WHERE c.edition_id = ${o.editionId} AND length(p.text_content) > 20 AND ${o.lessonId ? sql`p.lesson_id = ${o.lessonId}` : sql`l.unit_id = ${o.unitId}`}
+        WHERE c.edition_id = ${o.editionId} ${vf} AND length(p.text_content) > 20 AND ${o.lessonId ? sql`p.lesson_id = ${o.lessonId}` : sql`l.unit_id = ${o.unitId}`}
         ORDER BY c.sort, p.page_number LIMIT 12`);
       picked.push(...rows);
     }
@@ -34,7 +39,7 @@ export class RetrievalService {
         const [v] = await this.ai.provider.embed!([o.query.slice(0, 2000)]);
         const { rows } = await this.db.q.execute(sql`SELECT p.id, p.page_number AS page, p.text_content AS text, p.lesson_id AS "lessonId", c.id AS "componentId", c.title AS component, l.title AS lesson
           FROM book_pages p JOIN book_components c ON c.id = p.component_id LEFT JOIN book_lessons l ON l.id = p.lesson_id
-          WHERE c.edition_id = ${o.editionId} AND p.embedding IS NOT NULL ${notIn}
+          WHERE c.edition_id = ${o.editionId} ${vf} AND p.embedding IS NOT NULL ${notIn}
           ORDER BY p.embedding <=> ${`[${v.join(',')}]`}::vector LIMIT 4`);
         extra = rows;
       } catch { /* fall back to full-text search */ }
@@ -43,7 +48,7 @@ export class RetrievalService {
       const q = terms.map((t) => t.replace(/'/g, '')).join(' | ');
       const { rows } = await this.db.q.execute(sql`SELECT p.id, p.page_number AS page, p.text_content AS text, p.lesson_id AS "lessonId", c.id AS "componentId", c.title AS component, l.title AS lesson
         FROM book_pages p JOIN book_components c ON c.id = p.component_id LEFT JOIN book_lessons l ON l.id = p.lesson_id
-        WHERE c.edition_id = ${o.editionId} AND p.tsv @@ to_tsquery('simple', ${q}) ${notIn}
+        WHERE c.edition_id = ${o.editionId} ${vf} AND p.tsv @@ to_tsquery('simple', ${q}) ${notIn}
         ORDER BY ts_rank(p.tsv, to_tsquery('simple', ${q})) DESC, p.page_number LIMIT 4`);
       extra = rows;
     }

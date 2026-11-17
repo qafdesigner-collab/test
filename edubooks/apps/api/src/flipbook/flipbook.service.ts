@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { sees, visibleFor } from '../common/visibility';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import * as fs from 'fs';
@@ -167,8 +168,9 @@ export class FlipbookService {
     const [f] = pick ? await this.q.select().from(flipbooks).where(eq(flipbooks.id, pick.id)) : [];
     if (!f) throw new NotFoundException(flipbookId ? 'That unit was not found' : 'No flipbook has been uploaded for this part');
     if (!this.db.ctx.staff) {
-      const [c] = await this.q.select({ editionId: bookComponents.editionId }).from(bookComponents).where(eq(bookComponents.id, componentId));
+      const [c] = await this.q.select({ editionId: bookComponents.editionId, visibleTo: bookComponents.visibleTo }).from(bookComponents).where(eq(bookComponents.id, componentId));
       await this.access.assertEdition(c.editionId);
+      if (!sees(visibleFor(this.db.ctx), c.visibleTo)) throw new ForbiddenException(`This part is for ${c.visibleTo === 'TEACHER' ? 'teachers' : 'students'} only`);
     }
     const exp = Math.floor(Date.now() / 1000) + TOKEN_HOURS * 3600;
     const prot = await protectionFor(this.db);

@@ -11,11 +11,12 @@ import { Badge, Button, Card, Confirm, Dialog, EmptyState, ErrorBox, Field, Inpu
 import { useToast } from '@/components/ui/toast';
 
 // ---------- types ----------
-export interface Lesson { id: string; number: number; title: string; objectives: string; pageStart: number | null; pageEnd: number | null; unitId: string }
-export interface Unit { id: string; number: number; title: string; description: string; componentId: string; lessons: Lesson[] }
+export type Visible = 'ALL' | 'TEACHER' | 'STUDENT';
+export interface Lesson { id: string; number: number; title: string; objectives: string; pageStart: number | null; pageEnd: number | null; unitId: string; visibleTo?: Visible }
+export interface Unit { id: string; number: number; title: string; description: string; componentId: string; lessons: Lesson[]; visibleTo?: Visible }
 export interface Flipbook { id: string; kind: 'HTML' | 'SWF'; entry: string; fileCount: number; totalBytes: number; originalName: string; skippedFiles: number; createdAt: string }
 export interface FlipUnit { id: string; unitTitle: string; sort: number; kind: 'HTML' | 'SWF'; fileCount: number; totalBytes: number; originalName: string; createdAt: string }
-export interface Component { id: string; type: string; title: string; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null; flipbook: Flipbook | null; flipUnits?: FlipUnit[]; indexStatus: string; indexedPages: number; indexError: string | null }
+export interface Component { id: string; type: string; title: string; visibleTo?: Visible; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null; flipbook: Flipbook | null; flipUnits?: FlipUnit[]; indexStatus: string; indexedPages: number; indexError: string | null }
 export interface Resource {
   id: string; title: string; resourceType: string; audience: string; componentId: string | null; unitId: string | null; lessonId: string | null;
   createdAt: string; sharedWith: number; asset: { id: string; originalName: string; ext: string; sizeBytes: number; scanStatus: string };
@@ -61,6 +62,37 @@ const isScope = (r: Resource, s: Sel) =>
   s.kind === 'edition' ? !r.componentId : s.kind === 'component' ? r.componentId === s.id && !r.unitId : s.kind === 'unit' ? r.unitId === s.id && !r.lessonId : r.lessonId === s.id;
 
 // ================= Structure tab =================
+const VIS: { v: Visible; label: string; hint: string }[] = [
+  { v: 'ALL', label: '👥 Everyone', hint: 'Teachers and students' },
+  { v: 'TEACHER', label: '👩‍🏫 Teachers only', hint: 'Hidden from students' },
+  { v: 'STUDENT', label: '🎒 Students only', hint: 'Hidden from teachers' },
+];
+const teacherPart = (type: string) => type === 'TEACHER_GUIDE' || type === 'TEACHER_CARDS';
+/** Small label in the structure list for anything not shown to everyone. */
+function VisTag({ v }: { v?: Visible }) {
+  if (!v || v === 'ALL') return null;
+  return <span className={cn('shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold', v === 'TEACHER' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800')}>{v === 'TEACHER' ? 'Teachers only' : 'Students only'}</span>;
+}
+/**
+ * Who sees a part, unit or lesson. Saved at once. Publisher staff and school admins always see everything.
+ * Can be changed on published editions too.
+ */
+function VisibilityPicker({ kind, id, value, readOnly }: { kind: 'components' | 'units' | 'lessons'; id: string; value?: Visible; readOnly?: boolean }) {
+  const m = useBuilderMutation((v: Visible) => api.patch(`/publishing/${kind}/${id}`, { visibleTo: v }), 'Visibility saved');
+  const cur = value ?? 'ALL';
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm font-medium text-slate-700">Visible to</p>
+      <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Visible to">
+        {VIS.map((o) => (
+          <button key={o.v} type="button" role="radio" aria-checked={cur === o.v} disabled={readOnly || m.isPending} onClick={() => cur !== o.v && m.mutate(o.v)} title={o.hint}
+            className={cn('rounded-full px-3 py-1.5 text-sm font-semibold ring-1 disabled:opacity-60', cur === o.v ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-slate-700 ring-slate-200 hover:bg-slate-50')}>{o.label}</button>))}
+      </div>
+      <p className="text-xs text-slate-500">{VIS.find((o) => o.v === cur)!.hint}{kind !== 'components' ? ' — its resources too.' : ' — its pages, flipbook/CD, app and resources too.'} You (the publisher) and school admins always see everything.</p>
+    </div>
+  );
+}
+
 export function StructureTab({ tree }: { tree: EditionTree }) {
   const [sel, setSel] = useState<Sel>({ kind: 'edition' });
   const [open, setOpen] = useState<Record<string, boolean>>(() => Object.fromEntries(tree.components.slice(0, 1).map((c) => [c.id, true])));
@@ -77,7 +109,7 @@ export function StructureTab({ tree }: { tree: EditionTree }) {
 
   const [editRow, setEditRow] = useState<Component | null>(null); const [delRow, setDelRow] = useState<Component | null>(null);
   const delComp = useBuilderMutation((id: string) => api.del(`/publishing/components/${id}`), 'Part removed', () => { setDelRow(null); setSel({ kind: 'edition' }); });
-  const Row = ({ s, depth, icon, label, sub, actions, toggle, isOpen, canAct }: { s: Sel; depth: number; icon: React.ReactNode; label: string; sub?: string; actions?: React.ReactNode; toggle?: () => void; isOpen?: boolean; canAct?: boolean }) => {
+  const Row = ({ s, depth, icon, label, sub, actions, toggle, isOpen, canAct, vis }: { s: Sel; depth: number; icon: React.ReactNode; label: string; sub?: string; actions?: React.ReactNode; toggle?: () => void; isOpen?: boolean; canAct?: boolean; vis?: Visible }) => {
     const active = sel.kind === s.kind && (s.kind === 'edition' || (sel as any).id === (s as any).id);
     const n = count(s);
     return (
@@ -86,7 +118,7 @@ export function StructureTab({ tree }: { tree: EditionTree }) {
           <ChevronRight className={cn('size-4 transition-transform', isOpen && 'rotate-90')} />
         </button>
         <button onClick={() => setSel(s)} className="focus-ring flex min-w-0 flex-1 items-center gap-2 rounded py-2 text-left">
-          {icon}<span className="truncate font-medium">{label}</span>{sub && <span className="truncate text-xs text-slate-600">{sub}</span>}
+          <span className="shrink-0">{icon}</span><span className="truncate font-medium">{label}</span>{sub && <span className="truncate text-xs text-slate-600">{sub}</span>}<VisTag v={vis} />
           {n > 0 && <Badge className="ml-auto">{n}</Badge>}
         </button>
         {(canAct ?? !locked) && <div className="flex opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">{actions}</div>}
@@ -109,17 +141,17 @@ export function StructureTab({ tree }: { tree: EditionTree }) {
         {tree.components.map((c, ci) => (
           <div key={c.id}>
             <Row s={{ kind: 'component', id: c.id }} depth={0} isOpen={open[c.id]} toggle={() => setOpen({ ...open, [c.id]: !open[c.id] })}
-              icon={<Layers className="size-4 text-brand-500" />} label={c.title} sub={COMPONENT_TYPES[c.type]} canAct={!tree.locked.all}
+              icon={<Layers className="size-4 text-brand-500" />} label={c.title} sub={COMPONENT_TYPES[c.type]} vis={c.visibleTo} canAct={!tree.locked.all}
               actions={<><MoveBtns kind="component" list={tree.components} i={ci} />
                 <button className="rounded p-1 text-slate-500 hover:bg-white" onClick={() => setEditRow(c)} aria-label={`Edit ${c.title}`}><Pencil className="size-3.5" /></button>
                 <button className="rounded p-1 text-red-500 hover:bg-white" onClick={() => setDelRow(c)} aria-label={`Remove ${c.title}`}><Trash2 className="size-3.5" /></button></>} />
             {open[c.id] && c.units.map((u, ui) => (
               <div key={u.id}>
                 <Row s={{ kind: 'unit', id: u.id }} depth={1} isOpen={open[u.id] !== false} toggle={() => setOpen({ ...open, [u.id]: open[u.id] === false })}
-                  icon={<FolderOpen className="size-4 text-amber-500" />} label={`Unit ${u.number}`} sub={u.title} actions={<MoveBtns kind="unit" list={c.units} i={ui} />} />
+                  icon={<FolderOpen className="size-4 text-amber-500" />} label={`Unit ${u.number}`} sub={u.title} vis={u.visibleTo} actions={<MoveBtns kind="unit" list={c.units} i={ui} />} />
                 {open[u.id] !== false && u.lessons.map((l, li) => (
                   <Row key={l.id} s={{ kind: 'lesson', id: l.id }} depth={2} icon={<GraduationCap className="size-4 text-emerald-500" />}
-                    label={`Lesson ${l.number}`} sub={l.title} actions={<MoveBtns kind="lesson" list={u.lessons} i={li} />} />
+                    label={`Lesson ${l.number}`} sub={l.title} vis={l.visibleTo} actions={<MoveBtns kind="lesson" list={u.lessons} i={li} />} />
                 ))}
               </div>
             ))}
@@ -153,7 +185,7 @@ function RemovePartDialog({ comp, published, loading, onCancel, onConfirm }: { c
 }
 
 function ComponentDialog({ editionId, comp, onClose, locked }: { editionId: string; comp?: Component; onClose: () => void; locked?: boolean }) {
-  const [f, setF] = useState({ type: comp?.type ?? 'STUDENT_BOOK', title: comp?.title ?? '', partNumber: comp?.partNumber ?? '', description: comp?.description ?? '', pageCount: comp?.pageCount ?? '' });
+  const [f, setF] = useState({ type: comp?.type ?? 'STUDENT_BOOK', title: comp?.title ?? '', partNumber: comp?.partNumber ?? '', description: comp?.description ?? '', pageCount: comp?.pageCount ?? '', visibleTo: (comp?.visibleTo ?? 'ALL') as Visible });
   const m = useBuilderMutation(() => {
     const body = { ...f, partNumber: f.partNumber === '' ? null : Number(f.partNumber), pageCount: f.pageCount === '' ? null : Number(f.pageCount) };
     if (locked) delete (body as any).pageCount;
@@ -163,12 +195,14 @@ function ComponentDialog({ editionId, comp, onClose, locked }: { editionId: stri
     <Dialog open onOpenChange={onClose} title={comp ? 'Edit part' : 'Add part'} description="Parts are the items in the package: student book parts, homework book, cards, danglers, CD, mobile app…">
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); m.mutate(undefined); }}>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Type"><Select value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })}>{Object.entries(COMPONENT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
+          <Field label="Type"><Select value={f.type} onChange={(e) => setF({ ...f, type: e.target.value, ...(comp ? {} : { visibleTo: teacherPart(e.target.value) ? 'TEACHER' : 'ALL' }) })}>{Object.entries(COMPONENT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
           <Field label="Part number" hint="Optional"><Input type="number" min={1} max={20} value={f.partNumber} onChange={(e) => setF({ ...f, partNumber: e.target.value })} /></Field>
         </div>
         <Field label="Title"><Input required value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="Student Book Part 1" autoFocus /></Field>
         <Field label="Pages" hint="Optional — used by the digital reader"><Input disabled={locked} type="number" min={1} value={f.pageCount} onChange={(e) => setF({ ...f, pageCount: e.target.value })} /></Field>
         <Field label="Description"><Textarea rows={2} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
+        <Field label="Visible to" hint="Publisher and school admins always see everything"><Select value={f.visibleTo} onChange={(e) => setF({ ...f, visibleTo: e.target.value as Visible })}>
+          {VIS.map((o) => <option key={o.v} value={o.v}>{o.label.replace(/^\S+ /, '')} — {o.hint.toLowerCase()}</option>)}</Select></Field>
         <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button loading={m.isPending}>Save</Button></div>
       </form>
     </Dialog>
@@ -209,6 +243,7 @@ function NodePanel({ tree, sel, setSel, onExpand }: { tree: EditionTree; sel: Se
               {!readOnly && <div className="flex gap-1"><Button size="sm" variant="secondary" onClick={() => setEditComp(true)}><Pencil className="size-3.5" />Edit</Button>
                 <Button size="sm" variant="ghost" onClick={() => setConfirmDel(true)} aria-label="Remove part"><Trash2 className="size-4 text-red-500" /></Button></div>}
             </div>
+            <VisibilityPicker key={comp.id} kind="components" id={comp.id} value={comp.visibleTo} readOnly={readOnly} />
             {comp.type === 'MOBILE_APP' ? <MobileAppRow comp={comp} readOnly={readOnly} />
               : <>{comp.type !== 'CD' && <BookPdf comp={comp} editionId={tree.id} editionStatus={tree.status} readOnly={readOnly} />}
                 <FlipbookRow comp={comp} editionStatus={tree.status} readOnly={readOnly} />
@@ -439,6 +474,7 @@ function UnitEditor({ unit, locked, readOnly, onDelete, children }: { unit: Unit
         <Field label="Description"><Textarea rows={2} disabled={readOnly} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
         {!readOnly && <div className="flex justify-end"><Button size="sm" loading={save.isPending}>Save unit</Button></div>}
       </form>
+      <VisibilityPicker kind="units" id={unit.id} value={unit.visibleTo} readOnly={readOnly} />
       {children}
       <p className="text-sm text-slate-500">{unit.lessons.length} lesson{unit.lessons.length === 1 ? '' : 's'}</p>
     </div>
@@ -468,6 +504,7 @@ function LessonEditor({ lesson, locked, readOnly, onDelete }: { lesson: Lesson; 
         <Field label="Learning objectives" hint="Used later by the AI assistant to ground lesson plans."><Textarea rows={3} disabled={readOnly} value={f.objectives} onChange={(e) => setF({ ...f, objectives: e.target.value })} /></Field>
         {!readOnly && <div className="flex justify-end"><Button size="sm" loading={save.isPending}>Save lesson</Button></div>}
       </form>
+      <VisibilityPicker kind="lessons" id={lesson.id} value={lesson.visibleTo} readOnly={readOnly} />
     </div>
   );
 }

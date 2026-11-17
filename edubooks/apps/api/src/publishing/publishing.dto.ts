@@ -50,6 +50,8 @@ export class CreateComponentDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(20) partNumber?: number | null;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) description?: string;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5000) pageCount?: number | null;
+  /** ALL, TEACHER (hidden from students) or STUDENT (hidden from teachers). */
+  @ApiPropertyOptional({ enum: AUDIENCES }) @IsOptional() @IsEnum(AUDIENCES) visibleTo?: (typeof AUDIENCES)[number];
 }
 export class UpdateComponentDto extends PartialType(CreateComponentDto) {}
 
@@ -58,7 +60,9 @@ export class CreateUnitDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(999) number?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) description?: string;
 }
-export class UpdateUnitDto extends PartialType(CreateUnitDto) {}
+export class UpdateUnitDto extends PartialType(CreateUnitDto) {
+  @ApiPropertyOptional({ enum: AUDIENCES }) @IsOptional() @IsEnum(AUDIENCES) visibleTo?: (typeof AUDIENCES)[number];
+}
 
 export class CreateLessonDto {
   @ApiProperty() @IsString() @Length(1, 160) title: string;
@@ -67,7 +71,9 @@ export class CreateLessonDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5000) pageStart?: number | null;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5000) pageEnd?: number | null;
 }
-export class UpdateLessonDto extends PartialType(CreateLessonDto) {}
+export class UpdateLessonDto extends PartialType(CreateLessonDto) {
+  @ApiPropertyOptional({ enum: AUDIENCES }) @IsOptional() @IsEnum(AUDIENCES) visibleTo?: (typeof AUDIENCES)[number];
+}
 
 export class ReorderDto {
   @ApiProperty({ enum: ['component', 'unit', 'lesson', 'resource'] }) @IsIn(['component', 'unit', 'lesson', 'resource']) kind: 'component' | 'unit' | 'lesson' | 'resource';

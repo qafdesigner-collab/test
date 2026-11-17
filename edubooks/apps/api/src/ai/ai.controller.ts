@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { visibleFor } from '../common/visibility';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
@@ -51,7 +52,7 @@ export class AiController {
     await this.access.assertEdition(d.editionId);
     const to = Math.min(Math.max(d.pageTo ?? d.page, d.page), d.page + 9);
     const rows = (await this.db.q.execute(sql`SELECT p.page_number AS page, p.text_content AS text FROM book_pages p JOIN book_components c ON c.id = p.component_id
-      WHERE p.component_id = ${d.componentId} AND c.edition_id = ${d.editionId} AND p.page_number BETWEEN ${d.page} AND ${to} ORDER BY p.page_number`)).rows as { page: number; text: string }[];
+      WHERE p.component_id = ${d.componentId} AND c.edition_id = ${d.editionId} AND c.visible_to::text IN ${visibleFor(this.db.ctx) ?? ['ALL', 'TEACHER', 'STUDENT']} AND p.page_number BETWEEN ${d.page} AND ${to} ORDER BY p.page_number`)).rows as { page: number; text: string }[];
     const withText = rows.filter((x) => x.text.replace(/\s+/g, ' ').trim().split(' ').length >= 3);
     const items = makePageQuestions(withText, { count: d.count, types: d.types ?? [], seed: d.seed ?? 0 });
     const warnings: string[] = [];
