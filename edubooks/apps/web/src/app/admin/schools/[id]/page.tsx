@@ -11,6 +11,7 @@ import { Badge, Button, Card, Confirm, Dialog, ErrorBox, Field, Input, PageLoade
 import { CredentialsDialog, Stat, Status, Table, Td } from '@/components/common';
 import { PoolsTable, PublisherPoolDialog } from '@/components/pools';
 import { CurriculumSelect } from '@/components/curriculum';
+import { BookCover } from '@/components/book-cover';
 
 function YearDialog({ schoolId, onClose }: { schoolId: string; onClose: () => void }) {
   const y = new Date().getMonth() >= 7 ? new Date().getFullYear() : new Date().getFullYear() - 1;
@@ -58,7 +59,8 @@ export default function SchoolPage({ params }: { params: Promise<{ id: string }>
   const q = useQuery({ queryKey: ['school', id], queryFn: () => api.get(`/schools/${id}`) });
   const pools = useQuery({ queryKey: ['pools', id], queryFn: () => api.get(`/licensing/pools?schoolId=${id}`) });
   const orders = useQuery({ queryKey: ['orders', 'school', id], queryFn: () => api.get(`/commerce/orders?schoolId=${id}&pageSize=50`) });
-  const [tab, setTab] = useState<'licences' | 'orders' | 'years' | 'admins'>('licences');
+  const [tab, setTab] = useState<'books' | 'licences' | 'orders' | 'years' | 'admins'>('books');
+  const books = useQuery({ queryKey: ['schoolBooks', id], queryFn: () => api.get<any[]>(`/schools/${id}/books`) });
   const [dlg, setDlg] = useState<'' | 'year' | 'adjust' | 'suspend' | 'convert'>('');
   const [poolId, setPoolId] = useState(''); const [creds, setCreds] = useState<any>(null);
   const keys = ['school', 'schools'];
@@ -97,8 +99,9 @@ export default function SchoolPage({ params }: { params: Promise<{ id: string }>
         <Stat label="Expiring ≤ 45 days" value={L.expiringSoon.length} tone={L.expiringSoon.length ? 'amber' : 'slate'} sub="licence pools" />
         <Stat label="Transfer requests" value={L.pendingTransfers} tone={L.pendingTransfers ? 'amber' : 'slate'} sub="awaiting approval" />
       </div>
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: 'licences', label: 'Licences', count: pools.data?.length }, { id: 'orders', label: 'Orders', count: orders.data?.total },
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: 'books', label: 'Books', count: books.data?.length }, { id: 'licences', label: 'Licences', count: pools.data?.length }, { id: 'orders', label: 'Orders', count: orders.data?.total },
         { id: 'years', label: 'Academic years', count: s.academicYears.length }, { id: 'admins', label: 'School admins', count: s.admins.length }]} />
+      {tab === 'books' && (books.data ? <SchoolBooks schoolId={id} schoolName={s.name} books={books.data} canManage={isAdmin} /> : <PageLoader />)}
       {tab === 'licences' && (pools.data ? <PoolsTable pools={pools.data} onOpen={(p) => setPoolId(p.id)} /> : <PageLoader />)}
       {tab === 'orders' && (
         <Table head={['Order', 'Type', 'Year', 'Seats', 'Value', 'Status']} empty={!orders.data?.items.length}>
@@ -131,6 +134,44 @@ export default function SchoolPage({ params }: { params: Promise<{ id: string }>
         body={<p>Everyone at this school is signed out immediately and cannot sign in until you reactivate it. Licences and data are kept.</p>} />
       <Confirm open={dlg === 'convert'} onOpenChange={() => setDlg('')} title="Convert demo into a customer?" confirmLabel="Convert" loading={convert.isPending} onConfirm={() => convert.mutate()}
         body={<p>The school keeps its code and accounts and no longer expires. Trial seats still end on their own date — record the real order next.</p>} />
+    </div>
+  );
+}
+
+/**
+ * The books this school has. The publisher can switch a book off for the school for now, or remove it from the school;
+ * both close the book for the school's admins, teachers and students, and both can be undone here.
+ */
+function SchoolBooks({ schoolId, schoolName, books, canManage }: { schoolId: string; schoolName: string; books: any[]; canManage: boolean }) {
+  const [ask, setAsk] = useState<{ b: any; status: 'INACTIVE' | 'REMOVED' } | null>(null); const [reason, setReason] = useState('');
+  const set = useAction((v: { id: string; status: string; reason?: string }) => api.put(`/schools/${schoolId}/books/${v.id}`, { status: v.status, reason: v.reason }),
+    { ok: (r: any) => (r.status === 'ACTIVE' ? 'The book is open for the school again' : r.status === 'INACTIVE' ? 'Book switched off for this school' : 'Book removed from this school'), keys: ['schoolBooks'], after: () => { setAsk(null); setReason(''); } });
+  const shown = books.filter((b) => b.block !== 'REMOVED'); const removed = books.filter((b) => b.block === 'REMOVED');
+  const row = (b: any) => (
+    <li key={b.id} className={`flex flex-wrap items-center gap-3 px-5 py-3 ${b.block ? 'bg-slate-50' : ''}`}>
+      <BookCover url={b.coverUrl} color={b.coverColor} title={b.title} className={`aspect-[3/4] w-10 shrink-0 rounded text-[6px] ${b.block ? 'opacity-50 grayscale' : ''}`} label={!b.coverUrl} />
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-slate-900">{b.title} {b.block === 'INACTIVE' && <Badge tone="DRAFT">Switched off</Badge>}{b.block === 'REMOVED' && <Badge tone="danger">Removed</Badge>}{!b.licensed && !b.block && <Badge>Licence not active</Badge>}</p>
+        <p className="text-xs text-slate-500">{[b.grade, b.subject].filter(Boolean).join(' · ')}{b.validUntil ? ` · licence until ${fmtDay(b.validUntil)}` : ''} · {b.users} user{b.users === 1 ? '' : 's'}{b.block && b.reason ? ` · “${b.reason}”` : ''}{b.block ? ` · since ${fmtDay(b.blockedAt)}` : ''}</p>
+      </div>
+      {canManage && <div className="flex gap-2">
+        {b.block ? <Button size="sm" variant="success" loading={set.isPending && set.variables?.id === b.id} onClick={() => set.mutate({ id: b.id, status: 'ACTIVE' })}><Play className="size-4" />{b.block === 'REMOVED' ? 'Give back' : 'Switch on'}</Button>
+          : <><Button size="sm" variant="secondary" onClick={() => setAsk({ b, status: 'INACTIVE' })}><Pause className="size-4" />Switch off</Button>
+            <Button size="sm" variant="danger" onClick={() => setAsk({ b, status: 'REMOVED' })}>Remove</Button></>}
+      </div>}
+    </li>);
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="border-b border-slate-100 px-5 py-3"><p className="font-semibold">Books at this school</p>
+          <p className="text-xs text-slate-500"><b>Switch off</b> closes a book for the school for now (e.g. unpaid). <b>Remove</b> takes it away from the school. Both close it for the school admin, teachers and students at once, keep their work, and can be undone here.</p></div>
+        <ul className="divide-y divide-slate-100 text-sm">{shown.map(row)}{!shown.length && <li className="px-5 py-6 text-center text-slate-500">This school has no books yet — they come with an order (licences).</li>}</ul>
+      </Card>
+      {removed.length > 0 && <Card><div className="border-b border-slate-100 px-5 py-3 font-semibold">Removed from this school</div><ul className="divide-y divide-slate-100 text-sm">{removed.map(row)}</ul></Card>}
+      <Confirm open={!!ask} onOpenChange={() => setAsk(null)} danger={ask?.status === 'REMOVED'} title={ask ? `${ask.status === 'REMOVED' ? 'Remove' : 'Switch off'} “${ask.b.title}” for ${schoolName}?` : ''}
+        confirmLabel={ask?.status === 'REMOVED' ? 'Remove from school' : 'Switch off'} loading={set.isPending} onConfirm={() => ask && set.mutate({ id: ask.b.id, status: ask.status, reason })}
+        body={<div className="space-y-3"><p>{ask?.status === 'REMOVED' ? 'The book disappears from this school' : 'The book is closed for this school'} — school admin, teachers and students can no longer open it. Their homework, marks and notes are kept. You can {ask?.status === 'REMOVED' ? 'give it back' : 'switch it on again'} any time.</p>
+          <Field label="Reason (optional, for your records)"><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. payment pending" /></Field></div>} />
     </div>
   );
 }

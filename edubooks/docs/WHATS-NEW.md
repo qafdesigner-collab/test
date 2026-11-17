@@ -1,3 +1,12 @@
+# What's new in Knowledge Gate 1.3.22
+
+## Switch a book off for one school, or remove it
+- **Schools → open a school → Books** (new first tab) lists every book the school has, with its licence date and how many users have it.
+- **Switch off** closes the book for that school for now (for example, payment pending). **Remove** takes it away from the school and moves it to “Removed from this school”. You can add a reason for your records.
+- Either way the book closes at once for the school admin, teachers and students of that school only. Other schools are not affected, and homework, marks and notes are kept.
+- **Switch on** / **Give back** opens it again. Every change is in the Audit Log.
+- Only the super admin (publisher admin) can do this; sales and editors can see the list.
+
 # What's new in Knowledge Gate 1.3.21
 
 ## Privacy for book parts, units and lessons: “Visible to”

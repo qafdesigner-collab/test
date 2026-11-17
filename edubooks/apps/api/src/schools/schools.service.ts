@@ -13,6 +13,40 @@ export class SchoolsService {
   constructor(private readonly db: DbService, private readonly audit: AuditService, private readonly users: SchoolUsersService, private readonly licensing: LicensingService) {}
   private get q() { return this.db.q; }
 
+  // ---------- one school's books: switch a book off (INACTIVE) or take it away (REMOVED), and undo ----------
+  async books(schoolId: string) {
+    const [sc] = await this.q.select({ id: schools.id }).from(schools).where(eq(schools.id, schoolId));
+    if (!sc) throw new NotFoundException('School not found');
+    const { rows } = await this.q.execute(sql`SELECT bp.id, bp.title, bp.cover_color AS "coverColor",
+        CASE WHEN bp.cover_version IS NOT NULL THEN '/api/covers/' || bp.id || '?v=' || bp.cover_version END AS "coverUrl",
+        g.name AS grade, sj.name AS subject, bool_or(p.status = 'ACTIVE' AND p.valid_until > now()) AS licensed, max(p.valid_until) AS "validUntil",
+        (SELECT count(DISTINCT ae.user_id)::int FROM access_entitlements ae JOIN book_editions e2 ON e2.id = ae.edition_id
+          WHERE ae.school_id = ${schoolId} AND e2.package_id = bp.id AND ae.active) AS users,
+        k.status AS block, k.reason, k.created_at AS "blockedAt"
+      FROM license_pools p JOIN bundle_items b ON b.product_version_id = p.product_version_id
+      JOIN book_editions e ON e.id = b.edition_id JOIN book_packages bp ON bp.id = e.package_id
+      LEFT JOIN grades g ON g.id = bp.grade_id LEFT JOIN subjects sj ON sj.id = bp.subject_id
+      LEFT JOIN school_book_blocks k ON k.school_id = p.school_id AND k.package_id = bp.id
+      WHERE p.school_id = ${schoolId} AND p.status <> 'REVOKED'
+      GROUP BY bp.id, bp.title, bp.cover_color, bp.cover_version, g.name, g.sort, sj.name, sj.sort, k.status, k.reason, k.created_at
+      ORDER BY g.sort NULLS LAST, sj.sort NULLS LAST, bp.title`);
+    return rows;
+  }
+
+  async setBook(schoolId: string, packageId: string, status: 'ACTIVE' | 'INACTIVE' | 'REMOVED', reason = '') {
+    const [sc] = await this.q.select({ id: schools.id, name: schools.name }).from(schools).where(eq(schools.id, schoolId));
+    if (!sc) throw new NotFoundException('School not found');
+    const { rows: [bk] } = await this.q.execute(sql`SELECT id, title FROM book_packages WHERE id = ${packageId}`) as any;
+    if (!bk) throw new NotFoundException('Book not found');
+    if (status === 'ACTIVE') await this.q.execute(sql`DELETE FROM school_book_blocks WHERE school_id = ${schoolId} AND package_id = ${packageId}`);
+    else await this.q.execute(sql`INSERT INTO school_book_blocks (school_id, publisher_id, package_id, status, reason, created_by)
+      VALUES (${schoolId}, ${this.db.ctx.publisherId}, ${packageId}, ${status}, ${reason.slice(0, 300)}, ${this.db.ctx.userId})
+      ON CONFLICT (school_id, package_id) DO UPDATE SET status = EXCLUDED.status, reason = EXCLUDED.reason, created_by = EXCLUDED.created_by, created_at = now()`);
+    const what = status === 'ACTIVE' ? 'Gave back / switched on' : status === 'INACTIVE' ? 'Switched off' : 'Removed';
+    await this.audit.log(`schools.book.${status.toLowerCase()}`, 'school', schoolId, `${what} "${bk.title}" for ${sc.name}${reason ? ` — ${reason}` : ''}`);
+    return { status };
+  }
+
   async list(f: { search?: string; status?: string; demo?: string; page: number; pageSize: number }) {
     const w: SQL[] = [];
     if (f.search) w.push(or(ilike(schools.name, `%${f.search}%`), ilike(schools.code, `%${f.search}%`), ilike(schools.city, `%${f.search}%`))!);

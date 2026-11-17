@@ -453,13 +453,15 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
   async entitledEditionIds(userId: string, schoolAdminOf?: string | null): Promise<string[]> {
     if (schoolAdminOf) {
       const { rows } = await this.q.execute(sql`SELECT DISTINCT b.edition_id FROM license_pools p JOIN bundle_items b ON b.product_version_id = p.product_version_id
-        WHERE p.school_id = ${schoolAdminOf} AND p.status = 'ACTIVE' AND p.valid_until > now()`);
+        WHERE p.school_id = ${schoolAdminOf} AND p.status = 'ACTIVE' AND p.valid_until > now()
+          AND NOT EXISTS (SELECT 1 FROM school_book_blocks k JOIN book_editions be ON be.package_id = k.package_id WHERE be.id = b.edition_id AND k.school_id = p.school_id)`);
       return rows.map((r: any) => r.edition_id);
     }
     const { rows } = await this.q.execute(sql`SELECT DISTINCT e.edition_id FROM access_entitlements e
       JOIN license_assignments a ON a.id = e.assignment_id AND a.status = 'ACTIVE'
       JOIN license_pools p ON p.id = a.pool_id AND p.status = 'ACTIVE' AND p.valid_until > now()
-      WHERE e.user_id = ${userId} AND e.active AND e.valid_until > now()`);
+      WHERE e.user_id = ${userId} AND e.active AND e.valid_until > now()
+        AND NOT EXISTS (SELECT 1 FROM school_book_blocks k JOIN book_editions be ON be.package_id = k.package_id WHERE be.id = e.edition_id AND k.school_id = p.school_id)`);
     return rows.map((r: any) => r.edition_id);
   }
 

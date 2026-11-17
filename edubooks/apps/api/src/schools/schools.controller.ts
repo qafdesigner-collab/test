@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, IsBoolean } from 'class-validator';
@@ -50,6 +50,8 @@ class ReasonDto { @IsOptional() @IsString() @MaxLength(300) reason?: string; }
 const Id = () => new ParseUUIDPipe();
 const SALES = ['PUBLISHER_ADMIN', 'PUBLISHER_SALES'];
 
+class SchoolBookDto { @IsIn(['ACTIVE', 'INACTIVE', 'REMOVED']) status!: 'ACTIVE' | 'INACTIVE' | 'REMOVED'; @IsOptional() @IsString() @MaxLength(300) reason?: string; }
+
 @ApiTags('schools (publisher)')
 class SchoolLoginsQuery { @IsIn(['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PARENT', 'ALL']) role!: 'STUDENT' | 'TEACHER' | 'SCHOOL_ADMIN' | 'PARENT' | 'ALL'; @IsOptional() @IsUUID() classId?: string; }
 class SchoolResetDto { @IsIn(['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PARENT', 'ALL']) role!: 'STUDENT' | 'TEACHER' | 'SCHOOL_ADMIN' | 'PARENT' | 'ALL'; @IsOptional() @IsBoolean() onlyMissing?: boolean; @IsOptional() @IsUUID() classId?: string; @IsOptional() @IsArray() @ArrayMaxSize(600) @IsUUID('all', { each: true }) userIds?: string[]; }
@@ -65,6 +67,9 @@ export class SchoolsController {
   @Roles(...SALES) @Post('demo') demo(@Body() d: DemoDto) { return this.svc.createDemo(d); }
   @Roles(...SALES, 'PUBLISHER_EDITOR') @Get(':id') get(@Param('id', Id()) id: string) { return this.svc.get(id); }
   @Roles(...SALES) @Patch(':id') update(@Param('id', Id()) id: string, @Body() d: UpdateSchoolDto) { return this.svc.update(id, d); }
+  @Roles(...SALES, 'PUBLISHER_EDITOR') @Get(':id/books') books(@Param('id', Id()) id: string) { return this.svc.books(id); }
+  /** ACTIVE (on / give back), INACTIVE (switched off for now) or REMOVED (taken away from the school). */
+  @Roles('PUBLISHER_ADMIN') @Put(':id/books/:packageId') setBook(@Param('id', Id()) id: string, @Param('packageId', Id()) pkg: string, @Body() d: SchoolBookDto) { return this.svc.setBook(id, pkg, d.status, d.reason); }
   @Roles('PUBLISHER_ADMIN') @Post(':id/suspend') suspend(@Param('id', Id()) id: string, @Body() d: ReasonDto) { return this.svc.setStatus(id, 'SUSPENDED', d.reason); }
   @Roles('PUBLISHER_ADMIN') @Post(':id/reactivate') reactivate(@Param('id', Id()) id: string) { return this.svc.setStatus(id, 'ACTIVE'); }
   @Roles(...SALES) @Post(':id/academic-years') addYear(@Param('id', Id()) id: string, @Body() d: AcademicYearDto) { return this.svc.addAcademicYear(id, d); }
