@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { MyChecklists } from '@/components/checklists';
 import { api, fmtDate } from '@/lib/api';
 import { Badge, Card, EmptyState, ErrorBox, PageLoader, cn } from '@/components/ui';
 import { UpcomingEvents } from '@/components/calendar';
@@ -104,6 +105,7 @@ function Child({ id }: { id: string }) {
           <li key={x.id} className="flex items-center gap-3 px-5 py-3 text-sm"><span className="min-w-0 flex-1"><span className="block font-medium text-slate-900">{x.title}</span>
             <span className="block text-xs text-slate-600">{[x.subject, x.term, x.remarks].filter(Boolean).join(' · ')}</span></span>
             {x.absent ? <Badge tone="DRAFT">{t('Absent')}</Badge> : <Badge tone={p !== null && p >= 50 ? 'PUBLISHED' : 'danger'}>{x.marks} / {x.total}{p !== null ? ` · ${p}%` : ''}</Badge>}</li>); })}</ul></Card>}
+      <ChildChecklists id={id} />
       <MyTimetable path={`/parent/children/${id}/timetable`} title={t('🗓️ Timetable')} />
     </div>
   );
@@ -116,4 +118,14 @@ function Tile({ emoji, label, value, sub, tone }: { emoji: string; label: string
         <div><div className="text-2xl font-bold text-slate-900">{value}</div><div className="text-sm text-slate-700">{label}</div>{sub && <div className="text-xs text-slate-600">{sub}</div>}</div></div>
     </Card>
   );
+}
+
+/** Skill checklists the teacher shared for this child. */
+function ChildChecklists({ id }: { id: string }) {
+  const { t } = useT();
+  const kids = useQuery({ queryKey: ['parentKids'], queryFn: () => api.get<any>('/parent/children') });
+  const q = useQuery({ queryKey: ['parentChecklists', id], queryFn: () => api.get<any[]>(`/parent/children/${id}/checklists`) });
+  if (!q.data?.length) return null;
+  const name = kids.data?.children?.find((k: any) => k.id === id)?.displayName;
+  return <section className="space-y-2"><h2 className="font-semibold text-slate-900">{t('✅ Skill checklists')}</h2><MyChecklists items={q.data} name={name} /></section>;
 }

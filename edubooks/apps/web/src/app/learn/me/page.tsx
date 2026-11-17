@@ -4,11 +4,14 @@ import { api } from '@/lib/api';
 import { PageLoader, cn } from '@/components/ui';
 import { Mascot } from '@/components/games/mascot';
 import { useT } from '@/lib/i18n';
+import { useMe } from '@/lib/session';
+import { MyChecklists } from '@/components/checklists';
 
 export default function Me() {
   const { t, lang } = useT();
   const q = useQuery({ queryKey: ['achievements'], queryFn: () => api.get('/student/achievements') });
   const rep = useQuery({ queryKey: ['myReport'], queryFn: () => api.get('/student/report') });
+  const checks = useQuery({ queryKey: ['myChecklists'], queryFn: () => api.get<any[]>('/student/checklists') }); const me = useMe().data as any;
   if (!q.data) return <PageLoader />;
   const a = q.data; const earned = a.badges.filter((b: any) => b.earnedAt).length;
   const week = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); const k = d.toISOString().slice(0, 10); return { k, day: d.toLocaleDateString(lang === 'ar' ? 'ar' : undefined, { weekday: lang === 'ar' ? 'short' : 'narrow' }), on: a.activeDays.includes(k) }; });
@@ -35,6 +38,7 @@ export default function Me() {
             <div className="mb-3 h-4 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: b.coverColor }} /></div>
             <div className="flex gap-4 text-sm font-bold text-slate-600"><span>{t('🎮 {n} games', { n: b.plays })}</span><span>{t('📝 {n} homework', { n: b.homework })}</span></div></div>;
         })}</div></section>
+      {checks.data && checks.data.length > 0 && <section><h2 className="mb-4 text-2xl font-black text-slate-800">{t('✅ My skills')}</h2><MyChecklists items={checks.data} name={me?.displayName ?? me?.user?.displayName} /></section>}
       {rep.data?.exams?.length > 0 && <section><h2 className="mb-4 text-2xl font-black text-slate-800">{t('📝 Exam results')}</h2>
         <div className="grid gap-3 sm:grid-cols-2">{rep.data.exams.map((x: any) => <div key={x.id} className="flex items-center justify-between rounded-[2rem] bg-white p-4 shadow-sm">
           <div><b className="text-lg">{x.title}</b><div className="text-sm font-bold text-slate-500">{[x.subject, x.term].filter(Boolean).join(' · ')}</div></div>

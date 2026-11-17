@@ -238,3 +238,59 @@ export function printOrderDocument(o: any, c: CompanyInfo, brand: Branding) {
     <div class="foot">${companyFooter(c)}</div></section>`;
   return openDoc(`${invoice ? 'Invoice' : 'Quotation'} ${o.orderNo}`, css, body);
 }
+
+// ------------------------------------------------------------------ evaluation checklists
+export const CHECK_SCALES: Record<string, { name: string; levels: { v: number; icon: string; label: string; color: string; bg: string }[] }> = {
+  THREE: { name: '3 levels', levels: [
+    { v: 3, icon: '✅', label: 'Achieved', color: '#166534', bg: '#dcfce7' }, { v: 2, icon: '🔸', label: 'Developing', color: '#92400e', bg: '#fef3c7' }, { v: 1, icon: '⭕', label: 'Not yet', color: '#b91c1c', bg: '#fee2e2' }] },
+  FOUR: { name: '4 levels', levels: [
+    { v: 4, icon: '⭐', label: 'Excellent', color: '#1e40af', bg: '#dbeafe' }, { v: 3, icon: '✅', label: 'Good', color: '#166534', bg: '#dcfce7' },
+    { v: 2, icon: '🔸', label: 'Developing', color: '#92400e', bg: '#fef3c7' }, { v: 1, icon: '⭕', label: 'Needs help', color: '#b91c1c', bg: '#fee2e2' }] },
+  YESNO: { name: 'Yes / No', levels: [{ v: 2, icon: '✅', label: 'Yes', color: '#166534', bg: '#dcfce7' }, { v: 1, icon: '✖', label: 'Not yet', color: '#b91c1c', bg: '#fee2e2' }] },
+};
+export interface ChecklistPrint { title: string; term: string; scale: string; className: string; year?: string; teacher?: string; school?: string;
+  items: { id: string; area: string; label: string }[]; students: { name: string; username?: string; marks: Record<string, number>; comment: string }[] }
+
+/** One A4 page per student (report), or one class sheet (landscape grid). */
+export function printChecklists(c: ChecklistPrint, brand: Branding, mode: 'students' | 'class') {
+  const p = palette(brand.primaryColor); const scale = CHECK_SCALES[c.scale] ?? CHECK_SCALES.THREE;
+  const lv = (v?: number) => scale.levels.find((l) => l.v === v);
+  const key = scale.levels.map((l) => `<span class="k" style="background:${l.bg};color:${l.color}">${l.icon} ${esc(l.label)}</span>`).join(' ');
+  const head = (kind: string) => `<div class="top">${brandHead(brand)}<div><h1>${esc(c.school ?? brand.name)}</h1><div class="sub">${esc([c.term, c.year].filter(Boolean).join(' · '))}</div></div><div class="kind">${kind}</div></div>`;
+  const base = `.top{display:flex;align-items:center;gap:4mm;border-bottom:2.5px solid ${p[600]};padding-bottom:3mm} .logo{height:14mm;max-width:40mm;object-fit:contain} .logo-txt{font-size:30px}
+    .top h1{margin:0;font-size:18px;color:${p[800]}} .top .sub{color:#475569} .kind{margin-left:auto;font-weight:800;color:${p[700]};text-align:right}
+    .k{display:inline-block;border-radius:9px;padding:0.4mm 2.4mm;font-weight:700;font-size:10.5px;margin:0 1mm 1mm 0}
+    table{width:100%;border-collapse:collapse} th{background:${p[50]};text-align:left;font-size:11px;color:#334155;padding:1.6mm 2mm;border-bottom:1.5px solid ${p[500]}}
+    td{padding:1.4mm 2mm;border-bottom:1px solid #e2e8f0;vertical-align:middle} tr{break-inside:avoid} .area td{background:#f8fafc;font-weight:700;color:${p[800]};font-size:11px}
+    .sign{display:flex;justify-content:space-between;margin-top:12mm} .sign div{width:50mm;border-top:1px solid #334155;padding-top:1mm;text-align:center;color:#475569}`;
+  if (mode === 'students') {
+    const css = `.sheet{height:auto;min-height:297mm;padding:13mm 14mm;font-size:12px} ${base}
+      .meta{display:grid;grid-template-columns:2fr 1fr 1fr;gap:2mm;margin:3mm 0} .meta b{display:block;font-size:14px}
+      .lvl{white-space:nowrap;text-align:center;width:34mm} .cm{margin-top:4mm;border:1px solid #e2e8f0;border-radius:2mm;padding:3mm;min-height:18mm} .cm b{display:block;color:${p[700]};margin-bottom:1mm}
+      .sum{display:flex;gap:2mm;margin:2mm 0 3mm} .sum div{flex:1;border:1px solid #e2e8f0;border-radius:2mm;padding:1.5mm;text-align:center} .sum b{display:block;font-size:15px}`;
+    const body = c.students.map((s) => {
+      let area = '';
+      const rows = c.items.map((it) => {
+        const l = lv(s.marks[it.id]);
+        const a = it.area && it.area !== area ? `<tr class="area"><td colspan="2">${esc(it.area)}</td></tr>` : ''; area = it.area || area;
+        return `${a}<tr><td>${esc(it.label)}</td><td class="lvl">${l ? `<span class="k" style="background:${l.bg};color:${l.color}">${l.icon} ${esc(l.label)}</span>` : '<span style="color:#94a3b8">—</span>'}</td></tr>`;
+      }).join('');
+      const counts = scale.levels.map((l) => `<div style="background:${l.bg};color:${l.color}"><b>${c.items.filter((it) => s.marks[it.id] === l.v).length}</b>${l.icon} ${esc(l.label)}</div>`).join('');
+      return `<section class="sheet">${head('CHECKLIST REPORT')}
+        <div class="meta"><div>Student<b>${esc(s.name)}</b></div><div>Class<b>${esc(c.className)}</b></div><div>Checklist<b>${esc(c.title)}</b></div></div>
+        <div class="sum">${counts}</div>
+        <table><thead><tr><th>Skill / criterion</th><th class="lvl">Level</th></tr></thead><tbody>${rows}</tbody></table>
+        <div class="cm"><b>Teacher's comment</b>${esc(s.comment) || '&nbsp;'}</div>
+        <div class="sign"><div>Class teacher${c.teacher ? `<br><small>${esc(c.teacher)}</small>` : ''}</div><div>Principal</div><div>Parent</div></div></section>`;
+    }).join('');
+    return openDoc(`${c.title} — student reports`, css, body);
+  }
+  const css = `.sheet{height:auto;min-height:210mm;padding:10mm 10mm;font-size:10.5px} ${base}
+    .grid th.it{writing-mode:vertical-rl;transform:rotate(180deg);white-space:normal;height:42mm;max-width:9mm;font-size:9.5px;vertical-align:bottom;text-align:left}
+    .grid td.c{text-align:center;padding:0.8mm;width:8mm;font-size:12px} .grid td.n{white-space:nowrap;font-weight:600}`;
+  const rows = c.students.map((s, i) => `<tr><td>${i + 1}</td><td class="n">${esc(s.name)}</td>${c.items.map((it) => { const l = lv(s.marks[it.id]); return `<td class="c" style="${l ? `background:${l.bg}` : ''}">${l ? l.icon : ''}</td>`; }).join('')}</tr>`).join('');
+  const body = `<section class="sheet">${head(`CLASS CHECKLIST<br><small>${esc(c.className)}</small>`)}<p style="margin:2mm 0"><b>${esc(c.title)}</b> &nbsp; ${key}</p>
+    <table class="grid"><thead><tr><th>#</th><th>Student</th>${c.items.map((it) => `<th class="it">${esc(it.label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
+    <div class="sign"><div>Class teacher</div><div>Principal</div><div>Date</div></div></section>`;
+  return openDoc(`${c.title} — class sheet`, css, body, true);
+}

@@ -330,6 +330,13 @@
       "when": 1795020000000,
       "tag": "0046_school_book_blocks",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1795050000000,
+      "tag": "0047_checklists",
+      "breakpoints": true
     }
   ]
 }

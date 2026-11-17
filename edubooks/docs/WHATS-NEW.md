@@ -1,3 +1,16 @@
+# What's new in Knowledge Gate 1.3.23
+
+## Checklists for student evaluation
+- New **Checklists** page for teachers and school admins. Evaluate a class **skill by skill**.
+- **New checklist** offers three starting points, and you can change every line:
+  - 📋 **Ready-made lists**: Language & literacy, Early maths, Physical & motor skills, Personal/social/emotional, Learning habits (primary).
+  - 📖 **A unit of your book**: lines come from its lessons and learning objectives.
+  - ✏️ **Your own skills**: one per line; write “Reading: Knows the letter sounds” to group lines by area.
+- Choose the **scale**: ✅ Achieved · 🔸 Developing · ⭕ Not yet, or 4 levels (⭐ Excellent … ⭕ Needs help), or Yes / No.
+- **Marking grid**: one row per student, one column per skill. Tap a box to change it. The buttons under a skill mark the whole class at once, so you only change the exceptions. Add a comment per student, then **Save**.
+- **Print**: one A4 **report per student** (school logo, levels, totals, teacher's comment, signatures; Download PDF too) or a landscape **class sheet**. Also **Excel/CSV**.
+- **Share with students & parents**: students see their checklists under **⭐ My Stars → ✅ My skills**, and parents see them on their child's page (with Print). Nothing is shown before you share.
+
 # What's new in Knowledge Gate 1.3.22
 
 ## Switch a book off for one school, or remove it
