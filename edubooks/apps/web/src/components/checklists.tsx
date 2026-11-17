@@ -137,7 +137,8 @@ export function ChecklistEditor({ id, back }: { id: string; back: string }) {
   const csv = () => downloadCsv(`${d.title.replace(/[^\w -]+/g, '')}.csv`, d.roster.map((r: any) => ({ student: r.displayName, login: r.username,
     ...Object.fromEntries(d.items.map((it: any) => [it.label.slice(0, 60), scale.levels.find((l) => l.v === marks[r.id]?.[it.id])?.label ?? ''])), comment: comments[r.id] ?? '' })));
   const done = (sid: string) => d.items.filter((it: any) => marks[sid]?.[it.id]).length;
-  let lastArea = '';
+  const groups: { area: string; n: number }[] = [];
+  for (const it of d.items as any[]) { const g = groups[groups.length - 1]; if (g && g.area === (it.area || '')) g.n++; else groups.push({ area: it.area || '', n: 1 }); }
   return (
     <div className="space-y-4">
       <Link href={back} className="text-sm text-slate-500 hover:text-slate-800">← Checklists</Link>
@@ -159,36 +160,44 @@ export function ChecklistEditor({ id, back }: { id: string; back: string }) {
         <Card className="overflow-auto">
           <table className="min-w-full border-collapse text-sm">
             <thead className="sticky top-0 z-10 bg-white">
+              {groups.some((g) => g.area) && (
+                <tr>
+                  <th className="sticky left-0 z-20 border-b border-slate-200 bg-white" />
+                  {groups.map((g, gi) => (
+                    <th key={gi} colSpan={g.n} className="border-b border-l border-slate-200 bg-brand-50/60 px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-brand-800">{g.area || '\u00a0'}</th>))}
+                  <th className="border-b border-l border-slate-200 bg-white" />
+                </tr>)}
               <tr>
-                <th className="sticky left-0 z-20 min-w-48 border-b border-slate-200 bg-white p-2 text-left align-bottom">Student</th>
-                {d.items.map((it: any) => {
-                  const showArea = it.area && it.area !== lastArea; lastArea = it.area || lastArea;
-                  return (
-                    <th key={it.id} className="min-w-24 max-w-40 border-b border-l border-slate-100 p-2 text-left align-bottom font-medium">
-                      {showArea && <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-brand-700">{it.area}</span>}
-                      <span className="block text-xs leading-snug text-slate-800">{it.label}</span>
-                      <span className="mt-1 flex gap-0.5">{order.map((l) => <button key={l.v} type="button" title={`Everyone: ${l.label}`} aria-label={`Mark everyone ${l.label} for ${it.label}`} onClick={() => setColumn(it.id, l.v)} className="rounded px-1 text-xs hover:bg-slate-100">{l.icon}</button>)}</span>
-                    </th>);
-                })}
-                <th className="min-w-56 border-b border-l border-slate-100 p-2 text-left align-bottom">Comment</th>
+                <th className="sticky left-0 z-20 h-px w-52 min-w-52 border-b border-slate-200 bg-white p-3 text-left align-bottom font-semibold text-slate-700">Student</th>
+                {d.items.map((it: any) => (
+                  <th key={it.id} className="h-px w-32 min-w-32 max-w-32 border-b border-l border-slate-200 p-0 align-top font-medium">
+                    <div className="flex h-full flex-col justify-between gap-2 p-2">
+                      <span className="line-clamp-4 text-left text-xs leading-snug text-slate-800" title={it.label}>{it.label}</span>
+                      <span className="flex items-center justify-between rounded-md bg-slate-50 px-1 py-0.5" title="Mark the whole class">
+                        <span className="text-[10px] font-semibold uppercase text-slate-400">All</span>
+                        {order.map((l) => <button key={l.v} type="button" title={`Everyone: ${l.label}`} aria-label={`Mark everyone ${l.label} for ${it.label}`} onClick={() => setColumn(it.id, l.v)} className="grid size-6 place-items-center rounded text-sm hover:bg-white">{l.icon}</button>)}
+                      </span>
+                    </div>
+                  </th>))}
+                <th className="h-px w-64 min-w-64 border-b border-l border-slate-200 p-3 text-left align-bottom font-semibold text-slate-700">Comment</th>
               </tr>
             </thead>
             <tbody>
               {d.roster.map((r: any) => (
                 <tr key={r.id} className={cn('border-b border-slate-100', focus === r.id && 'bg-brand-50/40')}>
-                  <td className="sticky left-0 z-[1] bg-white p-2">
+                  <td className="sticky left-0 z-[1] w-52 min-w-52 border-r border-slate-200 bg-white p-3">
                     <p className="font-medium text-slate-900">{r.displayName}</p>
                     <p className="text-xs text-slate-500">{done(r.id)}/{d.items.length} marked · <button type="button" className="text-brand-700 hover:underline" onClick={() => printChecklists(printData(r.id), brand, 'students')}>report</button></p>
                   </td>
                   {d.items.map((it: any) => {
                     const l = scale.levels.find((x) => x.v === marks[r.id]?.[it.id]);
                     return (
-                      <td key={it.id} className="border-l border-slate-100 p-1 text-center">
+                      <td key={it.id} className="border-l border-slate-100 p-1.5 text-center align-middle">
                         <button type="button" onClick={() => cycle(r.id, it.id)} onFocus={() => setFocus(r.id)} aria-label={`${r.displayName} — ${it.label}: ${l?.label ?? 'not marked'}`}
-                          className="focus-ring h-10 w-full min-w-12 rounded-lg border text-lg transition" style={l ? { background: l.bg, borderColor: l.bg } : { borderColor: '#e2e8f0', borderStyle: 'dashed' }}>{l?.icon ?? ''}</button>
+                          className="focus-ring mx-auto block h-11 w-full rounded-lg border text-lg transition" style={l ? { background: l.bg, borderColor: l.bg } : { borderColor: '#e2e8f0', borderStyle: 'dashed' }}>{l?.icon ?? ''}</button>
                       </td>);
                   })}
-                  <td className="border-l border-slate-100 p-1"><Textarea rows={2} className="min-w-56 text-sm" value={comments[r.id] ?? ''} onFocus={() => setFocus(r.id)} onChange={(e) => { setComments((c) => ({ ...c, [r.id]: e.target.value })); touch(r.id); }} placeholder="Comment (optional)" aria-label={`Comment for ${r.displayName}`} /></td>
+                  <td className="w-64 min-w-64 border-l border-slate-100 p-1.5 align-middle"><Textarea rows={2} className="w-full resize-none text-sm" value={comments[r.id] ?? ''} onFocus={() => setFocus(r.id)} onChange={(e) => { setComments((c) => ({ ...c, [r.id]: e.target.value })); touch(r.id); }} placeholder="Comment (optional)" aria-label={`Comment for ${r.displayName}`} /></td>
                 </tr>))}
             </tbody>
           </table>
