@@ -33,10 +33,15 @@ describe('Phase 3 — products, orders & licensing rules', () => {
     it('freezes an activated version (API and database trigger), new versions are drafts', async () => {
       const p = (await editor.post('/api/commerce/products').send({ sku: 'KG-DUO', name: 'KG English + Maths', kind: 'BUNDLE', editionIds: editions.slice(0, 2).map((e) => e.id), priceMinor: 400000 })).body;
       expect((await editor.post(`/api/commerce/versions/${p.draftVersionId}/activate`)).status).toBe(201);
-      const r = await editor.patch(`/api/commerce/versions/${p.draftVersionId}`).send({ priceMinor: 1 });
-      expect(r.status).toBe(409);
-      await expect(owner.query(`DELETE FROM bundle_items WHERE product_version_id = $1`, [p.draftVersionId])).rejects.toThrow(/frozen|cannot change/);
-      await expect(owner.query(`UPDATE product_versions SET price_minor = 5 WHERE id = $1`, [p.draftVersionId])).rejects.toThrow(/frozen/);
+      // active but not sold yet: the price can still be corrected
+      expect((await editor.patch(`/api/commerce/versions/${p.draftVersionId}`).send({ priceMinor: 400000 })).status).toBe(200);
+      // a sold version (the seeded KG English package was ordered) is frozen — API and database trigger
+      const seeded = (await editor.get('/api/commerce/products')).body.items.find((x: any) => x.sku === 'KG-ENG');
+      const soldV = (await editor.get(`/api/commerce/products/${seeded.id}`)).body.versions.find((v: any) => v.status === 'ACTIVE');
+      expect(soldV.sold).toBe(true);
+      expect((await editor.patch(`/api/commerce/versions/${soldV.id}`).send({ priceMinor: 1 })).status).toBe(409);
+      await expect(owner.query(`DELETE FROM bundle_items WHERE product_version_id = $1`, [soldV.id])).rejects.toThrow(/frozen|cannot change/);
+      await expect(owner.query(`UPDATE product_versions SET price_minor = 5 WHERE id = $1`, [soldV.id])).rejects.toThrow(/frozen/);
       const v2 = (await editor.post(`/api/commerce/products/${p.id}/versions`).send({})).body;
       expect(v2).toMatchObject({ versionNo: 2, status: 'DRAFT', priceMinor: 400000 });
       await editor.patch(`/api/commerce/versions/${v2.id}`).send({ editionIds: editions.slice(0, 3).map((e) => e.id) });

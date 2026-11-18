@@ -21,6 +21,7 @@ export class CreateProductDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @Matches(/^[A-Z]{3}$/) currency?: string;
 }
 export class UpdateProductDto {
+  @IsOptional() @IsString() @Matches(/^[A-Za-z0-9._-]{2,40}$/, { message: 'Code: 2–40 letters, digits, dot, dash or underscore' }) sku?: string;
   @IsOptional() @IsString() @Length(2, 160) name?: string;
   @IsOptional() @IsUUID() gradeId?: string | null;
   @IsOptional() @IsString() @MaxLength(2000) description?: string;

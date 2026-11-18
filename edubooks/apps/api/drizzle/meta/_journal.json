@@ -337,6 +337,13 @@
       "when": 1795050000000,
       "tag": "0047_checklists",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1795080000000,
+      "tag": "0048_unsold_versions_editable",
+      "breakpoints": true
     }
   ]
 }

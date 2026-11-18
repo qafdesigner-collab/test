@@ -1,3 +1,12 @@
+# What's new in Knowledge Gate 1.3.25
+
+## Edit products
+- **Products & Bundles → open a product → Edit details**: change the **name, product code (SKU), curriculum/grade and description** at any time.
+- **Books and price**:
+  - **Not sold yet** (no school has ordered it): change the books and the price **directly** on the active version and press **Save changes**.
+  - **Already sold**: the sold version stays as it is, so schools keep exactly what they bought. Click **Change books or price** to make a new version, edit it, then **Activate** it. New orders use the new version.
+- The version header now says **“sold — frozen”** only when a version has really been sold.
+
 # What's new in Knowledge Gate 1.3.24
 
 - **Checklist marking grid tidied up.** Area names (Listening, Speaking…) are now a heading row spanning their skills. Every skill column has the same width with its name at the top. The “All ✅ 🔸 ⭕” buttons line up in one row. Student names and comments have fixed widths, so rows line up.

@@ -29,4 +29,16 @@ describe('Deleting books and products', () => {
     const prods = (await admin.get('/api/commerce/products')).body.items; const ordered = prods.find((x: any) => x.sku === o.lines[0].sku);
     const r = await admin.delete(`/api/commerce/products/${ordered.id}`); expect(r.status).toBe(409); expect(r.body.message).toMatch(/ordered or licensed/);
   });
+  it('edits a product: name, code and description; an unsold active version can change price and books', async () => {
+    const eds = (await admin.get('/api/commerce/sellable-editions')).body; const list = eds.items ?? eds;
+    const p = (await admin.post('/api/commerce/products').send({ kind: 'BUNDLE', sku: `ED-${Date.now() % 100000}`, name: 'Edit me', priceMinor: 1000, editionIds: list.slice(0, 2).map((e: any) => e.id ?? e.editionId) })).body;
+    expect((await admin.patch(`/api/commerce/products/${p.id}`).send({ name: 'Edited name', sku: `${p.sku}-X`, description: 'New text' })).status).toBe(200);
+    expect((await admin.patch(`/api/commerce/products/${p.id}`).send({ sku: 'KG-ENG' })).status).toBe(409);
+    expect((await admin.post(`/api/commerce/versions/${p.draftVersionId}/activate`)).status).toBe(201);
+    expect((await admin.patch(`/api/commerce/versions/${p.draftVersionId}`).send({ priceMinor: 2500, editionIds: list.slice(0, 3).map((e: any) => e.id ?? e.editionId) })).status).toBe(200);
+    const full = (await admin.get(`/api/commerce/products/${p.id}`)).body;
+    expect(full).toMatchObject({ name: 'Edited name', description: 'New text' }); expect(full.versions[0]).toMatchObject({ priceMinor: 2500, status: 'ACTIVE', sold: false });
+    expect(full.versions[0].items.length).toBe(3);
+    await admin.delete(`/api/commerce/products/${p.id}`);
+  });
 });

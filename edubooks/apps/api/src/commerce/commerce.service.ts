@@ -87,13 +87,17 @@ export class CommerceService {
       .where(inArray(orderLines.productVersionId, versions.map((v) => v.id))).groupBy(orderLines.productVersionId) : [];
     return {
       ...p,
-      versions: versions.map((v) => ({ ...v, items: items.filter((i) => i.versionId === v.id), orderLines: sold.find((s) => s.versionId === v.id)?.n ?? 0 })),
+      versions: await Promise.all(versions.map(async (v) => ({ ...v, items: items.filter((i) => i.versionId === v.id), orderLines: sold.find((s) => s.versionId === v.id)?.n ?? 0, sold: v.status === 'DRAFT' ? false : await this.sold(v.id) }))),
     };
   }
 
   async updateProduct(id: string, dto: UpdateProductDto) {
     const [before] = await this.q.select().from(products).where(eq(products.id, id));
     if (!before) throw new NotFoundException('Product not found');
+    if (dto.sku && dto.sku.toLowerCase() !== before.sku.toLowerCase()) {
+      const [dup] = await this.q.select({ id: products.id }).from(products).where(sql`lower(${products.sku}) = ${dto.sku.toLowerCase()} AND ${products.id} <> ${id}`);
+      if (dup) throw new ConflictException(`Another product already uses the code ${dto.sku}`);
+    }
     const [row] = await this.q.update(products).set({ ...dto, updatedAt: new Date() }).where(eq(products.id, id)).returning();
     await this.audit.log('commerce.product.update', 'product', id, `Updated product ${row.sku}`, before, row);
     return row;
@@ -122,7 +126,9 @@ export class CommerceService {
 
   async updateVersion(id: string, dto: UpdateVersionDto) {
     const { v, kind, sku } = await this.version(id);
-    if (v.status !== 'DRAFT') throw new ConflictException(`v${v.versionNo} is ${v.status.toLowerCase()} — it is frozen. Create a new version to change books or price.`);
+    // drafts, and active versions nobody has bought yet, can change; sold versions are frozen (schools keep what they bought)
+    const editable = v.status === 'DRAFT' || (v.status === 'ACTIVE' && !(await this.sold(id)));
+    if (!editable) throw new ConflictException(`v${v.versionNo} has been sold, so its books and price are frozen (schools keep what they bought). Use “Change books or price” to make a new version.`);
     if (dto.editionIds) {
       const ids = await this.validateItems(kind, dto.editionIds);
       await this.q.delete(bundleItems).where(eq(bundleItems.productVersionId, id));
@@ -133,8 +139,14 @@ export class CommerceService {
     if (dto.currency) patch.currency = dto.currency;
     if (dto.notes !== undefined) patch.notes = dto.notes;
     if (Object.keys(patch).length) await this.q.update(productVersions).set(patch).where(eq(productVersions.id, id));
-    await this.audit.log('commerce.version.update', 'product', v.productId, `Edited draft v${v.versionNo} of ${sku}`, undefined, dto);
+    await this.audit.log('commerce.version.update', 'product', v.productId, `Edited ${v.status === 'DRAFT' ? 'draft' : 'unsold active'} v${v.versionNo} of ${sku}`, undefined, dto);
     return { ok: true };
+  }
+
+  /** Ordered, licensed or used in an adjustment. */
+  async sold(versionId: string) {
+    const { rows: [r] } = await this.q.execute(sql`SELECT product_version_sold(${versionId}) AS s`) as any;
+    return !!r?.s;
   }
 
   async activateVersion(id: string) {
