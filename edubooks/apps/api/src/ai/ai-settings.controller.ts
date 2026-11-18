@@ -20,6 +20,12 @@ class AiSettingsDto {
   @IsOptional() @IsBoolean() enabled?: boolean;
 }
 
+
+/** Chat models a key can use, without speech / safety / embedding models — offered when the chosen model is unknown. */
+async function suggestModels(p: any): Promise<string[]> {
+  try { return (await p.models() as string[]).filter((m) => !/whisper|guard|tts|embed|playai|orpheus|moderation|distil|transcrib|speech|audio|image/i.test(m)).slice(0, 25); } catch { return []; }
+}
+
 const GUARD_DEFAULT = { baseUrl: 'https://api.groq.com/openai/v1', model: 'meta-llama/llama-prompt-guard-2-86m' };
 class GuardDto {
   @IsOptional() @IsBoolean() enabled?: boolean;
@@ -64,7 +70,13 @@ export class AiSettingsController {
     try {
       const out = await p.generate({ system: 'You are a helpful assistant for a school.', user: 'Reply with exactly: OK, I am ready to help teachers.', maxTokens: 30, json: false });
       return { ok: true, reply: out.text.trim().slice(0, 200), model: out.model, ms: Date.now() - t };
-    } catch (e: any) { return { ok: false, error: String(e?.message ?? e).slice(0, 300) }; }
+    } catch (e: any) { const error = String(e?.message ?? e).slice(0, 300); return { ok: false, error, suggestions: /does not know the model/.test(error) ? await suggestModels(p) : [] }; }
+  }
+
+  @Roles('PUBLISHER_ADMIN') @Post('models')
+  async models(@Body() d: AiSettingsDto) {
+    const p = this.ai.build(this.resolve({ ...d, model: d.model || 'x' }, await this.saved())) as any;
+    try { return { ok: true, models: await p.models() }; } catch (e: any) { return { ok: false, error: String(e?.message ?? e).slice(0, 300) }; }
   }
 
   @Roles('PUBLISHER_ADMIN') @Put()
@@ -194,8 +206,14 @@ export class SchoolAiController {
     try {
       const out = await p.generate({ system: 'You are a helpful assistant for a school.', user: 'Reply with exactly: OK, I am ready to help teachers.', maxTokens: 30, json: false });
       return { ok: true, reply: out.text.trim().slice(0, 200), model: out.model, ms: Date.now() - t };
-    } catch (e: any) { return { ok: false, error: String(e?.message ?? e).slice(0, 300) }; }
+    } catch (e: any) { const error = String(e?.message ?? e).slice(0, 300); return { ok: false, error, suggestions: /does not know the model/.test(error) ? await suggestModels(p) : [] }; }
   }
+  @Roles('SCHOOL_ADMIN') @Post('models')
+  async models(@Body() d: AiSettingsDto) {
+    const p = this.ai.build(resolveConn({ ...d, model: d.model || 'x' }, await this.allowed())) as any;
+    try { return { ok: true, models: await p.models() }; } catch (e: any) { return { ok: false, error: String(e?.message ?? e).slice(0, 300) }; }
+  }
+
   @Roles('SCHOOL_ADMIN') @Put()
   async save(@Body() d: AiSettingsDto) {
     const r = resolveConn(d, await this.allowed());

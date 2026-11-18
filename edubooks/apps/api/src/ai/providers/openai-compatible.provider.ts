@@ -24,9 +24,9 @@ export class OpenAiCompatibleProvider implements AiProvider {
       const text = (await res.text()).slice(0, 300);
       // some services / free models do not support "JSON mode": ask again without it (the prompt asks for JSON anyway)
       if (res.status === 400 && body?.response_format && /response_format|json/i.test(text)) { const { response_format: _r, ...rest } = body; return this.post(path, rest); }
-      throw new AiUnavailableError(res.status === 429 ? 'The AI service is busy or its free daily limit is used up — please try again later.'
-        : res.status === 401 || res.status === 403 || /api[ _-]?key/i.test(text) ? 'The AI service did not accept the API key — check that you pasted the whole key.'
-        : res.status === 404 && /model/i.test(text) ? `The AI service does not know the model “${this.model}” — check the model name.` : `The AI server answered ${res.status}: ${text}`);
+      throw new AiUnavailableError(res.status === 429 ? `${this.name} is busy or its free daily limit is used up — please try again later.`
+        : res.status === 401 || res.status === 403 || /api[ _-]?key/i.test(text) ? `${this.name} did not accept the API key — check that you pasted the whole key for this service.`
+        : res.status === 404 && /model/i.test(text) ? `${this.name} does not know the model “${this.model}”. Make sure the right service card is selected, or press “Show available models” and pick one.` : `The AI server answered ${res.status}: ${text}`);
     }
     return res.json() as Promise<any>;
   }
@@ -47,6 +47,14 @@ export class OpenAiCompatibleProvider implements AiProvider {
     if (!this.embedModel) throw new AiUnavailableError('No embedding model configured');
     const j = await this.post('/embeddings', { model: this.embedModel, input: texts });
     return (j.data ?? []).sort((a: any, b: any) => a.index - b.index).map((d: any) => d.embedding);
+  }
+
+  /** Models this key can use (for the "Show available models" list). */
+  async models(): Promise<string[]> {
+    const res = await fetch(`${this.baseUrl}/models`, { signal: AbortSignal.timeout(10_000), headers: this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {} });
+    if (!res.ok) throw new AiUnavailableError(res.status === 401 || res.status === 403 ? `${this.name} did not accept the API key.` : `${this.name} answered ${res.status} when asked for its models.`);
+    const j: any = await res.json();
+    return (j.data ?? j.models ?? []).map((m: any) => String(m.id ?? m.name ?? '').replace(/^models\//, '')).filter(Boolean).sort();
   }
 
   async health() {

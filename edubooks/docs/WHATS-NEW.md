@@ -1,3 +1,10 @@
+# What's new in Knowledge Gate 1.3.29
+
+- **Choosing the AI model is easier.** AI services (Groq especially) retire and rename models from time to time.
+  - **Show available models** lists the models your key can use; pick one from the list.
+  - When **Test connection** finds the model unknown, it shows the chat models your key can use as buttons. Click one and Test again.
+- The card you selected is shown above the fields (“Selected: Groq (free plan)”), and error messages name the service that answered.
+
 # What's new in Knowledge Gate 1.3.28
 
 ## 🛡️ Safety check for students: Llama Prompt Guard 2

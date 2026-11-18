@@ -10,8 +10,9 @@ beforeAll(async () => {
     let body = ''; req.on('data', (d) => (body += d));
     req.on('end', () => {
       if (req.headers.authorization !== 'Bearer free-key-1234') { res.statusCode = 401; res.end('{"error":"bad key"}'); return; }
-      if (req.url?.endsWith('/models')) { res.end(JSON.stringify({ data: [{ id: 'models/free-model' }] })); return; }
+      if (req.url?.endsWith('/models')) { res.end(JSON.stringify({ data: [{ id: 'models/free-model' }, { id: 'whisper-large-v3' }, { id: 'meta-llama/llama-prompt-guard-2-86m' }, { id: 'new-llama-70b' }] })); return; }
       const j = JSON.parse(body); calls.push(j);
+      if (j.model === 'retired-model') { res.statusCode = 404; res.end('{"error":{"message":"The model `retired-model` does not exist or you do not have access to it.","code":"model_not_found"}}'); return; }
       if (String(j.model).includes('prompt-guard')) { const t = j.messages[0].content; res.end(JSON.stringify({ choices: [{ message: { content: /ignore (all )?previous|you are now/i.test(t) ? '0.9987' : '0.0012' } }] })); return; }
       if (j.response_format) { res.statusCode = 400; res.end('{"error":"response_format is not supported"}'); return; } // like some free models
       const content = j.max_tokens <= 30 ? 'OK, I am ready to help teachers.' : JSON.stringify(plan);
@@ -39,6 +40,10 @@ describe('Super admin connects a free AI service', () => {
     expect((await admin.post('/api/ai/settings/test').send({ preset: 'gemini', model: 'x' })).status).toBe(400); // free services need a key
     const bad = (await admin.post('/api/ai/settings/test').send({ preset: 'custom', baseUrl: base, model: 'free-model', apiKey: 'wrong' })).body;
     expect(bad.ok).toBe(false); expect(bad.error).toMatch(/did not accept the API key/);
+    // a retired model: the test lists the chat models the key can use (not speech / safety models)
+    const old = (await admin.post('/api/ai/settings/test').send({ preset: 'custom', baseUrl: base, model: 'retired-model', apiKey: 'free-key-1234' })).body;
+    expect(old.ok).toBe(false); expect(old.error).toMatch(/does not know the model/); expect(old.suggestions).toEqual(['free-model', 'new-llama-70b']);
+    expect((await admin.post('/api/ai/settings/models').send({ preset: 'custom', baseUrl: base, model: '', apiKey: 'free-key-1234' })).body.models).toContain('new-llama-70b');
     const ok = (await admin.post('/api/ai/settings/test').send({ preset: 'custom', baseUrl: base, model: 'free-model', apiKey: 'free-key-1234' })).body;
     expect(ok).toMatchObject({ ok: true, reply: 'OK, I am ready to help teachers.' });
     const saved = (await admin.put('/api/ai/settings').send({ preset: 'custom', baseUrl: base, model: 'free-model', apiKey: 'free-key-1234' })).body;
