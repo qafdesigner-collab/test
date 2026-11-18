@@ -58,3 +58,18 @@ export async function ocrPages(file: string, pageNumbers: number[], onProgress?:
   }
   return out;
 }
+
+/** OCR of page pictures (e.g. a flipbook's page images), one time-limited tesseract run each. Failed pages come back as ''. */
+export async function ocrImageFiles(files: { n: number; file: string }[], onProgress?: (done: number) => void): Promise<Map<number, string>> {
+  const { ok, langs } = await ocrAvailable();
+  const out = new Map<number, string>(); if (!ok) return out;
+  const queue = files.slice(0, config.ocr.maxPages); let done = 0;
+  const worker = async () => {
+    for (let f = queue.shift(); f; f = queue.shift()) {
+      try { out.set(f.n, (await run('tesseract', [f.file, 'stdout', '-l', langs, '--psm', '3'], config.ocr.pageTimeoutMs)).replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()); }
+      catch { out.set(f.n, ''); } finally { onProgress?.(++done); }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, config.ocr.concurrency) }, worker));
+  return out;
+}

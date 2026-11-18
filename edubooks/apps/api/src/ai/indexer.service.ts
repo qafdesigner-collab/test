@@ -6,11 +6,12 @@ import * as path from 'path';
 import { randomBytes } from 'crypto';
 import { pipeline } from 'stream/promises';
 import { DbService, TenantCtx } from '../db/db.service';
-import { bookComponents, bookLessons, bookPages, bookUnits, digitalAssets } from '../db/schema';
+import { bookComponents, bookLessons, bookPages, bookUnits, digitalAssets, flipbookFiles, flipbooks } from '../db/schema';
 import { AuditService } from '../audit/audit.service';
 import { AssetsService } from '../storage/assets.service';
 import { extractPdfPages } from './extract';
-import { ocrAvailable, ocrPages } from './ocr';
+import { ocrAvailable, ocrImageFiles, ocrPages } from './ocr';
+import { detectFlipPages } from '../flipbook/flip-pages';
 import { AiProviderService } from './provider.service';
 import { appTmp } from '../common/tmp';
 
@@ -43,7 +44,8 @@ export class IndexerService {
   private async run(componentId: string) {
     // FOR UPDATE: waits until the transaction that uploaded the PDF has committed, then sees its result.
     const [c] = await this.db.q.select().from(bookComponents).where(eq(bookComponents.id, componentId)).for('update');
-    if (!c?.bookAssetId) throw new NotFoundException('This part has no book PDF');
+    if (!c) throw new NotFoundException('Book part not found');
+    if (!c.bookAssetId) return this.runFlipbook(c); // no PDF: read the page pictures of its HTML5 flipbook
     const [asset] = await this.db.q.select().from(digitalAssets).where(eq(digitalAssets.id, c.bookAssetId));
     const tmp = path.join(appTmp(), `idx-${randomBytes(8).toString('hex')}.pdf`);
     try {
@@ -67,6 +69,37 @@ export class IndexerService {
     } finally {
       fs.promises.rm(tmp, { force: true }).catch(() => undefined);
     }
+  }
+
+  /** A part with only an HTML5 flipbook: its page pictures are read with OCR (text recognition) into book pages. */
+  private async runFlipbook(c: typeof bookComponents.$inferSelect) {
+    const fbs = (await this.db.q.select().from(flipbooks).where(eq(flipbooks.componentId, c.id))).filter((f) => f.kind === 'HTML')
+      .sort((a, b) => Number(!!a.unitTitle) - Number(!!b.unitTitle) || a.sort - b.sort);
+    let found: { f: typeof flipbooks.$inferSelect; pages: { n: number; path: string }[] } | null = null;
+    for (const f of fbs) {
+      const files = await this.db.q.select({ path: flipbookFiles.path }).from(flipbookFiles).where(eq(flipbookFiles.flipbookId, f.id));
+      const pages = detectFlipPages(files.map((x) => x.path)); if (pages.length) { found = { f, pages }; break; }
+    }
+    if (!found) throw new NotFoundException('This part has no book PDF, and no page pictures were found in its flipbook (a SWF/CD cannot be read). Upload the PDF of this part for the AI.');
+    const ocr = await ocrAvailable();
+    if (!ocr.ok) throw new Error('Reading flipbook pages needs OCR (tesseract) on the server, which is not installed. Upload the PDF of this part instead.');
+    const dir = await fs.promises.mkdtemp(path.join(appTmp(), 'flipocr-'));
+    try {
+      const local: { n: number; file: string }[] = [];
+      for (const p of found.pages) {
+        const file = path.join(dir, `${p.n}${path.extname(p.path) || '.jpg'}`);
+        await pipeline(await this.assets.driver.read(`${found.f.storagePrefix}/${p.path}`), fs.createWriteStream(file)); local.push({ n: p.n, file });
+      }
+      const text = await ocrImageFiles(local);
+      const max = Math.max(...found.pages.map((p) => p.n));
+      const pages = Array.from({ length: max }, (_, i) => text.get(i + 1) ?? '');
+      await this.store(c.id, c.publisherId, pages);
+      const withText = pages.filter((p) => p.trim().length > 20).length;
+      await this.db.q.update(bookComponents).set({ indexStatus: withText ? 'DONE' : 'NO_TEXT', indexedPages: withText, indexedAt: new Date(), pageCount: c.pageCount ?? max,
+        indexError: withText ? null : 'No readable text found on the flipbook pages.' }).where(eq(bookComponents.id, c.id));
+      await this.audit.log('ai.index', 'book_component', c.id, `Read the flipbook pages of “${c.title}” with OCR for the AI assistant: ${withText} of ${max} pages with text`);
+      if (withText && this.ai.embeddingsEnabled) await this.embed(c.id).catch((e) => this.log.warn(`embeddings skipped: ${e.message}`));
+    } finally { await fs.promises.rm(dir, { recursive: true, force: true }).catch(() => undefined); }
   }
 
   /** Replace the page rows of a component and link each page to the lesson whose page range covers it. */

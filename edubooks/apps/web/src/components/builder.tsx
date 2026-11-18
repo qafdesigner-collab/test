@@ -247,6 +247,7 @@ function NodePanel({ tree, sel, setSel, onExpand }: { tree: EditionTree; sel: Se
             {comp.type === 'MOBILE_APP' ? <MobileAppRow comp={comp} readOnly={readOnly} />
               : <>{comp.type !== 'CD' && <BookPdf comp={comp} editionId={tree.id} editionStatus={tree.status} readOnly={readOnly} />}
                 <FlipbookRow comp={comp} editionStatus={tree.status} readOnly={readOnly} />
+                {!comp.bookFile && comp.flipbook?.kind === 'HTML' && <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3"><AiIndexStatus comp={comp} flip /></div>}
                 <FlipUnits comp={comp} editionStatus={tree.status} readOnly={readOnly} /></>}
             {!locked && !['MOBILE_APP', 'CD'].includes(comp.type) && (
               <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (unitTitle.trim()) addUnit.mutate(unitTitle.trim()); }}>
@@ -439,22 +440,22 @@ function FlipUnits({ comp, editionStatus, readOnly }: { comp: Component; edition
 }
 
 /** Text index used by the AI assistant: status + manual re-index. Polls while running. */
-function AiIndexStatus({ comp }: { comp: Component }) {
+function AiIndexStatus({ comp, flip }: { comp: Component; flip?: boolean }) {
   const qc = useQueryClient();
-  const reindex = useBuilderMutation(() => api.post(`/ai/index/components/${comp.id}`), 'Text extraction started');
+  const reindex = useBuilderMutation(() => api.post(`/ai/index/components/${comp.id}`), flip ? 'Reading the flipbook pages started' : 'Text extraction started');
   useEffect(() => {
     if (comp.indexStatus !== 'RUNNING') return;
     const t = setInterval(() => qc.invalidateQueries({ queryKey: ['edition'] }), 2000);
     return () => clearInterval(t);
   }, [comp.indexStatus, qc]);
-  const label = { NONE: 'Not indexed for AI', RUNNING: 'Extracting text for AI…', DONE: `AI-ready · ${comp.indexedPages} pages of text`, NO_TEXT: 'No text found (scanned PDF?)', ERROR: 'Text extraction failed' }[comp.indexStatus] ?? comp.indexStatus;
+  const label = { NONE: flip ? 'Flipbook pages not read for AI yet' : 'Not indexed for AI', RUNNING: flip ? 'Reading the flipbook pages (OCR)…' : 'Extracting text for AI…', DONE: `AI-ready · ${comp.indexedPages} pages of text`, NO_TEXT: 'No text found (scanned PDF?)', ERROR: 'Text extraction failed' }[comp.indexStatus] ?? comp.indexStatus;
   const tone = comp.indexStatus === 'DONE' ? 'PUBLISHED' : comp.indexStatus === 'RUNNING' ? 'info' : comp.indexStatus === 'NONE' ? 'neutral' : 'danger';
   return (
     <div className="flex w-full items-center gap-2 border-t border-slate-200 pt-2 text-xs">
       <Badge tone={tone}><Sparkles className="size-3" />{label}</Badge>
       {comp.indexError && <span className="truncate text-slate-500" title={comp.indexError}>{comp.indexError}</span>}
       <span className="flex-1" />
-      {comp.indexStatus !== 'RUNNING' && <Button size="sm" variant="ghost" onClick={() => reindex.mutate(undefined)} loading={reindex.isPending}>Re-index</Button>}
+      {comp.indexStatus !== 'RUNNING' && <Button size="sm" variant="ghost" onClick={() => reindex.mutate(undefined)} loading={reindex.isPending}>{flip ? (comp.indexStatus === 'NONE' ? 'Read pages for AI' : 'Read again') : 'Re-index'}</Button>}
     </div>
   );
 }

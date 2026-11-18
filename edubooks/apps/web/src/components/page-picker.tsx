@@ -48,7 +48,12 @@ function Thumb({ d, n, on, focus, onClick }: { d: any; n: number; on: boolean; f
  * Pages of a book part: a large preview of the page in focus, and a strip of all pages from page 1.
  * Click a page to choose it (or remove it); Shift+click chooses every page between. Typing “1-5, 10-15” works too.
  */
-export function PagePicker({ componentId, value, onChange }: { componentId: string; value: string; onChange: (v: string) => void }) {
+export function PagePicker({ componentId, value, onChange, flipbook }: { componentId: string; value: string; onChange: (v: string) => void; flipbook?: boolean }) {
+  if (flipbook) return <FlipPagePicker componentId={componentId} value={value} onChange={onChange} />;
+  return <PdfPagePicker componentId={componentId} value={value} onChange={onChange} />;
+}
+
+function PdfPagePicker({ componentId, value, onChange }: { componentId: string; value: string; onChange: (v: string) => void }) {
   const [doc, setDoc] = useState<any>(null); const [err, setErr] = useState(''); const [focus, setFocus] = useState(1); const last = useRef<number | null>(null);
   const preview = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -86,6 +91,55 @@ export function PagePicker({ componentId, value, onChange }: { componentId: stri
       </div>
       <div className="flex gap-2 overflow-x-auto rounded-xl bg-slate-50 p-2" role="group" aria-label="Book pages">
         {Array.from({ length: doc.numPages }, (_, i) => i + 1).map((n) => <Thumb key={n} d={doc} n={n} on={chosen.includes(n)} focus={focus === n} onClick={(e) => click(n, e)} />)}
+      </div>
+    </div>
+  );
+}
+
+/** The same picker for a flipbook: its page pictures (the publisher's HTML5 flipbook) instead of a PDF. */
+function FlipPagePicker({ componentId, value, onChange }: { componentId: string; value: string; onChange: (v: string) => void }) {
+  const [pages, setPages] = useState<{ n: number; src: string; thumb: string }[] | null>(null); const [err, setErr] = useState('');
+  const [focus, setFocus] = useState(1); const last = useRef<number | null>(null);
+  useEffect(() => {
+    let off = false; setPages(null); setErr('');
+    api.get<any>(`/reader/components/${componentId}/flip-pages`).then((r) => { if (!off) { setPages(r.pages); setFocus(parsePageList(value)[0] ?? r.pages[0]?.n ?? 1); } }).catch((e) => !off && setErr(e?.message ?? 'The pages could not be opened'));
+    return () => { off = true; };
+  }, [componentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (err) return <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{err}</p>;
+  if (!pages) return <div className="flex items-center gap-2 p-4 text-sm text-slate-500"><Spinner className="size-4" />Opening the flipbook pages…</div>;
+  if (!pages.length) return <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">This flipbook has no separate page pictures (for example a Flash/CD flipbook), so pages cannot be shown or read here. Please ask your publisher to upload the PDF of this part.</p>;
+  const max = pages[pages.length - 1].n; const cur = pages.find((p) => p.n === focus) ?? pages[0];
+  const chosen = parsePageList(value).filter((p) => p <= max);
+  const click = (n: number, e: React.MouseEvent) => {
+    setFocus(n);
+    let next: number[];
+    if (e.shiftKey && last.current) { const [a, b] = [Math.min(last.current, n), Math.max(last.current, n)]; next = [...chosen, ...Array.from({ length: b - a + 1 }, (_, k) => a + k)]; }
+    else next = chosen.includes(n) ? chosen.filter((p) => p !== n) : [...chosen, n];
+    last.current = n; onChange(pageListText(next.slice(0, 200)));
+  };
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-2"><img src={cur.src} alt={`Page ${cur.n}`} draggable={false} className="block w-[300px] rounded bg-white shadow-sm" /></div>
+        <div className="min-w-48 flex-1 space-y-2 text-sm">
+          <p className="text-lg font-semibold text-slate-900">Page {cur.n} <span className="text-sm font-normal text-slate-500">of {max} · flipbook</span></p>
+          <div className="flex gap-2">
+            <button type="button" className="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50 disabled:opacity-40" disabled={cur.n <= pages[0].n} onClick={() => setFocus(cur.n - 1)}>← Previous</button>
+            <button type="button" className="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50 disabled:opacity-40" disabled={cur.n >= max} onClick={() => setFocus(cur.n + 1)}>Next →</button>
+            <button type="button" className={cn('rounded-lg px-3 py-1.5 font-semibold', chosen.includes(cur.n) ? 'bg-brand-600 text-white' : 'bg-brand-50 text-brand-700')} onClick={(e) => click(cur.n, e)}>{chosen.includes(cur.n) ? '✓ Chosen' : '+ Choose this page'}</button>
+          </div>
+          <p className="text-slate-600">Chosen: <b>{chosen.length ? pageListText(chosen) : 'none yet'}</b>{chosen.length ? ` (${chosen.length} page${chosen.length === 1 ? '' : 's'})` : ''}</p>
+          <p className="text-xs text-slate-500">Click pages below to choose them. Hold <b>Shift</b> and click to choose all pages in between. Up to 30 pages.</p>
+          {chosen.length > 0 && <button type="button" className="text-xs text-red-600 hover:underline" onClick={() => onChange('')}>Clear all</button>}
+        </div>
+      </div>
+      <div className="flex gap-2 overflow-x-auto rounded-xl bg-slate-50 p-2" role="group" aria-label="Flipbook pages">
+        {pages.map((p) => { const on = chosen.includes(p.n); return (
+          <button key={p.n} type="button" onClick={(e) => click(p.n, e)} aria-pressed={on} aria-label={`Page ${p.n}${on ? ', chosen' : ''}`}
+            className={cn('shrink-0 rounded-lg border-2 bg-white p-1 transition', on ? 'border-brand-600 ring-2 ring-brand-200' : focus === p.n ? 'border-slate-400' : 'border-transparent hover:border-slate-300')}>
+            <img src={p.thumb} alt="" loading="lazy" draggable={false} className="block h-[110px] w-[84px] rounded bg-slate-100 object-contain" />
+            <span className={cn('mt-1 block text-center text-xs font-semibold', on ? 'text-brand-700' : 'text-slate-600')}>{on ? '✓ ' : ''}{p.n}</span>
+          </button>); })}
       </div>
     </div>
   );

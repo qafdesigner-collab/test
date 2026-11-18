@@ -1,3 +1,12 @@
+# What's new in Knowledge Gate 1.3.32
+
+## AI from flipbook pages too
+- Book parts that have only an **HTML5 flipbook** (no PDF) now work with the AI. The platform finds the flipbook's **page pictures** (as made by FlipHTML5, Flip PDF, FlipBuilder and similar makers) and **reads their text** (OCR).
+- **Teacher → AI assistant → 📚 From my book → 📄 Book pages**: choose the **book** (e.g. KG English), then the **part** (e.g. “Student Book 2 — flipbook”), then the **pages**, typed (1-5, 10-15) or clicked in the page strip with a **large preview**. Then make the lesson plan, homework, worksheet, questions or assessment from those pages.
+- The **assignment builder's page-question maker** also shows flipbook pages.
+- **Publisher:** the reading starts **automatically after uploading** a flipbook to a part without a PDF. The part shows its status, with a **“Read pages for AI” / “Read again”** button.
+- Limits: reading pictures needs **OCR (tesseract)** on the server, the same as for scanned PDFs. **SWF/CD flipbooks** have no page pictures and cannot be read; upload the PDF of those parts. When a part has both a PDF and a flipbook, the PDF is used (more exact text).
+
 # What's new in Knowledge Gate 1.3.31
 
 ## AI from chosen book pages

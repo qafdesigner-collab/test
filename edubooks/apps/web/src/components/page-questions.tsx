@@ -13,7 +13,25 @@ import type { Item } from '@/components/item-editor';
 const TYPES: [string, string][] = [['FILL_BLANK', 'Fill in the blank'], ['MCQ', 'Multiple choice'], ['TRUE_FALSE', 'True / false'], ['SHORT', 'Short answer']];
 
 /** Shows one page of the book (from the platform's own protected copy). */
-function PagePreview({ componentId, page, onPages }: { componentId: string; page: number; onPages: (n: number) => void }) {
+function PagePreview({ componentId, page, onPages, flipbook }: { componentId: string; page: number; onPages: (n: number) => void; flipbook?: boolean }) {
+  if (flipbook) return <FlipPreview componentId={componentId} page={page} onPages={onPages} />;
+  return <PdfPreview componentId={componentId} page={page} onPages={onPages} />;
+}
+
+/** A flipbook page picture (parts with a flipbook and no PDF). */
+function FlipPreview({ componentId, page, onPages }: { componentId: string; page: number; onPages: (n: number) => void }) {
+  const q = useQuery({ queryKey: ['flipPages', componentId], queryFn: () => api.get<any>(`/reader/components/${componentId}/flip-pages`), staleTime: 20 * 60_000 });
+  useEffect(() => { if (q.data?.pages?.length) onPages(q.data.pages[q.data.pages.length - 1].n); }, [q.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const p = q.data?.pages?.find((x: any) => x.n === page);
+  return (
+    <div className="relative grid min-h-[200px] w-[300px] place-items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" onContextMenu={(e) => e.preventDefault()}>
+      {q.isLoading ? <Spinner className="size-6" /> : p ? <img src={p.src} alt={`Book page ${page}`} draggable={false} className="block w-[300px] select-none" />
+        : <p className="p-4 text-center text-sm text-slate-500">{q.data?.pages?.length ? `This part has no page ${page}.` : 'This flipbook has no page pictures to show.'}</p>}
+    </div>
+  );
+}
+
+function PdfPreview({ componentId, page, onPages }: { componentId: string; page: number; onPages: (n: number) => void }) {
   const canvas = useRef<HTMLCanvasElement>(null); const doc = useRef<{ id: string; d: any } | null>(null);
   const [state, setState] = useState<'loading' | 'ok' | 'none' | 'error'>('loading');
   useEffect(() => {
@@ -50,7 +68,7 @@ function PagePreview({ componentId, page, onPages }: { componentId: string; page
 export function PageQuestionsPanel({ editionId, initial, onAdd }: { editionId: string; initial?: { componentId?: string | null; page?: number | null }; onAdd: (items: Item[], ref: { componentId: string; page: number } | null) => void }) {
   const toast = useToast();
   const book = useQuery({ queryKey: ['reader', editionId], queryFn: () => api.get<any>(`/reader/editions/${editionId}`) });
-  const parts: any[] = (book.data?.components ?? []).filter((c: any) => c.hasPdf);
+  const parts: any[] = (book.data?.components ?? []).filter((c: any) => c.hasPdf || c.flipbook === 'HTML');
   const [comp, setComp] = useState(initial?.componentId ?? ''); const [page, setPage] = useState(initial?.page ?? 1); const [pages, setPages] = useState(0);
   const [count, setCount] = useState(5); const [types, setTypes] = useState<string[]>(['FILL_BLANK', 'MCQ', 'TRUE_FALSE']);
   const [res, setRes] = useState<any>(null); const [pick, setPick] = useState<number[]>([]); const [busy, setBusy] = useState(false); const [seed, setSeed] = useState(0); const [link, setLink] = useState(true);
@@ -68,7 +86,7 @@ export function PageQuestionsPanel({ editionId, initial, onAdd }: { editionId: s
     <div className="space-y-4">
       <div className="flex flex-col gap-4 md:flex-row">
         <div className="space-y-2">
-          <PagePreview componentId={comp || parts[0].id} page={page} onPages={setPages} />
+          <PagePreview key={comp || parts[0].id} flipbook={!(parts.find((c) => c.id === (comp || parts[0].id))?.hasPdf)} componentId={comp || parts[0].id} page={page} onPages={setPages} />
           <div className="flex items-center justify-center gap-2 text-sm">
             <Button size="sm" variant="ghost" disabled={page <= 1} onClick={() => { setPage(page - 1); setRes(null); }} aria-label="Previous page"><ChevronLeft className="size-4" /></Button>
             <span className="font-medium">Page {page}{pages ? ` / ${pages}` : ''}</span>
@@ -77,7 +95,7 @@ export function PageQuestionsPanel({ editionId, initial, onAdd }: { editionId: s
         </div>
         <div className="min-w-0 flex-1 space-y-3">
           <div className="grid gap-3 sm:grid-cols-3">
-            {parts.length > 1 && <Field label="Book part" className="sm:col-span-3"><Select value={comp} onChange={(e) => { setComp(e.target.value); setPage(1); setRes(null); }}>{parts.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}</Select></Field>}
+            {parts.length > 1 && <Field label="Book part" className="sm:col-span-3"><Select value={comp} onChange={(e) => { setComp(e.target.value); setPage(1); setRes(null); }}>{parts.map((c) => <option key={c.id} value={c.id}>{c.title}{c.hasPdf ? '' : ' — flipbook'}</option>)}</Select></Field>}
             <Field label="Page number"><Input type="number" min={1} max={pages || 5000} value={page} onChange={(e) => { setPage(Math.max(1, Number(e.target.value) || 1)); setRes(null); }} /></Field>
             <Field label="How many questions"><Input type="number" min={1} max={30} value={count} onChange={(e) => setCount(Math.min(30, Math.max(1, Number(e.target.value) || 1)))} /></Field>
           </div>

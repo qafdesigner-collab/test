@@ -30,6 +30,7 @@ function Assistant() {
   const [mode, setMode] = useState<'ask' | 'book'>(params.get('task') || params.get('editionId') ? 'book' : 'ask');
   const [scope, setScope] = useState<'lesson' | 'pages'>('lesson'); const [pg, setPg] = useState({ componentId: '', pages: '' });
   const book = useBook(f.editionId ?? undefined);
+  const pgPart = (book.data?.components ?? []).find((c: any) => c.id === pg.componentId);
   const [r, setR] = useState<any>(null); const [out, setOut] = useState<any>(null); const [useDlg, setUseDlg] = useState<'' | 'ASSESSMENT'>('');
   const gen = useAction(() => api.post('/ai/generate', { ...f, lessonId: scope === 'lesson' ? f.lessonId || undefined : undefined, ...(scope === 'pages' ? { componentId: pg.componentId, pages: pg.pages } : {}) }), { keys: ['aiHistory', 'aiStatus'], after: (res) => { setR(res); setOut(res.output); } });
   const use = useAction((v: { as: string; classId?: string }) => api.post(`/ai/generations/${r.id}/use`, { ...v, output: out, title: out.title }), {
@@ -61,7 +62,8 @@ function Assistant() {
           {scope === 'lesson' ? <BookScope editionId={f.editionId} lessonId={f.lessonId} onChange={(v) => setF({ ...f, ...v })} required /> : <>
             <BookScope hideLesson editionId={f.editionId} lessonId={null} onChange={(v) => { setF({ ...f, editionId: v.editionId, lessonId: null }); setPg({ componentId: '', pages: '' }); }} required />
             {f.editionId && <Field label="Book part"><Select value={pg.componentId} onChange={(e) => setPg({ componentId: e.target.value, pages: '' })}>
-              <option value="">Choose…</option>{(book.data?.components ?? []).filter((c: any) => c.hasPdf).map((c: any) => <option key={c.id} value={c.id}>{c.title}{c.pageCount ? ` (${c.pageCount} pages)` : ''}</option>)}</Select></Field>}
+              <option value="">Choose…</option>{(book.data?.components ?? []).filter((c: any) => c.hasPdf || c.flipbook === 'HTML').map((c: any) => <option key={c.id} value={c.id}>{c.title}{c.hasPdf ? '' : ' — flipbook'}{c.pageCount ? ` (${c.pageCount} pages)` : ''}</option>)}</Select></Field>}
+            {pgPart && !pgPart.hasPdf && pgPart.indexStatus !== 'DONE' && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">{pgPart.indexStatus === 'RUNNING' ? 'The text of this flipbook is being read now — try again in a few minutes.' : 'The text of this flipbook has not been read yet, so the AI cannot use its pages. Ask your publisher to press “Read pages for AI” on this part.'}</p>}
             {pg.componentId && <Field label="Pages" hint="e.g. 1-5, 10-15 — or click the pages on the right"><Input value={pg.pages} onChange={(e) => setPg({ ...pg, pages: e.target.value })} placeholder="1-5, 10-15" /></Field>}
           </>}
           <Field label="What do you need?"><Select value={f.task} onChange={(e) => setF({ ...f, task: e.target.value })}>
@@ -78,7 +80,7 @@ function Assistant() {
         </Card>
 
         <div className="min-w-0 space-y-4">
-          {scope === 'pages' && pg.componentId && <Card className="p-4"><PagePicker componentId={pg.componentId} value={pg.pages} onChange={(v) => setPg({ ...pg, pages: v })} /></Card>}
+          {scope === 'pages' && pg.componentId && <Card className="p-4"><PagePicker key={pg.componentId} flipbook={!!pgPart && !pgPart.hasPdf} componentId={pg.componentId} value={pg.pages} onChange={(v) => setPg({ ...pg, pages: v })} /></Card>}
           {gen.isPending && <Card className="flex items-center gap-3 p-6 text-sm text-slate-600"><RefreshCw className="size-5 animate-spin" />Reading the lesson pages and drafting… this can take up to a minute on a self-hosted model.</Card>}
           {gen.error && <ErrorBox error={gen.error} />}
           {r && out && !gen.isPending && (

@@ -23,7 +23,7 @@ export class ReaderService {
     if (!ed) throw new NotFoundException('Book not found');
     const vis = visibleFor(this.db.ctx);
     let comps = await this.q.select({ id: bookComponents.id, visibleTo: bookComponents.visibleTo, type: bookComponents.type, title: bookComponents.title, partNumber: bookComponents.partNumber,
-      pageCount: bookComponents.pageCount, hasPdf: sql<boolean>`${bookComponents.bookAssetId} IS NOT NULL`,
+      pageCount: bookComponents.pageCount, indexedPages: bookComponents.indexedPages, indexStatus: bookComponents.indexStatus, hasPdf: sql<boolean>`${bookComponents.bookAssetId} IS NOT NULL`,
       flipbook: sql<string | null>`(SELECT f.kind FROM flipbooks f WHERE f.component_id = ${qc(bookComponents.id)} ORDER BY (f.unit_title IS NOT NULL), f.sort LIMIT 1)`,
       flipUnits: sql<number>`(SELECT count(*)::int FROM flipbooks f WHERE f.component_id = ${qc(bookComponents.id)})`,
       hasApp: sql<boolean>`EXISTS (SELECT 1 FROM book_apps a WHERE a.component_id = ${qc(bookComponents.id)} AND (a.asset_id IS NOT NULL OR a.android_url IS NOT NULL OR a.ios_url IS NOT NULL))` })

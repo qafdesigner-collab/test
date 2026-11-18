@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { sees, visibleFor } from '../common/visibility';
+import { detectFlipPages } from './flip-pages';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import * as fs from 'fs';
@@ -177,6 +178,27 @@ export class FlipbookService {
     const token = this.sign(f.id, f.publisherId, exp, prot.protect ? prot.watermark || ' ' : '', this.db.ctx.userId);
     return { url: `/api/flip/${token}/${f.entry.split('/').map(encodeURIComponent).join('/')}`, kind: f.kind, expiresAt: new Date(exp * 1000),
       id: f.id, units: all.map((x) => ({ id: x.id, title: x.unitTitle })) };
+  }
+
+  /** Page pictures of the part's HTML5 flipbook (main upload first, then units), for page choosing and reading text. */
+  async pageFiles(componentId: string) {
+    const all = (await this.q.select().from(flipbooks).where(eq(flipbooks.componentId, componentId)))
+      .filter((f) => f.kind === 'HTML').sort((a, b) => Number(!!a.unitTitle) - Number(!!b.unitTitle) || a.sort - b.sort);
+    for (const f of all) {
+      const files = await this.q.select({ path: flipbookFiles.path }).from(flipbookFiles).where(eq(flipbookFiles.flipbookId, f.id));
+      const pages = detectFlipPages(files.map((x) => x.path));
+      if (pages.length) return { flipbook: f, pages };
+    }
+    return null;
+  }
+  /** Page pictures with signed addresses, for the page picker (licence and "Visible to" are checked by link()). */
+  async pages(componentId: string) {
+    const found = await this.pageFiles(componentId);
+    if (!found) return { pages: [] as { n: number; src: string; thumb: string }[] };
+    const l = await this.link(componentId, found.flipbook.id);
+    const base = l.url.slice(0, l.url.indexOf('/', '/api/flip/'.length) + 1);
+    const enc = (p: string) => base + p.split('/').map(encodeURIComponent).join('/');
+    return { pages: found.pages.map((p) => ({ n: p.n, src: enc(p.path), thumb: enc(p.thumb ?? p.path) })), expiresAt: l.expiresAt };
   }
 
   private mac(payload: string) { return createHmac('sha256', config.fileUrlSecret).update(`flip:${payload}`).digest('base64url').slice(0, 32); }

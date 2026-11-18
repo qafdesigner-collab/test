@@ -1,4 +1,8 @@
 import { guardScript } from '../common/protection';
+import { AiModule } from '../ai/ai.module';
+import { IndexerService } from '../ai/indexer.service';
+import { bookComponents } from '../db/schema';
+import { eq } from 'drizzle-orm';
 import { denied, sameUser } from '../storage/files.controller';
 import { BadRequestException, Body, Controller, Delete, Get, Module, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { Type } from 'class-transformer';
@@ -43,7 +47,7 @@ class UnitDto { @IsOptional() @IsString() @Length(0, 120) unitTitle?: string; @I
 @ApiTags('flipbooks')
 @Controller()
 export class FlipbookController {
-  constructor(private readonly svc: FlipbookService, private readonly db: DbService) {}
+  constructor(private readonly svc: FlipbookService, private readonly db: DbService, private readonly indexer: IndexerService) {}
 
   @Roles(...PUBLISHER_STAFF) @ManualTx()
   @Post('publishing/components/:id/flipbook')
@@ -54,7 +58,13 @@ export class FlipbookController {
   }))
   upload(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File, @Req() req: any, @Query() q: UploadQuery) {
     if (!file) throw new BadRequestException('Choose the flipbook (.zip with index.html, or .swf)');
-    return this.db.withContext(req.ctx, () => this.svc.upload(id, file, { unitTitle: q.unit, replaceId: q.replace }));
+    return this.db.withContext(req.ctx, async () => {
+      const r = await this.svc.upload(id, file, { unitTitle: q.unit, replaceId: q.replace });
+      // a part without a PDF: read its flipbook pages for the AI in the background (when the flipbook has page pictures)
+      const [c] = await this.db.q.select({ pdf: bookComponents.bookAssetId }).from(bookComponents).where(eq(bookComponents.id, id));
+      if (!c?.pdf && await this.svc.pageFiles(id)) await this.indexer.start(id).catch(() => undefined);
+      return r;
+    });
   }
 
   /** Every upload of a part: the main one and its units (e.g. one SWF per CD unit). */
@@ -70,6 +80,10 @@ export class FlipbookController {
   remove(@Param('id', ParseUUIDPipe) id: string) { return this.svc.remove(id); }
 
   /** Signed address for the reader (licence checked). */
+  /** The page pictures of an HTML5 flipbook (for choosing pages and previews). */
+  @Get('reader/components/:id/flip-pages')
+  flipPages(@Param('id', ParseUUIDPipe) id: string) { return this.svc.pages(id); }
+
   @Get('reader/components/:id/flipbook')
   link(@Param('id', ParseUUIDPipe) id: string, @Query() q: LinkQuery) { return this.svc.link(id, q.unit); }
 
@@ -122,5 +136,5 @@ export class FlipbookController {
   }
 }
 
-@Module({ imports: [LmsModule, StorageModule], controllers: [FlipbookController], providers: [FlipbookService], exports: [FlipbookService] })
+@Module({ imports: [LmsModule, StorageModule, AiModule], controllers: [FlipbookController], providers: [FlipbookService], exports: [FlipbookService] })
 export class FlipbookModule {}
