@@ -6,11 +6,10 @@ import { AiProvider, AiUnavailableError, GenerateRequest, GenerateResult } from 
  * Default and recommended for low marginal cost: e.g. Ollama + qwen2.5:7b-instruct on one GPU.
  */
 export class OpenAiCompatibleProvider implements AiProvider {
-  readonly name = 'openai-compatible';
   readonly live = true;
-  constructor(private readonly baseUrl: string, readonly model: string, private readonly apiKey: string, private readonly timeoutMs: number, private readonly embedModel = '') {}
+  constructor(private readonly baseUrl: string, readonly model: string, private readonly apiKey: string, private readonly timeoutMs: number, private readonly embedModel = '', readonly name = 'openai-compatible') {}
 
-  private async post(path: string, body: unknown) {
+  private async post(path: string, body: any): Promise<any> {
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}${path}`, {
@@ -21,7 +20,14 @@ export class OpenAiCompatibleProvider implements AiProvider {
     } catch (e: any) {
       throw new AiUnavailableError(`The AI server at ${this.baseUrl} is not reachable (${e?.name === 'TimeoutError' ? 'timed out' : e?.message})`);
     }
-    if (!res.ok) throw new AiUnavailableError(`The AI server answered ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    if (!res.ok) {
+      const text = (await res.text()).slice(0, 300);
+      // some services / free models do not support "JSON mode": ask again without it (the prompt asks for JSON anyway)
+      if (res.status === 400 && body?.response_format && /response_format|json/i.test(text)) { const { response_format: _r, ...rest } = body; return this.post(path, rest); }
+      throw new AiUnavailableError(res.status === 429 ? 'The AI service is busy or its free daily limit is used up — please try again later.'
+        : res.status === 401 || res.status === 403 || /api[ _-]?key/i.test(text) ? 'The AI service did not accept the API key — check that you pasted the whole key.'
+        : res.status === 404 && /model/i.test(text) ? `The AI service does not know the model “${this.model}” — check the model name.` : `The AI server answered ${res.status}: ${text}`);
+    }
     return res.json() as Promise<any>;
   }
 
@@ -49,7 +55,8 @@ export class OpenAiCompatibleProvider implements AiProvider {
       if (!res.ok) return { ok: false, detail: `HTTP ${res.status}` };
       const j: any = await res.json();
       const ids: string[] = (j.data ?? []).map((m: any) => m.id);
-      return { ok: ids.length === 0 || ids.includes(this.model), detail: ids.includes(this.model) ? `${this.model} is available` : `Model ${this.model} not found on the server (has: ${ids.slice(0, 5).join(', ') || 'none'})` };
+      const has = ids.some((id) => id === this.model || id.endsWith(`/${this.model}`));
+      return { ok: ids.length === 0 || has, detail: has || !ids.length ? `${this.model} is available` : `Model ${this.model} not found on the server (has: ${ids.slice(0, 5).join(', ') || 'none'})` };
     } catch (e: any) {
       return { ok: false, detail: `Not reachable: ${e?.message}` };
     }

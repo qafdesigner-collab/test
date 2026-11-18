@@ -39,7 +39,7 @@ export class TutorService {
 
   async settings() {
     const s = await this.one(sql`SELECT enabled, daily_limit AS "dailyLimit" FROM tutor_settings WHERE school_id = ${this.ctx.schoolId}`);
-    return { enabled: !this.globalOff() && !!s?.enabled, dailyLimit: s?.dailyLimit ?? 20, available: !this.globalOff(), live: this.providers.provider.live };
+    return { enabled: !this.globalOff() && !!s?.enabled, dailyLimit: s?.dailyLimit ?? 20, available: !this.globalOff(), live: (await this.providers.current()).live };
   }
 
   async saveSettings(d: SettingsDto) {
@@ -89,7 +89,7 @@ export class TutorService {
       ...extra.filter((x) => !(x.componentId === d.componentId && near.some((p) => p.page === x.page))).slice(0, 3).map((x) => ({ page: x.page, text: x.text.slice(0, 1500), part: x.component }))];
     if (!sources.length) return save({ answer: "I can't read the words on this page yet, so I can't help with it. Please ask your teacher! 🦉" });
 
-    const provider = this.providers.provider;
+    const provider = await this.providers.current();
     const monthly = await this.one(sql`SELECT (SELECT count(*) FROM ai_generations WHERE school_id = ${this.ctx.schoolId} AND created_at >= date_trunc('month', now()))
       + (SELECT count(*) FROM tutor_messages WHERE school_id = ${this.ctx.schoolId} AND live AND created_at >= date_trunc('month', now())) AS n`);
     if (!provider.live || Number(monthly.n) >= config.ai.monthlyRequestsPerSchool) return save(this.offline(d.mode, question, sources, d.page));

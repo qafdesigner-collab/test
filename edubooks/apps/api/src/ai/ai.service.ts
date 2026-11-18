@@ -35,7 +35,7 @@ export class AiService {
   }
 
   async status() {
-    const p = this.providers.provider;
+    const p = await this.providers.current();
     return {
       provider: p.name, model: p.model, live: p.live, embeddings: this.providers.embeddingsEnabled, ocr: (await ocrAvailable()).ok, health: await this.providers.health(),
       tasks: Object.entries(TASKS).map(([id, t]) => ({ id, label: t.label, kind: t.kind })),
@@ -74,7 +74,7 @@ export class AiService {
     const notes = scrub(i.notes ?? '');
     const sources = await this.retrieval.sources({ editionId: i.editionId, lessonId: i.lessonId, unitId: meta.unitId, query: [meta.lesson, meta.unit, meta.objectives, notes].filter(Boolean).join(' ') });
     const ctx: Context = { task: i.task, ...meta, durationMin: i.durationMin ?? 40, difficulty: i.difficulty ?? 'EASY', count: Math.min(i.count ?? 5, 20), notes, sources };
-    const provider = this.providers.provider;
+    const provider = await this.providers.current();
     const started = Date.now();
     const tenant = { ...this.ctx };
     const record = async (v: { status: string; output?: any; error?: string; inputTokens?: number; outputTokens?: number; model?: string }) => {

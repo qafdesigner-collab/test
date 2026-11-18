@@ -344,6 +344,13 @@
       "when": 1795080000000,
       "tag": "0048_unsold_versions_editable",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1795110000000,
+      "tag": "0049_ai_settings",
+      "breakpoints": true
     }
   ]
 }
