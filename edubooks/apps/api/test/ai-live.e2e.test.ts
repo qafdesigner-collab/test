@@ -83,3 +83,25 @@ describe('Phase 5 — live AI provider (self-hosted, OpenAI-compatible)', () => 
     expect(over.body.message).toMatch(/used its 4 AI requests/);
   });
 });
+
+describe('Teacher chooses book pages (e.g. 1-5, 10-15) for the AI', () => {
+  let app: any; let teacher: any; let english: string; let part: string;
+  beforeAll(async () => {
+    const { createApp, login } = require('./helpers');
+    app = await createApp(); teacher = await login(app, 'teacher1', 'Teacher@12345', 'SUN01');
+    english = (await teacher.get('/api/teacher/books')).body.find((b: any) => b.title === 'KG English').editionId;
+    part = (await teacher.get(`/api/reader/editions/${english}`)).body.components.find((c: any) => c.hasPdf).id;
+  });
+  afterAll(async () => { await app.close(); });
+
+  it('uses exactly those pages and names them in the request', async () => {
+    mode = 'ok'; calls.length = 0;
+    const owner = require('./helpers').ownerPool(); await owner.query(`DELETE FROM ai_generations`); await owner.end(); // fresh monthly quota
+    const r = await teacher.post('/api/ai/generate').send({ task: 'LESSON_PLAN', editionId: english, componentId: part, pages: '2-3, 5' });
+    expect(r.status).toBe(201);
+    expect(r.body.sources.map((x: any) => x.page)).toEqual([2, 3, 5]);
+    expect(calls.at(-1).messages[1].content).toContain('BOOK PAGES CHOSEN BY THE TEACHER: 2–3, 5');
+    expect((await teacher.post('/api/ai/generate').send({ task: 'MCQ', editionId: english, componentId: part, pages: 'abc' })).status).toBe(400);
+    expect((await teacher.post('/api/ai/generate').send({ task: 'MCQ', editionId: english, componentId: part, pages: '1-40' })).status).toBe(400);
+  });
+});

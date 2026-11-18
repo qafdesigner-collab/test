@@ -15,13 +15,22 @@ import { AiProviderService } from './provider.service';
 export class RetrievalService {
   constructor(private readonly db: DbService, private readonly ai: AiProviderService) {}
 
-  async sources(o: { editionId: string; lessonId?: string | null; unitId?: string | null; query: string }): Promise<(Source & { componentId: string; lessonId: string | null })[]> {
+  async sources(o: { editionId: string; lessonId?: string | null; unitId?: string | null; query: string; pages?: { componentId: string; numbers: number[] } | null }): Promise<(Source & { componentId: string; lessonId: string | null })[]> {
     const budget = config.ai.maxSourceChars;
     // only text from parts / units / lessons this user may see ("Visible to")
     const vis = visibleFor(this.db.ctx);
     const vf = vis ? sql`AND c.visible_to::text IN ${vis} AND COALESCE(l.visible_to::text, 'ALL') IN ${vis}
       AND COALESCE((SELECT u.visible_to::text FROM book_units u WHERE u.id = l.unit_id), 'ALL') IN ${vis}` : sql``;
     const picked: any[] = [];
+    // pages the teacher chose (e.g. 1-5, 10-15): exactly those pages, each shortened so all of them fit
+    if (o.pages?.numbers.length) {
+      const { rows } = await this.db.q.execute(sql`SELECT p.id, p.page_number AS page, p.text_content AS text, p.lesson_id AS "lessonId", c.id AS "componentId", c.title AS component, l.title AS lesson
+        FROM book_pages p JOIN book_components c ON c.id = p.component_id LEFT JOIN book_lessons l ON l.id = p.lesson_id
+        WHERE c.edition_id = ${o.editionId} AND c.id = ${o.pages.componentId} ${vf} AND p.page_number IN ${o.pages.numbers} AND length(p.text_content) > 10
+        ORDER BY p.page_number`);
+      const each = Math.max(500, Math.floor(budget / Math.max(1, rows.length)));
+      return (rows as any[]).map((r, k) => ({ n: k + 1, page: r.page, text: String(r.text).slice(0, Math.min(2500, each)), component: r.component, componentId: r.componentId, lessonId: r.lessonId, lesson: r.lesson }));
+    }
     if (o.lessonId || o.unitId) {
       const { rows } = await this.db.q.execute(sql`SELECT p.id, p.page_number AS page, p.text_content AS text, p.lesson_id AS "lessonId", c.id AS "componentId", c.title AS component,
           l.title AS lesson

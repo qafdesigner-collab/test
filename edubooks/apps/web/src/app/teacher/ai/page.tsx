@@ -6,7 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { BookMarked, ClipboardList, NotebookPen, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { api, fmtDate } from '@/lib/api';
 import { useAction } from '@/lib/hooks';
-import { className, useMyClasses } from '@/lib/lms';
+import { className, useBook, useMyClasses } from '@/lib/lms';
+import { PagePicker, parsePageList } from '@/components/page-picker';
 import { Badge, Button, Card, Dialog, ErrorBox, Field, Input, PageLoader, Select, Textarea } from '@/components/ui';
 import { PageHeader } from '@/components/common';
 import { BookScope } from '@/components/book-scope';
@@ -27,8 +28,10 @@ function Assistant() {
   const history = useQuery({ queryKey: ['aiHistory'], queryFn: () => api.get('/ai/generations') });
   const [f, setF] = useState({ editionId: params.get('editionId'), lessonId: params.get('lessonId'), task: params.get('task') ?? 'LESSON_PLAN', durationMin: 40, difficulty: 'EASY', count: 6, notes: '' });
   const [mode, setMode] = useState<'ask' | 'book'>(params.get('task') || params.get('editionId') ? 'book' : 'ask');
+  const [scope, setScope] = useState<'lesson' | 'pages'>('lesson'); const [pg, setPg] = useState({ componentId: '', pages: '' });
+  const book = useBook(f.editionId ?? undefined);
   const [r, setR] = useState<any>(null); const [out, setOut] = useState<any>(null); const [useDlg, setUseDlg] = useState<'' | 'ASSESSMENT'>('');
-  const gen = useAction(() => api.post('/ai/generate', { ...f, lessonId: f.lessonId || undefined }), { keys: ['aiHistory', 'aiStatus'], after: (res) => { setR(res); setOut(res.output); } });
+  const gen = useAction(() => api.post('/ai/generate', { ...f, lessonId: scope === 'lesson' ? f.lessonId || undefined : undefined, ...(scope === 'pages' ? { componentId: pg.componentId, pages: pg.pages } : {}) }), { keys: ['aiHistory', 'aiStatus'], after: (res) => { setR(res); setOut(res.output); } });
   const use = useAction((v: { as: string; classId?: string }) => api.post(`/ai/generations/${r.id}/use`, { ...v, output: out, title: out.title }), {
     ok: (x) => (x.usedAs === 'QUESTION_BANK' ? 'Added to the question bank' : 'Saved — opening it now'), keys: ['aiHistory', 'plans', 'assessments', 'bank'],
     after: (x) => { if (x.usedAs === 'LESSON_PLAN') router.push(`/teacher/plans/${x.id}`); if (x.usedAs === 'ASSESSMENT') router.push(`/teacher/assessments/${x.id}`); },
@@ -50,7 +53,17 @@ function Assistant() {
       {mode === 'ask' ? <AiChat live={!!s?.live} /> : <>
       <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
         <Card className="h-fit space-y-4 p-5">
-          <BookScope editionId={f.editionId} lessonId={f.lessonId} onChange={(v) => setF({ ...f, ...v })} required />
+          <div className="flex gap-1.5" role="radiogroup" aria-label="Use">
+            {([['lesson', '📘 A lesson'], ['pages', '📄 Book pages']] as const).map(([k, l]) => (
+              <button key={k} type="button" role="radio" aria-checked={scope === k} onClick={() => setScope(k)}
+                className={scope === k ? 'rounded-full bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white' : 'rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200'}>{l}</button>))}
+          </div>
+          {scope === 'lesson' ? <BookScope editionId={f.editionId} lessonId={f.lessonId} onChange={(v) => setF({ ...f, ...v })} required /> : <>
+            <BookScope hideLesson editionId={f.editionId} lessonId={null} onChange={(v) => { setF({ ...f, editionId: v.editionId, lessonId: null }); setPg({ componentId: '', pages: '' }); }} required />
+            {f.editionId && <Field label="Book part"><Select value={pg.componentId} onChange={(e) => setPg({ componentId: e.target.value, pages: '' })}>
+              <option value="">Choose…</option>{(book.data?.components ?? []).filter((c: any) => c.hasPdf).map((c: any) => <option key={c.id} value={c.id}>{c.title}{c.pageCount ? ` (${c.pageCount} pages)` : ''}</option>)}</Select></Field>}
+            {pg.componentId && <Field label="Pages" hint="e.g. 1-5, 10-15 — or click the pages on the right"><Input value={pg.pages} onChange={(e) => setPg({ ...pg, pages: e.target.value })} placeholder="1-5, 10-15" /></Field>}
+          </>}
           <Field label="What do you need?"><Select value={f.task} onChange={(e) => setF({ ...f, task: e.target.value })}>
             {GROUPS.map(([g, ids]) => <optgroup key={g} label={g}>{ids.map((id) => <option key={id} value={id}>{s?.tasks.find((t: any) => t.id === id)?.label ?? id}</option>)}</optgroup>)}</Select></Field>
           <div className="grid grid-cols-3 gap-3">
@@ -60,11 +73,12 @@ function Assistant() {
           </div>
           <Field label="Notes for the assistant (optional)" hint="e.g. “class of 30, include a song, children find /b/ and /d/ confusing”. Please don’t include children’s names.">
             <Textarea rows={3} maxLength={500} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
-          <Button className="w-full" disabled={!f.editionId} loading={gen.isPending} onClick={() => gen.mutate()}><Sparkles className="size-4" />{r ? 'Generate again' : 'Generate draft'}</Button>
-          {!f.lessonId && f.editionId && <p className="text-xs text-amber-700">Choose a lesson for the best results — the assistant then reads exactly those pages.</p>}
+          <Button className="w-full" disabled={!f.editionId || (scope === 'pages' && (!pg.componentId || !parsePageList(pg.pages).length))} loading={gen.isPending} onClick={() => gen.mutate()}><Sparkles className="size-4" />{r ? 'Generate again' : 'Generate draft'}</Button>
+          {scope === 'lesson' && !f.lessonId && f.editionId && <p className="text-xs text-amber-700">Choose a lesson for the best results — the assistant then reads exactly those pages.</p>}
         </Card>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
+          {scope === 'pages' && pg.componentId && <Card className="p-4"><PagePicker componentId={pg.componentId} value={pg.pages} onChange={(v) => setPg({ ...pg, pages: v })} /></Card>}
           {gen.isPending && <Card className="flex items-center gap-3 p-6 text-sm text-slate-600"><RefreshCw className="size-5 animate-spin" />Reading the lesson pages and drafting… this can take up to a minute on a self-hosted model.</Card>}
           {gen.error && <ErrorBox error={gen.error} />}
           {r && out && !gen.isPending && (

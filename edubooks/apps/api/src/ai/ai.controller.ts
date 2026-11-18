@@ -24,6 +24,9 @@ class GenerateDto {
   @IsUUID() editionId: string;
   @IsOptional() @IsUUID() lessonId?: string;
   @IsOptional() @IsUUID() unitId?: string;
+  /** Instead of a lesson: a book part and its pages, e.g. "1-5, 10-15". */
+  @IsOptional() @IsUUID() componentId?: string;
+  @IsOptional() @IsString() @MaxLength(100) pages?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(10) @Max(180) durationMin?: number;
   @IsOptional() @IsIn(['EASY', 'MEDIUM', 'HARD']) difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(20) count?: number;

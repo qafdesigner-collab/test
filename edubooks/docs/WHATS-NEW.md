@@ -1,3 +1,13 @@
+# What's new in Knowledge Gate 1.3.31
+
+## AI from chosen book pages
+- **Teacher → AI assistant → 📚 From my book → 📄 Book pages.** Choose the book and the part, then the pages:
+  - type them (**1-5, 10-15, 20**), or
+  - click the **page thumbnails** in the strip (from page 1). **Shift+click** chooses every page in between.
+- A **large preview** shows the page you click, with Previous / Next and “Choose this page”. Up to 30 pages at a time.
+- The lesson plan, homework, worksheet or questions are made **from exactly those pages**. Each part cites its page numbers, and “Book pages used” lists them.
+- **📘 A lesson** works as before.
+
 # What's new in Knowledge Gate 1.3.30
 
 - **AI errors show the service's own reason** (“It said: …”). A refused key (401) is now told apart from **refused access (403)**. A 403 is often not the key at all: the service blocks the server's country or host, or the model needs its terms accepted in the service's console.

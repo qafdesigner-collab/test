@@ -1,6 +1,7 @@
 import { ocrAvailable } from './ocr';
 import { BadRequestException, HttpException, HttpStatus, Injectable, Logger, NotFoundException, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
 import { and, desc, eq, sql } from 'drizzle-orm';
+import { visibleFor } from '../common/visibility';
 import { DbService } from '../db/db.service';
 import { aiGenerations, bookComponents, bookEditions, bookLessons, bookPackages, bookUnits, grades, subjects } from '../db/schema';
 import { AuditService } from '../audit/audit.service';
@@ -15,10 +16,26 @@ import { AiUnavailableError } from './providers/types';
 
 export interface GenerateInput {
   task: Task; editionId: string; lessonId?: string | null; unitId?: string | null;
+  /** A book part and pages, e.g. "1-5, 10-15" (instead of a lesson). */
+  componentId?: string | null; pages?: string | null;
   durationMin?: number; difficulty?: 'EASY' | 'MEDIUM' | 'HARD'; count?: number; notes?: string;
 }
 
 /** Removes contact details a teacher might paste by accident — children's data never goes to a model. */
+/** "1-5, 10-15, 20" → [1..5, 10..15, 20]; at most 30 pages. */
+export function parsePages(t: string): number[] {
+  const out = new Set<number>();
+  for (const part of t.split(/[,;\s]+/).filter(Boolean)) {
+    const m = /^(\d{1,4})(?:\s*[-–]\s*(\d{1,4}))?$/.exec(part);
+    if (!m) throw new BadRequestException(`“${part}” is not a page or page range — write pages like 1-5, 10-15`);
+    const a = Number(m[1]); const b = m[2] ? Number(m[2]) : a;
+    if (a < 1 || b < a) throw new BadRequestException(`“${part}” is not a valid page range`);
+    for (let p = a; p <= b; p++) { out.add(p); if (out.size > 30) throw new BadRequestException('Choose at most 30 pages at a time'); }
+  }
+  return [...out].sort((x, y) => x - y);
+}
+const rangesLabel = (n: number[]) => { const r: string[] = []; for (let i = 0; i < n.length; i++) { let j = i; while (j + 1 < n.length && n[j + 1] === n[j] + 1) j++; r.push(i === j ? `${n[i]}` : `${n[i]}–${n[j]}`); i = j; } return r.join(', '); };
+
 const scrub = (s: string) => s.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[email removed]').replace(/\+?\d[\d\s-]{7,}\d/g, '[number removed]').slice(0, 500);
 
 @Injectable()
@@ -51,19 +68,25 @@ export class AiService {
       .where(eq(bookEditions.id, i.editionId));
     if (!ed) throw new NotFoundException('Book not found');
     let part: string | null = null; let unit: string | null = null; let lesson: string | null = null; let objectives: string | null = null; let pages: string | null = null;
-    let unitId = i.unitId ?? null;
+    let unitId = i.unitId ?? null; let pageNumbers: number[] | null = null;
     if (i.lessonId) {
       const [l] = await this.q.select({ l: bookLessons, u: bookUnits, c: bookComponents }).from(bookLessons).innerJoin(bookUnits, eq(bookUnits.id, bookLessons.unitId))
         .innerJoin(bookComponents, eq(bookComponents.id, bookUnits.componentId)).where(eq(bookLessons.id, i.lessonId));
       if (!l || l.c.editionId !== i.editionId) throw new BadRequestException('That lesson is not in this book');
       part = l.c.title; unit = `Unit ${l.u.number}: ${l.u.title}`; lesson = `Lesson ${l.l.number}: ${l.l.title}`; objectives = l.l.objectives || null; unitId = l.u.id;
       pages = l.l.pageStart ? `${l.l.pageStart}–${l.l.pageEnd ?? l.l.pageStart}` : null;
+    } else if (i.componentId && i.pages) {
+      const [c] = await this.q.select().from(bookComponents).where(eq(bookComponents.id, i.componentId));
+      if (!c || c.editionId !== i.editionId) throw new BadRequestException('That part is not in this book');
+      const vis = visibleFor(this.ctx); if (vis && !vis.includes(c.visibleTo as any)) throw new BadRequestException('That part is not available to you');
+      const nums = parsePages(i.pages); if (!nums.length) throw new BadRequestException('Choose the pages');
+      part = c.title; pages = rangesLabel(nums); pageNumbers = nums;
     } else if (unitId) {
       const [u] = await this.q.select({ u: bookUnits, c: bookComponents }).from(bookUnits).innerJoin(bookComponents, eq(bookComponents.id, bookUnits.componentId)).where(eq(bookUnits.id, unitId));
       if (!u || u.c.editionId !== i.editionId) throw new BadRequestException('That unit is not in this book');
       part = u.c.title; unit = `Unit ${u.u.number}: ${u.u.title}`; objectives = u.u.description || null;
     }
-    return { book: ed.title, grade: ed.grade, subject: ed.subject, part, unit, lesson, objectives, pages, unitId };
+    return { book: ed.title, grade: ed.grade, subject: ed.subject, part, unit, lesson, objectives, pages, unitId, pageNumbers };
   }
 
   /**
@@ -118,7 +141,9 @@ export class AiService {
     if (used >= limit) throw new HttpException(`Your school has used its ${limit} AI requests for this month.`, HttpStatus.TOO_MANY_REQUESTS);
     const meta = await this.lessonContext(i);
     const notes = scrub(i.notes ?? '');
-    const sources = await this.retrieval.sources({ editionId: i.editionId, lessonId: i.lessonId, unitId: meta.unitId, query: [meta.lesson, meta.unit, meta.objectives, notes].filter(Boolean).join(' ') });
+    const sources = await this.retrieval.sources({ editionId: i.editionId, lessonId: i.lessonId, unitId: meta.unitId, query: [meta.lesson, meta.unit, meta.objectives, notes].filter(Boolean).join(' '),
+      pages: meta.pageNumbers && i.componentId ? { componentId: i.componentId, numbers: meta.pageNumbers } : null });
+    if (meta.pageNumbers && !sources.length) throw new BadRequestException(`No text was found on pages ${meta.pages} of ${meta.part} — the pages may be pictures only, or the book's text is not indexed yet.`);
     const ctx: Context = { task: i.task, ...meta, durationMin: i.durationMin ?? 40, difficulty: i.difficulty ?? 'EASY', count: Math.min(i.count ?? 5, 20), notes, sources };
     const provider = await this.providers.current();
     const started = Date.now();
@@ -128,7 +153,7 @@ export class AiService {
       // in their own transaction — every request is logged and counts towards the quota.
       const write = () => this.q.insert(aiGenerations).values({
         publisherId: this.ctx.publisherId, schoolId: this.ctx.schoolId!, userId: this.ctx.userId, task: i.task, editionId: i.editionId, lessonId: i.lessonId ?? null,
-        provider: provider.name, model: v.model ?? provider.model, params: { durationMin: ctx.durationMin, difficulty: ctx.difficulty, count: ctx.count, notes, unitId: meta.unitId },
+        provider: provider.name, model: v.model ?? provider.model, params: { durationMin: ctx.durationMin, difficulty: ctx.difficulty, count: ctx.count, notes, unitId: meta.unitId, ...(meta.pageNumbers ? { componentId: i.componentId, pages: meta.pages } : {}) },
         sources: sources.map(({ n, page, component, componentId, lessonId }) => ({ n, page, component, componentId, lessonId })), grounded: sources.length > 0,
         output: v.output ?? null, status: v.status, error: v.error ?? null, inputTokens: v.inputTokens ?? 0, outputTokens: v.outputTokens ?? 0, latencyMs: Date.now() - started,
       }).returning({ id: aiGenerations.id });

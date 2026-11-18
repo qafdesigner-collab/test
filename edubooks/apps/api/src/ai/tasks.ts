@@ -52,7 +52,7 @@ export function buildPrompt(c: Context) {
           : `Suggest ${Math.min(c.count, 6)} classroom activities for this lesson, each with steps and materials.`;
   const user = [
     `BOOK: ${c.book} (${c.grade}, ${c.subject})`,
-    c.part && `PART: ${c.part}`, c.unit && `UNIT: ${c.unit}`, c.lesson && `LESSON: ${c.lesson}${c.pages ? ` (pages ${c.pages})` : ''}`,
+    c.part && `PART: ${c.part}`, c.unit && `UNIT: ${c.unit}`, c.lesson && `LESSON: ${c.lesson}${c.pages ? ` (pages ${c.pages})` : ''}`, !c.lesson && c.pages && `BOOK PAGES CHOSEN BY THE TEACHER: ${c.pages} — base everything on these pages`,
     c.objectives && `PUBLISHER'S LESSON OBJECTIVES: ${c.objectives}`,
     c.notes && `TEACHER'S NOTES: ${c.notes}`,
     '',
