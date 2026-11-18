@@ -5,6 +5,9 @@ import { AiProvider, AiUnavailableError, GenerateRequest, GenerateResult } from 
  * llama.cpp server and most hosted inference services expose (POST {base}/chat/completions, /embeddings).
  * Default and recommended for low marginal cost: e.g. Ollama + qwen2.5:7b-instruct on one GPU.
  */
+/** The service's own error message, short. */
+const said = (t: string) => { try { const j = JSON.parse(t); return String(j.error?.message ?? j.message ?? j.error ?? t).slice(0, 160); } catch { return t.slice(0, 160) || 'no details'; } };
+
 export class OpenAiCompatibleProvider implements AiProvider {
   readonly live = true;
   constructor(private readonly baseUrl: string, readonly model: string, private readonly apiKey: string, private readonly timeoutMs: number, private readonly embedModel = '', readonly name = 'openai-compatible') {}
@@ -25,7 +28,8 @@ export class OpenAiCompatibleProvider implements AiProvider {
       // some services / free models do not support "JSON mode": ask again without it (the prompt asks for JSON anyway)
       if (res.status === 400 && body?.response_format && /response_format|json/i.test(text)) { const { response_format: _r, ...rest } = body; return this.post(path, rest); }
       throw new AiUnavailableError(res.status === 429 ? `${this.name} is busy or its free daily limit is used up — please try again later.`
-        : res.status === 401 || res.status === 403 || /api[ _-]?key/i.test(text) ? `${this.name} did not accept the API key — check that you pasted the whole key for this service.`
+        : res.status === 401 || (res.status === 400 && /api[ _-]?key/i.test(text)) ? `${this.name} did not accept the API key — check that you pasted the whole key for this service. (It said: ${said(text)})`
+        : res.status === 403 ? `${this.name} refused access (403). The key may be fine: some services block requests from certain countries, networks or server hosts, or the key's project does not allow this model. (It said: ${said(text)})`
         : res.status === 404 && /model/i.test(text) ? `${this.name} does not know the model “${this.model}”. Make sure the right service card is selected, or press “Show available models” and pick one.` : `The AI server answered ${res.status}: ${text}`);
     }
     return res.json() as Promise<any>;

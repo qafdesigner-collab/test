@@ -1,3 +1,9 @@
+# What's new in Knowledge Gate 1.3.30
+
+- **AI errors show the service's own reason** (“It said: …”). A refused key (401) is now told apart from **refused access (403)**. A 403 is often not the key at all: the service blocks the server's country or host, or the model needs its terms accepted in the service's console.
+- **Save and use tests the service first.** A service that does not answer is not switched on, so teachers are never left with a broken AI. The same applies to a school's own AI.
+- **Teachers always get a draft.** If the AI service fails (busy, refused, limit used up), the assistant makes an offline draft from the lesson data and says why at the top, instead of showing only an error.
+
 # What's new in Knowledge Gate 1.3.29
 
 - **Choosing the AI model is easier.** AI services (Groq especially) retire and rename models from time to time.

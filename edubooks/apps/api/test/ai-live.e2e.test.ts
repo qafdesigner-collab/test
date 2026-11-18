@@ -63,15 +63,15 @@ describe('Phase 5 — live AI provider (self-hosted, OpenAI-compatible)', () => 
     expect(r.body.usage.inputTokens).toBe(1800);
   });
 
-  it('a down model server gives a clear 503 and the attempt is logged', async () => {
+  it('a down model server still gives the teacher an offline draft, with the reason; the attempt is logged', async () => {
     mode = 'down';
     const r = await teacher.post('/api/ai/generate').send({ task: 'MCQ', editionId: english, lessonId });
-    expect(r.status).toBe(503);
-    expect(r.body.message).toMatch(/AI server answered 500/);
+    expect(r.status).toBe(201); expect(r.body.live).toBe(false);
+    expect(r.body.warnings[0]).toMatch(/could not be used .*answered 500/);
     const owner = require('./helpers').ownerPool();
-    const { rows } = await owner.query(`SELECT status, error FROM ai_generations WHERE task = 'MCQ'`);
+    const { rows } = await owner.query(`SELECT status, error, model FROM ai_generations WHERE task = 'MCQ'`);
     await owner.end();
-    expect(rows).toEqual([{ status: 'ERROR', error: expect.stringMatching(/answered 500/) }]);
+    expect(rows).toEqual([{ status: 'OK', model: 'offline-drafter', error: expect.stringMatching(/answered 500/) }]);
   });
 
   it('enforces the monthly request quota per school', async () => {

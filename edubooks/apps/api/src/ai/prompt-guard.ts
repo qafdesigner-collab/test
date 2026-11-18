@@ -10,8 +10,11 @@ export async function promptGuardScore(o: { baseUrl: string; model: string; apiK
     body: JSON.stringify({ model: o.model, messages: [{ role: 'user', content: text.slice(0, 2000) }] }),
   });
   if (!res.ok) {
-    const t = (await res.text()).slice(0, 200);
-    throw new Error(res.status === 401 || res.status === 403 || /api[ _-]?key/i.test(t) ? 'The safety-check service did not accept the API key.' : `The safety-check service answered ${res.status}: ${t}`);
+    const raw = await res.text(); let t = raw.slice(0, 200);
+    try { const j = JSON.parse(raw); t = String(j.error?.message ?? j.message ?? raw).slice(0, 200); } catch { /* plain text */ }
+    throw new Error(res.status === 401 ? `The safety-check service did not accept the API key. (It said: ${t})`
+      : res.status === 403 ? `The safety-check service refused access (403) — the key may be fine; see what it said: ${t}`
+        : `The safety-check service answered ${res.status}: ${t}`);
   }
   const j: any = await res.json();
   const out = String(j.choices?.[0]?.message?.content ?? '').trim();

@@ -26,6 +26,12 @@ async function suggestModels(p: any): Promise<string[]> {
   try { return (await p.models() as string[]).filter((m) => !/whisper|guard|tts|embed|playai|orpheus|moderation|distil|transcrib|speech|audio|image/i.test(m)).slice(0, 25); } catch { return []; }
 }
 
+/** Saving runs the same small test first; a service that does not answer is not switched on. */
+async function checkWorks(p: any) {
+  try { await p.generate({ system: 'You are a helpful assistant for a school.', user: 'Reply with: OK', maxTokens: 10, json: false }); }
+  catch (e: any) { throw new BadRequestException(`Not saved — the AI service did not work: ${String(e?.message ?? e).slice(0, 300)}`); }
+}
+
 const GUARD_DEFAULT = { baseUrl: 'https://api.groq.com/openai/v1', model: 'meta-llama/llama-prompt-guard-2-86m' };
 class GuardDto {
   @IsOptional() @IsBoolean() enabled?: boolean;
@@ -82,6 +88,7 @@ export class AiSettingsController {
   @Roles('PUBLISHER_ADMIN') @Put()
   async save(@Body() d: AiSettingsDto) {
     const r = this.resolve(d, await this.saved()); const enabled = d.enabled ?? true;
+    if (enabled) await checkWorks(this.ai.build(r)); // never switch on a service that does not answer
     await this.db.q.execute(sql`INSERT INTO publisher_ai_settings (publisher_id, enabled, preset, base_url, model, api_key, updated_by)
       VALUES (${this.db.ctx.publisherId}, ${enabled}, ${r.preset}, ${r.baseUrl}, ${r.model}, ${seal(r.apiKey)}, ${this.db.ctx.userId})
       ON CONFLICT (publisher_id) DO UPDATE SET enabled = EXCLUDED.enabled, preset = EXCLUDED.preset, base_url = EXCLUDED.base_url, model = EXCLUDED.model,
@@ -217,6 +224,7 @@ export class SchoolAiController {
   @Roles('SCHOOL_ADMIN') @Put()
   async save(@Body() d: AiSettingsDto) {
     const r = resolveConn(d, await this.allowed());
+    await checkWorks(this.ai.build(r));
     await this.db.q.execute(sql`UPDATE school_ai_settings SET preset = ${r.preset}, base_url = ${r.baseUrl}, model = ${r.model}, api_key = ${seal(r.apiKey)},
       updated_by = ${this.db.ctx.userId}, updated_at = now() WHERE school_id = ${this.db.ctx.schoolId}`);
     this.ai.invalidate();

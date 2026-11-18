@@ -136,40 +136,42 @@ export class AiService {
       return row.id;
     };
 
-    let raw: any; let tokens = { inputTokens: 0, outputTokens: 0 }; let model = provider.model;
+    let raw: any; let tokens = { inputTokens: 0, outputTokens: 0 }; let model = provider.model; let fallback = '';
     if (!provider.live) {
       raw = offlineDraft(ctx);
     } else {
       const prompt = buildPrompt(ctx);
       let lastError = '';
-      for (let attempt = 0; attempt < 2 && raw === undefined; attempt++) {
+      for (let attempt = 0; attempt < 2 && raw === undefined && !fallback; attempt++) {
         let res;
         try {
           res = await provider.generate({ system: prompt.system, user: attempt ? `${prompt.user}\n\nYour previous answer could not be used (${lastError}). Reply with valid JSON only.` : prompt.user, maxTokens: 4000, json: true });
         } catch (e: any) {
-          const msg = e instanceof AiUnavailableError ? e.message : 'The AI service failed';
-          await this.record503(record, msg);
-          throw new ServiceUnavailableException(msg);
+          // the AI service failed (wrong key, busy, blocked…): the teacher still gets an offline draft, with the reason
+          fallback = e instanceof AiUnavailableError ? e.message : 'The AI service failed';
+          break;
         }
         tokens = { inputTokens: tokens.inputTokens + res.inputTokens, outputTokens: tokens.outputTokens + res.outputTokens }; model = res.model;
         if (res.refused) { await record({ status: 'REFUSED', ...tokens, model }); throw new UnprocessableEntityException('The AI declined this request. Try rephrasing your notes.'); }
         try { raw = normalise(i.task, parseJson(res.text), sources); } catch (e: any) { lastError = e.message; }
       }
-      if (raw === undefined) {
+      if (fallback) raw = offlineDraft(ctx);
+      else if (raw === undefined) {
         await record({ status: 'INVALID', error: lastError, ...tokens, model });
         throw new UnprocessableEntityException(`The AI answer could not be used (${lastError}). Please try again.`);
       }
     }
-    const { output, warnings } = provider.live ? raw : normalise(i.task, raw, sources);
-    if (!provider.live) warnings.unshift('Offline draft: no AI model is configured, so this was assembled from the lesson data only.');
-    const id = await record({ status: 'OK', output, ...tokens, model });
+    const live = provider.live && !fallback;
+    const { output, warnings } = live ? raw : normalise(i.task, raw, sources);
+    if (fallback) warnings.unshift(`The AI service could not be used (${fallback}) — this is an offline draft from the lesson data. Ask your admin to check the AI settings.`);
+    else if (!provider.live) warnings.unshift('Offline draft: no AI model is configured, so this was assembled from the lesson data only.');
+    const id = await record({ status: 'OK', output, ...tokens, model: fallback ? 'offline-drafter' : model, ...(fallback ? { error: fallback } : {}) });
     return {
-      id, task: i.task, provider: provider.name, model, live: provider.live, grounded: sources.length > 0, output, warnings,
+      id, task: i.task, provider: provider.name, model: fallback ? 'offline-drafter' : model, live, grounded: sources.length > 0, output, warnings,
       sources: sources.map((s) => ({ n: s.n, page: s.page, component: s.component, componentId: s.componentId, lesson: s.lesson, snippet: s.text.slice(0, 220) })),
       usage: { ...tokens, usedThisMonth: used + 1, monthlyLimit: limit },
     };
   }
-  private async record503(record: (v: any) => Promise<string>, msg: string) { await record({ status: 'ERROR', error: msg }).catch(() => undefined); }
 
   async history() {
     return this.q.select({ id: aiGenerations.id, task: aiGenerations.task, status: aiGenerations.status, grounded: aiGenerations.grounded, usedAs: aiGenerations.usedAs,
