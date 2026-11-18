@@ -1,3 +1,11 @@
+# What's new in Knowledge Gate 1.3.33
+
+## Automatic OCR
+- When a teacher chooses book pages that have **no text yet** (scanned pages, pictures, or a book that was never read), the platform now **reads those pages with OCR right away** and then makes the draft. The draft notes “… pages were read automatically with OCR”. The text is saved, so the next time it is instant. The same applies to the assignment builder's page-question maker.
+- If the chosen pages still have no words (pictures only), the message says so and suggests other pages or notes.
+- **OCR languages are automatic:** every language installed on the server is used, with English, French, German, Arabic and Urdu first (up to 6 at once). To add a language, the host installs it (e.g. tesseract-ocr-fra, -deu, -ara); no setting is needed. `OCR_LANGS` can still fix a list.
+- **Super admin → AI assistant** shows whether OCR is installed and which languages it reads. When OCR is missing, it says exactly what to ask the hosting company to install.
+
 # What's new in Knowledge Gate 1.3.32
 
 ## AI from flipbook pages too

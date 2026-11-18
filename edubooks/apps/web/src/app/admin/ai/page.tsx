@@ -9,6 +9,8 @@ import { Money, useMoney } from '@/lib/company';
 import { useToast } from '@/components/ui/toast';
 import { PageHeader, Stat, Table, Td } from '@/components/common';
 
+const LANG: Record<string, string> = { eng: 'English', fra: 'French', deu: 'German', ara: 'Arabic', urd: 'Urdu', spa: 'Spanish', hin: 'Hindi', ita: 'Italian', por: 'Portuguese', tur: 'Turkish', fas: 'Persian', chi_sim: 'Chinese' };
+
 export default function AdminAi() {
   const status = useQuery({ queryKey: ['aiStatus'], queryFn: () => api.get('/ai/status') });
   const usage = useQuery({ queryKey: ['aiUsage'], queryFn: () => api.get('/ai/usage') });
@@ -27,6 +29,13 @@ export default function AdminAi() {
         <div className="min-w-0 flex-1"><div className="font-semibold">{s.live ? `${s.provider} · ${s.model}` : 'Offline drafts (no AI model configured)'}</div>
           <div className="text-sm text-slate-500">{s.health.detail}{s.embeddings ? ' · semantic search on' : ' · full-text search'}</div></div>
         {s.health.ok ? <Badge tone="PUBLISHED"><CheckCircle2 className="size-3" />Healthy</Badge> : <Badge tone="danger"><XCircle className="size-3" />Unavailable</Badge>}
+      </Card>
+      <Card className={cn('flex flex-wrap items-center gap-3 p-4 text-sm', s.ocr ? '' : 'border-amber-200 bg-amber-50')}>
+        <span className="text-xl" aria-hidden>{s.ocr ? '🔎' : '⚠️'}</span>
+        <div className="min-w-0 flex-1"><b>OCR — reading pictures of pages:</b> {s.ocr
+          ? <>installed. Scanned pages and flipbook pages are read automatically when a book is uploaded, and again when a teacher chooses pages that have no text. Languages (found automatically): <b>{String(s.ocrLangs || '').split('+').filter(Boolean).map((l: string) => LANG[l] ?? l).join(', ') || '—'}</b>. More languages can be added by your host (e.g. “tesseract-ocr-fra”, “tesseract-ocr-deu”, “tesseract-ocr-ara”); they are used without any setting.</>
+          : 'not installed on this server, so pages that are pictures (scanned PDFs, flipbooks) cannot be read for the AI. Ask your hosting company to install “tesseract-ocr” (with the English, Arabic and Urdu languages) and “poppler-utils”.'}</div>
+        {s.ocr ? <Badge tone="PUBLISHED"><CheckCircle2 className="size-3" />Installed</Badge> : <Badge tone="danger"><XCircle className="size-3" />Not installed</Badge>}
       </Card>
       <ConnectAi />
       <SchoolsAi />

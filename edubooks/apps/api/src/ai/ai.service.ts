@@ -9,6 +9,7 @@ import { AccessService } from '../lms/access.service';
 import { LmsService, cleanItem } from '../lms/lms.service';
 import { config } from '../config';
 import { AiProviderService } from './provider.service';
+import { IndexerService } from './indexer.service';
 import { RetrievalService } from './retrieval.service';
 import { buildPrompt, Context, normalise, parseJson, Task, TASKS } from './tasks';
 import { offlineDraft } from './offline';
@@ -42,7 +43,7 @@ const scrub = (s: string) => s.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[email remov
 export class AiService {
   private readonly log = new Logger('AI');
   constructor(private readonly db: DbService, private readonly audit: AuditService, private readonly access: AccessService, private readonly lms: LmsService,
-    private readonly providers: AiProviderService, private readonly retrieval: RetrievalService) {}
+    private readonly providers: AiProviderService, private readonly retrieval: RetrievalService, private readonly indexer: IndexerService) {}
   private get q() { return this.db.q; }
   private get ctx() { return this.db.ctx; }
 
@@ -54,7 +55,7 @@ export class AiService {
   async status() {
     const p = await this.providers.current();
     return {
-      provider: p.name, model: p.model, live: p.live, embeddings: this.providers.embeddingsEnabled, ocr: (await ocrAvailable()).ok, health: await this.providers.health(),
+      provider: p.name, model: p.model, live: p.live, embeddings: this.providers.embeddingsEnabled, ocr: (await ocrAvailable()).ok, ocrLangs: (await ocrAvailable()).langs, health: await this.providers.health(),
       tasks: Object.entries(TASKS).map(([id, t]) => ({ id, label: t.label, kind: t.kind })),
       ...(this.ctx.schoolId ? { usedThisMonth: await this.usedThisMonth(), monthlyLimit: await this.providers.monthlyLimit(), access: (await this.providers.school()).access } : {}),
     };
@@ -141,9 +142,16 @@ export class AiService {
     if (used >= limit) throw new HttpException(`Your school has used its ${limit} AI requests for this month.`, HttpStatus.TOO_MANY_REQUESTS);
     const meta = await this.lessonContext(i);
     const notes = scrub(i.notes ?? '');
+    // automatic OCR: chosen pages without text (pictures, scans, never indexed) are read now
+    let ocrNote = '';
+    if (meta.pageNumbers && i.componentId) {
+      const o = await this.indexer.ensurePageText(i.componentId, meta.pageNumbers);
+      if (!o.ocr && o.missing.length === meta.pageNumbers.length) throw new BadRequestException(`Pages ${meta.pages} of ${meta.part} have no text yet, and they could not be read automatically: OCR (text recognition) is not installed on the server. Ask your publisher / host to install “tesseract-ocr” and “poppler-utils”.`);
+      if (o.read) ocrNote = `${o.read} page${o.read === 1 ? ' was' : 's were'} read automatically with OCR (text recognition) — check names and spellings in the draft.`;
+    }
     const sources = await this.retrieval.sources({ editionId: i.editionId, lessonId: i.lessonId, unitId: meta.unitId, query: [meta.lesson, meta.unit, meta.objectives, notes].filter(Boolean).join(' '),
       pages: meta.pageNumbers && i.componentId ? { componentId: i.componentId, numbers: meta.pageNumbers } : null });
-    if (meta.pageNumbers && !sources.length) throw new BadRequestException(`No text was found on pages ${meta.pages} of ${meta.part} — the pages may be pictures only, or the book's text is not indexed yet.`);
+    if (meta.pageNumbers && !sources.length) throw new BadRequestException(`No words were found on pages ${meta.pages} of ${meta.part}, even with OCR — these pages may be pictures without text. Choose other pages, or add notes describing what to teach.`);
     const ctx: Context = { task: i.task, ...meta, durationMin: i.durationMin ?? 40, difficulty: i.difficulty ?? 'EASY', count: Math.min(i.count ?? 5, 20), notes, sources };
     const provider = await this.providers.current();
     const started = Date.now();
@@ -188,6 +196,7 @@ export class AiService {
     }
     const live = provider.live && !fallback;
     const { output, warnings } = live ? raw : normalise(i.task, raw, sources);
+    if (ocrNote) warnings.unshift(ocrNote);
     if (fallback) warnings.unshift(`The AI service could not be used (${fallback}) — this is an offline draft from the lesson data. Ask your admin to check the AI settings.`);
     else if (!provider.live) warnings.unshift('Offline draft: no AI model is configured, so this was assembled from the lesson data only.');
     const id = await record({ status: 'OK', output, ...tokens, model: fallback ? 'offline-drafter' : model, ...(fallback ? { error: fallback } : {}) });

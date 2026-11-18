@@ -41,7 +41,8 @@ export const config = {
   ocr: {
     /** OCR for scanned book pages (needs `pdftoppm` + `tesseract` on the server). auto = use it when installed. */
     mode: (process.env.OCR_ENABLED || 'auto') as 'auto' | '1' | '0',
-    langs: process.env.OCR_LANGS || 'eng+urd',
+    /** 'auto' = every language installed on the server (English, French, German, Arabic, Urdu first), or e.g. 'eng+fra'. */
+    langs: process.env.OCR_LANGS || 'auto',
     dpi: Number(process.env.OCR_DPI || 200),
     maxPages: Number(process.env.OCR_MAX_PAGES || 400),
     pageTimeoutMs: Number(process.env.OCR_PAGE_TIMEOUT_MS || 60_000),

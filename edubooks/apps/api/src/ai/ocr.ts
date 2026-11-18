@@ -14,6 +14,7 @@ function run(cmd: string, args: string[], timeout: number): Promise<string> {
   });
 }
 
+const PREFERRED = ['eng', 'fra', 'deu', 'ara', 'urd', 'spa', 'hin'];
 let available: Promise<{ ok: boolean; langs: string }> | undefined;
 /** Detects pdftoppm + tesseract and keeps only the configured languages that are installed. */
 export function ocrAvailable() {
@@ -22,7 +23,10 @@ export function ocrAvailable() {
     try {
       await run('pdftoppm', ['-v'], 5000).catch((e) => { if (/ENOENT/.test(e.message)) throw e; return ''; });
       const installed = (await run('tesseract', ['--list-langs'], 5000)).split('\n').slice(1).map((l) => l.trim());
-      const langs = config.ocr.langs.split('+').filter((l) => installed.includes(l)).join('+');
+      // 'auto': the installed languages, the common ones first (each extra language makes reading slower, so at most 6)
+      const usable = installed.filter((l) => l && !['osd', 'equ', 'snum'].includes(l) && !l.includes('/'));
+      const wanted = config.ocr.langs === 'auto' ? [...PREFERRED.filter((l) => usable.includes(l)), ...usable.filter((l) => !PREFERRED.includes(l))].slice(0, 6) : config.ocr.langs.split('+');
+      const langs = wanted.filter((l) => usable.includes(l)).join('+');
       return { ok: !!langs, langs };
     } catch { return { ok: false, langs: '' }; }
   })();

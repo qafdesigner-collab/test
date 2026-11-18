@@ -71,6 +71,58 @@ export class IndexerService {
     }
   }
 
+  /**
+   * Automatic OCR of chosen pages: pages that have no text yet (pictures / scanned pages, or a book that was never
+   * indexed) are read now, before the AI uses them. Runs with the publisher's rights, writing only the pages' text.
+   */
+  async ensurePageText(componentId: string, numbers: number[]): Promise<{ read: number; missing: number[]; ocr: boolean }> {
+    const ctx = { ...this.db.ctx, staff: true };
+    return this.db.detached(ctx, async () => {
+      const [c] = await this.db.q.select().from(bookComponents).where(eq(bookComponents.id, componentId));
+      if (!c || !numbers.length) return { read: 0, missing: [], ocr: true };
+      const { rows } = await this.db.q.execute(sql`SELECT page_number FROM book_pages WHERE component_id = ${componentId} AND page_number IN ${numbers} AND length(text_content) > 20`);
+      const have = new Set((rows as any[]).map((r) => r.page_number));
+      const missing = numbers.filter((n) => !have.has(n)).slice(0, 30);
+      if (!missing.length) return { read: 0, missing: [], ocr: true };
+      const ocr = await ocrAvailable();
+      if (!ocr.ok) return { read: 0, missing, ocr: false };
+      let found = new Map<number, string>();
+      const dir = await fs.promises.mkdtemp(path.join(appTmp(), 'ocrnow-'));
+      try {
+        if (c.bookAssetId) {
+          const [asset] = await this.db.q.select().from(digitalAssets).where(eq(digitalAssets.id, c.bookAssetId));
+          const pdf = path.join(dir, 'book.pdf');
+          await pipeline(await this.assets.driver.read(asset.storageKey), fs.createWriteStream(pdf));
+          found = await ocrPages(pdf, missing);
+        } else {
+          const fbs = (await this.db.q.select().from(flipbooks).where(eq(flipbooks.componentId, componentId))).filter((f) => f.kind === 'HTML');
+          for (const f of fbs) {
+            const files = await this.db.q.select({ path: flipbookFiles.path }).from(flipbookFiles).where(eq(flipbookFiles.flipbookId, f.id));
+            const pages = detectFlipPages(files.map((x) => x.path)).filter((p) => missing.includes(p.n)); if (!pages.length) continue;
+            const local: { n: number; file: string }[] = [];
+            for (const p of pages) { const file = path.join(dir, `${p.n}${path.extname(p.path) || '.jpg'}`); await pipeline(await this.assets.driver.read(`${f.storagePrefix}/${p.path}`), fs.createWriteStream(file)); local.push({ n: p.n, file }); }
+            found = await ocrImageFiles(local); break;
+          }
+        }
+      } finally { await fs.promises.rm(dir, { recursive: true, force: true }).catch(() => undefined); }
+      const lessons = await this.db.q.select({ id: bookLessons.id, a: bookLessons.pageStart, b: bookLessons.pageEnd }).from(bookLessons)
+        .innerJoin(bookUnits, eq(bookUnits.id, bookLessons.unitId)).where(eq(bookUnits.componentId, componentId));
+      let read = 0;
+      for (const [n, text] of found) {
+        if (text.trim().length <= 20) continue; read++;
+        const l = lessons.find((x) => x.a && n >= x.a && n <= (x.b ?? x.a));
+        await this.db.q.execute(sql`INSERT INTO book_pages (publisher_id, component_id, page_number, text_content, lesson_id) VALUES (${c.publisherId}, ${componentId}, ${n}, ${text.slice(0, 20_000)}, ${l?.id ?? null})
+          ON CONFLICT (component_id, page_number) DO UPDATE SET text_content = EXCLUDED.text_content WHERE length(book_pages.text_content) <= 20`);
+      }
+      if (read) {
+        await this.db.q.execute(sql`UPDATE book_components SET indexed_pages = (SELECT count(*) FROM book_pages WHERE component_id = ${componentId} AND length(text_content) > 20),
+          index_status = 'DONE', index_error = NULL, indexed_at = now() WHERE id = ${componentId}`);
+        this.log.log(`OCR on demand: ${read} page(s) of “${c.title}”`);
+      }
+      return { read, missing: missing.filter((n) => (found.get(n)?.trim().length ?? 0) <= 20), ocr: true };
+    });
+  }
+
   /** A part with only an HTML5 flipbook: its page pictures are read with OCR (text recognition) into book pages. */
   private async runFlipbook(c: typeof bookComponents.$inferSelect) {
     const fbs = (await this.db.q.select().from(flipbooks).where(eq(flipbooks.componentId, c.id))).filter((f) => f.kind === 'HTML')
