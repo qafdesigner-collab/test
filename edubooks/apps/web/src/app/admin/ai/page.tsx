@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Cpu, Download, XCircle } from 'lucide-react';
 import { api, downloadCsv } from '@/lib/api';
@@ -8,8 +8,6 @@ import { AiConnectForm } from '@/components/ai-connect';
 import { Money, useMoney } from '@/lib/company';
 import { useToast } from '@/components/ui/toast';
 import { PageHeader, Stat, Table, Td } from '@/components/common';
-
-const LANG: Record<string, string> = { eng: 'English', fra: 'French', deu: 'German', ara: 'Arabic', urd: 'Urdu', spa: 'Spanish', hin: 'Hindi', ita: 'Italian', por: 'Portuguese', tur: 'Turkish', fas: 'Persian', chi_sim: 'Chinese' };
 
 export default function AdminAi() {
   const status = useQuery({ queryKey: ['aiStatus'], queryFn: () => api.get('/ai/status') });
@@ -30,13 +28,7 @@ export default function AdminAi() {
           <div className="text-sm text-slate-500">{s.health.detail}{s.embeddings ? ' · semantic search on' : ' · full-text search'}</div></div>
         {s.health.ok ? <Badge tone="PUBLISHED"><CheckCircle2 className="size-3" />Healthy</Badge> : <Badge tone="danger"><XCircle className="size-3" />Unavailable</Badge>}
       </Card>
-      <Card className={cn('flex flex-wrap items-center gap-3 p-4 text-sm', s.ocr ? '' : 'border-amber-200 bg-amber-50')}>
-        <span className="text-xl" aria-hidden>{s.ocr ? '🔎' : '⚠️'}</span>
-        <div className="min-w-0 flex-1"><b>OCR — reading pictures of pages:</b> {s.ocr
-          ? <>installed. Scanned pages and flipbook pages are read automatically when a book is uploaded, and again when a teacher chooses pages that have no text. Languages (found automatically): <b>{String(s.ocrLangs || '').split('+').filter(Boolean).map((l: string) => LANG[l] ?? l).join(', ') || '—'}</b>. More languages can be added by your host (e.g. “tesseract-ocr-fra”, “tesseract-ocr-deu”, “tesseract-ocr-ara”); they are used without any setting.</>
-          : 'not installed on this server, so pages that are pictures (scanned PDFs, flipbooks) cannot be read for the AI. Ask your hosting company to install “tesseract-ocr” (with the English, Arabic and Urdu languages) and “poppler-utils”.'}</div>
-        {s.ocr ? <Badge tone="PUBLISHED"><CheckCircle2 className="size-3" />Installed</Badge> : <Badge tone="danger"><XCircle className="size-3" />Not installed</Badge>}
-      </Card>
+      <OcrCard />
       <ConnectAi />
       <SchoolsAi />
       <div className="grid gap-4 sm:grid-cols-4">
@@ -178,5 +170,50 @@ function GuardSettings({ g }: { g: any }) {
       </div>
       <p className="text-xs text-slate-500">If the check service is busy or unreachable, Owl still answers (its other safety rules always apply), so students are never stuck.</p>
     </div>
+  );
+}
+
+/** OCR (reading pictures of pages): its state, and installing it from here — no root or hosting support needed. */
+function OcrCard() {
+  const qc = useQueryClient(); const toast = useToast();
+  const q = useQuery({ queryKey: ['ocr'], queryFn: () => api.get<any>('/ai/ocr'), refetchInterval: (x) => (x.state.data?.install?.state === 'running' ? 2000 : false) });
+  const [langs, setLangs] = useState<string[]>(['eng', 'fra', 'deu', 'ara', 'urd']); const [busy, setBusy] = useState(false); const [showLog, setShowLog] = useState(false); const [more, setMore] = useState(false);
+  const prev = useRef<string | undefined>(undefined);
+  useEffect(() => { const st = q.data?.install?.state; if (prev.current === 'running' && st === 'done') { toast('OCR installed'); qc.invalidateQueries({ queryKey: ['aiStatus'] }); } if (prev.current === 'running' && st === 'failed') toast('OCR installation failed', 'err'); prev.current = st; }, [q.data?.install?.state]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!q.data) return null;
+  const d = q.data; const ins = d.install; const running = ins.state === 'running';
+  const install = async () => { setBusy(true); try { await api.post('/ai/ocr/install', { langs }); qc.invalidateQueries({ queryKey: ['ocr'] }); } catch (e: any) { toast(e.message, 'err'); } finally { setBusy(false); } };
+  const remove = async () => { if (!confirm('Remove the OCR installed by the platform?')) return; try { await api.del('/ai/ocr'); qc.invalidateQueries({ queryKey: ['ocr'] }); toast('OCR removed'); } catch (e: any) { toast(e.message, 'err'); } };
+  return (
+    <Card className={cn('space-y-3 p-4 text-sm', d.available ? '' : 'border-amber-200 bg-amber-50')}>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xl" aria-hidden>{d.available ? '🔎' : '⚠️'}</span>
+        <div className="min-w-0 flex-1"><b>OCR — reading pictures of pages:</b> {d.available
+          ? <>installed{d.own ? ' (by the platform)' : ' (on the server)'}. Scanned pages and flipbook pages are read automatically. Languages: <b>{String(d.langs || '').split('+').filter(Boolean).map((l: string) => d.languages[l] ?? l).join(', ')}</b>.</>
+          : <>not installed yet, so pages that are pictures (scanned PDFs, flipbooks) cannot be read for the AI. Install it here — no technical steps needed.</>}</div>
+        {d.available ? <Badge tone="PUBLISHED"><CheckCircle2 className="size-3" />Installed</Badge> : <Badge tone="danger"><XCircle className="size-3" />Not installed</Badge>}
+      </div>
+      {running ? (
+        <div className="space-y-2 rounded-lg bg-white p-3">
+          <p className="flex items-center gap-2 font-medium text-slate-800"><span className="size-4 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />{ins.step}…</p>
+          <p className="text-xs text-slate-500">This takes about 3–10 minutes. You can leave this page; it continues on the server.</p>
+        </div>
+      ) : (!d.available || d.own || more) && d.linux ? (
+        <div className="space-y-2 rounded-lg bg-white p-3">
+          <p className="font-medium text-slate-800">{d.own ? 'Change the languages (installs again):' : more ? 'Install the platform’s own OCR with these languages (used instead of the server’s):' : 'Languages to read:'}</p>
+          <div className="flex flex-wrap gap-1.5">{Object.entries(d.languages).map(([k, v]: [string, any]) => (
+            <label key={k} className={cn('flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1 ring-1', langs.includes(k) ? 'bg-brand-50 ring-brand-300' : 'ring-slate-200')}>
+              <input type="checkbox" disabled={k === 'eng'} checked={langs.includes(k)} onChange={(e) => setLangs(e.target.checked ? [...langs, k] : langs.filter((x) => x !== k))} />{v}</label>))}</div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="mr-auto text-xs text-slate-500">Downloads Tesseract OCR and Poppler (open source, about 150–300 MB) from conda-forge into the app's own “ocr” folder. It stays after updates.</span>
+            {d.own && <Button size="sm" variant="ghost" onClick={remove}>Remove</Button>}
+            <Button size="sm" loading={busy} onClick={install}>{d.own ? 'Install again' : 'Install OCR'}</Button>
+          </div>
+        </div>
+      ) : d.linux ? <div className="flex justify-end"><Button size="sm" variant="ghost" onClick={() => setMore(true)}>Add more languages…</Button></div> : null}
+      {ins.state === 'failed' && !running && <p className="rounded-lg bg-red-50 p-2 text-red-700">The last installation failed: {ins.error}</p>}
+      {(ins.log?.length ?? 0) > 0 && <button type="button" className="text-xs text-slate-500 underline" onClick={() => setShowLog(!showLog)}>{showLog ? 'Hide' : 'Show'} installation log</button>}
+      {showLog && <pre className="max-h-48 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{(ins.log ?? []).join('\n')}</pre>}
+    </Card>
   );
 }

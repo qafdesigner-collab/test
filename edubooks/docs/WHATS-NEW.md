@@ -1,3 +1,12 @@
+# What's new in Knowledge Gate 1.3.34
+
+## Install OCR from the platform
+- **Super admin → AI assistant → OCR → Install OCR.** Choose the languages (English, French, German, Arabic, Urdu are ticked; Spanish, Hindi, Italian, Turkish, Persian can be added) and press **Install OCR**. No root, SSH or hosting support needed.
+- The platform downloads the official **micromamba** package tool, checks it against its published SHA-256 (a mismatch stops the installation), and installs **Tesseract OCR and Poppler** from **conda-forge**, plus the language packs, into the app's own **ocr** folder (about 150–300 MB). It takes 3–10 minutes, with progress and a log on the page. The folder stays after platform updates.
+- When it finishes, the platform uses it at once: scanned and flipbook pages are read automatically.
+- If the server already has OCR, **Add more languages…** installs the platform's own copy with the chosen languages. **Install again** changes the languages; **Remove** deletes it.
+- Linux servers only (as cPanel is). The server must be allowed to download from github.com, conda.anaconda.org and raw.githubusercontent.com.
+
 # What's new in Knowledge Gate 1.3.33
 
 ## Automatic OCR

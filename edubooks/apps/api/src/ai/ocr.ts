@@ -4,10 +4,14 @@ import * as os from 'os';
 import * as path from 'path';
 import { config } from '../config';
 import { appTmp } from '../common/tmp';
+import { localBin, localTessdata } from './ocr-install';
 
 function run(cmd: string, args: string[], timeout: number): Promise<string> {
+  // OCR installed by the platform itself (Super admin → AI → Install OCR) is used first
+  const own = cmd === 'tesseract' || cmd === 'pdftoppm' ? localBin(cmd) : null; const tessdata = localTessdata();
+  const env: Record<string, string | undefined> = { PATH: process.env.PATH, OMP_THREAD_LIMIT: '1', ...(own && tessdata ? { TESSDATA_PREFIX: tessdata } : {}) };
   return new Promise((resolve, reject) => {
-    execFile(cmd, args, { timeout, maxBuffer: 16 * 1024 * 1024, env: { PATH: process.env.PATH, OMP_THREAD_LIMIT: '1' } }, (err, stdout, stderr) => {
+    execFile(own ?? cmd, args, { timeout, maxBuffer: 16 * 1024 * 1024, env }, (err, stdout, stderr) => {
       if (err) return reject(new Error(err.killed ? `${cmd} timed out` : `${cmd}: ${(stderr || err.message).split('\n')[0].slice(0, 200)}`));
       resolve(stdout);
     });
@@ -15,10 +19,14 @@ function run(cmd: string, args: string[], timeout: number): Promise<string> {
 }
 
 const PREFERRED = ['eng', 'fra', 'deu', 'ara', 'urd', 'spa', 'hin'];
-let available: Promise<{ ok: boolean; langs: string }> | undefined;
+let available: Promise<{ ok: boolean; langs: string }> | undefined; let checkedAt = 0;
+/** Look again (e.g. right after OCR was installed). Every process re-checks within a minute when OCR was missing. */
+export function resetOcr() { available = undefined; }
 /** Detects pdftoppm + tesseract and keeps only the configured languages that are installed. */
 export function ocrAvailable() {
   if (config.ocr.mode === '0') return Promise.resolve({ ok: false, langs: '' });
+  if (available && Date.now() - checkedAt > 60_000) available.then((r) => { if (!r.ok) available = undefined; });
+  checkedAt = available ? checkedAt : Date.now();
   available ??= (async () => {
     try {
       await run('pdftoppm', ['-v'], 5000).catch((e) => { if (/ENOENT/.test(e.message)) throw e; return ''; });

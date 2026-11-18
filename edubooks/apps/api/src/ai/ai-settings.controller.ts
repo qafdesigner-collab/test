@@ -10,6 +10,8 @@ import { open, seal } from '../common/secret-box';
 import { AI_PRESETS, AiProviderService } from './provider.service';
 import { config } from '../config';
 import { promptGuardScore } from './prompt-guard';
+import { installStatus, LANG_NAMES, localBin, startInstall, uninstall } from './ocr-install';
+import { ocrAvailable, resetOcr } from './ocr';
 
 class AiSettingsDto {
   @IsIn(Object.keys(AI_PRESETS)) preset!: string;
@@ -237,6 +239,34 @@ export class SchoolAiController {
     await this.db.q.execute(sql`UPDATE school_ai_settings SET preset = '', base_url = '', model = '', api_key = '', updated_at = now() WHERE school_id = ${this.db.ctx.schoolId}`);
     this.ai.invalidate();
     await this.audit.log('ai.school.own', 'school', this.db.ctx.schoolId!, 'Disconnected the school\'s own AI');
+    return this.get();
+  }
+}
+
+class OcrInstallDto { @IsOptional() @IsIn(Object.keys(LANG_NAMES), { each: true }) langs?: string[]; }
+
+/** Super admin: install OCR from the platform (no root, no host support needed) and see its state. */
+@ApiTags('ai')
+@Controller('ai/ocr')
+export class OcrController {
+  constructor(private readonly db: DbService, private readonly audit: AuditService) {}
+  @Roles('PUBLISHER_ADMIN') @Get()
+  async get() {
+    const a = await ocrAvailable();
+    return { available: a.ok, langs: a.langs, own: !!localBin('tesseract'), install: installStatus(), languages: LANG_NAMES, linux: process.platform === 'linux' };
+  }
+  @Roles('PUBLISHER_ADMIN') @Post('install')
+  async install(@Body() d: OcrInstallDto) {
+    let st;
+    try { st = startInstall(d.langs ?? ['eng', 'fra', 'deu', 'ara', 'urd'], () => resetOcr()); } catch (e: any) { throw new BadRequestException(e.message); }
+    await this.audit.log('ai.ocr.install', 'publisher', this.db.ctx.publisherId, `Started installing OCR (${(st.langs ?? []).join(', ')})`);
+    return { install: st };
+  }
+  @Roles('PUBLISHER_ADMIN') @Delete()
+  async remove() {
+    if (installStatus().state === 'running') throw new BadRequestException('OCR is being installed right now — wait until it has finished.');
+    uninstall(); resetOcr();
+    await this.audit.log('ai.ocr.remove', 'publisher', this.db.ctx.publisherId, 'Removed the OCR installed by the platform');
     return this.get();
   }
 }
