@@ -95,6 +95,8 @@ export class TutorService {
     };
     if (question && UNSAFE.test(question)) return save({ answer: SAFE_REPLY, flagged: true });
     if (question && PERSONAL.test(question)) return save({ answer: PRIVATE_REPLY, flagged: true });
+    // optional safety check (Llama Prompt Guard): attempts to trick Owl never reach the AI model, and teachers see them
+    if (question) { const g = await this.providers.guard(question); if (g?.blocked) return save({ answer: "I'm Owl, and I only help with your book. 🦉 What would you like to know about this page?", flagged: true }); }
     // Owl explains the book; it does not do homework (also when the child pastes a question from their own homework)
     if (question && (HOMEWORK.test(question) || await this.isOwnHomework(question))) return save({ answer: HOMEWORK_REPLY });
 

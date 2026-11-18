@@ -6,6 +6,7 @@ import { open } from '../common/secret-box';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { OpenAiCompatibleProvider } from './providers/openai-compatible.provider';
 import { AiProvider } from './providers/types';
+import { promptGuardScore } from './prompt-guard';
 
 /** The publisher switched AI off for this school. */
 const schoolOff: AiProvider = {
@@ -95,7 +96,27 @@ export class AiProviderService {
     this.cache.set(pub, { at: Date.now(), p });
     return p;
   }
-  invalidate() { this.cache.clear(); this.healthCache.clear(); this.schoolCache.clear(); }
+  private guardCache = new Map<string, { at: number; g: { baseUrl: string; model: string; apiKey: string; threshold: number } | null }>();
+  /**
+   * Safety check of a student's question (prompt attacks / jailbreaks). null when no check is set up, or when the
+   * check service cannot be reached (the other safety rules still apply), so a busy free service never blocks Owl.
+   */
+  async guard(text: string): Promise<{ blocked: boolean; score: number } | null> {
+    const pub = this.db.ctx?.publisherId; if (!pub || !text.trim()) return null;
+    let hit = this.guardCache.get(pub);
+    if (!hit || Date.now() - hit.at > 30_000) {
+      let g: { baseUrl: string; model: string; apiKey: string; threshold: number } | null = null;
+      try {
+        const { rows: [r] } = await this.db.q.execute(sql`SELECT * FROM ai_guard_config()`) as any;
+        if (r?.enabled && r.base_url && r.model) g = { baseUrl: r.base_url, model: r.model, apiKey: open(r.api_key), threshold: Number(r.threshold) || 0.5 };
+      } catch { /* not set up */ }
+      hit = { at: Date.now(), g }; this.guardCache.set(pub, hit);
+    }
+    if (!hit.g) return null;
+    try { const score = await promptGuardScore(hit.g, text); return { blocked: score >= hit.g.threshold, score }; } catch { return null; }
+  }
+
+  invalidate() { this.cache.clear(); this.healthCache.clear(); this.schoolCache.clear(); this.guardCache.clear(); }
 
   async health() {
     const p = await this.current(); const k = `${p.name}|${p.model}`;

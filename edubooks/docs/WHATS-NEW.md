@@ -1,3 +1,12 @@
+# What's new in Knowledge Gate 1.3.28
+
+## 🛡️ Safety check for students: Llama Prompt Guard 2
+- **Super admin → AI assistant → Safety check for students.** It uses `meta-llama/llama-prompt-guard-2-86m`, which is free on Groq.
+- Every question a student types into **Ask Owl** is scored first. Trick questions (“ignore your rules”, “you are now…”) are **blocked before they reach the AI**: Owl answers “I only help with your book” and the question is **flagged** in the teachers' Ask Owl log.
+- Paste a free Groq key (if your main AI is Groq, its key is used automatically) and press **Test**. It scores a normal and a trick question so you can see it working; then **Switch on**. Block level 0.5 is recommended.
+- If the check service is busy or unreachable, Owl still answers with its other safety rules, so students are never stuck.
+- Prompt Guard is a safety checker, not a chat model, so it cannot be the main AI model.
+
 # What's new in Knowledge Gate 1.3.27
 
 ## AI per school, with billing
