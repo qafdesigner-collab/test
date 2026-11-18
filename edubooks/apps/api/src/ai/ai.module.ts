@@ -1,4 +1,4 @@
-import { AiSettingsController } from './ai-settings.controller';
+import { AiSettingsController, SchoolAiAdminController, SchoolAiController } from './ai-settings.controller';
 import { Module } from '@nestjs/common';
 import { LmsModule } from '../lms/lms.module';
 import { AiController } from './ai.controller';
@@ -7,5 +7,5 @@ import { IndexerService } from './indexer.service';
 import { AiProviderService } from './provider.service';
 import { RetrievalService } from './retrieval.service';
 import { TutorController, TutorService } from './tutor';
-@Module({ imports: [LmsModule], controllers: [AiSettingsController, AiController, TutorController], providers: [AiService, IndexerService, AiProviderService, RetrievalService, TutorService], exports: [IndexerService] })
+@Module({ imports: [LmsModule], controllers: [AiSettingsController, SchoolAiAdminController, SchoolAiController, AiController, TutorController], providers: [AiService, IndexerService, AiProviderService, RetrievalService, TutorService], exports: [IndexerService] })
 export class AiModule {}

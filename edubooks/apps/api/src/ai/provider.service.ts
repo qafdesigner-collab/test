@@ -7,6 +7,12 @@ import { AnthropicProvider } from './providers/anthropic.provider';
 import { OpenAiCompatibleProvider } from './providers/openai-compatible.provider';
 import { AiProvider } from './providers/types';
 
+/** The publisher switched AI off for this school. */
+const schoolOff: AiProvider = {
+  name: 'off', model: 'off', live: false,
+  generate: async () => { throw new Error('AI is switched off for this school'); },
+  health: async () => ({ ok: true, detail: 'AI is not switched on for your school — ask your publisher.' }),
+};
 const offline: AiProvider = {
   name: 'offline', model: 'offline-drafter', live: false,
   generate: async () => { throw new Error('offline provider has no model'); },
@@ -52,9 +58,34 @@ export class AiProviderService {
     return new OpenAiCompatibleProvider(s.baseUrl.replace(/\/+$/, ''), s.model, s.apiKey, config.ai.timeoutMs, '', AI_PRESETS[s.preset]?.label ?? s.preset);
   }
 
-  /** The model for the current request's publisher (settings are re-read every 30 s, so all app processes follow a change). */
+  private schoolCache = new Map<string, { at: number; v: { access: 'OFF' | 'PUBLISHER' | 'OWN'; limit: number; own: AiProvider | null } }>();
+  /** The publisher's rules for the current school: AI off / the publisher's AI / the school's own AI, and the monthly limit. */
+  async school() {
+    const sid = this.db.ctx?.schoolId;
+    if (!sid) return { access: 'PUBLISHER' as const, limit: config.ai.monthlyRequestsPerSchool, own: null };
+    const hit = this.schoolCache.get(sid); if (hit && Date.now() - hit.at < 30_000) return hit.v;
+    let v: { access: 'OFF' | 'PUBLISHER' | 'OWN'; limit: number; own: AiProvider | null } = { access: 'PUBLISHER', limit: config.ai.monthlyRequestsPerSchool, own: null };
+    try {
+      const { rows: [r] } = await this.db.q.execute(sql`SELECT * FROM school_ai_config()`) as any;
+      if (r) {
+        const own = r.access === 'OWN' && r.base_url && r.model ? this.build({ preset: r.preset, baseUrl: r.base_url, model: r.model, apiKey: open(r.api_key) }) : null;
+        // a school paying for its own AI service has no limit unless the publisher set one
+        v = { access: r.access, limit: r.monthly_limit ?? (r.access === 'OWN' ? 1_000_000_000 : config.ai.monthlyRequestsPerSchool), own };
+      }
+    } catch { /* keep the defaults */ }
+    this.schoolCache.set(sid, { at: Date.now(), v });
+    return v;
+  }
+  async monthlyLimit() { return (await this.school()).limit; }
+
+  /** The model for the current request (settings are re-read every 30 s, so all app processes follow a change). */
   async current(): Promise<AiProvider> {
     const pub = this.db.ctx?.publisherId; if (!pub) return this.provider;
+    if (this.db.ctx?.schoolId) {
+      const sc = await this.school();
+      if (sc.access === 'OFF') return schoolOff;
+      if (sc.access === 'OWN' && sc.own) return sc.own;
+    }
     const hit = this.cache.get(pub); if (hit && Date.now() - hit.at < 30_000) return hit.p;
     let p = this.provider;
     try {
@@ -64,7 +95,7 @@ export class AiProviderService {
     this.cache.set(pub, { at: Date.now(), p });
     return p;
   }
-  invalidate() { this.cache.clear(); this.healthCache.clear(); }
+  invalidate() { this.cache.clear(); this.healthCache.clear(); this.schoolCache.clear(); }
 
   async health() {
     const p = await this.current(); const k = `${p.name}|${p.model}`;

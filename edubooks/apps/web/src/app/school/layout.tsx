@@ -1,5 +1,5 @@
 'use client';
-import { ArrowLeftRight, School, GraduationCap, KeyRound, LayoutDashboard, Users, CalendarDays, HeartHandshake, UserCheck, Clock, Award, LineChart, FileText, MessagesSquare, Bird, Building, Mail , ListChecks } from 'lucide-react';
+import { ArrowLeftRight, School, GraduationCap, KeyRound, LayoutDashboard, Users, CalendarDays, HeartHandshake, UserCheck, Clock, Award, LineChart, FileText, MessagesSquare, Bird, Building, Mail , ListChecks, Sparkles } from 'lucide-react';
 import { Shell } from '@/components/shell';
 
 const NAV = [
@@ -7,6 +7,7 @@ const NAV = [
   { href: '/school/insights', label: 'Insights', icon: LineChart },
   { href: '/school/mail', label: 'Mail', icon: Mail },
   { href: '/school/messages', label: 'Messages', icon: MessagesSquare },
+  { href: '/school/ai', label: 'AI', icon: Sparkles },
   { href: '/school/tutor', label: 'Ask Owl (AI tutor)', icon: Bird },
   { href: '/school/classes', label: 'Classes', icon: School },
   { href: '/school/attendance', label: 'Attendance', icon: UserCheck },

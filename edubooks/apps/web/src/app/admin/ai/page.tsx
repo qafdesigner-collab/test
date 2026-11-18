@@ -1,9 +1,11 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Cpu, Download, XCircle } from 'lucide-react';
 import { api, downloadCsv } from '@/lib/api';
-import { Badge, Button, Card, Field, Input, PageLoader, cn } from '@/components/ui';
+import { Badge, Button, Card, Dialog, Field, Input, PageLoader, cn } from '@/components/ui';
+import { AiConnectForm } from '@/components/ai-connect';
+import { Money, useMoney } from '@/lib/company';
 import { useToast } from '@/components/ui/toast';
 import { PageHeader, Stat, Table, Td } from '@/components/common';
 
@@ -27,6 +29,7 @@ export default function AdminAi() {
         {s.health.ok ? <Badge tone="PUBLISHED"><CheckCircle2 className="size-3" />Healthy</Badge> : <Badge tone="danger"><XCircle className="size-3" />Unavailable</Badge>}
       </Card>
       <ConnectAi />
+      <SchoolsAi />
       <div className="grid gap-4 sm:grid-cols-4">
         <Stat label="Requests this month" value={sum('requests')} /><Stat label="Approved by teachers" value={sum('approved')} tone="green" sub="used as plan / homework / bank" />
         <Stat label="Grounded in book pages" value={sum('requests') ? `${Math.round((sum('grounded') / sum('requests')) * 100)}%` : '—'} />
@@ -41,56 +44,87 @@ export default function AdminAi() {
   );
 }
 
-/**
- * Connect an AI service from here: free plans (Google Gemini, Groq, OpenRouter) need only a free API key from
- * their website; or your own model server. Test first, then save. The key is stored encrypted and never shown again.
- */
+/** The publisher's own AI connection (used by every school set to “Uses your AI”). */
 function ConnectAi() {
-  const qc = useQueryClient(); const toast = useToast();
   const q = useQuery({ queryKey: ['aiSettings'], queryFn: () => api.get<any>('/ai/settings') });
-  const [f, setF] = useState({ preset: 'gemini', baseUrl: '', model: '', apiKey: '' });
-  const [test, setTest] = useState<any>(null); const [busy, setBusy] = useState<'' | 'test' | 'save' | 'off'>('');
-  useEffect(() => { if (q.data) setF({ preset: q.data.preset, baseUrl: q.data.baseUrl, model: q.data.model || q.data.presets[q.data.preset]?.model || '', apiKey: '' }); }, [q.data]);
-  if (!q.data) return null;
-  const P = q.data.presets; const cur = P[f.preset]; const own = f.preset === 'custom' || f.preset === 'ollama';
-  const body = { preset: f.preset, baseUrl: own ? f.baseUrl : undefined, model: f.model, apiKey: f.apiKey || undefined };
-  const run = async (kind: 'test' | 'save' | 'off') => {
-    setBusy(kind); if (kind !== 'off') setTest(null);
-    try {
-      if (kind === 'test') setTest(await api.post('/ai/settings/test', body));
-      else if (kind === 'save') { await api.put('/ai/settings', body); toast('AI connected — teachers and Ask Owl now use it'); }
-      else { await api.del('/ai/settings'); toast('AI service disconnected'); }
-      if (kind !== 'test') ['aiSettings', 'aiStatus'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
-    } catch (e: any) { toast(e.message, 'err'); } finally { setBusy(''); }
-  };
+  if (!q.data) return null; const d = q.data;
   return (
     <Card className="space-y-4 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div><h2 className="font-semibold text-slate-900">Connect an AI service</h2>
-          <p className="text-sm text-slate-500">Free plans need only a free API key from the service’s website. Without a service, teachers get offline drafts, and the page-question maker always works for free.</p></div>
-        {q.data.enabled && <Badge tone="PUBLISHED"><CheckCircle2 className="size-3" />Connected: {P[q.data.preset]?.label} · {q.data.model}</Badge>}
-      </div>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5" role="radiogroup" aria-label="AI service">
-        {Object.entries(P).map(([k, p]: [string, any]) => (
-          <button key={k} type="button" role="radio" aria-checked={f.preset === k} onClick={() => { setF({ ...f, preset: k, model: p.model, baseUrl: k === q.data.preset ? q.data.baseUrl : p.baseUrl, apiKey: '' }); setTest(null); }}
-            className={cn('rounded-xl border p-3 text-left text-sm transition', f.preset === k ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500' : 'border-slate-200 hover:bg-slate-50')}>
-            <b className="block text-slate-900">{p.label}</b><span className="text-xs text-slate-500">{k === 'ollama' ? 'free · needs own server' : k === 'custom' ? 'any compatible service' : 'free API key'}</span>
-          </button>))}
-      </div>
-      <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{cur.note}{cur.keyUrl && <> Get the key: <a className="font-medium text-brand-700 underline" href={cur.keyUrl} target="_blank" rel="noopener noreferrer">{cur.keyUrl.replace('https://', '')}</a></>}</p>
-      <div className="grid gap-3 md:grid-cols-3">
-        {own && <Field label="Server address"><Input value={f.baseUrl} onChange={(e) => setF({ ...f, baseUrl: e.target.value })} placeholder={cur.baseUrl || 'https://…/v1'} /></Field>}
-        <Field label="Model" hint="Change only if the service renamed it"><Input value={f.model} onChange={(e) => setF({ ...f, model: e.target.value })} placeholder={cur.model} /></Field>
-        <Field label="API key" hint={q.data.hasKey && q.data.preset === f.preset ? `Saved key ${q.data.keyHint} — leave empty to keep it` : own ? 'Only if your server needs one' : 'Paste the free key'}>
-          <Input type="password" autoComplete="off" value={f.apiKey} onChange={(e) => setF({ ...f, apiKey: e.target.value })} placeholder={q.data.hasKey && q.data.preset === f.preset ? q.data.keyHint : 'Paste key here'} /></Field>
-      </div>
-      {test && <p className={cn('rounded-lg p-3 text-sm', test.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700')}>{test.ok ? `✅ Works — the AI answered “${test.reply}” in ${(test.ms / 1000).toFixed(1)} s. Press Save to use it.` : `❌ ${test.error}`}</p>}
-      <div className="flex flex-wrap justify-end gap-2">
-        {q.data.enabled && <Button variant="ghost" loading={busy === 'off'} onClick={() => run('off')}>Disconnect</Button>}
-        <Button variant="secondary" loading={busy === 'test'} onClick={() => run('test')}>Test connection</Button>
-        <Button loading={busy === 'save'} onClick={() => run('save')}>Save and use</Button>
-      </div>
-      <p className="text-xs text-slate-500">Used by the teacher AI assistant (lesson plans, worksheets, questions) and Ask Owl for students. Book text and the teacher’s or student’s question are sent to the chosen service (the platform does not add names or logins). Each school’s monthly AI limit still applies.</p>
+      <div><h2 className="font-semibold text-slate-900">Connect an AI service</h2>
+        <p className="text-sm text-slate-500">Free plans need only a free API key from the service’s website. Without a service, teachers get offline drafts, and the page-question maker always works for free.</p></div>
+      <AiConnectForm presets={d.presets} endpoint="/ai/settings" invalidate={['aiSettings', 'aiStatus', 'aiSchools']}
+        saved={{ preset: d.preset, baseUrl: d.baseUrl, model: d.model, hasKey: d.hasKey, keyHint: d.keyHint, connected: d.enabled }} />
+      <p className="text-xs text-slate-500">Used by the teacher AI assistant and Ask Owl in every school set to “Uses your AI” below. Book text and the teacher’s or student’s question are sent to the chosen service (the platform does not add names or logins).</p>
     </Card>
+  );
+}
+
+const ACCESS: Record<string, { label: string; tone: string }> = { OFF: { label: '⛔ AI off', tone: 'neutral' }, PUBLISHER: { label: '✨ Uses your AI', tone: 'info' }, OWN: { label: '🔑 School’s own AI', tone: 'PUBLISHED' } };
+
+/** AI for each school: off / your AI / the school's own AI, with a monthly request limit and a monthly AI fee (billing). */
+function SchoolsAi() {
+  const q = useQuery({ queryKey: ['aiSchools'], queryFn: () => api.get<any>('/ai/schools') });
+  const money = useMoney(); const [edit, setEdit] = useState<any>(null); const [search, setSearch] = useState('');
+  if (!q.data) return null;
+  const list = q.data.schools.filter((s: any) => !search || `${s.name} ${s.code}`.toLowerCase().includes(search.toLowerCase()));
+  const billed = q.data.schools.filter((s: any) => s.access !== 'OFF' && s.feeMinor);
+  const total = billed.reduce((n: number, s: any) => n + Number(s.feeMinor), 0);
+  const csv = () => downloadCsv(`ai-billing-${new Date().toISOString().slice(0, 7)}.csv`, q.data.schools.map((s: any) => ({ school: s.name, code: s.code, ai: ACCESS[s.access].label.replace(/^\S+ /, ''),
+    requestsThisMonth: s.usedThisMonth, monthlyLimit: s.access === 'OWN' && s.monthlyLimit == null ? 'unlimited' : s.monthlyLimit ?? q.data.defaultLimit, monthlyFee: s.feeMinor == null ? '' : (s.feeMinor / 100).toFixed(2), note: s.billingNote })));
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+        <div><h2 className="font-semibold text-slate-900">AI for schools & billing</h2>
+          <p className="text-xs text-slate-500">Switch AI on or off per school, let a school use its own AI key, set a monthly request limit and a monthly AI fee. {billed.length > 0 && <>AI fees this month: <b>{money.main(total)}</b> from {billed.length} school{billed.length === 1 ? '' : 's'}.</>}</p></div>
+        <div className="flex gap-2"><Input className="h-9 w-48" placeholder="Search school" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search school" />
+          <Button size="sm" variant="secondary" onClick={csv}><Download className="size-4" />Billing CSV</Button></div>
+      </div>
+      <div className="overflow-x-auto"><table className="w-full text-sm">
+        <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-5 py-2">School</th><th className="px-3 py-2">AI</th><th className="px-3 py-2">Requests this month</th><th className="px-3 py-2">Monthly fee</th><th className="px-3 py-2" /></tr></thead>
+        <tbody className="divide-y divide-slate-100">{list.map((s: any) => {
+          const limit = s.access === 'OWN' && s.monthlyLimit == null ? null : s.monthlyLimit ?? q.data.defaultLimit;
+          return (<tr key={s.id}>
+            <td className="px-5 py-2.5"><span className="font-medium text-slate-900">{s.name}</span> <span className="font-mono text-xs text-slate-500">{s.code}</span>{s.isDemo && <Badge className="ml-1">demo</Badge>}</td>
+            <td className="px-3 py-2.5"><Badge tone={ACCESS[s.access].tone}>{ACCESS[s.access].label}</Badge>{s.access === 'OWN' && <span className="block text-xs text-slate-500">{s.ownConnected ? `connected · ${s.ownModel}` : 'not connected yet — uses your AI until then'}</span>}</td>
+            <td className="px-3 py-2.5 tabular-nums">{s.usedThisMonth} / {limit ?? '∞'}{limit ? <div className="mt-1 h-1.5 w-28 overflow-hidden rounded-full bg-slate-100"><div className={cn('h-full rounded-full', s.usedThisMonth >= limit ? 'bg-red-500' : 'bg-violet-500')} style={{ width: `${Math.min(100, (s.usedThisMonth / limit) * 100)}%` }} /></div> : null}</td>
+            <td className="px-3 py-2.5">{s.feeMinor == null ? <span className="text-slate-400">—</span> : <Money v={s.feeMinor} inline />}{s.billingNote && <span className="block text-xs text-slate-500">{s.billingNote}</span>}</td>
+            <td className="px-3 py-2.5 text-right"><Button size="sm" variant="ghost" onClick={() => setEdit(s)}>Edit</Button></td>
+          </tr>);
+        })}</tbody></table></div>
+      {edit && <SchoolAiDialog s={edit} defaultLimit={q.data.defaultLimit} onClose={() => setEdit(null)} />}
+    </Card>
+  );
+}
+
+function SchoolAiDialog({ s, defaultLimit, onClose }: { s: any; defaultLimit: number; onClose: () => void }) {
+  const qc = useQueryClient(); const toast = useToast(); const money = useMoney();
+  const [f, setF] = useState({ access: s.access, limit: s.monthlyLimit == null ? '' : String(s.monthlyLimit), fee: s.feeMinor == null ? '' : String(s.feeMinor / 100), note: s.billingNote ?? '' });
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try {
+      await api.put(`/ai/schools/${s.id}`, { access: f.access, monthlyLimit: f.limit === '' ? null : Math.max(0, Math.round(Number(f.limit))), feeMinor: f.fee === '' ? null : Math.round(Number(f.fee) * 100), billingNote: f.note });
+      toast('Saved'); qc.invalidateQueries({ queryKey: ['aiSchools'] }); onClose();
+    } catch (e: any) { toast(e.message, 'err'); setBusy(false); }
+  };
+  return (
+    <Dialog open onOpenChange={onClose} title={`AI for ${s.name}`} description="Changes apply to the school's teachers and students within a minute.">
+      <div className="space-y-4">
+        <div className="grid gap-2" role="radiogroup" aria-label="AI for this school">
+          {[['PUBLISHER', '✨ Uses your AI', 'Teachers and students use the AI you connected. Counts against the limit below.'],
+            ['OWN', '🔑 School’s own AI', 'The school admin connects the school’s own AI key (free plans available). They pay their AI service; you can still charge a fee.'],
+            ['OFF', '⛔ AI off', 'No AI for this school. The free page-question maker and offline drafts still work.']].map(([k, l, h]) => (
+            <button key={k} type="button" role="radio" aria-checked={f.access === k} onClick={() => setF({ ...f, access: k })}
+              className={cn('rounded-xl border p-3 text-left text-sm', f.access === k ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500' : 'border-slate-200 hover:bg-slate-50')}>
+              <b className="block">{l}</b><span className="text-xs text-slate-500">{h}</span></button>))}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="AI requests per month" hint={f.access === 'OWN' ? 'Empty = unlimited (their own key)' : `Empty = default (${defaultLimit})`}><Input type="number" min={0} value={f.limit} onChange={(e) => setF({ ...f, limit: e.target.value })} placeholder={f.access === 'OWN' ? 'unlimited' : String(defaultLimit)} /></Field>
+          <Field label={`Monthly AI fee (${money.finance.currency})`} hint="For your billing; empty = no fee"><Input type="number" min={0} step="0.01" value={f.fee} onChange={(e) => setF({ ...f, fee: e.target.value })} placeholder="0.00" /></Field>
+        </div>
+        <Field label="Billing note" hint="Optional, e.g. “AI add-on, paid yearly”"><Input value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} /></Field>
+        <div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button loading={busy} onClick={save}>Save</Button></div>
+      </div>
+    </Dialog>
   );
 }

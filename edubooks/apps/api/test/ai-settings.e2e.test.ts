@@ -69,3 +69,38 @@ describe('Super admin connects a free AI service', () => {
     expect((await teacher.post('/api/ai/chat').send({ message: 'hello' })).status).toBe(503);
   });
 });
+
+describe('AI per school: the publisher decides, a school may connect its own AI', () => {
+  let app: any; let admin: any; let teacher: any; let principal: any; let school: string;
+  beforeAll(async () => {
+    const { createApp, login } = require('./helpers');
+    app = await createApp();
+    admin = await login(app, 'admin', 'Admin@12345'); teacher = await login(app, 'teacher1', 'Teacher@12345', 'SUN01'); principal = await login(app, 'principal', 'School@12345', 'SUN01');
+    school = (await admin.get('/api/ai/schools')).body.schools.find((s: any) => s.code === 'SUN01').id;
+    await admin.put('/api/ai/settings').send({ preset: 'custom', baseUrl: base, model: 'free-model', apiKey: 'free-key-1234' });
+  });
+  afterAll(async () => { await admin.put(`/api/ai/schools/${school}`).send({ access: 'PUBLISHER' }); await admin.delete('/api/ai/settings'); await app.close(); });
+
+  it('off for a school; a monthly limit and fee; the school\'s own service when allowed', async () => {
+    expect((await teacher.get('/api/ai/status')).body).toMatchObject({ live: true, model: 'free-model', access: 'PUBLISHER' });
+    // AI off for this school
+    expect((await admin.put(`/api/ai/schools/${school}`).send({ access: 'OFF' })).status).toBe(200);
+    expect((await teacher.post('/api/ai/chat').send({ message: 'hello' })).body.message).toMatch(/not switched on for your school/);
+    // the school may not connect its own AI unless allowed
+    expect((await principal.put('/api/school/ai').send({ preset: 'custom', baseUrl: base, model: 'free-model', apiKey: 'free-key-1234' })).status).toBe(403);
+    expect((await teacher.put(`/api/ai/schools/${school}`).send({ access: 'OWN' })).status).toBe(403);
+    // allowed: own AI, with a limit and a monthly fee for billing
+    expect((await admin.put(`/api/ai/schools/${school}`).send({ access: 'OWN', monthlyLimit: 500, feeMinor: 15000, billingNote: 'AI add-on' })).status).toBe(200);
+    expect((await principal.get('/api/school/ai')).body).toMatchObject({ access: 'OWN', monthlyLimit: 500, own: null });
+    const t = (await principal.post('/api/school/ai/test').send({ preset: 'custom', baseUrl: base, model: 'free-model', apiKey: 'free-key-1234' })).body;
+    expect(t.ok).toBe(true);
+    const saved = (await principal.put('/api/school/ai').send({ preset: 'custom', baseUrl: base, model: 'free-model', apiKey: 'free-key-1234' })).body;
+    expect(saved.own).toMatchObject({ model: 'free-model', keyHint: '••••1234' }); expect(JSON.stringify(saved)).not.toContain('free-key-1234');
+    expect((await teacher.get('/api/ai/status')).body).toMatchObject({ live: true, monthlyLimit: 500, access: 'OWN' });
+    expect((await teacher.post('/api/ai/chat').send({ message: 'hello' })).status).toBe(201);
+    const row = (await admin.get('/api/ai/schools')).body.schools.find((s: any) => s.id === school);
+    expect(row).toMatchObject({ access: 'OWN', monthlyLimit: 500, feeMinor: 15000, billingNote: 'AI add-on', ownConnected: true });
+    expect(row.usedThisMonth).toBeGreaterThan(0);
+    expect((await principal.delete('/api/school/ai')).body.own).toBeNull();
+  });
+});

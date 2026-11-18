@@ -107,7 +107,7 @@ export class TutorService {
     const provider = await this.providers.current();
     const monthly = await this.one(sql`SELECT (SELECT count(*) FROM ai_generations WHERE school_id = ${this.ctx.schoolId} AND created_at >= date_trunc('month', now()))
       + (SELECT count(*) FROM tutor_messages WHERE school_id = ${this.ctx.schoolId} AND live AND created_at >= date_trunc('month', now())) AS n`);
-    if (!provider.live || Number(monthly.n) >= config.ai.monthlyRequestsPerSchool) return save(this.offline(d.mode, question, sources, d.page));
+    if (!provider.live || Number(monthly.n) >= await this.providers.monthlyLimit()) return save(this.offline(d.mode, question, sources, d.page));
 
     const system = [
       `You are Owl, a kind, patient reading helper for a young child (${comp.grade ?? 'primary school'}). You help ONLY with the book "${comp.book}".`,

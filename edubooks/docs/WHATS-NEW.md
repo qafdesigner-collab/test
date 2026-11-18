@@ -1,3 +1,18 @@
+# What's new in Knowledge Gate 1.3.27
+
+## AI per school, with billing
+- **Super admin → AI assistant → AI for schools & billing**: one row per school, showing its AI setting, requests this month (with a bar towards the limit) and monthly fee. **Edit** a school to choose:
+  - **✨ Uses your AI**: the AI you connected above.
+  - **🔑 School's own AI**: the school admin connects the school's own AI key (free plans available). Until they do, your AI is used.
+  - **⛔ AI off**: no AI for that school. The free page-question maker and offline drafts still work.
+  - **AI requests per month** (empty = default; for “own AI”, empty = unlimited), **monthly AI fee** in your currency, and a **billing note**.
+- The total of AI fees for the month is shown, and **Billing CSV** downloads all schools with requests, limits and fees.
+- Changes reach the school within a minute and are recorded in the Audit Log.
+
+## School admins: AI page
+- **School admin → AI** shows the school's AI setting, requests this month and the model in use.
+- When the publisher allows **School's own AI**, the school admin connects its own service here: Gemini, Groq or OpenRouter (free keys), its own server, or another service. **Test connection**, then **Save and use**. The key is encrypted and never shown again.
+
 # What's new in Knowledge Gate 1.3.26
 
 ## Free AI — connect it yourself

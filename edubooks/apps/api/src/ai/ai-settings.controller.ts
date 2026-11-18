@@ -1,12 +1,14 @@
-import { BadRequestException, Body, Controller, Delete, Get, Post, Put } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Post, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import { sql } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
 import { Roles } from '../common/decorators';
 import { AuditService } from '../audit/audit.service';
 import { open, seal } from '../common/secret-box';
 import { AI_PRESETS, AiProviderService } from './provider.service';
+import { config } from '../config';
 
 class AiSettingsDto {
   @IsIn(Object.keys(AI_PRESETS)) preset!: string;
@@ -70,6 +72,100 @@ export class AiSettingsController {
     await this.db.q.execute(sql`DELETE FROM publisher_ai_settings WHERE publisher_id = ${this.db.ctx.publisherId}`);
     this.ai.invalidate();
     await this.audit.log('ai.settings', 'publisher', this.db.ctx.publisherId, 'Disconnected the AI service');
+    return this.get();
+  }
+}
+
+class SchoolAiDto {
+  @IsIn(['OFF', 'PUBLISHER', 'OWN']) access!: 'OFF' | 'PUBLISHER' | 'OWN';
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(10_000_000) monthlyLimit?: number | null;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) feeMinor?: number | null;
+  @IsOptional() @IsString() @MaxLength(300) billingNote?: string;
+}
+const usageSql = (schoolId: string | ReturnType<typeof sql>) => sql`(SELECT count(*) FROM ai_generations g WHERE g.school_id = ${schoolId} AND g.created_at >= date_trunc('month', now()))
+  + (SELECT count(*) FROM tutor_messages t WHERE t.school_id = ${schoolId} AND t.live AND t.created_at >= date_trunc('month', now()))`;
+const resolveConn = (d: AiSettingsDto, prev?: { preset: string; api_key: string }) => {
+  const p = AI_PRESETS[d.preset];
+  const baseUrl = (d.preset === 'custom' || d.preset === 'ollama' ? d.baseUrl || p.baseUrl : p.baseUrl).trim().replace(/\/+$/, '');
+  if (!/^https?:\/\/[^\s/]+/i.test(baseUrl)) throw new BadRequestException('Enter the address of the AI service (it starts with https://)');
+  const apiKey = d.apiKey?.trim() || (prev && prev.preset === d.preset ? open(prev.api_key) : '');
+  if (!['ollama', 'custom'].includes(d.preset) && !apiKey) throw new BadRequestException('Paste the free API key from the service’s website');
+  return { preset: d.preset, baseUrl, model: d.model.trim() || p.model, apiKey };
+};
+
+/** Super admin: AI for each school — off / the publisher's AI / the school's own AI — with monthly limit and fee (billing). */
+@ApiTags('ai')
+@Controller('ai/schools')
+export class SchoolAiAdminController {
+  constructor(private readonly db: DbService, private readonly ai: AiProviderService, private readonly audit: AuditService) {}
+  @Roles('PUBLISHER_ADMIN', 'PUBLISHER_SALES') @Get()
+  async list() {
+    const { rows } = await this.db.q.execute(sql`SELECT s.id, s.name, s.code, s.is_demo AS "isDemo", coalesce(a.access, 'PUBLISHER') AS access, a.monthly_limit AS "monthlyLimit", a.fee_minor::float8 AS "feeMinor",
+        coalesce(a.billing_note, '') AS "billingNote", (a.access = 'OWN' AND a.base_url <> '') AS "ownConnected", nullif(a.model, '') AS "ownModel", nullif(a.preset, '') AS "ownPreset",
+        (${usageSql(sql`s.id`)})::int AS "usedThisMonth"
+      FROM schools s LEFT JOIN school_ai_settings a ON a.school_id = s.id ORDER BY s.name`);
+    return { defaultLimit: config.ai.monthlyRequestsPerSchool, schools: rows };
+  }
+  @Roles('PUBLISHER_ADMIN') @Put(':id')
+  async set(@Param('id', new ParseUUIDPipe()) id: string, @Body() d: SchoolAiDto) {
+    const { rows: [sc] } = await this.db.q.execute(sql`SELECT id, name FROM schools WHERE id = ${id}`) as any;
+    if (!sc) throw new NotFoundException('School not found');
+    await this.db.q.execute(sql`INSERT INTO school_ai_settings (school_id, publisher_id, access, monthly_limit, fee_minor, billing_note, updated_by)
+      VALUES (${id}, ${this.db.ctx.publisherId}, ${d.access}, ${d.monthlyLimit ?? null}, ${d.feeMinor ?? null}, ${(d.billingNote ?? '').trim()}, ${this.db.ctx.userId})
+      ON CONFLICT (school_id) DO UPDATE SET access = EXCLUDED.access, monthly_limit = EXCLUDED.monthly_limit, fee_minor = EXCLUDED.fee_minor,
+        billing_note = EXCLUDED.billing_note, updated_by = EXCLUDED.updated_by, updated_at = now()`);
+    this.ai.invalidate();
+    const label = { OFF: 'AI off', PUBLISHER: 'uses the publisher’s AI', OWN: 'school’s own AI' }[d.access];
+    await this.audit.log('ai.school', 'school', id, `${sc.name}: ${label}${d.monthlyLimit != null ? `, ${d.monthlyLimit} requests/month` : ''}${d.feeMinor != null ? `, fee ${(d.feeMinor / 100).toFixed(2)}/month` : ''}`, undefined, d, id);
+    return { ok: true };
+  }
+}
+
+/** School admin: see the school's AI, and connect the school's own AI service when the publisher allows it. */
+@ApiTags('ai')
+@Controller('school/ai')
+export class SchoolAiController {
+  constructor(private readonly db: DbService, private readonly ai: AiProviderService, private readonly audit: AuditService) {}
+  private async row() {
+    const { rows: [r] } = await this.db.q.execute(sql`SELECT * FROM school_ai_settings WHERE school_id = ${this.db.ctx.schoolId}`) as any;
+    return r as any;
+  }
+  @Roles('SCHOOL_ADMIN') @Get()
+  async get() {
+    const r = await this.row(); const sc = await this.ai.school(); const pub = await this.ai.current();
+    const { rows: [u] } = await this.db.q.execute(sql`SELECT (${usageSql(this.db.ctx.schoolId!)})::int AS n`) as any;
+    return { access: r?.access ?? 'PUBLISHER', monthlyLimit: sc.limit >= 1_000_000_000 ? null : sc.limit, usedThisMonth: u.n, presets: AI_PRESETS,
+      using: pub.live ? { name: pub.name, model: pub.model } : null,
+      own: r?.base_url ? { preset: r.preset, baseUrl: r.base_url, model: r.model, hasKey: !!r.api_key, keyHint: r.api_key ? `••••${open(r.api_key).slice(-4)}` : '' } : null };
+  }
+  private async allowed() {
+    const r = await this.row();
+    if (r?.access !== 'OWN') throw new ForbiddenException('Your publisher has not allowed this school to connect its own AI service. Please ask them.');
+    return r;
+  }
+  @Roles('SCHOOL_ADMIN') @Post('test')
+  async test(@Body() d: AiSettingsDto) {
+    const r = resolveConn(d, await this.allowed()); const p = this.ai.build(r); const t = Date.now();
+    try {
+      const out = await p.generate({ system: 'You are a helpful assistant for a school.', user: 'Reply with exactly: OK, I am ready to help teachers.', maxTokens: 30, json: false });
+      return { ok: true, reply: out.text.trim().slice(0, 200), model: out.model, ms: Date.now() - t };
+    } catch (e: any) { return { ok: false, error: String(e?.message ?? e).slice(0, 300) }; }
+  }
+  @Roles('SCHOOL_ADMIN') @Put()
+  async save(@Body() d: AiSettingsDto) {
+    const r = resolveConn(d, await this.allowed());
+    await this.db.q.execute(sql`UPDATE school_ai_settings SET preset = ${r.preset}, base_url = ${r.baseUrl}, model = ${r.model}, api_key = ${seal(r.apiKey)},
+      updated_by = ${this.db.ctx.userId}, updated_at = now() WHERE school_id = ${this.db.ctx.schoolId}`);
+    this.ai.invalidate();
+    await this.audit.log('ai.school.own', 'school', this.db.ctx.schoolId!, `Connected the school's own AI: ${AI_PRESETS[r.preset].label} · ${r.model}`);
+    return this.get();
+  }
+  @Roles('SCHOOL_ADMIN') @Delete()
+  async remove() {
+    await this.allowed();
+    await this.db.q.execute(sql`UPDATE school_ai_settings SET preset = '', base_url = '', model = '', api_key = '', updated_at = now() WHERE school_id = ${this.db.ctx.schoolId}`);
+    this.ai.invalidate();
+    await this.audit.log('ai.school.own', 'school', this.db.ctx.schoolId!, 'Disconnected the school\'s own AI');
     return this.get();
   }
 }

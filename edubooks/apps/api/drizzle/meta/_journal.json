@@ -351,6 +351,13 @@
       "when": 1795110000000,
       "tag": "0049_ai_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1795140000000,
+      "tag": "0050_school_ai",
+      "breakpoints": true
     }
   ]
 }

@@ -39,7 +39,7 @@ export class AiService {
     return {
       provider: p.name, model: p.model, live: p.live, embeddings: this.providers.embeddingsEnabled, ocr: (await ocrAvailable()).ok, health: await this.providers.health(),
       tasks: Object.entries(TASKS).map(([id, t]) => ({ id, label: t.label, kind: t.kind })),
-      ...(this.ctx.schoolId ? { usedThisMonth: await this.usedThisMonth(), monthlyLimit: config.ai.monthlyRequestsPerSchool } : {}),
+      ...(this.ctx.schoolId ? { usedThisMonth: await this.usedThisMonth(), monthlyLimit: await this.providers.monthlyLimit(), access: (await this.providers.school()).access } : {}),
     };
   }
 
@@ -73,9 +73,10 @@ export class AiService {
    */
   async chat(d: { message: string; history?: { role: 'user' | 'assistant'; text: string }[]; editionId?: string }) {
     const used = await this.usedThisMonth();
-    if (used >= config.ai.monthlyRequestsPerSchool) throw new HttpException(`Your school has used its ${config.ai.monthlyRequestsPerSchool} AI requests for this month.`, HttpStatus.TOO_MANY_REQUESTS);
+    const limit = await this.providers.monthlyLimit();
+    if (used >= limit) throw new HttpException(`Your school has used its ${limit} AI requests for this month.`, HttpStatus.TOO_MANY_REQUESTS);
     const provider = await this.providers.current();
-    if (!provider.live) throw new ServiceUnavailableException('No AI service is connected yet. Ask the super admin to connect one (AI assistant → Connect an AI service — free plans are available).');
+    if (!provider.live) throw new ServiceUnavailableException(provider.name === 'off' ? 'AI is not switched on for your school. Please ask your school admin or publisher.' : 'No AI service is connected yet. Ask the super admin (or your school admin) to connect one — free plans are available.');
     const message = scrub(d.message).slice(0, 4000);
     let book = ''; let sources: any[] = [];
     if (d.editionId) {
@@ -102,7 +103,7 @@ export class AiService {
       if (res.refused) { await log({ status: 'REFUSED' }); throw new UnprocessableEntityException('The AI declined this request. Try asking in a different way.'); }
       const text = res.text.trim();
       await log({ status: 'OK', text, inTok: res.inputTokens, outTok: res.outputTokens, model: res.model });
-      return { text, model: res.model, pages: sources.map((x) => x.page), remaining: Math.max(0, config.ai.monthlyRequestsPerSchool - used - 1) };
+      return { text, model: res.model, pages: sources.map((x) => x.page), remaining: Math.max(0, limit - used - 1) };
     } catch (e: any) {
       if (e instanceof UnprocessableEntityException) throw e;
       const msg = e instanceof AiUnavailableError ? e.message : 'The AI service failed';
@@ -113,7 +114,8 @@ export class AiService {
   async generate(i: GenerateInput) {
     if (!TASKS[i.task]) throw new BadRequestException('Unknown task');
     const used = await this.usedThisMonth();
-    if (used >= config.ai.monthlyRequestsPerSchool) throw new HttpException(`Your school has used its ${config.ai.monthlyRequestsPerSchool} AI requests for this month.`, HttpStatus.TOO_MANY_REQUESTS);
+    const limit = await this.providers.monthlyLimit();
+    if (used >= limit) throw new HttpException(`Your school has used its ${limit} AI requests for this month.`, HttpStatus.TOO_MANY_REQUESTS);
     const meta = await this.lessonContext(i);
     const notes = scrub(i.notes ?? '');
     const sources = await this.retrieval.sources({ editionId: i.editionId, lessonId: i.lessonId, unitId: meta.unitId, query: [meta.lesson, meta.unit, meta.objectives, notes].filter(Boolean).join(' ') });
@@ -164,7 +166,7 @@ export class AiService {
     return {
       id, task: i.task, provider: provider.name, model, live: provider.live, grounded: sources.length > 0, output, warnings,
       sources: sources.map((s) => ({ n: s.n, page: s.page, component: s.component, componentId: s.componentId, lesson: s.lesson, snippet: s.text.slice(0, 220) })),
-      usage: { ...tokens, usedThisMonth: used + 1, monthlyLimit: config.ai.monthlyRequestsPerSchool },
+      usage: { ...tokens, usedThisMonth: used + 1, monthlyLimit: limit },
     };
   }
   private async record503(record: (v: any) => Promise<string>, msg: string) { await record({ status: 'ERROR', error: msg }).catch(() => undefined); }
