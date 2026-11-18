@@ -3,7 +3,7 @@ import { visibleFor } from '../common/visibility';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { ValidateNested, ArrayMaxSize, IsArray, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 import { sql } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
 import { AccessService } from '../lms/access.service';
@@ -13,6 +13,12 @@ import { AiService } from './ai.service';
 import { IndexerService } from './indexer.service';
 import { TASKS } from './tasks';
 
+class ChatTurn { @IsIn(['user', 'assistant']) role!: 'user' | 'assistant'; @IsString() @MaxLength(6000) text!: string; }
+class ChatDto {
+  @IsString() @MaxLength(4000) message!: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @ValidateNested({ each: true }) @Type(() => ChatTurn) history?: ChatTurn[];
+  @IsOptional() @IsUUID() editionId?: string;
+}
 class GenerateDto {
   @IsIn(Object.keys(TASKS)) task: keyof typeof TASKS;
   @IsUUID() editionId: string;
@@ -62,6 +68,8 @@ export class AiController {
     return { items, pages: rows.map((x) => ({ page: x.page, hasText: withText.some((w) => w.page === x.page) })), source: 'built-in', warnings };
   }
   @Roles('TEACHER', 'SCHOOL_ADMIN', 'PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Get('status') status() { return this.ai.status(); }
+  /** Teachers' open assistant (research, question papers, anything for teaching). Students have Ask Owl only. */
+  @Roles('TEACHER', 'SCHOOL_ADMIN') @Throttle({ default: { limit: 20, ttl: 60_000 } }) @Post('chat') chat(@Body() d: ChatDto) { return this.ai.chat(d); }
   @Roles('TEACHER') @Throttle({ default: { limit: Number(process.env.AI_RATE_LIMIT_PER_MIN || 10), ttl: 60_000 } })
   @Post('generate') generate(@Body() d: GenerateDto) { return this.ai.generate(d); }
   @Roles('TEACHER') @Get('generations') history() { return this.ai.history(); }

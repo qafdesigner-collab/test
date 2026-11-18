@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { use, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ArrowLeftRight, GraduationCap, Pencil, Search, UserPlus } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, Undo2, GraduationCap, Pencil, Search, UserPlus } from 'lucide-react';
 import { api, fmtDate, fmtDay } from '@/lib/api';
 import { useAction } from '@/lib/hooks';
 import { Badge, Button, Card, Dialog, ErrorBox, Field, Input, PageLoader, Select, Textarea } from '@/components/ui';
@@ -76,7 +76,7 @@ export default function PoolPage({ params }: { params: Promise<{ id: string }> }
         <Card>
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3"><h2 className="font-semibold">Seat holders ({holders.length})</h2>
             <label className="flex items-center gap-1.5 text-xs text-slate-500"><input type="checkbox" checked={showEnded} onChange={(e) => setShowEnded(e.target.checked)} />history</label></div>
-          {isStudent && <p className="border-b border-slate-100 bg-amber-50 px-5 py-2 text-xs text-amber-800">Student seats can be moved to another student only with the publisher&apos;s approval — use “Transfer”.</p>}
+          {isStudent && <p className="border-b border-slate-100 bg-amber-50 px-5 py-2 text-xs text-amber-800">Given a book to the wrong student? Use “Undo” within {p.undoDays ?? 7} days. After that, a student seat moves to another student only with the publisher&apos;s approval — use “Transfer”.</p>}
           <ul className="max-h-[28rem] divide-y divide-slate-100 overflow-y-auto">
             {[...holders, ...(showEnded ? history : [])].map((a: any) => (
               <li key={a.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
@@ -84,6 +84,8 @@ export default function PoolPage({ params }: { params: Promise<{ id: string }> }
                 <span className="flex-1"><span className="font-medium">{a.displayName}</span> <span className="font-mono text-xs text-slate-500">{a.username}</span>
                   {a.endReason && <span className="block text-xs text-slate-500">{a.endReason}{a.endedAt && ` · ${fmtDate(a.endedAt)}`}</span>}</span>
                 <Status s={a.status} />{a.pendingTransfer && <Badge tone="DRAFT">transfer pending</Badge>}
+                {a.status === 'ACTIVE' && live && isStudent && !a.pendingTransfer && Date.now() - new Date(a.assignedAt).getTime() < (p.undoDays ?? 7) * 864e5 &&
+                  <Button size="sm" variant="ghost" onClick={() => setRelease(a)} title={`Given by mistake? You can take it back within ${p.undoDays ?? 7} days.`}><Undo2 className="size-4" />Undo</Button>}
                 {a.status === 'ACTIVE' && live && (isStudent
                   ? !a.pendingTransfer && <Button size="sm" variant="ghost" onClick={() => setTransfer(a)}><ArrowLeftRight className="size-4" />Transfer</Button>
                   : <Button size="sm" variant="ghost" onClick={() => setRelease(a)}>Release</Button>)}
@@ -94,7 +96,7 @@ export default function PoolPage({ params }: { params: Promise<{ id: string }> }
         </Card>
       </div>
       {transfer && <TransferDialog a={transfer} candidates={eligible.data ?? []} onClose={() => setTransfer(null)} />}
-      {release && <ReleaseDialog a={release} onClose={() => setRelease(null)} />}
+      {release && <ReleaseDialog a={release} student={isStudent} onClose={() => setRelease(null)} />}
       {editGrades && grades.data && <GradesDialog poolId={id} data={grades.data} onClose={() => setEditGrades(false)} />}
     </div>
   );
@@ -113,14 +115,15 @@ function TransferDialog({ a, candidates, onClose }: { a: any; candidates: any[];
     </Dialog>
   );
 }
-function ReleaseDialog({ a, onClose }: { a: any; onClose: () => void }) {
+function ReleaseDialog({ a, student, onClose }: { a: any; student?: boolean; onClose: () => void }) {
   const [reason, setReason] = useState('');
-  const m = useAction(() => api.post(`/school/assignments/${a.id}/release`, { reason }), { ok: 'Seat released', keys: ['schoolPool', 'eligible', 'schoolPools', 'schoolOverview'], after: onClose });
+  const m = useAction(() => api.post(`/school/assignments/${a.id}/release`, { reason }), { ok: student ? 'Book taken back — the seat is free again' : 'Seat released', keys: ['schoolPool', 'eligible', 'schoolPools', 'schoolOverview'], after: onClose });
   return (
-    <Dialog open onOpenChange={onClose} title={`Release ${a.displayName}'s teacher seat?`} description="The teacher loses access to these books and the seat becomes free for another teacher.">
+    <Dialog open onOpenChange={onClose} title={student ? `Undo: take the book back from ${a.displayName}?` : `Release ${a.displayName}'s teacher seat?`}
+      description={student ? 'The student loses access to these books at once and the seat becomes free to give to the right student. Their homework and marks are kept.' : 'The teacher loses access to these books and the seat becomes free for another teacher.'}>
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
         <Field label="Reason (optional)"><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Teaching another class now" /></Field>
-        <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button variant="danger" loading={m.isPending}>Release seat</Button></div>
+        <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button variant="danger" loading={m.isPending}>{student ? 'Undo — take book back' : 'Release seat'}</Button></div>
       </form>
     </Dialog>
   );

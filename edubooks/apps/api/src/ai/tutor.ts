@@ -26,6 +26,10 @@ const PERSONAL = /([\w.+-]+@[\w-]+\.[\w.]+)|(\+?\d[\d\s-]{7,}\d)|\b(my address|i
 const SAFE_REPLY = "That sounds like something to talk about with a grown-up you trust, like your teacher or your family. 💛 Shall we get back to your book? 📚";
 const PRIVATE_REPLY = "Please don't share your phone number, address, email or passwords here. Keep them safe! 🔒 What would you like to know about your book?";
 
+/** Asking Owl to do schoolwork instead of explaining the book. */
+const HOMEWORK = /\b(do|solve|answer|complete|finish|write|make)\b[^.?!]{0,30}\b(my|our|the|this|these)\b[^.?!]{0,20}\b(home ?work|assignment|worksheet|test|exam|quiz|essay|paragraph|story|project|questions?\s*\d*|exercise)\b|\banswers?\s+(of|for|to)\s+(q(uestion)?\.?\s*\d+|my|the|this|all|these)\b|\b(give|tell|send)\s+me\s+(the|all)?\s*answers?\b|\bhome ?work\b/i;
+const HOMEWORK_REPLY = "I can't do your homework for you — but I can help you understand it! 🦉 Tap “Explain this page”, or ask me what a word or idea in your book means.";
+const words = (t: string) => new Set(t.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 2));
 const OUT_BLOCK = /(https?:\/\/|www\.)/i;
 const tidy = (s: string) => s.replace(/https?:\/\/\S+/g, '').replace(/\s+\n/g, '\n').trim().slice(0, 900);
 
@@ -57,6 +61,15 @@ export class TutorService {
     return { enabled: s.enabled, remaining: s.enabled ? Math.max(0, s.dailyLimit - (await this.usedToday())) : 0 };
   }
 
+  /** True when the question is (mostly) the text of a question in homework / tests set for this student recently. */
+  private async isOwnHomework(question: string) {
+    const q = words(question); if (q.size < 4) return false;
+    const items = await this.rows(sql`SELECT i.prompt FROM assessment_items i JOIN assessments a ON a.id = i.assessment_id
+      JOIN enrolments e ON e.class_id = a.class_id AND e.student_id = ${this.ctx.userId}
+      WHERE a.status = 'PUBLISHED' AND a.created_at > now() - interval '120 days' LIMIT 500`);
+    return items.some((it: any) => { const p = words(String(it.prompt)); if (p.size < 4) return false; let n = 0; for (const w of p) if (q.has(w)) n++; return n / p.size >= 0.7; });
+  }
+
   /** Text of the page the pupil is looking at, plus the page either side. */
   private async pageText(componentId: string, page: number) {
     return this.rows(sql`SELECT page_number AS page, text_content AS text FROM book_pages WHERE component_id = ${componentId} AND page_number BETWEEN ${page - 1} AND ${page + 1} AND length(text_content) > 10 ORDER BY page_number`);
@@ -82,6 +95,8 @@ export class TutorService {
     };
     if (question && UNSAFE.test(question)) return save({ answer: SAFE_REPLY, flagged: true });
     if (question && PERSONAL.test(question)) return save({ answer: PRIVATE_REPLY, flagged: true });
+    // Owl explains the book; it does not do homework (also when the child pastes a question from their own homework)
+    if (question && (HOMEWORK.test(question) || await this.isOwnHomework(question))) return save({ answer: HOMEWORK_REPLY });
 
     const near = await this.pageText(d.componentId, d.page);
     const extra = d.mode === 'ASK' ? await this.retrieval.sources({ editionId: d.editionId, query: question }) : [];
@@ -96,10 +111,10 @@ export class TutorService {
 
     const system = [
       `You are Owl, a kind, patient reading helper for a young child (${comp.grade ?? 'primary school'}). You help ONLY with the book "${comp.book}".`,
-      'Use ONLY the BOOK PAGES given. If the answer is not in them, say kindly that the book does not say, and suggest asking the teacher.',
+      'Use ONLY the BOOK PAGES given. If the answer is not in them, or the question is not about this book, say kindly that you can only help with this book, and suggest asking the teacher. Do not answer general questions from outside the book.',
       'Use very simple words and short sentences (at most 5 sentences). Be warm and encouraging. You may use one or two emojis.',
       'Never ask for or mention personal information. Never give links. Never talk about violence, adult topics or anything unsafe; instead suggest talking to a trusted grown-up.',
-      'Do not do homework for the child: give hints and explain ideas, but do not just give answers to worksheet questions.',
+      'Never do homework, tests, worksheets, essays or projects for the child and never give their answers. Explain the ideas in the book and give small hints instead.',
       'Reply with JSON only.',
     ].join('\n');
     const shape = d.mode === 'QUIZ'

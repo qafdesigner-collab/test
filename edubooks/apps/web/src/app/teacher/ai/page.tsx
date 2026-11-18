@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/common';
 import { BookScope } from '@/components/book-scope';
 import { ItemEditor } from '@/components/item-editor';
 import { AiNotices, SourceChips } from '@/components/ai-bits';
+import { AiChat } from '@/components/ai-chat';
 
 const GROUPS: [string, string[]][] = [
   ['Plan', ['LESSON_PLAN']], ['Questions', ['HOMEWORK', 'WORKSHEET', 'MCQ', 'SHORT', 'FILL_BLANK', 'TRUE_FALSE', 'ASSESSMENT']],
@@ -25,6 +26,7 @@ function Assistant() {
   const status = useQuery({ queryKey: ['aiStatus'], queryFn: () => api.get('/ai/status') });
   const history = useQuery({ queryKey: ['aiHistory'], queryFn: () => api.get('/ai/generations') });
   const [f, setF] = useState({ editionId: params.get('editionId'), lessonId: params.get('lessonId'), task: params.get('task') ?? 'LESSON_PLAN', durationMin: 40, difficulty: 'EASY', count: 6, notes: '' });
+  const [mode, setMode] = useState<'ask' | 'book'>(params.get('task') || params.get('editionId') ? 'book' : 'ask');
   const [r, setR] = useState<any>(null); const [out, setOut] = useState<any>(null); const [useDlg, setUseDlg] = useState<'' | 'ASSESSMENT'>('');
   const gen = useAction(() => api.post('/ai/generate', { ...f, lessonId: f.lessonId || undefined }), { keys: ['aiHistory', 'aiStatus'], after: (res) => { setR(res); setOut(res.output); } });
   const use = useAction((v: { as: string; classId?: string }) => api.post(`/ai/generations/${r.id}/use`, { ...v, output: out, title: out.title }), {
@@ -35,11 +37,17 @@ function Assistant() {
   const s = status.data;
   return (
     <div className="space-y-6">
-      <PageHeader title="AI teaching assistant" sub="Drafts lesson plans, homework, worksheets and activities from the pages of your licensed books. You review and edit everything before it is used.">
+      <PageHeader title="AI teaching assistant" sub="Ask the AI anything for your teaching — research, question papers, plans, letters — or make lesson plans, homework and questions from the pages of your books. You review everything before it is used.">
         {s && <Badge tone={s.live ? 'info' : 'DRAFT'}>{s.live ? `Model: ${s.model}` : 'Offline drafts (no AI model configured)'}</Badge>}
         {s?.monthlyLimit && <Badge>{s.usedThisMonth} / {s.monthlyLimit} requests this month</Badge>}
       </PageHeader>
       {s && !s.health.ok && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">The AI server is not available: {s.health.detail}</div>}
+      <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="AI mode">
+        {([['ask', '💬 Ask AI anything'], ['book', '📚 From my book (plans, homework, questions)']] as const).map(([k, l]) => (
+          <button key={k} type="button" role="tab" aria-selected={mode === k} onClick={() => setMode(k)}
+            className={mode === k ? 'rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white' : 'rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200'}>{l}</button>))}
+      </div>
+      {mode === 'ask' ? <AiChat live={!!s?.live} /> : <>
       <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
         <Card className="h-fit space-y-4 p-5">
           <BookScope editionId={f.editionId} lessonId={f.lessonId} onChange={(v) => setF({ ...f, ...v })} required />
@@ -121,6 +129,7 @@ function Assistant() {
         </div>
       </div>
       {useDlg && <ClassPicker onClose={() => setUseDlg('')} onPick={(classId) => { setUseDlg(''); use.mutate({ as: 'ASSESSMENT', classId }); }} />}
+      </>}
     </div>
   );
 }

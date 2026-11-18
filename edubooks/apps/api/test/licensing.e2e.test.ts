@@ -159,6 +159,8 @@ describe('Phase 3 — products, orders & licensing rules', () => {
       const from = pool.assignments.find((a: any) => a.status === 'ACTIVE');
       const holderIds = pool.assignments.map((a: any) => a.userId);
       const to = students.find((s) => !holderIds.includes(s.id));
+      // given more than 7 days ago: the school can no longer undo it
+      await owner.query(`UPDATE license_assignments SET created_at = now() - interval '10 days' WHERE id = $1`, [from.id]);
       expect((await principal.post(`/api/school/assignments/${from.id}/release`).send({})).status).toBe(403);
       const t = await principal.post('/api/school/transfers').send({ assignmentId: from.id, toUserId: to.id, reason: 'Student moved to another city' });
       expect(t.status).toBe(201);

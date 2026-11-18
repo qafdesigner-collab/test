@@ -41,8 +41,8 @@ describe('AI tutor for students', () => {
     expect((await student.get('/api/tutor/status')).body).toMatchObject({ enabled: false });
     expect((await ask({ mode: 'EXPLAIN' })).status).toBe(403);
     expect((await teacher.put('/api/tutor/settings').send({ enabled: true })).status).toBe(403);
-    expect((await principal.put('/api/tutor/settings').send({ enabled: true, dailyLimit: 5 })).body).toMatchObject({ enabled: true, dailyLimit: 5 });
-    expect((await student.get('/api/tutor/status')).body).toMatchObject({ enabled: true, remaining: 5 });
+    expect((await principal.put('/api/tutor/settings').send({ enabled: true, dailyLimit: 7 })).body).toMatchObject({ enabled: true, dailyLimit: 7 });
+    expect((await student.get('/api/tutor/status')).body).toMatchObject({ enabled: true, remaining: 7 });
   });
 
   it('answers from the book, keeps children safe and lets teachers see the questions', async () => {
@@ -59,6 +59,11 @@ describe('AI tutor for students', () => {
     const priv = await ask({ mode: 'ASK', question: 'my phone is 0300 1234567 call me' });
     expect(priv.body.answer).toMatch(/don't share/);
     expect(calls.length).toBe(n); // never sent to the model
+    // Owl does not do homework — the request never reaches the model
+    const hw = await ask({ mode: 'ASK', question: 'please do my homework for me' });
+    expect(hw.body.answer).toMatch(/can't do your homework/); expect(calls.length).toBe(n);
+    expect((await ask({ mode: 'ASK', question: 'give me the answers' })).body.answer).toMatch(/can't do your homework/);
+    expect(calls.length).toBe(n);
     reply = { answer: 'Visit https://evil.example for more', pages: [] };
     expect((await ask({ mode: 'ASK', question: 'what is on this page?' })).body.answer).not.toMatch(/https?:/);
     reply = { answer: 'Quiz time!', quiz: [{ q: 'A is for?', options: ['apple', 'ball', 'cat'], answer: 0 }, { q: 'bad', options: ['x'], answer: 3 }], pages: [2] };

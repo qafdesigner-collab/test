@@ -56,7 +56,16 @@ describe('Super admin connects a free AI service', () => {
     // asked with JSON mode first, then again without it when the service refused
     expect(calls.slice(before).map((c) => !!c.response_format)).toEqual([true, false]);
 
+    // teachers: open assistant for any teaching task (plain text, not limited to the book); students cannot use it
+    const chat = await teacher.post('/api/ai/chat').send({ message: 'Make a 10-question paper on plants for grade 2 with an answer key', history: [{ role: 'user', text: 'Hi' }, { role: 'assistant', text: 'Hello!' }] });
+    expect(chat.status).toBe(201); expect(chat.body.text.length).toBeGreaterThan(5);
+    expect(calls.at(-1).response_format).toBeUndefined(); expect(calls.at(-1).messages[1].content).toContain('plants');
+    const withBook = await teacher.post('/api/ai/chat').send({ message: 'Ideas for teaching the letter A', editionId: english });
+    expect(withBook.status).toBe(201); expect(calls.at(-1).messages[1].content).toContain('KG English');
+    const { login } = require('./helpers'); const student = await login(app, 'student1', 'Student@123', 'SUN01');
+    expect((await student.post('/api/ai/chat').send({ message: 'do my homework' })).status).toBe(403);
     expect((await admin.delete('/api/ai/settings')).status).toBe(200);
     expect((await teacher.get('/api/ai/status')).body.live).toBe(false);
+    expect((await teacher.post('/api/ai/chat').send({ message: 'hello' })).status).toBe(503);
   });
 });

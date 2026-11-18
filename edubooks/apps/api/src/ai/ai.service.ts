@@ -66,6 +66,50 @@ export class AiService {
     return { book: ed.title, grade: ed.grade, subject: ed.subject, part, unit, lesson, objectives, pages, unitId };
   }
 
+  /**
+   * Teachers' open assistant: any teaching task (research, lesson ideas, question papers, rubrics, letters to
+   * parents…), not limited to the book. A book can be added for context. Students never reach this (they only
+   * have Ask Owl, which answers from their book and does not do homework).
+   */
+  async chat(d: { message: string; history?: { role: 'user' | 'assistant'; text: string }[]; editionId?: string }) {
+    const used = await this.usedThisMonth();
+    if (used >= config.ai.monthlyRequestsPerSchool) throw new HttpException(`Your school has used its ${config.ai.monthlyRequestsPerSchool} AI requests for this month.`, HttpStatus.TOO_MANY_REQUESTS);
+    const provider = await this.providers.current();
+    if (!provider.live) throw new ServiceUnavailableException('No AI service is connected yet. Ask the super admin to connect one (AI assistant → Connect an AI service — free plans are available).');
+    const message = scrub(d.message).slice(0, 4000);
+    let book = ''; let sources: any[] = [];
+    if (d.editionId) {
+      await this.access.assertEdition(d.editionId);
+      const { rows: [ed] } = await this.q.execute(sql`SELECT b.title, g.name AS grade, s.name AS subject FROM book_editions e JOIN book_packages b ON b.id = e.package_id
+        LEFT JOIN grades g ON g.id = b.grade_id LEFT JOIN subjects s ON s.id = b.subject_id WHERE e.id = ${d.editionId}`) as any;
+      sources = await this.retrieval.sources({ editionId: d.editionId, query: message });
+      book = `\n\nThe teacher is working with the book "${ed?.title}" (${[ed?.grade, ed?.subject].filter(Boolean).join(', ')}). Relevant pages from it:\n${sources.map((x) => `[page ${x.page}${x.component ? `, ${x.component}` : ''}] ${x.text.slice(0, 1500)}`).join('\n\n')}\nUse these pages where they help and mention the page numbers you used.`;
+    }
+    const system = ['You are a helpful, knowledgeable assistant for school teachers (early years and primary).',
+      'Help with any teaching work: research and explanations of topics, lesson plans, question papers and answer keys, worksheets, rubrics, activities, differentiation, report comments, letters and messages to parents, classroom management.',
+      'Write clearly with headings and lists where useful. Be accurate; if you are not sure about a fact, say so. Keep content suitable for a school.'].join('\n');
+    const history = (d.history ?? []).slice(-8).map((h) => `${h.role === 'user' ? 'Teacher' : 'Assistant'}: ${h.text.slice(0, 3000)}`).join('\n\n');
+    const user = `${history ? `Conversation so far:\n${history}\n\n` : ''}Teacher: ${message}${book}`;
+    const started = Date.now(); const tenant = { ...this.ctx };
+    const log = (v: { status: string; text?: string; error?: string; inTok?: number; outTok?: number; model?: string }) => {
+      const write = () => this.q.insert(aiGenerations).values({ publisherId: this.ctx.publisherId, schoolId: this.ctx.schoolId!, userId: this.ctx.userId, task: 'CHAT', editionId: d.editionId ?? null,
+        provider: provider.name, model: v.model ?? provider.model, params: { message: message.slice(0, 500) }, sources: sources.map(({ n, page, component }) => ({ n, page, component })), grounded: sources.length > 0,
+        output: v.text ? { text: v.text } : null, status: v.status, error: v.error ?? null, inputTokens: v.inTok ?? 0, outputTokens: v.outTok ?? 0, latencyMs: Date.now() - started });
+      return v.status === 'OK' ? write() : this.db.detached(tenant, write);
+    };
+    try {
+      const res = await provider.generate({ system, user, maxTokens: 3000, json: false });
+      if (res.refused) { await log({ status: 'REFUSED' }); throw new UnprocessableEntityException('The AI declined this request. Try asking in a different way.'); }
+      const text = res.text.trim();
+      await log({ status: 'OK', text, inTok: res.inputTokens, outTok: res.outputTokens, model: res.model });
+      return { text, model: res.model, pages: sources.map((x) => x.page), remaining: Math.max(0, config.ai.monthlyRequestsPerSchool - used - 1) };
+    } catch (e: any) {
+      if (e instanceof UnprocessableEntityException) throw e;
+      const msg = e instanceof AiUnavailableError ? e.message : 'The AI service failed';
+      await log({ status: 'ERROR', error: msg }); throw new ServiceUnavailableException(msg);
+    }
+  }
+
   async generate(i: GenerateInput) {
     if (!TASKS[i.task]) throw new BadRequestException('Unknown task');
     const used = await this.usedThisMonth();
@@ -130,7 +174,7 @@ export class AiService {
       createdAt: aiGenerations.createdAt, provider: aiGenerations.provider, model: aiGenerations.model,
       title: sql<string | null>`${aiGenerations.output}->>'title'`,
       lesson: sql<string | null>`(SELECT 'Lesson ' || l.number || ': ' || l.title FROM book_lessons l WHERE l.id = ${aiGenerations.lessonId})` })
-      .from(aiGenerations).where(eq(aiGenerations.userId, this.ctx.userId)).orderBy(desc(aiGenerations.createdAt)).limit(50);
+      .from(aiGenerations).where(and(eq(aiGenerations.userId, this.ctx.userId), sql`${aiGenerations.task} <> 'CHAT'`)).orderBy(desc(aiGenerations.createdAt)).limit(50);
   }
 
   async get(id: string) {

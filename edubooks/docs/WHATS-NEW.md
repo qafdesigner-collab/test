@@ -1,3 +1,23 @@
+# What's new in Knowledge Gate 1.3.26
+
+## Free AI — connect it yourself
+- **Super admin → AI assistant → Connect an AI service.** Choose **Google Gemini**, **Groq** or **OpenRouter** (all have free plans: get a free API key on their website and paste it), your **own server** (Ollama / LM Studio), or any OpenAI-compatible service.
+- **Test connection** first, then **Save and use**. The key is stored encrypted and never shown again, only its last 4 characters. **Disconnect** goes back to offline drafts. No server settings needed.
+- Free plans have daily limits, and Google may use free-plan requests to improve its products. Book text and the question are sent; the platform adds no names or logins.
+
+## AI for teachers: anything for teaching
+- **Teacher → AI assistant → 💬 Ask AI anything**: research a topic, make a question paper with answer key, plan a lesson, write rubrics, report comments or a note to parents. Not limited to the book; you can add a book so the AI also uses its pages. Answers can be copied or printed / saved as PDF.
+- **📚 From my book** is the existing tool (lesson plans, homework, worksheets, questions from the book pages).
+
+## AI for students: only their book, never their homework
+- **Ask Owl** answers **only from the student's book**. Questions about anything else get “I can only help with this book.”
+- Owl **does not do homework**. Requests like “do my homework” or “give me the answers”, and questions **copied from homework or tests set for that student**, get a kind refusal with an offer to explain the page instead. These requests never reach the AI service, and teachers can see them in the Ask Owl log.
+- Students cannot use the teachers' AI.
+
+## School admins can undo a book given by mistake
+- **Book licences → open a licence → Undo** next to a student, within **7 days** of giving the book. The student loses access at once (homework and marks are kept) and the seat is free for the right student.
+- After 7 days a student seat still moves only by **Transfer** with publisher approval. Teacher seats can be released at any time, as before.
+
 # What's new in Knowledge Gate 1.3.25
 
 ## Edit products

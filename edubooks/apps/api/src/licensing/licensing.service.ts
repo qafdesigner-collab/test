@@ -14,6 +14,9 @@ import { CommerceService } from '../commerce/commerce.service';
 type Pool = typeof licensePools.$inferSelect;
 const LIVE = ['ACTIVE', 'SUSPENDED'] as const;
 
+/** Days within which a school admin may take back (undo) a student seat it gave by mistake. */
+export const UNDO_DAYS = Number(process.env.SEAT_UNDO_DAYS || 7);
+
 @Injectable()
 export class LicensingService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger('Licensing');
@@ -82,7 +85,7 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
       pendingTransfer: sql<boolean>`EXISTS (SELECT 1 FROM license_transfers t WHERE t.assignment_id = ${qc(licenseAssignments.id)} AND t.status = 'PENDING')`,
     }).from(licenseAssignments).innerJoin(licenseSeats, eq(licenseSeats.id, licenseAssignments.seatId)).innerJoin(users, eq(users.id, licenseAssignments.userId))
       .where(eq(licenseAssignments.poolId, id)).orderBy(asc(licenseSeats.seatNo), desc(licenseAssignments.assignedAt));
-    return { ...pool, assignments };
+    return { ...pool, assignments, undoDays: UNDO_DAYS };
   }
 
   /** The grades a pool's book is for: the publisher's grade(s) plus any extra grades this school added. */
@@ -265,9 +268,11 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
     const { a } = await this.assignment(id);
     if (this.ctx.schoolId && a.poolId) {
       const [p] = await this.q.select({ seatType: licensePools.seatType }).from(licensePools).where(eq(licensePools.id, a.poolId));
-      if (p.seatType === 'STUDENT') throw new ForbiddenException('Student seats cannot be released by the school. Request a transfer — it needs publisher approval.');
+      // a student seat given by mistake can be taken back within a few days; after that it moves only by a publisher-approved transfer
+      if (p.seatType === 'STUDENT' && Date.now() - new Date(a.assignedAt).getTime() > UNDO_DAYS * 864e5)
+        throw new ForbiddenException(`This book was given more than ${UNDO_DAYS} days ago, so it can no longer be undone. Use “Transfer” — it needs publisher approval.`);
     }
-    const { pool, name } = await this.endAssignment(id, 'RELEASED', reason || 'Released by school');
+    const { pool, name } = await this.endAssignment(id, 'RELEASED', reason || (this.ctx.schoolId ? 'Undone by school' : 'Released'));
     await this.audit.log('licensing.seat.release', 'license_pool', pool.id, `Released ${pool.seatType.toLowerCase()} seat of ${name}`, undefined, { assignmentId: id, reason }, pool.schoolId);
     return { ok: true };
   }
