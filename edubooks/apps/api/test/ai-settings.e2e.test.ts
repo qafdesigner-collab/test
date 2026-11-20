@@ -143,3 +143,43 @@ describe('Safety check for students (Llama Prompt Guard 2)', () => {
     expect(log.find((x: any) => x.question.startsWith('Ignore all previous'))?.flagged).toBe(true);
   });
 });
+
+describe('Main AI (e.g. Ollama) with backups', () => {
+  let app: any; let admin: any; let teacher: any; let ollama: http.Server; let ollamaBase = ''; const seen: string[] = [];
+  beforeAll(async () => {
+    ollama = http.createServer((req, res) => {
+      let body = ''; req.on('data', (d) => (body += d));
+      req.on('end', () => {
+        if (req.url?.endsWith('/models')) { res.end(JSON.stringify({ data: [{ id: 'qwen2.5:7b' }] })); return; }
+        seen.push('ollama'); const j = JSON.parse(body);
+        res.end(JSON.stringify({ model: 'qwen2.5:7b', choices: [{ message: { content: j.max_tokens <= 30 ? 'OK' : JSON.stringify(plan) } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }));
+      });
+    });
+    await new Promise<void>((r) => ollama.listen(0, '127.0.0.1', () => r()));
+    ollamaBase = `http://127.0.0.1:${(ollama.address() as AddressInfo).port}/v1`;
+    const { createApp, login } = require('./helpers');
+    app = await createApp(); admin = await login(app, 'admin', 'Admin@12345'); teacher = await login(app, 'teacher1', 'Teacher@12345', 'SUN01');
+  });
+  afterAll(async () => { ollama.close(); await admin.delete('/api/ai/settings'); await app.close(); });
+
+  it('uses Ollama first; when it is off, the backup answers and the teacher is told', async () => {
+    expect((await admin.put('/api/ai/settings').send({ preset: 'ollama', baseUrl: ollamaBase, model: 'qwen2.5:7b' })).status).toBe(200);
+    const added = await admin.put('/api/ai/settings/backups').send({ preset: 'custom', baseUrl: base, model: 'free-model', apiKey: 'free-key-1234' });
+    expect(added.status).toBe(200); expect(added.body.backups).toHaveLength(1); expect(added.body.backups[0]).toMatchObject({ model: 'free-model', keyHint: '••••1234' });
+    expect(JSON.stringify(added.body)).not.toContain('free-key-1234');
+    const english = (await teacher.get('/api/teacher/books')).body.find((b: any) => b.title === 'KG English').editionId;
+    const lessonId = (await teacher.get(`/api/reader/editions/${english}`)).body.components[0].units[0].lessons[0].id;
+    const owner = require('./helpers').ownerPool(); await owner.query(`DELETE FROM ai_generations`); await owner.end();
+    const a = await teacher.post('/api/ai/generate').send({ task: 'LESSON_PLAN', editionId: english, lessonId });
+    expect(a.status).toBe(201); expect(a.body.model).toBe('qwen2.5:7b'); expect(seen).toContain('ollama');
+    // the computer with Ollama is switched off
+    await new Promise<void>((r) => ollama.close(() => r())); (ollama as any).closeAllConnections?.();
+    const b = await teacher.post('/api/ai/generate').send({ task: 'LESSON_PLAN', editionId: english, lessonId });
+    expect(b.status).toBe(201); expect(b.body.live).toBe(true); expect(b.body.model).toBe('free-model');
+    expect(b.body.warnings.join(' ')).toMatch(/main AI did not answer.*backup AI/);
+    const chat = await teacher.post('/api/ai/chat').send({ message: 'Ideas for a song about colours' });
+    expect(chat.status).toBe(201);
+    const list = (await admin.get('/api/ai/settings')).body.backups;
+    expect((await admin.delete(`/api/ai/settings/backups/${list[0].id}`)).body.backups).toHaveLength(0);
+  });
+});

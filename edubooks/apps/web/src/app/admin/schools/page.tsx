@@ -2,7 +2,9 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/components/ui/toast';
+import { hasRole, useMe } from '@/lib/session';
 import { Building2, Plus, Sparkles } from 'lucide-react';
 import { api, daysLeft, qs } from '@/lib/api';
 import { useAction } from '@/lib/hooks';
@@ -68,6 +70,7 @@ export default function SchoolsPage() {
         <Button variant="secondary" onClick={() => setDlg('demo')}><Sparkles className="size-4" />Demo school</Button>
         <Button onClick={() => setDlg('new')}><Plus className="size-4" />Register school</Button>
       </PageHeader>
+      <Registrations />
       <div className="flex flex-wrap gap-3">
         <Input className="max-w-xs" placeholder="Search name, code or city…" aria-label="Search" value={f.search} onChange={(e) => setF({ ...f, search: e.target.value, page: 1 })} />
         <Select className="w-40" aria-label="Status" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value, page: 1 })}><option value="">Any status</option><option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option></Select>
@@ -90,6 +93,48 @@ export default function SchoolsPage() {
       )}
       {dlg === 'new' && <NewSchool onClose={() => setDlg('')} />}
       {dlg === 'demo' && <NewDemo onClose={() => setDlg('')} />}
+    </div>
+  );
+}
+
+/** Schools that registered themselves from the login page: approve or reject; open / close the registration page. */
+function Registrations() {
+  const qc = useQueryClient(); const toast = useToast(); const { data: me } = useMe(); const isAdmin = hasRole(me, 'PUBLISHER_ADMIN');
+  const q = useQuery({ queryKey: ['registrations'], queryFn: () => api.get<any>('/schools/registrations') });
+  const [reject, setReject] = useState<any>(null); const [note, setNote] = useState(''); const [busy, setBusy] = useState('');
+  if (!q.data) return null;
+  const pending = q.data.items.filter((r: any) => r.status === 'PENDING');
+  const act = async (r: any, what: 'approve' | 'reject', n = '') => {
+    setBusy(r.school_id + what);
+    try { await api.post(`/schools/${r.school_id}/registration/${what}`, { note: n || undefined }); toast(what === 'approve' ? `${r.name} approved — they can sign in now` : `${r.name} rejected`); setReject(null); setNote('');
+      ['registrations', 'schools'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); } catch (e: any) { toast(e.message, 'err'); } finally { setBusy(''); }
+  };
+  const toggle = async () => { try { await api.put('/schools/registration-settings', { enabled: !q.data.enabled }); qc.invalidateQueries({ queryKey: ['registrations'] }); toast(q.data.enabled ? 'Registration page closed' : 'Registration page open'); } catch (e: any) { toast(e.message, 'err'); } };
+  return (
+    <div className={`rounded-xl border p-4 ${pending.length ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div><p className="font-semibold text-slate-900">🏫 School registrations {pending.length > 0 && <Badge tone="DRAFT">{pending.length} waiting</Badge>}</p>
+          <p className="text-xs text-slate-600">Schools can register themselves with “Register your school” on the login page. They sign in only after you approve.</p></div>
+        {isAdmin && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={q.data.enabled} onChange={toggle} />Registration page open</label>}
+      </div>
+      {pending.length > 0 && <ul className="mt-3 divide-y divide-amber-200">{pending.map((r: any) => (
+        <li key={r.school_id} className="flex flex-wrap items-start gap-3 py-3 text-sm">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-slate-900">{r.name} <span className="font-mono text-xs text-slate-500">{r.code}</span></p>
+            <p className="text-slate-600">{[r.city, r.address, r.phone, r.school_email, r.students ? `${r.students} students` : null].filter(Boolean).join(' · ')}</p>
+            <p className="text-slate-600">Admin: <b>{r.contact_name}</b> · {r.contact_email}{r.contact_phone ? ` · ${r.contact_phone}` : ''}</p>
+            {r.message && <p className="mt-1 rounded bg-white/70 p-2 text-slate-700">“{r.message}”</p>}
+            <p className="text-xs text-slate-500">Registered {new Date(r.created_at).toLocaleString()}</p>
+          </div>
+          {isAdmin && <div className="flex gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setReject(r)}>Reject</Button>
+            <Button size="sm" variant="success" loading={busy === r.school_id + 'approve'} onClick={() => act(r, 'approve')}>Approve</Button>
+            <Link href={`/admin/schools/${r.school_id}`} className="self-center text-xs text-brand-700 hover:underline">Open</Link></div>}
+        </li>))}</ul>}
+      {reject && <Dialog open onOpenChange={() => setReject(null)} title={`Reject ${reject.name}?`} description="The school cannot sign in. To let it in later, open the school and press Reactivate.">
+        <div className="space-y-3"><Field label="Reason (optional, for your records)"><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. could not confirm the school" /></Field>
+          <div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setReject(null)}>Cancel</Button><Button variant="danger" loading={busy === reject.school_id + 'reject'} onClick={() => act(reject, 'reject', note)}>Reject</Button></div></div>
+      </Dialog>}
     </div>
   );
 }

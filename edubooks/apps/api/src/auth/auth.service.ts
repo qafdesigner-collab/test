@@ -24,7 +24,12 @@ export class AuthService {
       if (!ok && until) throw lockedFor(new Date(until));
     }
     if (!u || !ok) throw new UnauthorizedException('Wrong school code, username or password');
-    if (u.school_id && u.school_status !== 'ACTIVE') throw new ForbiddenException('This school account is suspended. Please contact the publisher.');
+    if (u.school_id && u.school_status !== 'ACTIVE') {
+      const { rows: [r] } = await this.db.root.execute(sql`SELECT school_registration_status(${u.school_id}) AS s`) as any;
+      if (r?.s === 'PENDING') throw new ForbiddenException('Your school registration has been received and is waiting for approval by the publisher. You will be able to sign in once it is approved.');
+      if (r?.s === 'REJECTED') throw new ForbiddenException('Your school registration was not approved. Please contact the publisher.');
+      throw new ForbiddenException('This school account is suspended. Please contact the publisher.');
+    }
     if (u.user_status !== 'ACTIVE') throw new ForbiddenException('This account is not active.');
 
     const token = randomBytes(32).toString('base64url');

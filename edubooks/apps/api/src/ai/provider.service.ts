@@ -7,6 +7,7 @@ import { AnthropicProvider } from './providers/anthropic.provider';
 import { OpenAiCompatibleProvider } from './providers/openai-compatible.provider';
 import { AiProvider } from './providers/types';
 import { promptGuardScore } from './prompt-guard';
+import { FallbackProvider } from './providers/fallback.provider';
 
 /** The publisher switched AI off for this school. */
 const schoolOff: AiProvider = {
@@ -91,7 +92,12 @@ export class AiProviderService {
     let p = this.provider;
     try {
       const { rows: [s] } = await this.db.q.execute(sql`SELECT * FROM ai_provider_config()`) as any;
-      if (s?.enabled && s.base_url && s.model) p = this.build({ preset: s.preset, baseUrl: s.base_url, model: s.model, apiKey: open(s.api_key) });
+      if (s?.enabled && s.base_url && s.model) {
+        const main = this.build({ preset: s.preset, baseUrl: s.base_url, model: s.model, apiKey: open(s.api_key) });
+        const backups = (Array.isArray(s.backups) ? s.backups : []).filter((b: any) => b?.baseUrl && b?.model)
+          .map((b: any) => this.build({ preset: b.preset, baseUrl: b.baseUrl, model: b.model, apiKey: open(b.apiKey ?? '') }));
+        p = backups.length ? new FallbackProvider([main, ...backups]) : main;
+      }
     } catch { /* settings not readable: keep the environment model */ }
     this.cache.set(pub, { at: Date.now(), p });
     return p;

@@ -55,6 +55,7 @@ function ConnectAi() {
         <p className="text-sm text-slate-500">Free plans need only a free API key from the service’s website. Without a service, teachers get offline drafts, and the page-question maker always works for free.</p></div>
       <AiConnectForm presets={d.presets} endpoint="/ai/settings" invalidate={['aiSettings', 'aiStatus', 'aiSchools']}
         saved={{ preset: d.preset, baseUrl: d.baseUrl, model: d.model, hasKey: d.hasKey, keyHint: d.keyHint, connected: d.enabled }} />
+      {d.enabled && <BackupAi d={d} />}
       <GuardSettings g={d.guard} />
       <p className="text-xs text-slate-500">Used by the teacher AI assistant and Ask Owl in every school set to “Uses your AI” below. Book text and the teacher’s or student’s question are sent to the chosen service (the platform does not add names or logins).</p>
     </Card>
@@ -215,5 +216,31 @@ function OcrCard() {
       {(ins.log?.length ?? 0) > 0 && <button type="button" className="text-xs text-slate-500 underline" onClick={() => setShowLog(!showLog)}>{showLog ? 'Hide' : 'Show'} installation log</button>}
       {showLog && <pre className="max-h-48 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{(ins.log ?? []).join('\n')}</pre>}
     </Card>
+  );
+}
+
+/** Backups: used in order when the main AI does not answer (e.g. Ollama on a computer that is switched off). */
+function BackupAi({ d }: { d: any }) {
+  const qc = useQueryClient(); const toast = useToast(); const [adding, setAdding] = useState(false);
+  const remove = async (id: string) => { try { await api.del(`/ai/settings/backups/${id}`); qc.invalidateQueries({ queryKey: ['aiSettings'] }); qc.invalidateQueries({ queryKey: ['aiStatus'] }); } catch (e: any) { toast(e.message, 'err'); } };
+  const main = `${d.presets[d.preset]?.label ?? d.preset} · ${d.model}`;
+  return (
+    <div className="space-y-3 rounded-xl border border-sky-200 bg-sky-50/40 p-4">
+      <div><h3 className="font-semibold text-slate-900">🔁 Backup AI</h3>
+        <p className="text-sm text-slate-600">If the main AI does not answer (for example Ollama on a computer that is switched off, or a free plan's daily limit is used up), the next one answers automatically. A service that just failed is skipped for 2 minutes, so teachers do not wait.</p></div>
+      <ol className="space-y-1.5 text-sm">
+        <li className="flex items-center gap-2"><span className="grid size-6 place-items-center rounded-full bg-brand-600 text-xs font-bold text-white">1</span><b>{main}</b><span className="text-xs text-slate-500">main</span></li>
+        {d.backups.map((b: any, i: number) => (
+          <li key={b.id} className="flex items-center gap-2"><span className="grid size-6 place-items-center rounded-full bg-sky-600 text-xs font-bold text-white">{i + 2}</span>
+            <b>{b.label} · {b.model}</b>{b.keyHint && <span className="text-xs text-slate-500">key {b.keyHint}</span>}
+            <button type="button" className="ml-auto text-xs text-red-600 hover:underline" onClick={() => remove(b.id)}>Remove</button></li>))}
+        <li className="flex items-center gap-2 text-slate-500"><span className="grid size-6 place-items-center rounded-full bg-slate-300 text-xs font-bold text-white">{d.backups.length + 2}</span>Offline drafts (always works)</li>
+      </ol>
+      {d.backups.length < 3 && (adding
+        ? <div className="rounded-lg bg-white p-3"><p className="mb-2 text-sm font-medium">Add a backup AI — choose the service, paste its key, Test, then Save:</p>
+            <AiConnectForm presets={d.presets} endpoint="/ai/settings/backups" invalidate={['aiSettings', 'aiStatus']} saved={null} />
+            <div className="mt-2 flex justify-end"><Button size="sm" variant="ghost" onClick={() => setAdding(false)}>Close</Button></div></div>
+        : <Button size="sm" variant="secondary" onClick={() => setAdding(true)}>+ Add a backup AI</Button>)}
+    </div>
   );
 }

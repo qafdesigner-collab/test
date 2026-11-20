@@ -1,3 +1,17 @@
+# What's new in Knowledge Gate 1.3.35
+
+## AI: main + backups (e.g. Ollama first, then Gemini)
+- **Super admin → AI assistant → 🔁 Backup AI.** Under the main AI (for example your own **Ollama**), add up to **3 backups** (Gemini, Groq, OpenRouter…). Each is tested before it is saved.
+- Every request goes to the main AI first. If it does not answer (computer switched off, tunnel closed, free daily limit used up), the **next one answers automatically**. A service that just failed is skipped for 2 minutes, so teachers do not wait for it. Offline drafts remain the last step.
+- When a backup made a draft, the teacher sees “The main AI did not answer, so this draft was made by the backup AI (…)”. Ask Owl and the teachers' chat use the same order.
+
+## Schools can register themselves
+- The **login page** has **“Register your school”**. The school fills in its details (name, city, address, phone, email, number of students, curriculum) and its **admin** (name, email, mobile, login ID, password), with an optional message.
+- The school gets its **school code** at once (made from its name, e.g. GMS72), but it **cannot sign in until you approve it**. Trying shows “waiting for approval”.
+- You get a **notification** (and an email copy when email is set up). **Schools → School registrations** lists the waiting schools with all their details: **Approve** (they can sign in) or **Reject** (with an optional reason).
+- **Registration page open** turns the button on the login page on or off.
+- Protection: at most 5 registrations per hour from one address, and a hidden field that catches spam robots.
+
 # What's new in Knowledge Gate 1.3.34
 
 ## Install OCR from the platform

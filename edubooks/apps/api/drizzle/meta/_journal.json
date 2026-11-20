@@ -365,6 +365,27 @@
       "when": 1795170000000,
       "tag": "0051_prompt_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1795200000000,
+      "tag": "0052_ai_backups",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1795230000000,
+      "tag": "0053_school_registration",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1795260000000,
+      "tag": "0054_registration_setting",
+      "breakpoints": true
     }
   ]
 }

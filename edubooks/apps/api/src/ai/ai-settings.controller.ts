@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { sql } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
 import { DbService } from '../db/db.service';
 import { Roles } from '../common/decorators';
 import { AuditService } from '../audit/audit.service';
@@ -67,7 +68,8 @@ export class AiSettingsController {
     const guard = { enabled: !!s?.guard_enabled, baseUrl: s?.guard_base_url ?? GUARD_DEFAULT.baseUrl, model: s?.guard_model ?? GUARD_DEFAULT.model,
       threshold: s?.guard_threshold ?? 0.5, hasKey: !!s?.guard_key, keyHint: s?.guard_key ? `••••${open(s.guard_key).slice(-4)}` : '',
       canUseMainKey: s?.preset === 'groq' && !!s?.api_key };
-    return { guard, presets: AI_PRESETS, enabled: !!s?.enabled, preset: s?.preset ?? 'gemini', baseUrl: s?.base_url ?? '', model: s?.model ?? '',
+    const backups = (Array.isArray(s?.backups) ? s.backups : []).map((b: any) => ({ id: b.id, preset: b.preset, label: AI_PRESETS[b.preset]?.label ?? b.preset, baseUrl: b.baseUrl, model: b.model, keyHint: b.apiKey ? `••••${open(b.apiKey).slice(-4)}` : '' }));
+    return { backups, guard, presets: AI_PRESETS, enabled: !!s?.enabled, preset: s?.preset ?? 'gemini', baseUrl: s?.base_url ?? '', model: s?.model ?? '',
       hasKey: !!s?.api_key, keyHint: s?.api_key ? `••••${open(s.api_key).slice(-4)}` : '', updatedAt: s?.updated_at ?? null };
   }
 
@@ -128,6 +130,33 @@ export class AiSettingsController {
         guard_key = EXCLUDED.guard_key, guard_threshold = EXCLUDED.guard_threshold, updated_at = now()`);
     this.ai.invalidate();
     await this.audit.log('ai.guard', 'publisher', this.db.ctx.publisherId, `${on ? 'Switched on' : 'Switched off'} the students' safety check (${g.model}, threshold ${g.threshold})`);
+    return this.get();
+  }
+
+  // ---------- backups: used in order when the main AI does not answer ----------
+  @Roles('PUBLISHER_ADMIN') @Post('backups/test')
+  backupTest(@Body() d: AiSettingsDto) { return this.test(d); }
+  @Roles('PUBLISHER_ADMIN') @Post('backups/models')
+  backupModels(@Body() d: AiSettingsDto) { return this.models(d); }
+  @Roles('PUBLISHER_ADMIN') @Put('backups')
+  async addBackup(@Body() d: AiSettingsDto) {
+    const s = await this.saved();
+    if (!s?.enabled) throw new BadRequestException('Connect the main AI first, then add backups.');
+    const list = Array.isArray(s.backups) ? s.backups : [];
+    if (list.length >= 3) throw new BadRequestException('Up to 3 backups — remove one first.');
+    const r = this.resolve(d, list.find((b: any) => b.preset === d.preset) ? { preset: d.preset, api_key: list.find((b: any) => b.preset === d.preset).apiKey } : s);
+    await checkWorks(this.ai.build(r));
+    const item = { id: randomUUID().slice(0, 8), preset: r.preset, baseUrl: r.baseUrl, model: r.model, apiKey: seal(r.apiKey) };
+    await this.db.q.execute(sql`UPDATE publisher_ai_settings SET backups = ${JSON.stringify([...list, item])}::jsonb, updated_at = now() WHERE publisher_id = ${this.db.ctx.publisherId}`);
+    this.ai.invalidate();
+    await this.audit.log('ai.settings', 'publisher', this.db.ctx.publisherId, `Added backup AI: ${AI_PRESETS[r.preset].label} · ${r.model}`);
+    return this.get();
+  }
+  @Roles('PUBLISHER_ADMIN') @Delete('backups/:id')
+  async removeBackup(@Param('id') id: string) {
+    const s = await this.saved(); const list = (Array.isArray(s?.backups) ? s.backups : []).filter((b: any) => b.id !== id);
+    await this.db.q.execute(sql`UPDATE publisher_ai_settings SET backups = ${JSON.stringify(list)}::jsonb, updated_at = now() WHERE publisher_id = ${this.db.ctx.publisherId}`);
+    this.ai.invalidate();
     return this.get();
   }
 

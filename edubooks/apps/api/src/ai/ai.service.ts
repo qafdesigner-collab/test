@@ -169,7 +169,7 @@ export class AiService {
       return row.id;
     };
 
-    let raw: any; let tokens = { inputTokens: 0, outputTokens: 0 }; let model = provider.model; let fallback = '';
+    let raw: any; let tokens = { inputTokens: 0, outputTokens: 0 }; let model = provider.model; let fallback = ''; let viaNote = '';
     if (!provider.live) {
       raw = offlineDraft(ctx);
     } else {
@@ -185,6 +185,7 @@ export class AiService {
           break;
         }
         tokens = { inputTokens: tokens.inputTokens + res.inputTokens, outputTokens: tokens.outputTokens + res.outputTokens }; model = res.model;
+        if ((res as any).via) viaNote = `The main AI did not answer, so this draft was made by the backup AI (${(res as any).via}).`;
         if (res.refused) { await record({ status: 'REFUSED', ...tokens, model }); throw new UnprocessableEntityException('The AI declined this request. Try rephrasing your notes.'); }
         try { raw = normalise(i.task, parseJson(res.text), sources); } catch (e: any) { lastError = e.message; }
       }
@@ -197,6 +198,7 @@ export class AiService {
     const live = provider.live && !fallback;
     const { output, warnings } = live ? raw : normalise(i.task, raw, sources);
     if (ocrNote) warnings.unshift(ocrNote);
+    if (viaNote) warnings.unshift(viaNote);
     if (fallback) warnings.unshift(`The AI service could not be used (${fallback}) — this is an offline draft from the lesson data. Ask your admin to check the AI settings.`);
     else if (!provider.live) warnings.unshift('Offline draft: no AI model is configured, so this was assembled from the lesson data only.');
     const id = await record({ status: 'OK', output, ...tokens, model: fallback ? 'offline-drafter' : model, ...(fallback ? { error: fallback } : {}) });

@@ -1,5 +1,6 @@
 'use client';
-import { Suspense, useState } from 'react';
+import Link from 'next/link';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { BookOpen, Building2 } from 'lucide-react';
@@ -56,6 +57,7 @@ function LoginScreen() {
           <h2 className="text-2xl font-semibold text-slate-900">{t('Sign in')}</h2>
           <p className="mb-6 mt-1 text-sm text-slate-500">{t('Use the login your school or publisher gave you.')}</p>
           <Suspense><LoginForm /></Suspense>
+          <RegisterLink />
           <div className="mt-5 flex justify-center"><InstallAppButton className="ring-1 ring-slate-200" /></div>
           <div className="mt-8 lg:hidden"><LoginContact /></div>
         </div>
@@ -78,3 +80,16 @@ function BrandPanel() {
   );
 }
 
+
+/** “Register your school” — shown when the publisher has school registration open. */
+function RegisterLink() {
+  const { t } = useT(); const [on, setOn] = useState(false);
+  useEffect(() => { api.get<any>('/public/school-registration').then((r) => setOn(!!r.enabled)).catch(() => undefined); }, []);
+  if (!on) return null;
+  return (
+    <div className="mt-5 rounded-xl border border-slate-200 p-4 text-center">
+      <p className="text-sm text-slate-600">{t('New school?')}</p>
+      <Link href="/register" className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-brand-600 px-4 py-2 font-medium text-brand-700 hover:bg-brand-50"><Building2 className="size-4" />{t('Register your school')}</Link>
+    </div>
+  );
+}
