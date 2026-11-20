@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm';
 import { Ctx, PUBLISHER_STAFF, Roles } from '../common/decorators';
 import { DbService, TenantCtx } from '../db/db.service';
 import { LmsService } from '../lms/lms.service';
+import { AccessService } from '../lms/access.service';
 import { ENGINES, Engine } from './engines';
 import { GamesService } from './games.service';
 
@@ -39,7 +40,7 @@ const Id = () => new ParseUUIDPipe();
 @ApiTags('games')
 @Controller()
 export class GamesController {
-  constructor(private readonly games: GamesService, private readonly lms: LmsService, private readonly db: DbService) {}
+  constructor(private readonly games: GamesService, private readonly lms: LmsService, private readonly db: DbService, private readonly access: AccessService) {}
 
   // Publisher library
   @Roles(...PUBLISHER_STAFF) @Get('publishing/games') library(@Query('editionId') editionId?: string, @Query('engine') engine?: string) { return this.games.libraryList({ editionId, engine }); }
@@ -70,14 +71,16 @@ export class GamesController {
   async home(@Ctx() c: TenantCtx) {
     const { rows } = await this.db.q.execute(sql`SELECT rp.last_page AS page, rp.component_id AS "componentId", c.title AS part, e.id AS "editionId", p.title, p.cover_color AS "coverColor", CASE WHEN p.cover_version IS NOT NULL THEN '/api/covers/' || p.id || '?v=' || p.cover_version END AS "coverUrl", c.page_count AS "pageCount"
       FROM reader_progress rp JOIN book_components c ON c.id = rp.component_id JOIN book_editions e ON e.id = c.edition_id JOIN book_packages p ON p.id = e.package_id
-      WHERE rp.user_id = ${c.userId} ORDER BY rp.updated_at DESC LIMIT 1`);
+      WHERE rp.user_id = ${c.userId} ORDER BY rp.updated_at DESC LIMIT 20`);
+    // only a book the child still holds a licence for (a licence can end or move to another book)
+    const eds = await this.access.editions(); const cont = (rows as any[]).find((r) => eds === 'ALL' || eds.includes(r.editionId)) ?? null;
     // Sequential: all queries share the request's single transaction connection.
     const homework = await this.lms.studentList(); const games = await this.games.studentAvailable(); const ach = await this.games.achievements();
     const today = ((await this.db.q.execute(sql`SELECT coalesce(sum(reading), 0)::int AS reading, coalesce(sum(games), 0)::int AS games, coalesce(sum(homework), 0)::int AS homework
       FROM user_activity WHERE user_id = ${c.userId} AND day = current_date`)).rows[0] ?? { reading: 0, games: 0, homework: 0 }) as any;
     return {
       today,
-      continueReading: rows[0] ?? null,
+      continueReading: cont,
       homework: homework.filter((h: any) => !h.submission && h.status === 'PUBLISHED'),
       games: games.slice(0, 8),
       stars: ach.stars, streak: ach.streak, badges: ach.badges.filter((b) => b.earnedAt).sort((a, b) => +new Date(b.earnedAt!) - +new Date(a.earnedAt!)).slice(0, 4),

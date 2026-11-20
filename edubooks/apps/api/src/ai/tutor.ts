@@ -10,6 +10,7 @@ import { config } from '../config';
 import { AccessService } from '../lms/access.service';
 import { AiProviderService } from './provider.service';
 import { RetrievalService } from './retrieval.service';
+import { IndexerService } from './indexer.service';
 import { parseJson } from './tasks';
 
 class AskDto {
@@ -35,7 +36,7 @@ const tidy = (s: string) => s.replace(/https?:\/\/\S+/g, '').replace(/\s+\n/g, '
 
 @Injectable()
 export class TutorService {
-  constructor(private readonly db: DbService, private readonly access: AccessService, private readonly providers: AiProviderService, private readonly retrieval: RetrievalService) {}
+  constructor(private readonly db: DbService, private readonly access: AccessService, private readonly providers: AiProviderService, private readonly retrieval: RetrievalService, private readonly indexer: IndexerService) {}
   private get ctx() { return this.db.ctx; }
   private async rows(s: ReturnType<typeof sql>) { return (await this.db.q.execute(s)).rows as any[]; }
   private async one(s: ReturnType<typeof sql>) { return (await this.rows(s))[0]; }
@@ -100,7 +101,12 @@ export class TutorService {
     // Owl explains the book; it does not do homework (also when the child pastes a question from their own homework)
     if (question && (HOMEWORK.test(question) || await this.isOwnHomework(question))) return save({ answer: HOMEWORK_REPLY });
 
-    const near = await this.pageText(d.componentId, d.page);
+    let near = await this.pageText(d.componentId, d.page);
+    // a page with no text yet (a flipbook picture or a scanned page) is read with OCR now, the first time anyone asks
+    if (!near.some((p) => p.page === d.page)) {
+      const r = await this.indexer.ensurePageText(d.componentId, [d.page - 1, d.page, d.page + 1].filter((n) => n >= 1)).catch(() => null);
+      if (r?.read) near = await this.pageText(d.componentId, d.page);
+    }
     const extra = d.mode === 'ASK' ? await this.retrieval.sources({ editionId: d.editionId, query: question }) : [];
     const sources = [...near.map((p) => ({ page: p.page, text: String(p.text).slice(0, 2500) })),
       ...extra.filter((x) => !(x.componentId === d.componentId && near.some((p) => p.page === x.page))).slice(0, 3).map((x) => ({ page: x.page, text: x.text.slice(0, 1500), part: x.component }))];

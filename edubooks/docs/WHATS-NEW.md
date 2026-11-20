@@ -1,3 +1,9 @@
+# What's new in Knowledge Gate 1.3.37
+
+- **Ask Owl 🦉 works in flipbooks.** Books that only have a flipbook (no PDF) now show the **Ask Owl** button too. In a flipbook the student sets **“I am on page …”** in Owl's panel (− / + or type the number), then taps **Explain this page**, **Quiz me** or asks a question.
+- **Owl reads pages without text automatically.** The first time a student asks about a flipbook picture or a scanned page, the page is read with OCR (text recognition) and kept, so Owl can explain it. This needs OCR installed (Super admin → AI assistant → OCR).
+- **“Continue reading” fixed:** a student's home page no longer links to a book whose licence has ended or moved (it showed “You do not hold a licence for this book”). It now shows the last book they can still open.
+
 # What's new in Knowledge Gate 1.3.36
 
 - **Clear messages when an upload fails:** “no free disk space left” when the server or hosting quota is full, and “the upload stopped before the whole file arrived” when the connection drops. Before, both showed “Unexpected server error”.

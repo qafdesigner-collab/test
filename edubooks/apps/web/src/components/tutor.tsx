@@ -15,8 +15,11 @@ export function useTutorStatus(enabled: boolean) {
 }
 
 /** "Ask Owl" panel inside the reader for pupils. */
-export function TutorPanel({ editionId, componentId, page, onGo, onClose }: { editionId: string; componentId: string; page: number; onGo: (p: number) => void; onClose: () => void }) {
-  const { t } = useT(); const qc = useQueryClient(); const toast = useToast();
+export function TutorPanel({ editionId, componentId, page: readerPage, onGo: readerGo, onClose, askPage }: { editionId: string; componentId: string; page: number; onGo: (p: number) => void; onClose: () => void; askPage?: boolean }) {
+  const { t } = useT();
+  // In a flipbook the reader cannot see which page is open, so the student tells Owl.
+  const [ownPage, setOwnPage] = useState(1); const page = askPage ? ownPage : readerPage;
+  const onGo = askPage ? (p: number) => setOwnPage(p) : readerGo; const qc = useQueryClient(); const toast = useToast();
   const status = useTutorStatus(true);
   const [turns, setTurns] = useState<Turn[]>([{ who: 'owl', text: t("Hi! I'm Owl 🦉 I can explain this page, answer a question about your book, or give you a little quiz.") }]);
   const [q, setQ] = useState(''); const [busy, setBusy] = useState(false); const end = useRef<HTMLDivElement>(null);
@@ -50,6 +53,10 @@ export function TutorPanel({ editionId, componentId, page, onGo, onClose }: { ed
         <div ref={end} />
       </div>
       <div className="space-y-2 border-t border-amber-200 p-3">
+        {askPage && <label className="flex items-center gap-2 text-sm font-bold text-amber-900">📖 {t('I am on page')}
+          <button type="button" aria-label={t('Previous page')} className="rounded-full bg-amber-100 px-2" onClick={() => setOwnPage(Math.max(1, ownPage - 1))}>−</button>
+          <Input type="number" min={1} max={5000} className="h-8 w-20 text-center" value={ownPage} onChange={(e) => setOwnPage(Math.min(5000, Math.max(1, Number(e.target.value) || 1)))} />
+          <button type="button" aria-label={t('Next page')} className="rounded-full bg-amber-100 px-2" onClick={() => setOwnPage(Math.min(5000, ownPage + 1))}>+</button></label>}
         <div className="flex gap-2">
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => ask('EXPLAIN')}>💡 {t('Explain this page')}</Button>
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => ask('QUIZ')}>⭐ {t('Quiz me')}</Button>
