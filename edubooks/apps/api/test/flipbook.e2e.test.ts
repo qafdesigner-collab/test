@@ -54,6 +54,8 @@ describe('Flipbooks (HTML zip and Flash/SWF)', () => {
     const other = await login(app, 'student1', 'Student@123', 'SUN01');
     expect((await other.get(link.url).set('Sec-Fetch-Dest', 'iframe')).status).toBe(401);
     expect(page.text).toContain('FLIPBOOK HOME');
+    // the page reporter tells the reader which page is open (for Ask Owl), placed before </body>
+    expect(page.text).toMatch(/kgFlipPages[\s\S]*<\/script><\/body>/);
     expect(page.headers['content-security-policy']).toMatch(/^sandbox allow-scripts/);
     expect(page.headers['content-security-policy']).toContain("frame-ancestors 'self'");
     expect(page.headers['x-frame-options']).toBeUndefined();

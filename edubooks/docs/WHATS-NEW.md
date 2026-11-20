@@ -1,3 +1,9 @@
+# What's new in Knowledge Gate 1.3.39
+
+- **Ask Owl 🦉 follows the open flipbook page by itself.** The “I am on page” box is gone. When a student turns a page in a flipbook, Owl's panel shows **📖 Page N** for that page (or **Page N–M** when two pages are shown side by side).
+- **Only the open page.** Explain, Quiz me and questions use **only the page(s) the student has open** — not the pages around it and not other parts of the book. If the page has no text yet (a picture page), it is read with OCR at that moment and kept.
+- If a flipbook does not tell which page is open, Owl says “Turn to a page in your book, then ask Owl.”
+
 # What's new in Knowledge Gate 1.3.38
 
 - **Clear message when the server takes too long.** If the hosting stops a slow request (for example the first time the AI reads flipbook pages with OCR), teachers now see “The server took too long to answer… try again in a minute” instead of “Unexpected token '<' … is not valid JSON”. The second try is usually quick, because the pages are already read.

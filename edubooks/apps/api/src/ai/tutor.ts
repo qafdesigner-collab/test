@@ -16,6 +16,8 @@ import { parseJson } from './tasks';
 class AskDto {
   @IsUUID() editionId!: string; @IsUUID() componentId!: string;
   @Type(() => Number) @IsInt() @Min(1) @Max(5000) page!: number;
+  /** the right-hand page when the book shows two pages side by side */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5000) toPage?: number;
   @IsIn(['EXPLAIN', 'ASK', 'QUIZ']) mode!: 'EXPLAIN' | 'ASK' | 'QUIZ';
   @IsOptional() @IsString() @MaxLength(300) question?: string;
 }
@@ -71,9 +73,9 @@ export class TutorService {
     return items.some((it: any) => { const p = words(String(it.prompt)); if (p.size < 4) return false; let n = 0; for (const w of p) if (q.has(w)) n++; return n / p.size >= 0.7; });
   }
 
-  /** Text of the page the pupil is looking at, plus the page either side. */
-  private async pageText(componentId: string, page: number) {
-    return this.rows(sql`SELECT page_number AS page, text_content AS text FROM book_pages WHERE component_id = ${componentId} AND page_number BETWEEN ${page - 1} AND ${page + 1} AND length(text_content) > 10 ORDER BY page_number`);
+  /** Text of the page(s) the student has open — only those, never other pages of the book. */
+  private async pageText(componentId: string, pages: number[]) {
+    return this.rows(sql`SELECT page_number AS page, text_content AS text FROM book_pages WHERE component_id = ${componentId} AND page_number IN ${pages} AND length(text_content) > 10 ORDER BY page_number`);
   }
 
   async ask(d: AskDto) {
@@ -101,15 +103,14 @@ export class TutorService {
     // Owl explains the book; it does not do homework (also when the child pastes a question from their own homework)
     if (question && (HOMEWORK.test(question) || await this.isOwnHomework(question))) return save({ answer: HOMEWORK_REPLY });
 
-    let near = await this.pageText(d.componentId, d.page);
+    const open = [...new Set([d.page, d.toPage ?? d.page])].filter((n) => n >= d.page && n <= d.page + 1);
+    let near = await this.pageText(d.componentId, open);
     // a page with no text yet (a flipbook picture or a scanned page) is read with OCR now, the first time anyone asks
-    if (!near.some((p) => p.page === d.page)) {
-      const r = await this.indexer.ensurePageText(d.componentId, [d.page - 1, d.page, d.page + 1].filter((n) => n >= 1)).catch(() => null);
-      if (r?.read) near = await this.pageText(d.componentId, d.page);
+    if (open.some((n) => !near.some((p) => p.page === n))) {
+      const r = await this.indexer.ensurePageText(d.componentId, open).catch(() => null);
+      if (r?.read) near = await this.pageText(d.componentId, open);
     }
-    const extra = d.mode === 'ASK' ? await this.retrieval.sources({ editionId: d.editionId, query: question }) : [];
-    const sources = [...near.map((p) => ({ page: p.page, text: String(p.text).slice(0, 2500) })),
-      ...extra.filter((x) => !(x.componentId === d.componentId && near.some((p) => p.page === x.page))).slice(0, 3).map((x) => ({ page: x.page, text: x.text.slice(0, 1500), part: x.component }))];
+    const sources = near.map((p) => ({ page: p.page, text: String(p.text).slice(0, 3500) }));
     if (!sources.length) return save({ answer: "I can't read the words on this page yet, so I can't help with it. Please ask your teacher! 🦉" });
 
     const provider = await this.providers.current();
@@ -119,7 +120,7 @@ export class TutorService {
 
     const system = [
       `You are Owl, a kind, patient reading helper for a young child (${comp.grade ?? 'primary school'}). You help ONLY with the book "${comp.book}".`,
-      'Use ONLY the BOOK PAGES given. If the answer is not in them, or the question is not about this book, say kindly that you can only help with this book, and suggest asking the teacher. Do not answer general questions from outside the book.',
+      'Use ONLY the BOOK PAGES given — they are the page(s) the child has open right now. Never use other pages or outside knowledge. If the answer is not on these pages, or the question is not about this book, say kindly that you can only help with this book, and suggest asking the teacher. Do not answer general questions from outside the book.',
       'Use very simple words and short sentences (at most 5 sentences). Be warm and encouraging. You may use one or two emojis.',
       'Never ask for or mention personal information. Never give links. Never talk about violence, adult topics or anything unsafe; instead suggest talking to a trusted grown-up.',
       'Never do homework, tests, worksheets, essays or projects for the child and never give their answers. Explain the ideas in the book and give small hints instead.',
@@ -128,7 +129,8 @@ export class TutorService {
     const shape = d.mode === 'QUIZ'
       ? '{"answer": "one short encouraging sentence", "quiz": [{"q": string, "options": [3 short strings], "answer": index of the right option}] (exactly 3 questions about these pages), "pages": [page numbers used]}'
       : '{"answer": string, "pages": [page numbers used]}';
-    const task = d.mode === 'EXPLAIN' ? `Explain page ${d.page} simply, as if to a young child.` : d.mode === 'QUIZ' ? `Make a tiny quiz about page ${d.page}.` : `The child asks: "${question.replace(/"/g, "'")}"`;
+    const here = sources.length > 1 ? `pages ${sources.map((x) => x.page).join(' and ')}` : `page ${sources[0].page}`;
+    const task = d.mode === 'EXPLAIN' ? `Explain ${here} simply, as if to a young child.` : d.mode === 'QUIZ' ? `Make a tiny quiz about ${here} only.` : `The child asks: "${question.replace(/"/g, "'")}"`;
     const user = `BOOK PAGES:\n${sources.map((x: any) => `[page ${x.page}${x.part ? `, ${x.part}` : ''}]\n${x.text}`).join('\n\n')}\n\nTASK: ${task}\n\nReply as JSON: ${shape}`;
     try {
       const res = await provider.generate({ system, user, maxTokens: 700, json: true });

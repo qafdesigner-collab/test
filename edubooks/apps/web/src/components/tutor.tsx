@@ -15,21 +15,20 @@ export function useTutorStatus(enabled: boolean) {
 }
 
 /** "Ask Owl" panel inside the reader for pupils. */
-export function TutorPanel({ editionId, componentId, page: readerPage, onGo: readerGo, onClose, askPage }: { editionId: string; componentId: string; page: number; onGo: (p: number) => void; onClose: () => void; askPage?: boolean }) {
-  const { t } = useT();
-  // In a flipbook the reader cannot see which page is open, so the student tells Owl.
-  const [ownPage, setOwnPage] = useState(1); const page = askPage ? ownPage : readerPage;
-  const onGo = askPage ? (p: number) => setOwnPage(p) : readerGo; const qc = useQueryClient(); const toast = useToast();
+export function TutorPanel({ editionId, componentId, page, toPage, flip, onGo, onClose }: { editionId: string; componentId: string; page: number; toPage?: number; flip?: boolean; onGo: (p: number) => void; onClose: () => void }) {
+  const { t } = useT(); const qc = useQueryClient(); const toast = useToast();
+  // page 0: the flipbook has not told the reader which page is open yet
+  const unknown = !page; const here = toPage && toPage !== page ? `${page}–${toPage}` : String(page);
   const status = useTutorStatus(true);
-  const [turns, setTurns] = useState<Turn[]>([{ who: 'owl', text: t("Hi! I'm Owl 🦉 I can explain this page, answer a question about your book, or give you a little quiz.") }]);
+  const [turns, setTurns] = useState<Turn[]>([{ who: 'owl', text: t("Hi! I'm Owl 🦉 I can explain the page you have open, answer a question about it, or give you a little quiz.") }]);
   const [q, setQ] = useState(''); const [busy, setBusy] = useState(false); const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }); }, [turns.length]);
   const ask = async (mode: 'EXPLAIN' | 'ASK' | 'QUIZ', question = '') => {
-    if (busy) return;
+    if (busy || unknown) return;
     const label = mode === 'EXPLAIN' ? t('Explain this page') : mode === 'QUIZ' ? t('Quiz me') : question;
     setTurns((x) => [...x, { who: 'me', text: label }]); setBusy(true); setQ('');
     try {
-      const r = await api.post<any>('/tutor/ask', { editionId, componentId, page, mode, question: question || undefined });
+      const r = await api.post<any>('/tutor/ask', { editionId, componentId, page, toPage: toPage && toPage !== page ? toPage : undefined, mode, question: question || undefined });
       setTurns((x) => [...x, { who: 'owl', text: r.answer, quiz: r.quiz, pages: (r.sources ?? []).map((s: any) => s.page) }]);
       qc.setQueryData(['tutorStatus'], (o: any) => ({ ...(o ?? {}), enabled: true, remaining: r.remaining }));
     } catch (e: any) { setTurns((x) => [...x, { who: 'owl', text: e.message }]); }
@@ -46,24 +45,21 @@ export function TutorPanel({ editionId, componentId, page: readerPage, onGo: rea
             <div className={cn('max-w-[90%] rounded-2xl px-3 py-2 text-[15px] leading-snug shadow-sm', x.who === 'me' ? 'bg-violet-600 text-white' : 'bg-white text-slate-900')}>
               <p className="whitespace-pre-wrap">{x.text}</p>
               {x.who === 'owl' && i > 0 && <button onClick={() => speak(x.text)} className="mt-1 text-xs font-bold text-amber-700">🔊 {t('Read to me')}</button>}
-              {x.pages?.length ? <div className="mt-1 flex flex-wrap gap-1">{x.pages.map((p) => <button key={p} onClick={() => onGo(p)} className="rounded-full bg-amber-100 px-2 text-xs font-bold text-amber-900">📖 {t('page {n}', { n: p })}</button>)}</div> : null}
+              {x.pages?.length && !flip ? <div className="mt-1 flex flex-wrap gap-1">{x.pages.map((p) => <button key={p} onClick={() => onGo(p)} className="rounded-full bg-amber-100 px-2 text-xs font-bold text-amber-900">📖 {t('page {n}', { n: p })}</button>)}</div> : null}
               {x.quiz?.length ? <MiniQuiz quiz={x.quiz} /> : null}
             </div></div>))}
         {busy && <div className="text-sm font-bold text-amber-800">🦉 {t('Owl is thinking…')}</div>}
         <div ref={end} />
       </div>
       <div className="space-y-2 border-t border-amber-200 p-3">
-        {askPage && <label className="flex items-center gap-2 text-sm font-bold text-amber-900">📖 {t('I am on page')}
-          <button type="button" aria-label={t('Previous page')} className="rounded-full bg-amber-100 px-2" onClick={() => setOwnPage(Math.max(1, ownPage - 1))}>−</button>
-          <Input type="number" min={1} max={5000} className="h-8 w-20 text-center" value={ownPage} onChange={(e) => setOwnPage(Math.min(5000, Math.max(1, Number(e.target.value) || 1)))} />
-          <button type="button" aria-label={t('Next page')} className="rounded-full bg-amber-100 px-2" onClick={() => setOwnPage(Math.min(5000, ownPage + 1))}>+</button></label>}
+        <p className="text-sm font-bold text-amber-900">{unknown ? t('Turn to a page in your book, then ask Owl.') : `📖 ${t('Page {n}', { n: here })}`}</p>
         <div className="flex gap-2">
-          <Button size="sm" variant="secondary" disabled={busy} onClick={() => ask('EXPLAIN')}>💡 {t('Explain this page')}</Button>
-          <Button size="sm" variant="secondary" disabled={busy} onClick={() => ask('QUIZ')}>⭐ {t('Quiz me')}</Button>
+          <Button size="sm" variant="secondary" disabled={busy || unknown} onClick={() => ask('EXPLAIN')}>💡 {t('Explain this page')}</Button>
+          <Button size="sm" variant="secondary" disabled={busy || unknown} onClick={() => ask('QUIZ')}>⭐ {t('Quiz me')}</Button>
         </div>
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (q.trim().length >= 2) ask('ASK', q.trim()); else toast(t('Type your question'), 'err'); }}>
           <Input aria-label={t('Your question')} maxLength={300} placeholder={t('Ask about your book…')} value={q} onChange={(e) => setQ(e.target.value)} />
-          <Button disabled={busy}>{t('Ask')}</Button>
+          <Button disabled={busy || unknown}>{t('Ask')}</Button>
         </form>
         <p className="text-[11px] text-slate-600">{t('Owl only knows your book. Your teacher can see your questions.')}</p>
       </div>

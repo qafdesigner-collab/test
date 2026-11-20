@@ -40,3 +40,17 @@ document.addEventListener('keydown',function(e){var k=(e.key||'').toLowerCase();
 document.addEventListener('visibilitychange',function(){var h=document.getElementById('kg-sh');if(!h)return;if(document.visibilityState==='hidden'){h.dataset.away='1';h.style.display='flex';}else if(h.dataset.away){delete h.dataset.away;h.style.display='none';}});document.addEventListener('keyup',function(e){var k=(e.key||'').toLowerCase();if(k==='printscreen'||k==='snapshot'){try{navigator.clipboard.writeText('')}catch(_){}show();}},true);document.addEventListener('keydown',function(e){var k=(e.key||'').toLowerCase();if(e.shiftKey&&(e.metaKey||k==='meta'||k==='os'))show();},true);
 window.print=function(){};})();</script>`;
 }
+
+/**
+ * Script added to HTML5 flipbooks: tells the reader around the frame which page(s) are open, so Ask Owl can explain exactly
+ * that page. Uses the flipbook's own page API (FlipHTML5-style BookInfo), else a page number in the address, else the page
+ * pictures that take the most room on screen. Only page numbers are sent.
+ */
+export const FLIP_PAGE_REPORTER = `<script>(function(){if(window.parent===window)return;var last='';
+function vis(){var best=[],max=0;var im=document.querySelectorAll('img');for(var i=0;i<im.length;i++){var m=/\\/(?:page|pages|large|mobile)\\/(?:page)?0*(\\d+)\\.(?:jpe?g|png|webp)/i.exec(im[i].src||'');if(!m)continue;
+if(im[i].checkVisibility&&!im[i].checkVisibility({opacityProperty:true,visibilityProperty:true}))continue;var r=im[i].getBoundingClientRect();
+var a=Math.max(0,Math.min(r.right,innerWidth)-Math.max(r.left,0))*Math.max(0,Math.min(r.bottom,innerHeight)-Math.max(r.top,0));if(a>0)best.push([+m[1],a]);if(a>max)max=a;}
+return best.filter(function(x){return x[1]>=max*0.6}).map(function(x){return x[0]}).sort(function(a,b){return a-b}).slice(0,2);}
+function cur(){try{if(window.BookInfo&&BookInfo.getCurrentPages){var a=BookInfo.getCurrentPages();if(a&&a.length)return Array.prototype.slice.call(a).map(Number).filter(function(n){return n>0}).slice(0,2);}}catch(e){}
+var m=/[#&?](?:p|page|pg)=(\\d+)/i.exec(location.hash+'&'+location.search);if(m)return[+m[1]];return vis();}
+setInterval(function(){var p=cur();var k=p.join(',');if(k&&k!==last){last=k;parent.postMessage({kgFlipPages:p},'*');}},700);})();</script>`;

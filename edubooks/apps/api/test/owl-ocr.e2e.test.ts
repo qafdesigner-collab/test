@@ -20,7 +20,15 @@ describe('Ask Owl reads pages that have no text yet; continue reading only shows
     const r = await student.post('/api/tutor/ask').send({ editionId: ed, componentId: part.id, page: 2, mode: 'EXPLAIN' });
     expect(r.status).toBe(201);
     expect(r.body.answer).not.toMatch(/can't read the words/);
-    expect(r.body.sources.length).toBeGreaterThan(0);
+    // only the open page is used — never the pages around it
+    expect(r.body.sources.map((x: any) => x.page)).toEqual([2]);
+    const owner2 = ownerPool();
+    const { rows } = await owner2.query(`SELECT page_number FROM book_pages WHERE component_id = $1 AND length(text_content) > 20 ORDER BY 1`, [part.id]); await owner2.end();
+    expect(rows.map((x: any) => x.page_number)).toEqual([2]);
+    // a double-page spread: both open pages, nothing else
+    const q = await student.post('/api/tutor/ask').send({ editionId: ed, componentId: part.id, page: 2, toPage: 3, mode: 'ASK', question: 'What is on these pages?' });
+    expect(q.status).toBe(201);
+    expect(q.body.sources.every((x: any) => [2, 3].includes(x.page))).toBe(true);
   }, 120_000);
 
   it('continue reading skips a book the student no longer holds a licence for', async () => {

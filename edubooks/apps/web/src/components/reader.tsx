@@ -70,6 +70,13 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   const flip = useQuery({ queryKey: ['flipbook', comp?.id, flipUnit], queryFn: () => api.get(`/reader/components/${comp!.id}/flipbook${flipUnit ? `?unit=${flipUnit}` : ''}`), enabled: !!comp?.flipbook && view === 'flip', staleTime: 5 * 3600_000 , placeholderData: (prev: any) => (prev && flipUnit ? prev : undefined) });
   const flipUnits: { id: string; title: string | null }[] = (flip.data as any)?.units ?? [];
   const flipMode = view === 'flip' && !!comp?.flipbook;
+  // the flipbook frame reports which page(s) are open (see FLIP_PAGE_REPORTER on the server), so Ask Owl uses exactly that page
+  const flipRef = useRef<HTMLIFrameElement>(null); const [flipPages, setFlipPages] = useState<number[]>([]);
+  useEffect(() => { setFlipPages([]); }, [comp?.id, flipMode]);
+  useEffect(() => {
+    const on = (e: MessageEvent) => { if (e.source && e.source === flipRef.current?.contentWindow && Array.isArray(e.data?.kgFlipPages)) setFlipPages(e.data.kgFlipPages.map(Number).filter((n: number) => n > 0).slice(0, 2)); };
+    window.addEventListener('message', on); return () => window.removeEventListener('message', on);
+  }, []);
 
   // Default part: the first one with pages; resume at last page read.
   useEffect(() => {
@@ -230,13 +237,13 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
           {comp?.type === 'MOBILE_APP' ? <AppPanel componentId={comp.id} title={comp.title} />
           : flipMode ? (flip.error ? <div className="m-auto"><ErrorBox error={flip.error} /></div>
             : !flip.data ? <Spinner className="m-auto size-8" />
-              : <ContentGuard className="absolute inset-0"><iframe key={flip.data.url} src={flip.data.url} title={`${comp?.title} — flipbook`} className={cn('absolute inset-0 size-full border-0 bg-white', kid && 'rounded-2xl')}
+              : <ContentGuard className="absolute inset-0"><iframe ref={flipRef} key={flip.data.url} src={flip.data.url} title={`${comp?.title} — flipbook`} className={cn('absolute inset-0 size-full border-0 bg-white', kid && 'rounded-2xl')}
                   sandbox="allow-scripts allow-popups allow-forms allow-modals allow-pointer-lock allow-downloads allow-presentation" allow="fullscreen; autoplay" allowFullScreen referrerPolicy="no-referrer" /></ContentGuard>)
           : !comp?.hasPdf ? <div className="m-auto max-w-sm text-center text-slate-500"><FileText className="mx-auto mb-2 size-10" />This part has resources only — see the files listed for it.</div>
             : docError ? <div className="m-auto"><ErrorBox error={new Error(docError)} /></div>
               : <>{loadingDoc && <Spinner className="absolute left-1/2 top-1/2 size-8" />}<ContentGuard className="relative"><canvas ref={canvas} className={cn('block bg-white shadow-xl', kid ? 'rounded-2xl' : 'rounded')} aria-label={`Page ${page} of ${pages}`} />{doc && comp && <HotspotLayer componentId={comp.id} page={page} editing={editHot} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} />}</ContentGuard></>}
         </main>
-        {owl && comp && <TutorPanel key={`${comp.id}-${flipMode}`} editionId={editionId} componentId={comp.id} page={page} onGo={go} askPage={flipMode} onClose={() => setOwl(false)} />}
+        {owl && comp && <TutorPanel key={`${comp.id}-${flipMode}`} editionId={editionId} componentId={comp.id} page={flipMode ? flipPages[0] ?? 0 : page} toPage={flipMode ? flipPages[1] : undefined} flip={flipMode} onGo={go} onClose={() => setOwl(false)} />}
         {!owl && (lessonResources.length > 0 || lessonWork.length > 0 || lessonGames.length > 0 || (!kid && lessonHere)) && (
           <aside className="hidden w-64 shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-3 text-sm xl:block">
             {!kid && lessonHere && <Link href={`/teacher/ai?editionId=${editionId}&lessonId=${lessonHere.id}`} className="mb-3 block rounded-lg bg-violet-50 px-3 py-2 font-medium text-violet-800 hover:bg-violet-100">✨ AI assistant for this lesson</Link>}

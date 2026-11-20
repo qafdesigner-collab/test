@@ -1,4 +1,4 @@
-import { guardScript } from '../common/protection';
+import { FLIP_PAGE_REPORTER, guardScript } from '../common/protection';
 import { AiModule } from '../ai/ai.module';
 import { IndexerService } from '../ai/indexer.service';
 import { bookComponents } from '../db/schema';
@@ -122,12 +122,13 @@ export class FlipbookController {
     flipHeaders(res, f.mime);
     if (t.protect) res.setHeader('Cache-Control', 'no-store');
     const stream = await this.svc['assets'].driver.read(f.key);
-    if ((f.kind === 'SWF' || t.protect) && f.mime.startsWith('text/html')) {
+    if (f.mime.startsWith('text/html')) {
       const chunks: Buffer[] = [];
       for await (const c of stream) chunks.push(c as Buffer);
       let html = Buffer.concat(chunks).toString('utf8');
       if (t.protect) html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + guardScript(t.watermark)) : guardScript(t.watermark) + html;
       if (f.kind === 'SWF') html = this.svc.injectRuffle(html, base);
+      else html = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, (m) => FLIP_PAGE_REPORTER + m) : html + FLIP_PAGE_REPORTER;
       res.setHeader('Content-Length', String(Buffer.byteLength(html)));
       return res.end(html);
     }
