@@ -1,3 +1,8 @@
+# What's new in Knowledge Gate 1.3.36
+
+- **Clear messages when an upload fails:** “no free disk space left” when the server or hosting quota is full, and “the upload stopped before the whole file arrived” when the connection drops. Before, both showed “Unexpected server error”.
+- **Super admin → Updates → 💾 Disk space** shows the free space and what the platform keeps: database backups, previous version, temporary files, logs, OCR and your files. **Free up space** keeps the 2 newest backups, deletes old temporary files, and can optionally remove the previous version. Your books and data are never touched.
+
 # What's new in Knowledge Gate 1.3.35
 
 ## AI: main + backups (e.g. Ollama first, then Gemini)

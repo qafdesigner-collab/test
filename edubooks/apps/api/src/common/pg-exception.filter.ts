@@ -31,6 +31,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return res.status(err.status).json({ statusCode: err.status, message });
     }
     if (err?.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ statusCode: 413, message: 'File is too large.' });
+    // the server's disk (or the hosting account's quota) is full
+    if (err?.code === 'ENOSPC' || err?.code === 'EDQUOT' || err?.cause?.code === 'ENOSPC' || err?.cause?.code === 'EDQUOT')
+      return res.status(507).json({ statusCode: 507, message: 'The server has no free disk space left (hosting quota full). Free up space — e.g. Super admin → Updates → Free up space, or delete old backups in cPanel — then try again.' });
+    // the upload stopped half-way (connection dropped, or the host cut a long upload)
+    if (/request aborted|unexpected end of form|ECONNRESET|aborted/i.test(String(err?.message ?? '')) || err?.code === 'ECONNRESET')
+      return res.status(400).json({ statusCode: 400, message: 'The upload stopped before the whole file arrived. Please try again — or use the small update file, or “download it from a link”.' });
     this.log.error(`${err?.cause?.message ? `[${err.cause.code}] ${err.cause.message} — ` : ''}${String(err?.message).slice(0, 300)}`, err?.stack);
     return res.status(500).json({ statusCode: 500, message: 'Unexpected server error' });
   }

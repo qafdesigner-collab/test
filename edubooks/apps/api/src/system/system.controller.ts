@@ -1,4 +1,6 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Logger, Post, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Type } from 'class-transformer';
+import { IsInt, Max, Min } from 'class-validator';
 import { ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
@@ -33,6 +35,20 @@ const logFn = (l: Logger) => (level: string, msg: string) => (level === 'error' 
  * Super admin → Updates. Works on single-folder installs (cPanel package), where the program can replace itself.
  * Docker installs are updated by deploying new images instead.
  */
+class FreeSpaceDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(30) keepBackups?: number;
+  /** Also delete the previous version (then "Roll back" is no longer possible). */
+  @IsOptional() previousVersion?: boolean;
+}
+const fileSize = (p: string) => { try { return fs.statSync(p).size; } catch { return 0; } };
+function dirSize(p: string): number {
+  let n = 0;
+  try {
+    for (const e of fs.readdirSync(p, { withFileTypes: true })) { const q = path.join(p, e.name); n += e.isDirectory() ? dirSize(q) : e.isFile() ? fileSize(q) : 0; }
+  } catch { /* missing or not readable */ }
+  return n;
+}
+
 @ApiTags('system')
 @Roles('PUBLISHER_ADMIN')
 @Controller('system/updates')
@@ -51,6 +67,41 @@ export class SystemController {
   status() {
     if (!root() || !fs.existsSync(path.join(root(), 'updater.js'))) return { supported: false };
     return { supported: true, ...updater().status(logFn(this.log)) };
+  }
+
+  /** Disk use of what the platform keeps besides your data: backups, the previous version (for Roll back), temporary files. */
+  @Get('space')
+  async space() {
+    this.supported();
+    const r = root(); const size = (p: string) => dirSize(p);
+    const backups = path.join(r, 'backups');
+    const files = fs.existsSync(backups) ? fs.readdirSync(backups).filter((f) => /^edubooks-db-.*\.tar\.gz$/.test(f)).sort() : [];
+    let free: number | null = null; try { const st = (fs as any).statfsSync(r); free = st.bavail * st.bsize; } catch { /* old Node */ }
+    return { free, backups: { count: files.length, bytes: files.reduce((n, f) => n + fileSize(path.join(backups, f)), 0) }, previous: size(path.join(r, '.previous-version')),
+      temp: size(path.join(r, 'tmp')) + size(path.join(r, 'updates', 'incoming')) + (updater().status().state?.state === 'staged' ? 0 : size(path.join(r, 'updates', 'staging'))),
+      logs: size(path.join(r, 'logs')), storage: size(path.join(r, 'storage')), ocr: size(path.join(r, 'ocr')) };
+  }
+
+  /** Deletes temporary files and old database backups (the newest ones are kept). Your data and files are not touched. */
+  @Post('free-space')
+  async freeSpace(@Body() d: FreeSpaceDto, @Req() req: any) {
+    this.supported();
+    const r = root(); const keep = d.keepBackups ?? 2; let freed = 0;
+    const del = (p: string) => { const n = fs.statSync(p).isDirectory() ? dirSize(p) : fileSize(p); fs.rmSync(p, { recursive: true, force: true }); freed += n; };
+    const backups = path.join(r, 'backups');
+    if (fs.existsSync(backups)) {
+      const files = fs.readdirSync(backups).filter((f) => /^edubooks-db-.*\.tar\.gz$/.test(f)).sort();
+      for (const f of files.slice(0, Math.max(0, files.length - keep))) del(path.join(backups, f));
+    }
+    for (const dir of [path.join(r, 'tmp'), path.join(r, 'updates', 'incoming')]) {
+      if (!fs.existsSync(dir)) continue;
+      // only leftovers older than an hour (not an upload that is arriving right now)
+      for (const f of fs.readdirSync(dir)) { const p = path.join(dir, f); try { if (Date.now() - fs.statSync(p).mtimeMs > 3600_000 && f !== 'restart.txt') del(p); } catch { /* gone */ } }
+    }
+    if (updater().status().state?.state !== 'staged' && fs.existsSync(path.join(r, 'updates', 'staging'))) del(path.join(r, 'updates', 'staging'));
+    if (d.previousVersion && fs.existsSync(path.join(r, '.previous-version'))) del(path.join(r, '.previous-version'));
+    await this.db.withContext(req.ctx, () => this.audit.log('system.free_space', 'system', null, `Freed ${(freed / 1048576).toFixed(0)} MB (kept ${keep} backups${d.previousVersion ? ', removed the previous version' : ''})`)).catch(() => undefined);
+    return { freed, ...(await this.space()) };
   }
 
   /** Upload a package: it is unpacked and checked, nothing is changed yet. */

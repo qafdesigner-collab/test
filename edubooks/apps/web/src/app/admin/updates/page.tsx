@@ -48,6 +48,7 @@ export default function UpdatesPage() {
         : <>
           <Result st={st} />
           <UploadCard onStaged={() => qc.invalidateQueries({ queryKey: ['updates'] })} />
+          <SpaceCard />
         </>}
 
       <Card className="overflow-hidden">
@@ -169,4 +170,35 @@ function Result({ st }: { st: any }) {
   if (st.state === 'rolled_back') return <Card className="flex items-center gap-3 border-amber-200 bg-amber-50 p-4 text-amber-900"><RotateCcw className="size-5 shrink-0" />{st.message}</Card>;
   if (st.state === 'failed') return <Card className="flex items-center gap-3 border-red-200 bg-red-50 p-4 text-red-900"><XCircle className="size-5 shrink-0" />{st.error}</Card>;
   return null;
+}
+
+const mb = (n: number | null | undefined) => (n == null ? '—' : n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(1)} GB` : `${Math.round(n / 1048576)} MB`);
+/** Disk space: what the platform keeps besides your data, and freeing it (old backups, temporary files). */
+function SpaceCard() {
+  const q = useQuery({ queryKey: ['updateSpace'], queryFn: () => api.get<any>('/system/updates/space') });
+  const [busy, setBusy] = useState(false); const [prev, setPrev] = useState(false); const [msg, setMsg] = useState(''); const [err, setErr] = useState<unknown>(null);
+  const qc = useQueryClient();
+  const free = async () => {
+    setBusy(true); setErr(null); setMsg('');
+    try { const r = await api.post<any>('/system/updates/free-space', { keepBackups: 2, previousVersion: prev || undefined }); setMsg(`Freed ${mb(r.freed)}.`); qc.setQueryData(['updateSpace'], r); }
+    catch (e) { setErr(e); } finally { setBusy(false); }
+  };
+  if (!q.data) return null; const d = q.data;
+  const rows: [string, string, string][] = [
+    ['Database backups', `${d.backups.count} · ${mb(d.backups.bytes)}`, 'made before each update; the 2 newest are kept'],
+    ['Previous version', mb(d.previous), 'used by “Roll back”'],
+    ['Temporary files', mb(d.temp), 'uploads and unpacked updates'],
+    ['Logs', mb(d.logs), ''], ['OCR', mb(d.ocr), 'if installed from the AI page'], ['Your files (books, resources)', mb(d.storage), 'never deleted here'],
+  ];
+  return (
+    <Card className="space-y-3 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold text-slate-900">💾 Disk space</h2>
+        {d.free != null && <span className={`text-sm font-medium ${d.free < 1024 ** 3 ? 'text-red-600' : 'text-slate-600'}`}>Free on the server: {mb(d.free)}{d.free < 1024 ** 3 ? ' — low' : ''}</span>}</div>
+      <table className="w-full text-sm"><tbody className="divide-y divide-slate-100">{rows.map(([a, b, c]) => <tr key={a}><td className="py-1.5 font-medium text-slate-700">{a}</td><td className="py-1.5 tabular-nums">{b}</td><td className="py-1.5 text-xs text-slate-500">{c}</td></tr>)}</tbody></table>
+      <p className="text-xs text-slate-500">An update needs free space for the upload and for unpacking it (about 3× the file). If an upload fails with “Unexpected server error” or “no free disk space”, free up space here, or use the <b>small</b> update file.</p>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={prev} onChange={(e) => setPrev(e.target.checked)} />Also delete the previous version (then Roll back is no longer possible)</label>
+      {err ? <ErrorBox error={err} /> : null}{msg && <p className="text-sm text-emerald-700">{msg}</p>}
+      <div className="flex justify-end"><Button variant="secondary" loading={busy} onClick={free}>Free up space</Button></div>
+    </Card>
+  );
 }
