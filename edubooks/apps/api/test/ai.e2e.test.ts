@@ -48,7 +48,8 @@ describe('Phase 5 — AI assistant (offline provider)', () => {
 
   it('reports the provider status and quota', async () => {
     const s = (await teacher.get('/api/ai/status')).body;
-    expect(s).toMatchObject({ provider: 'offline', live: false, usedThisMonth: 0 });
+    expect(s).toMatchObject({ provider: '', live: false, usedThisMonth: 0 });
+    expect((await admin.get('/api/ai/status')).body).toMatchObject({ provider: 'offline', live: false });
     expect(s.tasks.map((t: any) => t.id)).toEqual(expect.arrayContaining(['LESSON_PLAN', 'WORKSHEET', 'MCQ', 'DIFFERENTIATE', 'GAMES']));
   });
 
@@ -59,7 +60,7 @@ describe('Phase 5 — AI assistant (offline provider)', () => {
     expect(r.body.sources.length).toBeGreaterThan(0);
     for (const s of r.body.sources.filter((x: any) => x.n <= 4)) expect(s.page >= pageRange[0] && s.page <= pageRange[1]).toBe(true);
     expect(r.body.output.steps.reduce((n: number, s: any) => n + s.minutes, 0)).toBeGreaterThan(20);
-    expect(r.body.warnings[0]).toMatch(/Offline draft/);
+    expect(r.body.warnings[0]).toMatch(/simple draft made from the lesson/);
     const { rows } = await owner.query(`SELECT params->>'notes' AS notes, status, grounded FROM ai_generations WHERE id = $1`, [r.body.id]);
     expect(rows[0]).toMatchObject({ status: 'OK', grounded: true });
     expect(rows[0].notes).not.toMatch(/miss@school|1234567/);

@@ -42,7 +42,7 @@ function Assistant() {
   return (
     <div className="space-y-6">
       <PageHeader title="AI teaching assistant" sub="Ask the AI anything for your teaching — research, question papers, plans, letters — or make lesson plans, homework and questions from the pages of your books. You review everything before it is used.">
-        {s && <Badge tone={s.live ? 'info' : 'DRAFT'}>{s.live ? `Model: ${s.model}` : 'Offline drafts (no AI model configured)'}</Badge>}
+        {s && <Badge tone={s.live ? 'info' : 'DRAFT'}>{s.live ? (s.model ? `Model: ${s.model}` : '✨ AI ready') : 'Offline drafts (no AI model configured)'}</Badge>}
         {s?.monthlyLimit && <Badge>{s.usedThisMonth} / {s.monthlyLimit} requests this month</Badge>}
       </PageHeader>
       {s && !s.health.ok && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">The AI server is not available: {s.health.detail}</div>}

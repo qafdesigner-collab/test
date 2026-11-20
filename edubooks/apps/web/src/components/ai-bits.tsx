@@ -20,7 +20,7 @@ export function AiNotices({ r }: { r: { live: boolean; grounded: boolean; provid
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <Badge tone={r.live ? 'info' : 'DRAFT'}><Cpu className="size-3" />{r.live ? `${r.model}` : 'Offline draft'}</Badge>
+        <Badge tone={r.live ? 'info' : 'DRAFT'}><Cpu className="size-3" />{r.live ? (r.model || 'AI draft') : 'Offline draft'}</Badge>
         <Badge tone={r.grounded ? 'PUBLISHED' : 'danger'}>{r.grounded ? 'Grounded in the book pages' : 'Not grounded — no book text'}</Badge>
         <span className="text-slate-500">AI drafts can be wrong. Review and edit before using with children.</span>
       </div>

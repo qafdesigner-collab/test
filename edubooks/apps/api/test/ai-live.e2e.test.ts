@@ -40,7 +40,7 @@ describe('Phase 5 — live AI provider (self-hosted, OpenAI-compatible)', () => 
 
   it('sends grounded book text + rules to the model and drops invented citations', async () => {
     const s = (await teacher.get('/api/ai/status')).body;
-    expect(s).toMatchObject({ provider: 'openai-compatible', model: 'test-model', live: true, health: { ok: true } });
+    expect(s).toMatchObject({ provider: '', model: '', live: true, health: { ok: true } });
     const r = await teacher.post('/api/ai/generate').send({ task: 'LESSON_PLAN', editionId: english, lessonId, durationMin: 30 });
     expect(r.status).toBe(201);
     expect(r.body.output.steps[0].sources).toEqual([1]);
@@ -67,7 +67,8 @@ describe('Phase 5 — live AI provider (self-hosted, OpenAI-compatible)', () => 
     mode = 'down';
     const r = await teacher.post('/api/ai/generate').send({ task: 'MCQ', editionId: english, lessonId });
     expect(r.status).toBe(201); expect(r.body.live).toBe(false);
-    expect(r.body.warnings[0]).toMatch(/could not be used .*answered 500/);
+    // the teacher gets a plain message; the technical reason is kept for the admins
+    expect(r.body.warnings[0]).toMatch(/not available right now/); expect(r.body.warnings.join(' ')).not.toMatch(/answered 500/);
     const owner = require('./helpers').ownerPool();
     const { rows } = await owner.query(`SELECT status, error, model FROM ai_generations WHERE task = 'MCQ'`);
     await owner.end();

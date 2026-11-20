@@ -52,8 +52,10 @@ describe('Super admin connects a free AI service', () => {
     // saving again without a key keeps the saved one
     expect((await admin.put('/api/ai/settings').send({ preset: 'custom', baseUrl: base, model: 'free-model' })).body.hasKey).toBe(true);
 
+    // teachers see that the AI is ready, but not which service or model it is (only admins do)
     const s = (await teacher.get('/api/ai/status')).body;
-    expect(s).toMatchObject({ model: 'free-model', live: true, health: { ok: true } });
+    expect(s).toMatchObject({ model: '', provider: '', live: true, health: { ok: true } });
+    expect((await admin.get('/api/ai/status')).body).toMatchObject({ model: 'free-model', live: true });
     const english = (await teacher.get('/api/teacher/books')).body.find((b: any) => b.title === 'KG English').editionId;
     const lessonId = (await teacher.get(`/api/reader/editions/${english}`)).body.components[0].units[0].lessons[0].id;
     const before = calls.length;
@@ -88,7 +90,8 @@ describe('AI per school: the publisher decides, a school may connect its own AI'
   afterAll(async () => { await admin.put(`/api/ai/schools/${school}`).send({ access: 'PUBLISHER' }); await admin.delete('/api/ai/settings'); await app.close(); });
 
   it('off for a school; a monthly limit and fee; the school\'s own service when allowed', async () => {
-    expect((await teacher.get('/api/ai/status')).body).toMatchObject({ live: true, model: 'free-model', access: 'PUBLISHER' });
+    expect((await teacher.get('/api/ai/status')).body).toMatchObject({ live: true, model: '', access: 'PUBLISHER' });
+    expect((await principal.get('/api/ai/status')).body).toMatchObject({ live: true, model: 'free-model', access: 'PUBLISHER' });
     // AI off for this school
     expect((await admin.put(`/api/ai/schools/${school}`).send({ access: 'OFF' })).status).toBe(200);
     expect((await teacher.post('/api/ai/chat').send({ message: 'hello' })).body.message).toMatch(/not switched on for your school/);
@@ -171,12 +174,16 @@ describe('Main AI (e.g. Ollama) with backups', () => {
     const lessonId = (await teacher.get(`/api/reader/editions/${english}`)).body.components[0].units[0].lessons[0].id;
     const owner = require('./helpers').ownerPool(); await owner.query(`DELETE FROM ai_generations`); await owner.end();
     const a = await teacher.post('/api/ai/generate').send({ task: 'LESSON_PLAN', editionId: english, lessonId });
-    expect(a.status).toBe(201); expect(a.body.model).toBe('qwen2.5:7b'); expect(seen).toContain('ollama');
+    expect(a.status).toBe(201); expect(a.body.model).toBe(''); expect(seen).toContain('ollama');
     // the computer with Ollama is switched off
     await new Promise<void>((r) => ollama.close(() => r())); (ollama as any).closeAllConnections?.();
     const b = await teacher.post('/api/ai/generate').send({ task: 'LESSON_PLAN', editionId: english, lessonId });
-    expect(b.status).toBe(201); expect(b.body.live).toBe(true); expect(b.body.model).toBe('free-model');
-    expect(b.body.warnings.join(' ')).toMatch(/main AI did not answer.*backup AI/);
+    expect(b.status).toBe(201); expect(b.body.live).toBe(true);
+    // the teacher just gets the draft: which AI answered (and that a backup was used) is for the admins
+    expect(b.body.model).toBe(''); expect(b.body.warnings.join(' ')).not.toMatch(/backup|main AI/);
+    const owner2 = require('./helpers').ownerPool();
+    const { rows: [g] } = await owner2.query(`SELECT model FROM ai_generations WHERE id = $1`, [b.body.id]); await owner2.end();
+    expect(g.model).toBe('free-model');
     const chat = await teacher.post('/api/ai/chat').send({ message: 'Ideas for a song about colours' });
     expect(chat.status).toBe(201);
     const list = (await admin.get('/api/ai/settings')).body.backups;

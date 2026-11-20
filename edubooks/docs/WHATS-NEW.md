@@ -1,3 +1,8 @@
+# What's new in Knowledge Gate 1.3.42
+
+- **AI service details only for admins.** Teachers no longer see which AI service or model is used (the page shows **✨ AI ready**), nor notes such as “The main AI did not answer, so this draft was made by the backup AI”. When the AI cannot be reached, teachers see a plain message: “The AI is not available right now… try again in a few minutes”.
+- The **super admin** (and publisher staff) and **school admins** still see everything: the model, backups and the technical reasons — on the AI assistant pages and in the AI usage records.
+
 # What's new in Knowledge Gate 1.3.41
 
 - **Two pages open side by side?** Owl's panel now shows **“Which page? Page 4 | Page 5”**. The student taps one, and Explain, Quiz me, questions and Read to Owl use **only that page** (read with OCR if it is a picture page). With one page open, Owl simply uses that page — there is nothing to type or choose.

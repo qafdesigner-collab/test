@@ -79,7 +79,7 @@ export class AiController {
   @Roles('TEACHER') @Throttle({ default: { limit: Number(process.env.AI_RATE_LIMIT_PER_MIN || 10), ttl: 60_000 } })
   @Post('generate') generate(@Body() d: GenerateDto) { return this.ai.generate(d); }
   @Roles('TEACHER') @Get('generations') history() { return this.ai.history(); }
-  @Roles('TEACHER') @Get('generations/:id') get(@Param('id', Id()) id: string) { return this.ai.get(id); }
+  @Roles('TEACHER') @Get('generations/:id') get(@Param('id', Id()) id: string) { return this.ai.view(id); }
   @Roles('TEACHER') @Post('generations/:id/use') use(@Param('id', Id()) id: string, @Body() d: UseDto) { return this.ai.use(id, d); }
   @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR', 'PUBLISHER_SALES', 'SCHOOL_ADMIN') @Get('usage') usage() { return this.ai.usage(); }
 

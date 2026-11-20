@@ -52,10 +52,19 @@ export class AiService {
     return (rows[0] as any).n as number;
   }
 
+  /**
+   * Which AI service and model answered, backups and technical errors are shown only to the super admin, publisher staff
+   * and school admins. Teachers see the result and a plain message.
+   */
+  private get seesAiDetails() { return !!this.ctx.staff || this.ctx.roles.some((r) => r === 'SCHOOL_ADMIN' || r.startsWith('PUBLISHER_')); }
+  static readonly NOT_NOW = 'The AI is not available right now. Please try again in a few minutes.';
+
   async status() {
-    const p = await this.providers.current();
+    const p = await this.providers.current(); const admin = this.seesAiDetails;
+    const health = await this.providers.health();
     return {
-      provider: p.name, model: p.model, live: p.live, embeddings: this.providers.embeddingsEnabled, ocr: (await ocrAvailable()).ok, ocrLangs: (await ocrAvailable()).langs, health: await this.providers.health(),
+      provider: admin ? p.name : '', model: admin ? p.model : '', live: p.live, embeddings: this.providers.embeddingsEnabled, ocr: (await ocrAvailable()).ok, ocrLangs: (await ocrAvailable()).langs,
+      health: admin || health.ok ? health : { ...health, detail: AiService.NOT_NOW },
       tasks: Object.entries(TASKS).map(([id, t]) => ({ id, label: t.label, kind: t.kind })),
       ...(this.ctx.schoolId ? { usedThisMonth: await this.usedThisMonth(), monthlyLimit: await this.providers.monthlyLimit(), access: (await this.providers.school()).access } : {}),
     };
@@ -127,11 +136,11 @@ export class AiService {
       if (res.refused) { await log({ status: 'REFUSED' }); throw new UnprocessableEntityException('The AI declined this request. Try asking in a different way.'); }
       const text = res.text.trim();
       await log({ status: 'OK', text, inTok: res.inputTokens, outTok: res.outputTokens, model: res.model });
-      return { text, model: res.model, pages: sources.map((x) => x.page), remaining: Math.max(0, limit - used - 1) };
+      return { text, model: this.seesAiDetails ? res.model : '', pages: sources.map((x) => x.page), remaining: Math.max(0, limit - used - 1) };
     } catch (e: any) {
       if (e instanceof UnprocessableEntityException) throw e;
       const msg = e instanceof AiUnavailableError ? e.message : 'The AI service failed';
-      await log({ status: 'ERROR', error: msg }); throw new ServiceUnavailableException(msg);
+      await log({ status: 'ERROR', error: msg }); throw new ServiceUnavailableException(this.seesAiDetails ? msg : AiService.NOT_NOW);
     }
   }
 
@@ -198,23 +207,33 @@ export class AiService {
     const live = provider.live && !fallback;
     const { output, warnings } = live ? raw : normalise(i.task, raw, sources);
     if (ocrNote) warnings.unshift(ocrNote);
-    if (viaNote) warnings.unshift(viaNote);
-    if (fallback) warnings.unshift(`The AI service could not be used (${fallback}) — this is an offline draft from the lesson data. Ask your admin to check the AI settings.`);
-    else if (!provider.live) warnings.unshift('Offline draft: no AI model is configured, so this was assembled from the lesson data only.');
+    const admin = this.seesAiDetails;
+    if (viaNote && admin) warnings.unshift(viaNote);
+    if (fallback) warnings.unshift(admin ? `The AI service could not be used (${fallback}) — this is an offline draft from the lesson data. Ask your admin to check the AI settings.`
+      : 'The AI is not available right now, so this is a simple draft made from the lesson. You can edit it, or try again in a few minutes.');
+    else if (!provider.live) warnings.unshift(admin ? 'Offline draft: no AI model is configured, so this was assembled from the lesson data only.' : 'This is a simple draft made from the lesson (the AI is not switched on). Ask your school admin about the AI.');
     const id = await record({ status: 'OK', output, ...tokens, model: fallback ? 'offline-drafter' : model, ...(fallback ? { error: fallback } : {}) });
     return {
-      id, task: i.task, provider: provider.name, model: fallback ? 'offline-drafter' : model, live, grounded: sources.length > 0, output, warnings,
+      id, task: i.task, provider: admin ? provider.name : '', model: admin ? (fallback ? 'offline-drafter' : model) : '', live, grounded: sources.length > 0, output, warnings,
       sources: sources.map((s) => ({ n: s.n, page: s.page, component: s.component, componentId: s.componentId, lesson: s.lesson, snippet: s.text.slice(0, 220) })),
       usage: { ...tokens, usedThisMonth: used + 1, monthlyLimit: limit },
     };
   }
 
   async history() {
-    return this.q.select({ id: aiGenerations.id, task: aiGenerations.task, status: aiGenerations.status, grounded: aiGenerations.grounded, usedAs: aiGenerations.usedAs,
+    const admin = this.seesAiDetails;
+    const rows = await this.q.select({ id: aiGenerations.id, task: aiGenerations.task, status: aiGenerations.status, grounded: aiGenerations.grounded, usedAs: aiGenerations.usedAs,
       createdAt: aiGenerations.createdAt, provider: aiGenerations.provider, model: aiGenerations.model,
       title: sql<string | null>`${aiGenerations.output}->>'title'`,
       lesson: sql<string | null>`(SELECT 'Lesson ' || l.number || ': ' || l.title FROM book_lessons l WHERE l.id = ${aiGenerations.lessonId})` })
       .from(aiGenerations).where(and(eq(aiGenerations.userId, this.ctx.userId), sql`${aiGenerations.task} <> 'CHAT'`)).orderBy(desc(aiGenerations.createdAt)).limit(50);
+    return admin ? rows : rows.map((r) => ({ ...r, provider: '', model: '' }));
+  }
+
+  /** A saved draft as the user sees it (no AI service details for teachers). */
+  async view(id: string) {
+    const g = await this.get(id);
+    return this.seesAiDetails ? g : { ...g, provider: '', model: '', error: g.error ? AiService.NOT_NOW : null };
   }
 
   async get(id: string) {
