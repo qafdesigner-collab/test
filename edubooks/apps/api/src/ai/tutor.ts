@@ -21,6 +21,43 @@ class AskDto {
   @IsIn(['EXPLAIN', 'ASK', 'QUIZ']) mode!: 'EXPLAIN' | 'ASK' | 'QUIZ';
   @IsOptional() @IsString() @MaxLength(300) question?: string;
 }
+class ReadDto {
+  @IsUUID() editionId!: string; @IsUUID() componentId!: string;
+  @Type(() => Number) @IsInt() @Min(1) @Max(5000) page!: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5000) toPage?: number;
+  /** what the browser heard the student read */
+  @IsString() @MaxLength(4000) transcript!: string;
+}
+
+/** Words of a text, for comparing reading: lower case, letters and numbers only. */
+export function readWords(t: string) {
+  return t.normalize('NFKC').toLowerCase().replace(/[\u064B-\u0652\u0670]/g, '').split(/[^\p{L}\p{N}']+/u).map((w) => w.replace(/^'+|'+$/g, '')).filter(Boolean);
+}
+const near = (a: string, b: string) => {
+  if (a === b) return true; if (a.length < 4 || b.length < 4 || Math.abs(a.length - b.length) > 1) return false;
+  let i = 0; while (i < a.length && a[i] === b[i]) i++; // one letter different, missing or extra (speech recognition slips)
+  return a.slice(i + 1) === b.slice(i + 1) || a.slice(i + 1) === b.slice(i) || a.slice(i) === b.slice(i + 1);
+};
+/**
+ * Compares what the student read with the page: the part of the page they read (first to last word heard),
+ * which of its words were read, missed, and which spoken words were not on the page.
+ */
+export function compareReading(pageText: string, transcript: string) {
+  const P = readWords(pageText).slice(0, 1500), S = readWords(transcript).slice(0, 600);
+  const m = P.length, n = S.length;
+  const L: Uint16Array[] = Array.from({ length: m + 1 }, () => new Uint16Array(n + 1));
+  for (let i = m - 1; i >= 0; i--) for (let j = n - 1; j >= 0; j--) L[i][j] = near(P[i], S[j]) ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const okP = new Set<number>(), okS = new Set<number>();
+  for (let i = 0, j = 0; i < m && j < n;) { if (near(P[i], S[j]) && L[i][j] === L[i + 1][j + 1] + 1) { okP.add(i); okS.add(j); i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) i++; else j++; }
+  if (okP.size < 2) return { matched: okP.size, score: 0, words: [] as { w: string; ok: boolean }[], missed: [] as string[], extra: S.slice(0, 15) };
+  const first = Math.min(...okP), last = Math.max(...okP);
+  const words = P.slice(first, last + 1).map((w, k) => ({ w, ok: okP.has(first + k) }));
+  const missed = words.filter((x) => !x.ok).map((x) => x.w);
+  const extra = S.filter((_, j) => !okS.has(j));
+  const score = Math.round((100 * okP.size) / Math.max(words.length, okP.size + Math.floor(extra.length / 2)));
+  return { matched: okP.size, score: Math.min(100, score), words, missed: [...new Set(missed)].slice(0, 15), extra: [...new Set(extra)].slice(0, 15) };
+}
+
 class SettingsDto { @IsBoolean() enabled!: boolean; @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) dailyLimit?: number; }
 
 /** Topics a children's book helper never discusses: the pupil is kindly sent to a trusted adult and the teacher can see it. */
@@ -147,6 +184,40 @@ export class TutorService {
     }
   }
 
+  /** Read-aloud self check: compares what the student read with the open page and gives kind feedback. */
+  async read(d: ReadDto) {
+    const s = await this.settings();
+    if (!s.enabled) throw new ForbiddenException('Ask Owl is not switched on for your school yet');
+    await this.access.assertEdition(d.editionId);
+    const comp = await this.one(sql`SELECT c.id FROM book_components c WHERE c.id = ${d.componentId} AND c.edition_id = ${d.editionId} AND c.visible_to::text IN ${visibleFor(this.ctx) ?? ['ALL', 'TEACHER', 'STUDENT']}`);
+    if (!comp) throw new BadRequestException('That page is not in this book');
+    const used = await this.usedToday();
+    if (used >= s.dailyLimit) throw new HttpException("You've done lots of great work today! Owl is resting now — try again tomorrow. 🦉", HttpStatus.TOO_MANY_REQUESTS);
+    const transcript = d.transcript.trim();
+    if (readWords(transcript).length < 2) throw new BadRequestException("Owl didn't hear you. Tap 🎤 and read the page aloud, nice and clear.");
+    const open = [...new Set([d.page, d.toPage ?? d.page])].filter((n) => n >= d.page && n <= d.page + 1);
+    let near = await this.pageText(d.componentId, open);
+    if (open.some((n) => !near.some((p) => p.page === n))) {
+      const r = await this.indexer.ensurePageText(d.componentId, open).catch(() => null);
+      if (r?.read) near = await this.pageText(d.componentId, open);
+    }
+    const text = near.map((p) => String(p.text)).join('\n');
+    let feedback: string; let r: ReturnType<typeof compareReading> | null = null;
+    if (!text.trim()) feedback = "I can't read the words on this page yet, so I can't check your reading. Please read it to your teacher! 🦉";
+    else {
+      r = compareReading(text, transcript);
+      const practise = r.missed.slice(0, 5).map((w) => `“${w}”`).join(', ');
+      feedback = r.matched < 2 ? "Hmm, I didn't hear words from this page. 🦉 Look at the page and try again, reading slowly and clearly."
+        : r.score >= 90 ? `Excellent reading! ⭐⭐⭐ You read ${r.matched} words right.${practise ? ` Just check ${practise}.` : ''}`
+          : r.score >= 70 ? `Good reading! ⭐⭐ You read ${r.matched} words right. Let's practise ${practise || 'a few words'} and read it once more.`
+            : `Nice try! ⭐ You read ${r.matched} words right. Read slowly with your finger under each word.${practise ? ` Practise ${practise}.` : ''}`;
+    }
+    await this.db.q.execute(sql`INSERT INTO tutor_messages (publisher_id, school_id, student_id, edition_id, component_id, page, mode, question, answer, sources, score)
+      VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${this.ctx.userId}, ${d.editionId}, ${d.componentId}, ${d.page}, 'READ', ${transcript.slice(0, 2000)}, ${feedback},
+        ${JSON.stringify(open.map((page) => ({ page })))}::jsonb, ${r ? r.score : null})`);
+    return { feedback, score: r?.score ?? null, matched: r?.matched ?? 0, words: r?.words.slice(0, 400) ?? [], missed: r?.missed ?? [], extra: r?.extra ?? [], pages: open, remaining: Math.max(0, s.dailyLimit - used - 1) };
+  }
+
   /** Without an AI model: show the book's own words that match best. */
   private offline(mode: string, question: string, sources: { page: number; text: string }[], page: number) {
     const here = sources.find((x) => x.page === page) ?? sources[0];
@@ -169,7 +240,7 @@ export class TutorService {
     if (classId) await this.access.assertTeaches(classId);
     const scope = classId ? sql`t.student_id IN (SELECT student_id FROM enrolments WHERE class_id = ${classId})`
       : cls ? sql`t.student_id IN (SELECT student_id FROM enrolments WHERE class_id = ANY(${`{${(cls.length ? cls : ['00000000-0000-0000-0000-000000000000']).join(',')}}`}::uuid[]))` : sql`true`;
-    return this.rows(sql`SELECT t.id, t.mode, t.question, t.answer, t.page, t.flagged, t.created_at AS "createdAt", u.display_name AS student, b.title AS book
+    return this.rows(sql`SELECT t.id, t.mode, t.question, t.answer, t.page, t.score, t.flagged, t.created_at AS "createdAt", u.display_name AS student, b.title AS book
       FROM tutor_messages t JOIN users u ON u.id = t.student_id LEFT JOIN book_editions e ON e.id = t.edition_id LEFT JOIN book_packages b ON b.id = e.package_id
       WHERE ${scope} AND ${flaggedOnly ? sql`t.flagged` : sql`true`} ORDER BY t.created_at DESC LIMIT 200`);
   }
@@ -181,6 +252,7 @@ export class TutorController {
   constructor(private readonly svc: TutorService) {}
   @Roles('STUDENT') @Get('status') status() { return this.svc.status(); }
   @Roles('STUDENT') @Post('ask') ask(@Body() d: AskDto) { return this.svc.ask(d); }
+  @Roles('STUDENT') @Post('read') read(@Body() d: ReadDto) { return this.svc.read(d); }
   @Roles('SCHOOL_ADMIN', 'TEACHER') @Get('settings') settings() { return this.svc.settings(); }
   @Roles('SCHOOL_ADMIN') @Put('settings') save(@Body() d: SettingsDto) { return this.svc.saveSettings(d); }
   @Roles('SCHOOL_ADMIN', 'TEACHER') @Get('log') log(@Query('classId', new ParseUUIDPipe({ optional: true })) classId?: string, @Query('flagged') flagged?: string) { return this.svc.log(classId, flagged === '1'); }

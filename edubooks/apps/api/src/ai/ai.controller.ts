@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { visibleFor } from '../common/visibility';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -11,6 +11,7 @@ import { makePageQuestions, QType } from './page-questions';
 import { Roles } from '../common/decorators';
 import { AiService } from './ai.service';
 import { IndexerService } from './indexer.service';
+import { ContentsService } from './contents.service';
 import { TASKS } from './tasks';
 
 class ChatTurn { @IsIn(['user', 'assistant']) role!: 'user' | 'assistant'; @IsString() @MaxLength(6000) text!: string; }
@@ -53,7 +54,7 @@ class PageQuestionsDto {
 @ApiTags('ai')
 @Controller('ai')
 export class AiController {
-  constructor(private readonly ai: AiService, private readonly indexer: IndexerService, private readonly db: DbService, private readonly access: AccessService) {}
+  constructor(private readonly ai: AiService, private readonly indexer: IndexerService, private readonly db: DbService, private readonly access: AccessService, private readonly contents: ContentsService) {}
 
   /** Questions from a book page, made by the built-in question maker: free, unlimited, no outside AI service. */
   @Roles('TEACHER', 'SCHOOL_ADMIN') @Post('page-questions')
@@ -85,4 +86,19 @@ export class AiController {
   // Publisher: the text index the assistant is grounded in.
   @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Get('index/editions/:id') indexStatus(@Param('id', Id()) id: string) { return this.indexer.status(id); }
   @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Post('index/components/:id') index(@Param('id', Id()) id: string) { return this.indexer.start(id); }
+
+  // Publisher: contents (units, lessons and their first pages) found from the part's pages
+  @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Post('contents/components/:id/find')
+  async findContents(@Param('id', Id()) id: string) {
+    const ctx = { ...this.db.ctx };
+    await this.contents.save(id, { source: 'HEADINGS', units: [], foundAt: new Date().toISOString(), running: true });
+    // in the background: the AI can take a minute, longer than a hosting allows for one request
+    setImmediate(() => { this.db.detached(ctx, async () => {
+      try { await this.contents.save(id, await this.contents.detect(id)); }
+      catch (e: any) { await this.contents.save(id, { source: 'HEADINGS', units: [], foundAt: new Date().toISOString(), error: String(e.message).slice(0, 300) }); }
+    }).catch(() => undefined); });
+    return { started: true };
+  }
+  @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Post('contents/components/:id/apply') applyContents(@Param('id', Id()) id: string) { return this.contents.apply(id); }
+  @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Delete('contents/components/:id') dismissContents(@Param('id', Id()) id: string) { return this.contents.dismiss(id); }
 }

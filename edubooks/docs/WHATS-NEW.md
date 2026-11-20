@@ -1,3 +1,17 @@
+# What's new in Knowledge Gate 1.3.40
+
+## 🎤 Read to Owl — students check their own reading
+- In **Ask Owl**, the student taps **🎤 Read to Owl** and reads the open page aloud, then taps **I finished reading**.
+- Owl compares what it heard with the words on that page and answers kindly: **score**, how many words were read right, and which words to practise. The page's words are shown **green (read right)** and **red (missed or not clear)**.
+- Reading language: English, Arabic, Urdu, Hindi or French (remembered on the device). Picture pages are read with OCR first.
+- Teachers and school admins see every reading check in **Ask Owl → Questions and reading checks**, with the score.
+- Listening uses the browser's own speech recognition (Chrome, Edge, Android, and Safari on iPhone/iPad/Mac). Firefox cannot listen.
+
+## 📑 Contents found automatically from the pages
+- When a book PDF or flipbook is added and its pages have been read, the platform finds **where each unit and lesson begins** — from headings such as “Unit 2”, “Lesson 3”, “الوحدة ٢”, “سبق ۳”, “पाठ 4”, and with the AI when one is connected.
+- A part that has **no units yet gets them automatically**, with each lesson's page range, and every page is linked to its lesson.
+- A part that already has units shows them in **📑 Contents from the pages** (Book packages → the part). **Add to contents** adds only what is missing and fills empty page numbers — it never changes what you entered. Works on published editions too. **Find again** runs it again at any time.
+
 # What's new in Knowledge Gate 1.3.39
 
 - **Ask Owl 🦉 follows the open flipbook page by itself.** The “I am on page” box is gone. When a student turns a page in a flipbook, Owl's panel shows **📖 Page N** for that page (or **Page N–M** when two pages are shown side by side).

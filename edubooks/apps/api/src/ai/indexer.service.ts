@@ -13,6 +13,7 @@ import { extractPdfPages } from './extract';
 import { ocrAvailable, ocrImageFiles, ocrPages } from './ocr';
 import { detectFlipPages } from '../flipbook/flip-pages';
 import { AiProviderService } from './provider.service';
+import { ContentsService } from './contents.service';
 import { appTmp } from '../common/tmp';
 
 /** Builds the searchable text index of a book part (book_pages) from its PDF. */
@@ -20,7 +21,7 @@ import { appTmp } from '../common/tmp';
 export class IndexerService {
   private readonly log = new Logger('BookIndexer');
   private readonly running = new Set<string>();
-  constructor(private readonly db: DbService, private readonly assets: AssetsService, private readonly audit: AuditService, private readonly ai: AiProviderService) {}
+  constructor(private readonly db: DbService, private readonly assets: AssetsService, private readonly audit: AuditService, private readonly ai: AiProviderService, private readonly contents: ContentsService) {}
 
   /** Starts indexing in the background (own transaction); returns immediately. */
   async start(componentId: string) {
@@ -32,6 +33,8 @@ export class IndexerService {
     await this.db.q.update(bookComponents).set({ indexStatus: 'RUNNING', indexError: null }).where(eq(bookComponents.id, componentId));
     setImmediate(() => {
       this.db.detached(ctx, () => this.run(componentId))
+        // then find the part's contents (units / lessons and their first pages) from the text just read
+        .then(() => this.db.detached(ctx, () => this.contents.auto(componentId)))
         .catch((e) => this.db.detached(ctx, async () => {
           this.log.warn(`index ${componentId} failed: ${e.message}`);
           await this.db.q.update(bookComponents).set({ indexStatus: 'ERROR', indexError: String(e.message).slice(0, 300) }).where(eq(bookComponents.id, componentId));

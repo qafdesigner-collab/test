@@ -16,7 +16,8 @@ export interface Lesson { id: string; number: number; title: string; objectives:
 export interface Unit { id: string; number: number; title: string; description: string; componentId: string; lessons: Lesson[]; visibleTo?: Visible }
 export interface Flipbook { id: string; kind: 'HTML' | 'SWF'; entry: string; fileCount: number; totalBytes: number; originalName: string; skippedFiles: number; createdAt: string }
 export interface FlipUnit { id: string; unitTitle: string; sort: number; kind: 'HTML' | 'SWF'; fileCount: number; totalBytes: number; originalName: string; createdAt: string }
-export interface Component { id: string; type: string; title: string; visibleTo?: Visible; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null; flipbook: Flipbook | null; flipUnits?: FlipUnit[]; indexStatus: string; indexedPages: number; indexError: string | null }
+export interface Component { id: string; type: string; title: string; visibleTo?: Visible; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null; flipbook: Flipbook | null; flipUnits?: FlipUnit[]; indexStatus: string; indexedPages: number; indexError: string | null; contentsSuggestion?: FoundContents | null }
+export interface FoundContents { source: 'AI' | 'HEADINGS'; units: { number: number; title: string; page: number; lessons: { number: number; title: string; page: number; pageEnd?: number }[] }[]; foundAt: string; applied?: boolean; result?: string; running?: boolean; error?: string }
 export interface Resource {
   id: string; title: string; resourceType: string; audience: string; componentId: string | null; unitId: string | null; lessonId: string | null;
   createdAt: string; sharedWith: number; asset: { id: string; originalName: string; ext: string; sizeBytes: number; scanStatus: string };
@@ -451,11 +452,49 @@ function AiIndexStatus({ comp, flip }: { comp: Component; flip?: boolean }) {
   const label = { NONE: flip ? 'Flipbook pages not read for AI yet' : 'Not indexed for AI', RUNNING: flip ? 'Reading the flipbook pages (OCR)…' : 'Extracting text for AI…', DONE: `AI-ready · ${comp.indexedPages} pages of text`, NO_TEXT: 'No text found (scanned PDF?)', ERROR: 'Text extraction failed' }[comp.indexStatus] ?? comp.indexStatus;
   const tone = comp.indexStatus === 'DONE' ? 'PUBLISHED' : comp.indexStatus === 'RUNNING' ? 'info' : comp.indexStatus === 'NONE' ? 'neutral' : 'danger';
   return (
-    <div className="flex w-full items-center gap-2 border-t border-slate-200 pt-2 text-xs">
+    <div className="flex w-full flex-wrap items-center gap-2 border-t border-slate-200 pt-2 text-xs">
       <Badge tone={tone}><Sparkles className="size-3" />{label}</Badge>
       {comp.indexError && <span className="truncate text-slate-500" title={comp.indexError}>{comp.indexError}</span>}
       <span className="flex-1" />
       {comp.indexStatus !== 'RUNNING' && <Button size="sm" variant="ghost" onClick={() => reindex.mutate(undefined)} loading={reindex.isPending}>{flip ? (comp.indexStatus === 'NONE' ? 'Read pages for AI' : 'Read again') : 'Re-index'}</Button>}
+      {comp.indexStatus === 'DONE' && <ContentsFound comp={comp} />}
+    </div>
+  );
+}
+
+/** Units and lessons (with their first pages) found from the part's pages, by headings or the AI. */
+function ContentsFound({ comp }: { comp: Component }) {
+  const qc = useQueryClient(); const s = comp.contentsSuggestion; const [open, setOpen] = useState(false);
+  const toast = useToast(); const toastRef = useRef(toast); toastRef.current = toast;
+  const find = useBuilderMutation(() => api.post(`/ai/contents/components/${comp.id}/find`), 'Looking for the units and lessons…');
+  const apply = useBuilderMutation(() => api.post<any>(`/ai/contents/components/${comp.id}/apply`), undefined, (r) => toastRef.current?.(`Contents added: ${r.unitsAdded} unit(s), ${r.lessonsAdded} lesson(s), ${r.pagesSet} page number(s) filled in`));
+  const dismiss = useBuilderMutation(() => api.del(`/ai/contents/components/${comp.id}`), 'Dismissed');
+  useEffect(() => {
+    if (!s?.running) return;
+    const t = setInterval(() => qc.invalidateQueries({ queryKey: ['edition'] }), 2500);
+    return () => clearInterval(t);
+  }, [s?.running, qc]);
+  const lessons = s?.units.reduce((n, u) => n + u.lessons.length, 0) ?? 0;
+  return (
+    <div className="w-full basis-full rounded-lg border border-violet-200 bg-violet-50/60 p-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <b className="text-violet-900">📑 Contents from the pages</b>
+        {s?.running ? <span className="text-violet-700">Looking for units and lessons…</span>
+          : s?.error ? <span className="text-red-700">{s.error}</span>
+            : s?.units.length ? <span className="text-slate-700">{s.units.length} unit(s), {lessons} lesson(s) found {s.source === 'AI' ? 'by the AI' : 'from the headings'}{s.applied ? ` · ✅ ${s.result ?? 'added'}` : ' · not added yet'}</span>
+              : s ? <span className="text-slate-600">No units or lessons found in the text.</span> : <span className="text-slate-600">Find where each unit and lesson begins, and build the index automatically.</span>}
+        <span className="flex-1" />
+        {!!s?.units.length && <Button size="sm" variant="ghost" onClick={() => setOpen(!open)}>{open ? 'Hide' : 'Show'}</Button>}
+        {!!s?.units.length && !s.applied && <Button size="sm" onClick={() => apply.mutate(undefined)} loading={apply.isPending}>Add to contents</Button>}
+        {!s?.running && <Button size="sm" variant="secondary" onClick={() => find.mutate(undefined)} loading={find.isPending}>{s ? 'Find again' : 'Find units & lessons'}</Button>}
+        {!!s && !s.running && <Button size="sm" variant="ghost" onClick={() => dismiss.mutate(undefined)} loading={dismiss.isPending}>Dismiss</Button>}
+      </div>
+      {open && !!s?.units.length && (
+        <ol className="mt-2 space-y-1 text-slate-800">{s.units.map((u) => (
+          <li key={`${u.number}-${u.page}`}><b>Unit {u.number}: {u.title}</b> <span className="text-slate-500">— starts on page {u.page}</span>
+            <ul className="ms-4 list-disc">{u.lessons.map((l) => <li key={`${l.number}-${l.page}`}>Lesson {l.number}: {l.title} <span className="text-slate-500">— pages {l.page}{l.pageEnd && l.pageEnd !== l.page ? `–${l.pageEnd}` : ''}</span></li>)}</ul></li>))}</ol>
+      )}
+      {!!s?.units.length && !s.applied && <p className="mt-1 text-[11px] text-slate-500">“Add to contents” adds the units and lessons that are missing and fills empty page numbers. It never changes what you already entered, and works on published editions too.</p>}
     </div>
   );
 }
@@ -697,7 +736,7 @@ export function LockBanner({ tree }: { tree: EditionTree }) {
   if (tree.locked.all) return <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-100 p-4 text-sm text-slate-700"><ShieldAlert className="size-5 shrink-0" />This {tree.package.status === 'ARCHIVED' ? 'package' : 'edition'} is archived and read-only.</div>;
   if (tree.locked.structure) return (
     <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-      <Lock className="size-5 shrink-0" /><div><b>Published — units and lessons locked.</b> Schools may hold licences for this edition, so units, lessons and page ranges can’t change. You can still add, rename or remove whole parts, fix titles and objectives, and attach or update resources. To restructure, create a new edition.</div>
+      <Lock className="size-5 shrink-0" /><div><b>Published — units and lessons locked.</b> Schools may hold licences for this edition, so units, lessons and page ranges can’t change. You can still add, rename or remove whole parts, fix titles and objectives, and attach or update resources. “Contents from the pages” can still add missing units and lessons and fill empty page numbers. To restructure, create a new edition.</div>
     </div>
   );
   return null;

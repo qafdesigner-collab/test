@@ -224,6 +224,7 @@ export const bookComponents = pgTable('book_components', {
   indexedPages: integer('indexed_pages').notNull().default(0),
   indexedAt: timestamp('indexed_at', { withTimezone: true }),
   indexError: text('index_error'),
+  contentsSuggestion: jsonb('contents_suggestion'),
   /** ALL, TEACHER (hidden from students) or STUDENT (hidden from teachers). */
   visibleTo: audienceEnum('visible_to').notNull().default('ALL'),
 }, (t) => [index('components_edition_idx').on(t.editionId)]);
