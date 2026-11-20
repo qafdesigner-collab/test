@@ -113,6 +113,15 @@ function unzip(zipFile, dest) {
   });
 }
 
+/** Fingerprint of the program libraries in a package-lock.json, ignoring the app's own version number (it changes every release). */
+function libsOf(file) {
+  try {
+    const j = JSON.parse(fs.readFileSync(file, 'utf8')); delete j.version;
+    for (const [k, v] of Object.entries(j.packages || {})) if (!k.startsWith('node_modules/') || v.link) delete v.version;
+    return crypto.createHash('sha256').update(JSON.stringify(j)).digest('hex');
+  } catch { return sha(file); }
+}
+
 /** Unpacks and checks an update package. Accepts the full public_html zip or the small update zip. */
 async function stage(zipFile) {
   try { heal(); } catch { /* best effort */ }
@@ -129,7 +138,7 @@ async function stage(zipFile) {
   }
   const build = buildOf(base);
   const hasModules = fs.existsSync(path.join(base, 'node_modules'));
-  if (!hasModules && sha(path.join(base, 'package-lock.json')) !== sha(path.join(ROOT, 'package-lock.json'))) {
+  if (!hasModules && libsOf(path.join(base, 'package-lock.json')) !== libsOf(path.join(ROOT, 'package-lock.json'))) {
     rm(STAGING);
     throw new Error('This update needs new program libraries. Please upload the FULL package (edubooks-lms-public_html.zip) instead of the small update package.');
   }
