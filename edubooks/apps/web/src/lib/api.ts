@@ -4,7 +4,14 @@ export class ApiError extends Error {
 
 async function parse(res: Response) {
   const text = await res.text();
-  const body = text ? JSON.parse(text) : null;
+  let body: any = null;
+  try { body = text ? JSON.parse(text) : null; } catch {
+    // not JSON: an error page from the web server or hosting (e.g. a time limit while the AI or OCR was still working)
+    const slow = [502, 503, 504, 408, 524].includes(res.status) || res.ok;
+    throw new ApiError(res.status, slow
+      ? 'The server took too long to answer. If it was reading book pages or waiting for the AI, try again in a minute — it is usually quicker the second time.'
+      : `The server sent an unexpected answer (HTTP ${res.status}). Please try again.`);
+  }
   if (!res.ok) {
     const msg = Array.isArray(body?.message) ? body.message.join('; ') : body?.message || `Request failed (${res.status})`;
     if (res.status === 401 && typeof window !== 'undefined' && !location.pathname.startsWith('/login')) {

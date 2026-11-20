@@ -1,3 +1,7 @@
+# What's new in Knowledge Gate 1.3.38
+
+- **Clear message when the server takes too long.** If the hosting stops a slow request (for example the first time the AI reads flipbook pages with OCR), teachers now see “The server took too long to answer… try again in a minute” instead of “Unexpected token '<' … is not valid JSON”. The second try is usually quick, because the pages are already read.
+
 # What's new in Knowledge Gate 1.3.37
 
 - **Ask Owl 🦉 works in flipbooks.** Books that only have a flipbook (no PDF) now show the **Ask Owl** button too. In a flipbook the student sets **“I am on page …”** in Owl's panel (− / + or type the number), then taps **Explain this page**, **Quiz me** or asks a question.
