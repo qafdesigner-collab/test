@@ -16,10 +16,14 @@ export function useTutorStatus(enabled: boolean) {
 }
 
 /** "Ask Owl" panel inside the reader for pupils. */
-export function TutorPanel({ editionId, componentId, page, toPage, flip, onGo, onClose }: { editionId: string; componentId: string; page: number; toPage?: number; flip?: boolean; onGo: (p: number) => void; onClose: () => void }) {
+export function TutorPanel({ editionId, componentId, page: openPage, toPage, flip, onGo, onClose }: { editionId: string; componentId: string; page: number; toPage?: number; flip?: boolean; onGo: (p: number) => void; onClose: () => void }) {
   const { t } = useT(); const qc = useQueryClient(); const toast = useToast();
   // page 0: the flipbook has not told the reader which page is open yet
-  const unknown = !page; const here = toPage && toPage !== page ? `${page}–${toPage}` : String(page);
+  // two pages side by side: the student taps the one Owl should use (the left one first)
+  const spread = !!toPage && toPage !== openPage; const [pick, setPick] = useState<number | null>(null);
+  useEffect(() => { setPick(null); }, [openPage, toPage]);
+  const page = spread && pick === toPage ? toPage! : openPage;
+  const unknown = !page;
   const status = useTutorStatus(true);
   const [turns, setTurns] = useState<Turn[]>([{ who: 'owl', text: t("Hi! I'm Owl 🦉 I can explain the page you have open, answer a question about it, give you a little quiz, or listen to you read it.") }]);
   const [q, setQ] = useState(''); const [busy, setBusy] = useState(false); const end = useRef<HTMLDivElement>(null);
@@ -29,7 +33,7 @@ export function TutorPanel({ editionId, componentId, page, toPage, flip, onGo, o
     const label = mode === 'EXPLAIN' ? t('Explain this page') : mode === 'QUIZ' ? t('Quiz me') : question;
     setTurns((x) => [...x, { who: 'me', text: label }]); setBusy(true); setQ('');
     try {
-      const r = await api.post<any>('/tutor/ask', { editionId, componentId, page, toPage: toPage && toPage !== page ? toPage : undefined, mode, question: question || undefined });
+      const r = await api.post<any>('/tutor/ask', { editionId, componentId, page, mode, question: question || undefined });
       setTurns((x) => [...x, { who: 'owl', text: r.answer, quiz: r.quiz, pages: (r.sources ?? []).map((s: any) => s.page) }]);
       qc.setQueryData(['tutorStatus'], (o: any) => ({ ...(o ?? {}), enabled: true, remaining: r.remaining }));
     } catch (e: any) { setTurns((x) => [...x, { who: 'owl', text: e.message }]); }
@@ -55,7 +59,7 @@ export function TutorPanel({ editionId, componentId, page, toPage, flip, onGo, o
     if (!said.trim()) { setTurns((x) => [...x, { who: 'owl', text: t("Owl didn't hear you. Tap 🎤 and read the page aloud, nice and clear.") }]); return; }
     setTurns((x) => [...x, { who: 'me', text: `🎤 ${said.trim()}` }]); setBusy(true); setHeard('');
     try {
-      const r = await api.post<any>('/tutor/read', { editionId, componentId, page, toPage: toPage && toPage !== page ? toPage : undefined, transcript: said.trim().slice(0, 4000) });
+      const r = await api.post<any>('/tutor/read', { editionId, componentId, page, transcript: said.trim().slice(0, 4000) });
       setTurns((x) => [...x, { who: 'owl', text: r.feedback, reading: { score: r.score, words: r.words ?? [] } }]);
       qc.setQueryData(['tutorStatus'], (o: any) => ({ ...(o ?? {}), enabled: true, remaining: r.remaining }));
     } catch (e: any) { setTurns((x) => [...x, { who: 'owl', text: e.message }]); }
@@ -82,7 +86,13 @@ export function TutorPanel({ editionId, componentId, page, toPage, flip, onGo, o
         <div ref={end} />
       </div>
       <div className="space-y-2 border-t border-amber-200 p-3">
-        <p className="text-sm font-bold text-amber-900">{unknown ? t('Turn to a page in your book, then ask Owl.') : `📖 ${t('Page {n}', { n: here })}`}</p>
+        {unknown ? <p className="text-sm font-bold text-amber-900">{t('Turn to a page in your book, then ask Owl.')}</p>
+          : spread ? (
+            <div className="flex items-center gap-2 text-sm font-bold text-amber-900">📖 {t('Which page?')}
+              {[openPage, toPage!].map((n) => <button key={n} type="button" aria-pressed={page === n} onClick={() => setPick(n)}
+                className={cn('rounded-full border px-3 py-0.5', page === n ? 'border-violet-600 bg-violet-600 text-white' : 'border-amber-300 bg-white text-amber-900')}>{t('Page {n}', { n })}</button>)}
+            </div>)
+            : <p className="text-sm font-bold text-amber-900">📖 {t('Page {n}', { n: page })}</p>}
         {listening ? (
           <div className="rounded-xl border-2 border-rose-300 bg-white p-2">
             <p className="text-sm font-black text-rose-700">🔴 {t('Listening… read the page aloud')}</p>

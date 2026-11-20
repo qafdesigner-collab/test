@@ -1,3 +1,7 @@
+# What's new in Knowledge Gate 1.3.41
+
+- **Two pages open side by side?** Owl's panel now shows **“Which page? Page 4 | Page 5”**. The student taps one, and Explain, Quiz me, questions and Read to Owl use **only that page** (read with OCR if it is a picture page). With one page open, Owl simply uses that page — there is nothing to type or choose.
+
 # What's new in Knowledge Gate 1.3.40
 
 ## 🎤 Read to Owl — students check their own reading
