@@ -1,0 +1,31 @@
+Knowledge Gate — installation
+===========================
+
+INSTALL
+1. Open your domain in the browser, e.g. https://lms.yourdomain.com
+2. Follow the setup wizard:
+     Check  ->  Super admin  ->  Database  ->  Install
+3. Sign in at /login (choose "Publisher staff").
+
+UPDATE TO A NEW VERSION (recommended way)
+1. Sign in as super admin -> Updates (left menu).
+2. Upload edubooks-lms-update.zip (small) or the full zip, check, and click
+   "Install update". A safety backup is made first, the database is updated
+   automatically, and if the new version cannot start the previous one comes
+   back by itself. "Roll back" returns to the previous version.
+
+UPDATE WITHOUT THE ADMIN PANEL (only if the site does not open)
+1. Upload the full zip into the same folder (public_html) and extract it.
+2. Open https://lms.yourdomain.com/index.php and click "Update now".
+
+NOTES
+- Install into the ROOT folder of a domain or subdomain (public_html, or the
+  subdomain's own folder). Sub-folders like /lms are not supported.
+- MySQL is not used. Knowledge Gate brings its own private database.
+- Your hosting must allow Node.js apps (cPanel: "Setup Node.js App"). The wizard
+  tests this. On some servers it asks you for one extra click in cPanel and
+  shows exactly what to enter.
+- The wizard moves the app to a private folder in your home directory
+  (~/edubooks-app) and removes itself from public_html.
+- Nightly backups are saved in ~/edubooks-app/backups. Download a copy regularly.
+- Full guide: ~/edubooks-app/README.md
