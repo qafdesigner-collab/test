@@ -26,7 +26,12 @@ describe('Flipbook made from the book PDF, with the publisher\'s own videos and 
     const set = await admin.patch(`/api/publishing/components/${part.id}`).send({ displayMode: 'FLIP' }); expect(set.body).toMatchObject({ displayMode: 'FLIP' });
     expect((await admin.patch(`/api/publishing/components/${part.id}`).send({ displayMode: 'BOOK' })).status).toBe(400);
     const r = (await student.get(`/api/reader/editions/${ed}`)).body.components.find((c: any) => c.id === part.id);
-    expect(r.displayMode).toBe('FLIP');
+    expect(r.displayMode).toBe('FLIP'); expect(r.flipLayout).toBe('COVER');
+    // how pages pair up: cover first (default), pairs from page 1, or one page at a time
+    expect((await admin.patch(`/api/publishing/components/${part.id}`).send({ flipLayout: 'PAIRS' })).body.flipLayout).toBe('PAIRS');
+    expect((await admin.patch(`/api/publishing/components/${part.id}`).send({ flipLayout: 'TWO' })).status).toBe(400);
+    expect((await student.get(`/api/reader/editions/${ed}`)).body.components.find((c: any) => c.id === part.id).flipLayout).toBe('PAIRS');
+    await admin.patch(`/api/publishing/components/${part.id}`).send({ flipLayout: 'COVER' });
   });
 
   it('places a picture and the publisher\'s own video on pages; only licensed readers can open them', async () => {

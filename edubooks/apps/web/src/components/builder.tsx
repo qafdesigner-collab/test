@@ -16,7 +16,7 @@ export interface Lesson { id: string; number: number; title: string; objectives:
 export interface Unit { id: string; number: number; title: string; description: string; componentId: string; lessons: Lesson[]; visibleTo?: Visible }
 export interface Flipbook { id: string; kind: 'HTML' | 'SWF'; entry: string; fileCount: number; totalBytes: number; originalName: string; skippedFiles: number; createdAt: string }
 export interface FlipUnit { id: string; unitTitle: string; sort: number; kind: 'HTML' | 'SWF'; fileCount: number; totalBytes: number; originalName: string; createdAt: string }
-export interface Component { id: string; type: string; title: string; visibleTo?: Visible; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null; flipbook: Flipbook | null; flipUnits?: FlipUnit[]; indexStatus: string; indexedPages: number; indexError: string | null; contentsSuggestion?: FoundContents | null; displayMode?: 'PDF' | 'FLIP' }
+export interface Component { id: string; type: string; title: string; visibleTo?: Visible; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null; flipbook: Flipbook | null; flipUnits?: FlipUnit[]; indexStatus: string; indexedPages: number; indexError: string | null; contentsSuggestion?: FoundContents | null; displayMode?: 'PDF' | 'FLIP'; flipLayout?: 'COVER' | 'PAIRS' | 'SINGLE' }
 export interface FoundContents { source: 'AI' | 'HEADINGS'; units: { number: number; title: string; page: number; lessons: { number: number; title: string; page: number; pageEnd?: number }[] }[]; foundAt: string; applied?: boolean; result?: string; running?: boolean; error?: string }
 export interface Resource {
   id: string; title: string; resourceType: string; audience: string; componentId: string | null; unitId: string | null; lessonId: string | null;
@@ -293,6 +293,7 @@ function BookPdf({ comp, editionId, editionStatus, readOnly }: { comp: Component
   // after choosing the PDF: show it as a flipbook (page turn, with videos and elements) or as simple PDF pages?
   const [asking, setAsking] = useState<File | null>(null);
   const setMode = useBuilderMutation((m: 'PDF' | 'FLIP') => api.patch(`/publishing/components/${comp.id}`, { displayMode: m }), undefined);
+  const setLayout = useBuilderMutation((l: 'COVER' | 'PAIRS' | 'SINGLE') => api.patch(`/publishing/components/${comp.id}`, { flipLayout: l }), 'Page layout saved');
   const upload = async (file?: File, mode?: 'PDF' | 'FLIP') => {
     if (!file) return;
     setAsking(null); setPct(0);
@@ -325,6 +326,15 @@ function BookPdf({ comp, editionId, editionStatus, readOnly }: { comp: Component
                 className={cn('rounded-md px-2.5 py-1 font-medium', (comp.displayMode ?? 'PDF') === m ? 'bg-brand-600 text-white' : 'text-slate-700 hover:bg-slate-50')}>{l}</button>))}
           </div>
           <span className="text-slate-500">{comp.displayMode === 'FLIP' ? 'Pages turn like a real book. Add videos, audio, pictures, links and games with “Add videos & elements”.' : 'Plain pages with zoom.'}</span>
+          {comp.displayMode === 'FLIP' && <div className="flex w-full flex-wrap items-center gap-2">
+            <span className="font-medium text-slate-700">Page layout:</span>
+            <div role="radiogroup" aria-label="Page layout" className="flex flex-wrap rounded-lg bg-white p-0.5 ring-1 ring-slate-200">
+              {([['COVER', '📕 Cover first (1 | 2–3 | 4–5)'], ['PAIRS', '📖 Pairs (1–2 | 3–4)'], ['SINGLE', '📄 One page at a time']] as const).map(([l, t]) => (
+                <button key={l} type="button" role="radio" aria-checked={(comp.flipLayout ?? 'COVER') === l} disabled={readOnly || setLayout.isPending} onClick={() => setLayout.mutate(l)}
+                  className={cn('rounded-md px-2.5 py-1 font-medium', (comp.flipLayout ?? 'COVER') === l ? 'bg-violet-600 text-white' : 'text-slate-700 hover:bg-slate-50')}>{t}</button>))}
+            </div>
+            <span className="text-slate-500">Choose so left-hand pages (inner margin on the right) sit on the left. Landscape pages are always shown alone, full width.</span>
+          </div>}
         </div>)}
       {comp.bookFile && <AiIndexStatus comp={comp} />}
       <Dialog open={!!asking} onOpenChange={(o) => !o && setAsking(null)} title="How should readers see this book?" description={asking ? `${asking.name} · ${fmtBytes(asking.size)}` : ''}>

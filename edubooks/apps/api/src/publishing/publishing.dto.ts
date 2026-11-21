@@ -54,6 +54,8 @@ export class CreateComponentDto {
   @ApiPropertyOptional({ enum: AUDIENCES }) @IsOptional() @IsEnum(AUDIENCES) visibleTo?: (typeof AUDIENCES)[number];
   /** how readers see the PDF: PDF (plain pages) or FLIP (page-turn flipbook with elements) */
   @ApiPropertyOptional({ enum: ['PDF', 'FLIP'] }) @IsOptional() @IsIn(['PDF', 'FLIP']) displayMode?: 'PDF' | 'FLIP';
+  /** flipbook pages: COVER (page 1 alone on the right), PAIRS (1–2, 3–4…) or SINGLE (one page at a time) */
+  @ApiPropertyOptional({ enum: ['COVER', 'PAIRS', 'SINGLE'] }) @IsOptional() @IsIn(['COVER', 'PAIRS', 'SINGLE']) flipLayout?: 'COVER' | 'PAIRS' | 'SINGLE';
 }
 export class UpdateComponentDto extends PartialType(CreateComponentDto) {}
 

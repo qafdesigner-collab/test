@@ -9,7 +9,7 @@ import { api } from '@/lib/api';
 import { cn, ErrorBox, PageLoader, Spinner } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 import { HotspotLayer } from '@/components/hotspots';
-import { PdfFlipbook, spreadOf, stepPage } from '@/components/pdf-flip';
+import { PdfFlipbook, spreadOf, stepPage, usePageShapes, type FlipLayout } from '@/components/pdf-flip';
 import { TutorPanel, useTutorStatus } from '@/components/tutor';
 import { ContentGuard, useProtection } from '@/components/content-guard';
 import { AppPanel } from '@/components/app-panel';
@@ -126,8 +126,10 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   const pages = doc?.numPages ?? comp?.pageCount ?? 1;
   const go = useCallback((n: number) => { window.speechSynthesis?.cancel(); setSpeaking(false); setPage(Math.min(Math.max(1, n), pages)); }, [pages]);
   // next / previous: a whole spread in the flipbook view
-  const step = useCallback((dir: 1 | -1) => go(pdfFlip ? stepPage(page, pages, wide, dir) : page + dir), [go, pdfFlip, page, pages, wide]);
-  const spread = pdfFlip ? spreadOf(page, pages, wide) : [page];
+  const layout: FlipLayout = comp?.flipLayout ?? 'COVER';
+  const shape = usePageShapes(pdfFlip ? doc : null, page);
+  const step = useCallback((dir: 1 | -1) => go(pdfFlip ? stepPage(page, pages, wide, dir, layout, shape) : page + dir), [go, pdfFlip, page, pages, wide, layout, shape]);
+  const spread = pdfFlip ? spreadOf(page, pages, wide, layout, shape) : [page];
 
   // Save progress (debounced).
   useEffect(() => {
@@ -256,7 +258,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
                   sandbox="allow-scripts allow-popups allow-forms allow-modals allow-pointer-lock allow-downloads allow-presentation" allow="fullscreen; autoplay" allowFullScreen referrerPolicy="no-referrer" /></ContentGuard>)
           : !comp?.hasPdf ? <div className="m-auto max-w-sm text-center text-slate-500"><FileText className="mx-auto mb-2 size-10" />This part has resources only — see the files listed for it.</div>
             : docError ? <div className="m-auto"><ErrorBox error={new Error(docError)} /></div>
-              : pdfFlip ? (!doc ? <Spinner className="m-auto size-8" /> : <ContentGuard className="absolute inset-0"><PdfFlipbook doc={doc} page={page} pages={pages} onPage={go} onWide={setWide} componentId={comp.id}
+              : pdfFlip ? (!doc ? <Spinner className="m-auto size-8" /> : <ContentGuard className="absolute inset-0"><PdfFlipbook doc={doc} page={page} pages={pages} onPage={go} onWide={setWide} layout={layout} shape={shape} componentId={comp.id}
                   editing={editHot} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} /></ContentGuard>)
               : <>{loadingDoc && <Spinner className="absolute left-1/2 top-1/2 size-8" />}<ContentGuard className="relative"><canvas ref={canvas} className={cn('block bg-white shadow-xl', kid ? 'rounded-2xl' : 'rounded')} aria-label={`Page ${page} of ${pages}`} />{doc && comp && <HotspotLayer componentId={comp.id} page={page} editing={editHot} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} />}</ContentGuard></>}
         </main>

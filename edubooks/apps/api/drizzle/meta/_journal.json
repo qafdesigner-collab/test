@@ -400,6 +400,13 @@
       "when": 1795440000000,
       "tag": "0056_flipbook_maker",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1795530000000,
+      "tag": "0057_flip_layout",
+      "breakpoints": true
     }
   ]
 }
