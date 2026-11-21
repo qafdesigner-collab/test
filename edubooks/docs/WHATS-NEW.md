@@ -1,3 +1,11 @@
+# What's new in Knowledge Gate 1.4.2
+
+## 📖 Flipbooks now turn like real paper (FlipHTML5 style)
+- Pages **curl from the corner** as you drag them, with shadows and the next page showing on the back — click a corner, drag, swipe on phones, or use the arrows. The cover curls too.
+- A dark book stage with the familiar **toolbar**: 🔲 **Thumbnails** (all pages, tap to jump), 🔍 **Zoom** (opens the page view), 🔊 **page-turn sound** (on/off, remembered), ⬅ ➡ with the page number, 🔎 **Search** the book's words, ▶ **Auto flip**, ⛶ **Full screen**.
+- Two pages side by side on computers and tablets (following your **Page layout**: cover first / pairs / one page), one page on phones. Videos, pictures and other elements on the pages work inside the book.
+- While you add elements (✏️ Hotspots), and for books that mix portrait and landscape pages, the earlier flipbook view is used.
+
 # What's new in Knowledge Gate 1.4.1
 
 ## 🗣️ Natural reading voice (Piper)

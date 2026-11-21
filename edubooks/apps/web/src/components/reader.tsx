@@ -10,6 +10,7 @@ import { cn, ErrorBox, PageLoader, Spinner } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 import { HotspotLayer } from '@/components/hotspots';
 import { PdfFlipbook, spreadOf, stepPage, usePageShapes, type FlipLayout } from '@/components/pdf-flip';
+import { PdfCurlbook } from '@/components/pdf-curl';
 import { TutorPanel, useTutorStatus } from '@/components/tutor';
 import { ContentGuard, useProtection } from '@/components/content-guard';
 import { AppPanel } from '@/components/app-panel';
@@ -263,6 +264,8 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
                   sandbox="allow-scripts allow-popups allow-forms allow-modals allow-pointer-lock allow-downloads allow-presentation" allow="fullscreen; autoplay" allowFullScreen referrerPolicy="no-referrer" /></ContentGuard>)
           : !comp?.hasPdf ? <div className="m-auto max-w-sm text-center text-slate-500"><FileText className="mx-auto mb-2 size-10" />This part has resources only — see the files listed for it.</div>
             : docError ? <div className="m-auto"><ErrorBox error={new Error(docError)} /></div>
+              : pdfFlip && doc && !editHot && (shape(page) > 1) === (shape(1) > 1) ? <ContentGuard className="absolute inset-0"><PdfCurlbook doc={doc} page={page} pages={pages} onPage={go} onWide={setWide} layout={layout} shape={shape}
+                  componentId={comp.id} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} onZoom={() => setAsBook(false)} /></ContentGuard>
               : pdfFlip ? (!doc ? <Spinner className="m-auto size-8" /> : <ContentGuard className="absolute inset-0"><PdfFlipbook doc={doc} page={page} pages={pages} onPage={go} onWide={setWide} layout={layout} shape={shape} componentId={comp.id}
                   editing={editHot} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} /></ContentGuard>)
               : <>{loadingDoc && <Spinner className="absolute left-1/2 top-1/2 size-8" />}<ContentGuard className="relative"><canvas ref={canvas} className={cn('block bg-white shadow-xl', kid ? 'rounded-2xl' : 'rounded')} aria-label={`Page ${page} of ${pages}`} />{doc && comp && <HotspotLayer componentId={comp.id} page={page} editing={editHot} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} />}</ContentGuard></>}

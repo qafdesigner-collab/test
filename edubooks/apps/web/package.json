@@ -1,6 +1,6 @@
 {
   "name": "@edubooks/web",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
@@ -28,6 +28,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.71.0",
     "next": "^15.5.29",
+    "page-flip": "^2.0.7",
     "pdfjs-dist": "^4.10.38",
     "qrcode": "1.5.4",
     "react": "^19.3.1",

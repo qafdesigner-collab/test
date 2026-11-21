@@ -23,11 +23,11 @@ let playing: HTMLAudioElement | null = null;
 const playFile = async (assetId: string) => { const { url } = await api.get<{ url: string }>(`/assets/${assetId}/link`); playing?.pause(); playing = new Audio(url); await playing.play().catch(() => undefined); };
 
 /** A video or picture shown on the page itself. */
-function InlineMedia({ h, editing, onEdit }: { h: Hotspot; editing: boolean; onEdit: () => void }) {
+function InlineMedia({ h, editing, onEdit, noFlip }: { h: Hotspot; editing: boolean; onEdit: () => void; noFlip?: boolean }) {
   const url = useMedia(h.assetId);
   const embed = h.kind === 'VIDEO' && !h.assetId ? embedUrl(h.url) : null;
   return (
-    <div className={cn('absolute overflow-hidden rounded-lg bg-black/5', editing && 'ring-2 ring-sky-600')} style={{ left: `${h.x * 100}%`, top: `${h.y * 100}%`, width: `${h.w * 100}%`, height: `${h.h * 100}%` }}>
+    <div data-noflip={noFlip && h.kind === 'VIDEO' ? '' : undefined} className={cn('absolute overflow-hidden rounded-lg bg-black/5', editing && 'ring-2 ring-sky-600')} style={{ left: `${h.x * 100}%`, top: `${h.y * 100}%`, width: `${h.w * 100}%`, height: `${h.h * 100}%` }}>
       {h.kind === 'IMAGE' ? (url ? <img src={url} alt={h.title || 'Picture'} className="size-full object-contain" draggable={false} /> : null)
         : embed ? <iframe src={embed} title={h.title || 'Video'} className="size-full" allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
           : url ? <video src={url} controls playsInline preload="metadata" className="size-full bg-black object-contain" controlsList="nodownload" onContextMenu={(e) => e.preventDefault()} /> : null}
@@ -39,7 +39,7 @@ function InlineMedia({ h, editing, onEdit }: { h: Hotspot; editing: boolean; onE
 const speak = (t: string) => { void speakText(t); };
 
 /** Tappable areas drawn over a book page. Publisher staff can draw new ones in edit mode. */
-export function HotspotLayer({ componentId, page, editing, kid, games }: { componentId: string; page: number; editing: boolean; kid: boolean; games: { id: string; title: string }[] }) {
+export function HotspotLayer({ componentId, page, editing, kid, games, noFlip }: { componentId: string; page: number; editing: boolean; kid: boolean; games: { id: string; title: string }[]; noFlip?: boolean }) {
   const q = useQuery({ queryKey: ['hotspots', componentId], queryFn: () => api.get<Hotspot[]>(`/reader/components/${componentId}/hotspots`) });
   const [open, setOpen] = useState<Hotspot | null>(null); const [form, setForm] = useState<Partial<Hotspot> | null>(null);
   const [draw, setDraw] = useState<{ x0: number; y0: number; x: number; y: number } | null>(null);
@@ -53,9 +53,9 @@ export function HotspotLayer({ componentId, page, editing, kid, games }: { compo
       onPointerDown={editing ? (e) => { if (e.target !== box.current) return; const p = pos(e); box.current!.setPointerCapture(e.pointerId); setDraw({ x0: p.x, y0: p.y, ...p }); } : undefined}
       onPointerMove={editing && draw ? (e) => setDraw({ ...draw, ...pos(e) }) : undefined}
       onPointerUp={editing && draw ? () => { if (rect && rect.w > 0.02 && rect.h > 0.02) setForm({ page, ...rect, kind: 'NOTE', title: '', body: '', url: '', gameId: null }); setDraw(null); } : undefined}>
-      {here.filter((h) => h.inline).map((h) => <InlineMedia key={h.id} h={h} editing={editing} onEdit={() => setForm(h)} />)}
+      {here.filter((h) => h.inline).map((h) => <InlineMedia key={h.id} h={h} editing={editing} onEdit={() => setForm(h)} noFlip={noFlip} />)}
       {here.filter((h) => !h.inline).map((h) => (
-        <button key={h.id} onClick={() => activate(h)} aria-label={`${KINDS[h.kind].label}${h.title ? `: ${h.title}` : ''}`} title={h.title || KINDS[h.kind].label}
+        <button key={h.id} data-noflip={noFlip ? '' : undefined} onClick={() => activate(h)} aria-label={`${KINDS[h.kind].label}${h.title ? `: ${h.title}` : ''}`} title={h.title || KINDS[h.kind].label}
           className={cn('focus-ring group absolute rounded-lg border-2 transition', editing ? 'border-sky-600 bg-sky-400/25' : 'border-amber-400/70 bg-amber-300/10 hover:bg-amber-300/30 motion-safe:animate-[pulse_2.5s_ease-in-out_3]')}
           style={{ left: `${h.x * 100}%`, top: `${h.y * 100}%`, width: `${h.w * 100}%`, height: `${h.h * 100}%` }}>
           <span className={cn('absolute -right-2 -top-2 grid place-items-center rounded-full bg-white shadow', kid ? 'size-8 text-lg' : 'size-6 text-sm')}>{KINDS[h.kind].icon}</span>
