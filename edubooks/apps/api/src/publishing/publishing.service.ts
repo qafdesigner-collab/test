@@ -434,6 +434,17 @@ export class PublishingService {
   }
 
   // =============== the book's own PDF (digital reader) ===============
+  /** A video, audio or picture file for the elements on a book's pages (flipbook / page hotspots). */
+  async addPageMedia(componentId: string, file: UploadedTemp) {
+    const c = await this.component(componentId);
+    const e = await this.edition(c.editionId);
+    if (e.status === 'ARCHIVED') throw new ConflictException('This edition is archived.');
+    const { asset, kind } = await this.assets.ingest(file);
+    if (!['VIDEO', 'AUDIO', 'IMAGE'].includes(kind.resourceType)) throw new BadRequestException('Choose a video (MP4, WebM), an audio file (MP3, M4A) or a picture (JPG, PNG, GIF).');
+    await this.audit.log('publishing.page_media', 'book_component', componentId, `Added ${kind.resourceType.toLowerCase()} “${asset.originalName}” for the pages of “${c.title}”`);
+    return { assetId: asset.id, kind: kind.resourceType as 'VIDEO' | 'AUDIO' | 'IMAGE', name: asset.originalName, mime: asset.mimeType, size: Number(asset.sizeBytes) };
+  }
+
   async setBookPdf(componentId: string, file: UploadedTemp) {
     try {
       const c = await this.component(componentId);

@@ -1,3 +1,14 @@
+# What's new in Knowledge Gate 1.4.0
+
+## 📖 Make a flipbook from your PDF — with your own videos and elements
+- When you upload a book PDF (Book packages → the part → **Upload PDF**), you are asked: **📖 Make a flipbook** or **📄 Keep as a simple PDF**. You can change it any time with **Readers see it as: 📖 Flipbook | 📄 PDF pages**.
+- **Flipbook:** pages turn like a real book — the cover alone, then two pages side by side with a turning page; on phones one page at a time with swipe. Readers can switch to **📄 Pages** to zoom.
+- **Add videos & elements** (opens the book; press **✏️ Hotspots** and drag on a page): **🎬 your own video (MP4)** or a YouTube/Vimeo link, **🔊 audio (MP3)** or words read aloud, **🖼️ pictures**, **🔗 links**, **🎮 games** and **💬 notes**.
+- Videos and pictures can be shown **on the page itself** (tick “Show on the page”), or as a tappable icon.
+- Your files are protected like the book: only schools with this book can open them, they play inside the platform and cannot be downloaded. Big videos are sent in pieces, so they upload reliably.
+- Works with everything else: Ask Owl and Read to Owl (with “Which page?” when two pages are open), OCR, automatic contents, bookmarks, reading progress and “Visible to”.
+- Your FlipHTML5 flipbooks keep working as before.
+
 # What's new in Knowledge Gate 1.3.42
 
 - **AI service details only for admins.** Teachers no longer see which AI service or model is used (the page shows **✨ AI ready**), nor notes such as “The main AI did not answer, so this draft was made by the backup AI”. When the AI cannot be reached, teachers see a plain message: “The AI is not available right now… try again in a few minutes”.

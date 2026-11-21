@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 import { PartialType } from '@nestjs/swagger';
 import { Roles } from '../common/decorators';
 import { ReaderService } from './reader.service';
@@ -12,11 +12,15 @@ export class HotspotDto {
   @Type(() => Number) @IsInt() @Min(1) @Max(5000) page: number;
   @IsNumber() @Min(0) @Max(1) x: number; @IsNumber() @Min(0) @Max(1) y: number;
   @IsNumber() @Min(0.01) @Max(1) w: number; @IsNumber() @Min(0.01) @Max(1) h: number;
-  @IsIn(['NOTE', 'AUDIO', 'VIDEO', 'LINK', 'GAME']) kind: 'NOTE' | 'AUDIO' | 'VIDEO' | 'LINK' | 'GAME';
+  @IsIn(['NOTE', 'AUDIO', 'VIDEO', 'LINK', 'GAME', 'IMAGE']) kind: 'NOTE' | 'AUDIO' | 'VIDEO' | 'LINK' | 'GAME' | 'IMAGE';
   @IsOptional() @IsString() @MaxLength(120) title?: string;
   @IsOptional() @IsString() @MaxLength(4000) body?: string;
   @IsOptional() @IsString() @MaxLength(500) url?: string | null;
   @IsOptional() @IsUUID() gameId?: string | null;
+  /** the publisher's own video / audio / picture file (uploaded with page-media-from-upload) */
+  @IsOptional() @IsUUID() assetId?: string | null;
+  /** show the video or picture on the page itself instead of as a tappable icon */
+  @IsOptional() @IsBoolean() inline?: boolean;
 }
 class UpdateHotspotDto extends PartialType(HotspotDto) {}
 const Id = () => new ParseUUIDPipe();

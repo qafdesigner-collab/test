@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { cn, ErrorBox, PageLoader, Spinner } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 import { HotspotLayer } from '@/components/hotspots';
+import { PdfFlipbook, spreadOf, stepPage } from '@/components/pdf-flip';
 import { TutorPanel, useTutorStatus } from '@/components/tutor';
 import { ContentGuard, useProtection } from '@/components/content-guard';
 import { AppPanel } from '@/components/app-panel';
@@ -70,6 +71,11 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   const flip = useQuery({ queryKey: ['flipbook', comp?.id, flipUnit], queryFn: () => api.get(`/reader/components/${comp!.id}/flipbook${flipUnit ? `?unit=${flipUnit}` : ''}`), enabled: !!comp?.flipbook && view === 'flip', staleTime: 5 * 3600_000 , placeholderData: (prev: any) => (prev && flipUnit ? prev : undefined) });
   const flipUnits: { id: string; title: string | null }[] = (flip.data as any)?.units ?? [];
   const flipMode = view === 'flip' && !!comp?.flipbook;
+  // a PDF the publisher chose to show as a flipbook: page-turn view (a reader can switch to plain pages, e.g. to zoom)
+  const [asBook, setAsBook] = useState(true);
+  useEffect(() => { setAsBook(true); }, [comp?.id]);
+  const pdfFlip = !flipMode && !!comp?.hasPdf && comp?.displayMode === 'FLIP' && asBook;
+  const [wide, setWide] = useState(false);
   // the flipbook frame reports which page(s) are open (see FLIP_PAGE_REPORTER on the server), so Ask Owl uses exactly that page
   const flipRef = useRef<HTMLIFrameElement>(null); const [flipPages, setFlipPages] = useState<number[]>([]);
   useEffect(() => { setFlipPages([]); }, [comp?.id, flipMode]);
@@ -119,6 +125,9 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
 
   const pages = doc?.numPages ?? comp?.pageCount ?? 1;
   const go = useCallback((n: number) => { window.speechSynthesis?.cancel(); setSpeaking(false); setPage(Math.min(Math.max(1, n), pages)); }, [pages]);
+  // next / previous: a whole spread in the flipbook view
+  const step = useCallback((dir: 1 | -1) => go(pdfFlip ? stepPage(page, pages, wide, dir) : page + dir), [go, pdfFlip, page, pages, wide]);
+  const spread = pdfFlip ? spreadOf(page, pages, wide) : [page];
 
   // Save progress (debounced).
   useEffect(() => {
@@ -131,11 +140,11 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
-      if (e.key === 'ArrowRight' || e.key === 'PageDown') go(page + 1);
-      if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(page - 1);
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') step(1);
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') step(-1);
     };
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
-  }, [go, page]);
+  }, [step]);
 
   useEffect(() => { const f = () => setFull(!!document.fullscreenElement); document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f); }, []);
   const toggleFull = () => (document.fullscreenElement ? document.exitFullscreen() : shell.current?.requestFullscreen());
@@ -180,21 +189,27 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
             <button role="tab" aria-selected={view === 'flip'} onClick={() => setView('flip')} className={cn('rounded-lg px-3 py-1', view === 'flip' ? 'bg-white shadow-sm' : 'text-slate-700')}>📖 Flipbook</button>
             <button role="tab" aria-selected={view === 'pdf'} disabled={!comp.hasPdf} onClick={() => setView('pdf')} className={cn('rounded-lg px-3 py-1 disabled:opacity-40', view === 'pdf' ? 'bg-white shadow-sm' : 'text-slate-700')}>📄 Pages</button>
           </div>)}
+        {!comp?.flipbook && comp?.hasPdf && comp?.displayMode === 'FLIP' && (
+          <div role="tablist" aria-label="View" className="flex rounded-xl bg-slate-100 p-1 text-sm font-medium">
+            <button role="tab" aria-selected={asBook} onClick={() => setAsBook(true)} className={cn('rounded-lg px-3 py-1', asBook ? 'bg-white shadow-sm' : 'text-slate-700')}>📖 Book</button>
+            <button role="tab" aria-selected={!asBook} onClick={() => setAsBook(false)} className={cn('rounded-lg px-3 py-1', !asBook ? 'bg-white shadow-sm' : 'text-slate-700')}>📄 Pages</button>
+          </div>)}
         {flipMode && flipUnits.length > 1 && (
           <select aria-label="Choose the unit" value={(flip.data as any)?.id ?? ''} onChange={(e) => setFlipUnit(e.target.value)}
             className={cn('h-9 max-w-[14rem] rounded-xl border border-slate-300 bg-white px-2 text-sm font-medium text-slate-800', kid && 'h-11 text-base font-bold')}>
             {flipUnits.map((u, i) => <option key={u.id} value={u.id}>{u.title ?? (comp?.type === 'CD' ? 'Main CD' : 'Main flipbook')}{u.title ? '' : ` (${i + 1})`}</option>)}
           </select>)}
         {!flipMode && comp?.type !== 'MOBILE_APP' && <>
-        <button className={btn} onClick={() => go(page - 1)} disabled={page <= 1} aria-label="Previous page"><ChevronLeft className="size-6" /></button>
+        <button className={btn} onClick={() => step(-1)} disabled={spread[0] <= 1} aria-label="Previous page"><ChevronLeft className="size-6" /></button>
         <label className="flex items-center gap-1 text-sm"><span className="sr-only">Page</span>
           <input type="number" min={1} max={pages} value={page} onChange={(e) => go(Number(e.target.value) || 1)} className="w-14 rounded-lg border border-slate-300 px-2 py-1 text-center" />
           <span className="text-slate-500">/ {pages}</span></label>
-        <button className={btn} onClick={() => go(page + 1)} disabled={page >= pages} aria-label="Next page"><ChevronRight className="size-6" /></button>
+        <button className={btn} onClick={() => step(1)} disabled={spread[spread.length - 1] >= pages} aria-label="Next page"><ChevronRight className="size-6" /></button>
         <span className="mx-1 h-6 w-px bg-slate-200" />
+        {!pdfFlip && <>
         <button className={btn} onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))} aria-label="Zoom out"><ZoomOut className="size-5" /></button>
         <span className="w-10 text-center text-xs tabular-nums text-slate-500">{Math.round(zoom * 100)}%</span>
-        <button className={btn} onClick={() => setZoom((z) => Math.min(3, z + 0.25))} aria-label="Zoom in"><ZoomIn className="size-5" /></button>
+        <button className={btn} onClick={() => setZoom((z) => Math.min(3, z + 0.25))} aria-label="Zoom in"><ZoomIn className="size-5" /></button></>}
         <button className={btn} onClick={toggleBookmark} aria-label={mark ? 'Remove bookmark' : 'Bookmark this page'} aria-pressed={!!mark} disabled={!doc}>{mark ? <BookmarkCheck className="size-5 text-amber-500" /> : <Bookmark className="size-5" />}</button>
         {me?.roles?.includes('TEACHER') && comp?.hasPdf && <a href={`/teacher/whiteboard?new=1&editionId=${editionId}&componentId=${comp.id}&page=${page}`} className={btn} title="Teach this page live on the whiteboard" aria-label="Teach this page on the whiteboard"><Presentation className="size-5" /></a>}
         {canEditHot && <button className={cn(btn, 'w-auto px-2 text-sm font-medium', editHot && 'bg-sky-100 text-sky-800')} onClick={() => { setEditHot(!editHot); if (!editHot) toast('Drag on the page to draw a hotspot. Click one to edit it.'); }} aria-pressed={editHot}>✏️ Hotspots</button>}
@@ -241,9 +256,11 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
                   sandbox="allow-scripts allow-popups allow-forms allow-modals allow-pointer-lock allow-downloads allow-presentation" allow="fullscreen; autoplay" allowFullScreen referrerPolicy="no-referrer" /></ContentGuard>)
           : !comp?.hasPdf ? <div className="m-auto max-w-sm text-center text-slate-500"><FileText className="mx-auto mb-2 size-10" />This part has resources only — see the files listed for it.</div>
             : docError ? <div className="m-auto"><ErrorBox error={new Error(docError)} /></div>
+              : pdfFlip ? (!doc ? <Spinner className="m-auto size-8" /> : <ContentGuard className="absolute inset-0"><PdfFlipbook doc={doc} page={page} pages={pages} onPage={go} onWide={setWide} componentId={comp.id}
+                  editing={editHot} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} /></ContentGuard>)
               : <>{loadingDoc && <Spinner className="absolute left-1/2 top-1/2 size-8" />}<ContentGuard className="relative"><canvas ref={canvas} className={cn('block bg-white shadow-xl', kid ? 'rounded-2xl' : 'rounded')} aria-label={`Page ${page} of ${pages}`} />{doc && comp && <HotspotLayer componentId={comp.id} page={page} editing={editHot} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} />}</ContentGuard></>}
         </main>
-        {owl && comp && <TutorPanel key={`${comp.id}-${flipMode}`} editionId={editionId} componentId={comp.id} page={flipMode ? flipPages[0] ?? 0 : page} toPage={flipMode ? flipPages[1] : undefined} flip={flipMode} onGo={go} onClose={() => setOwl(false)} />}
+        {owl && comp && <TutorPanel key={`${comp.id}-${flipMode}`} editionId={editionId} componentId={comp.id} page={flipMode ? flipPages[0] ?? 0 : spread[0]} toPage={flipMode ? flipPages[1] : spread[1]} flip={flipMode} onGo={go} onClose={() => setOwl(false)} />}
         {!owl && (lessonResources.length > 0 || lessonWork.length > 0 || lessonGames.length > 0 || (!kid && lessonHere)) && (
           <aside className="hidden w-64 shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-3 text-sm xl:block">
             {!kid && lessonHere && <Link href={`/teacher/ai?editionId=${editionId}&lessonId=${lessonHere.id}`} className="mb-3 block rounded-lg bg-violet-50 px-3 py-2 font-medium text-violet-800 hover:bg-violet-100">✨ AI assistant for this lesson</Link>}

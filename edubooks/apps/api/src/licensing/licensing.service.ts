@@ -483,7 +483,8 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
         LEFT JOIN book_components rc ON rc.id = r.component_id LEFT JOIN book_units ru ON ru.id = r.unit_id LEFT JOIN book_lessons rl ON rl.id = r.lesson_id
         WHERE r.asset_id = ${assetId} AND r.edition_id IN ${editions} AND r.audience::text IN ${audiences}
         AND COALESCE(rc.visible_to::text, 'ALL') IN ${vis} AND COALESCE(ru.visible_to::text, 'ALL') IN ${vis} AND COALESCE(rl.visible_to::text, 'ALL') IN ${vis}
-      UNION ALL SELECT 1 FROM book_components bc WHERE bc.book_asset_id = ${assetId} AND bc.edition_id IN ${editions} AND bc.visible_to::text IN ${vis} LIMIT 1`);
+      UNION ALL SELECT 1 FROM book_components bc WHERE bc.book_asset_id = ${assetId} AND bc.edition_id IN ${editions} AND bc.visible_to::text IN ${vis}
+      UNION ALL SELECT 1 FROM page_hotspots h JOIN book_components hc ON hc.id = h.component_id WHERE h.asset_id = ${assetId} AND hc.edition_id IN ${editions} AND hc.visible_to::text IN ${vis} LIMIT 1`);
     return rows.length > 0;
   }
 }

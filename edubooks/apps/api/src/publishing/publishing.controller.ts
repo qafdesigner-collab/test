@@ -92,6 +92,13 @@ export class PublishingController {
     const f = this.chunks.take(req.ctx.userId, d.uploadId);
     return this.db.withContext(req.ctx, async () => ({ ...(await this.svc.setBookPdf(id, f)), indexing: (await this.indexer.start(id)).started, compressing: !!ghostscript() })).finally(() => f.done());
   }
+  /** Video / audio / picture for the elements on a book's pages (sent in pieces first, see /uploads). */
+  @ManualTx()
+  @Post('components/:id/page-media-from-upload')
+  pageMedia(@Param('id', Id()) id: string, @Body() d: FromUploadDto, @Req() req: any) {
+    const f = this.chunks.take(req.ctx.userId, d.uploadId);
+    return this.db.withContext(req.ctx, () => this.svc.addPageMedia(id, f)).finally(() => f.done());
+  }
   @ManualTx()
   @Post('editions/:id/resources-from-upload')
   resourceFromUpload(@Param('id', Id()) id: string, @Body() d: ResourceFromUploadDto, @Req() req: any) {

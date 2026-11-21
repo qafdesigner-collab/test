@@ -52,6 +52,8 @@ export class CreateComponentDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5000) pageCount?: number | null;
   /** ALL, TEACHER (hidden from students) or STUDENT (hidden from teachers). */
   @ApiPropertyOptional({ enum: AUDIENCES }) @IsOptional() @IsEnum(AUDIENCES) visibleTo?: (typeof AUDIENCES)[number];
+  /** how readers see the PDF: PDF (plain pages) or FLIP (page-turn flipbook with elements) */
+  @ApiPropertyOptional({ enum: ['PDF', 'FLIP'] }) @IsOptional() @IsIn(['PDF', 'FLIP']) displayMode?: 'PDF' | 'FLIP';
 }
 export class UpdateComponentDto extends PartialType(CreateComponentDto) {}
 

@@ -23,7 +23,7 @@ export class ReaderService {
     if (!ed) throw new NotFoundException('Book not found');
     const vis = visibleFor(this.db.ctx);
     let comps = await this.q.select({ id: bookComponents.id, visibleTo: bookComponents.visibleTo, type: bookComponents.type, title: bookComponents.title, partNumber: bookComponents.partNumber,
-      pageCount: bookComponents.pageCount, indexedPages: bookComponents.indexedPages, indexStatus: bookComponents.indexStatus, hasPdf: sql<boolean>`${bookComponents.bookAssetId} IS NOT NULL`,
+      pageCount: bookComponents.pageCount, indexedPages: bookComponents.indexedPages, indexStatus: bookComponents.indexStatus, hasPdf: sql<boolean>`${bookComponents.bookAssetId} IS NOT NULL`, displayMode: bookComponents.displayMode,
       flipbook: sql<string | null>`(SELECT f.kind FROM flipbooks f WHERE f.component_id = ${qc(bookComponents.id)} ORDER BY (f.unit_title IS NOT NULL), f.sort LIMIT 1)`,
       flipUnits: sql<number>`(SELECT count(*)::int FROM flipbooks f WHERE f.component_id = ${qc(bookComponents.id)})`,
       hasApp: sql<boolean>`EXISTS (SELECT 1 FROM book_apps a WHERE a.component_id = ${qc(bookComponents.id)} AND (a.asset_id IS NOT NULL OR a.android_url IS NOT NULL OR a.ios_url IS NOT NULL))` })
@@ -78,38 +78,49 @@ export class ReaderService {
   // ---------- interactive page hotspots ----------
   async hotspots(componentId: string) {
     await this.component(componentId);
-    const { rows } = await this.q.execute(sql`SELECT h.id, h.page, h.x, h.y, h.w, h.h, h.kind, h.title, h.body, h.url, h.game_id AS "gameId", g.title AS "gameTitle", g.engine AS "gameEngine"
-      FROM page_hotspots h LEFT JOIN game_activities g ON g.id = h.game_id WHERE h.component_id = ${componentId} ORDER BY h.page, h.y, h.x`);
+    const { rows } = await this.q.execute(sql`SELECT h.id, h.page, h.x, h.y, h.w, h.h, h.kind, h.title, h.body, h.url, h.game_id AS "gameId", g.title AS "gameTitle", g.engine AS "gameEngine",
+        h.asset_id AS "assetId", h.inline, a.mime_type AS "mime", a.original_name AS "fileName"
+      FROM page_hotspots h LEFT JOIN game_activities g ON g.id = h.game_id LEFT JOIN digital_assets a ON a.id = h.asset_id WHERE h.component_id = ${componentId} ORDER BY h.page, h.y, h.x`);
     return rows;
   }
-  private async hotspotValues(d: { kind?: string; url?: string | null; gameId?: string | null; x?: number; y?: number; w?: number; h?: number }, editionId: string) {
+  private async hotspotValues(d: { kind?: string; url?: string | null; gameId?: string | null; assetId?: string | null; x?: number; y?: number; w?: number; h?: number }, editionId: string) {
     if (d.x !== undefined && d.w !== undefined && d.x + d.w > 1.0001) throw new BadRequestException('The area goes past the right edge of the page');
     if (d.y !== undefined && d.h !== undefined && d.y + d.h > 1.0001) throw new BadRequestException('The area goes past the bottom of the page');
-    const url = d.kind ? checkUrl(d.kind, d.url) : undefined;
+    // the publisher's own file: a video, audio or picture of the right kind, uploaded by this publisher
+    let assetId: string | null = null;
+    if (d.assetId && ['VIDEO', 'AUDIO', 'IMAGE'].includes(d.kind ?? '')) {
+      const { rows: [a] } = await this.q.execute(sql`SELECT mime_type AS mime FROM digital_assets WHERE id = ${d.assetId} AND publisher_id = ${this.db.ctx.publisherId}`) as any;
+      const want = { VIDEO: 'video/', AUDIO: 'audio/', IMAGE: 'image/' }[d.kind as 'VIDEO' | 'AUDIO' | 'IMAGE'];
+      if (!a || !String(a.mime).startsWith(want)) throw new BadRequestException(`Choose a ${d.kind === 'IMAGE' ? 'picture' : d.kind!.toLowerCase()} file for this element`);
+      assetId = d.assetId;
+    }
+    if (d.kind === 'IMAGE' && !assetId) throw new BadRequestException('Upload a picture');
+    const url = d.kind === 'VIDEO' && assetId ? null : d.kind ? checkUrl(d.kind, d.url) : undefined;
     if (d.kind === 'GAME') {
       if (!d.gameId) throw new BadRequestException('Choose a game');
       const { rows } = await this.q.execute(sql`SELECT 1 FROM game_activities WHERE id = ${d.gameId} AND school_id IS NULL AND (edition_id = ${editionId} OR edition_id IS NULL)`);
       if (!rows.length) throw new BadRequestException('Choose one of the publisher games for this book');
     }
-    return { url, gameId: d.kind === 'GAME' ? d.gameId! : d.kind ? null : undefined };
+    return { url, assetId, gameId: d.kind === 'GAME' ? d.gameId! : d.kind ? null : undefined };
   }
   async addHotspot(componentId: string, d: any) {
     const c = await this.component(componentId);
     if (c.pageCount && d.page > c.pageCount) throw new BadRequestException('Page out of range');
     const v = await this.hotspotValues(d, c.editionId);
-    if ((d.kind === 'NOTE' || d.kind === 'AUDIO') && !d.body?.trim()) throw new BadRequestException(d.kind === 'AUDIO' ? 'Type the words to read aloud' : 'Type the note');
-    const { rows: [h] } = await this.q.execute(sql`INSERT INTO page_hotspots (publisher_id, component_id, page, x, y, w, h, kind, title, body, url, game_id, created_by)
-      VALUES (${this.db.ctx.publisherId}, ${componentId}, ${d.page}, ${d.x}, ${d.y}, ${d.w}, ${d.h}, ${d.kind}, ${d.title?.trim() ?? ''}, ${d.body ?? ''}, ${v.url ?? null}, ${v.gameId ?? null}, ${this.db.ctx.userId})
+    if ((d.kind === 'NOTE' || (d.kind === 'AUDIO' && !v.assetId)) && !d.body?.trim()) throw new BadRequestException(d.kind === 'AUDIO' ? 'Type the words to read aloud, or upload an audio file' : 'Type the note');
+    const { rows: [h] } = await this.q.execute(sql`INSERT INTO page_hotspots (publisher_id, component_id, page, x, y, w, h, kind, title, body, url, game_id, asset_id, inline, created_by)
+      VALUES (${this.db.ctx.publisherId}, ${componentId}, ${d.page}, ${d.x}, ${d.y}, ${d.w}, ${d.h}, ${d.kind}, ${d.title?.trim() ?? ''}, ${d.body ?? ''}, ${v.url ?? null}, ${v.gameId ?? null}, ${v.assetId}, ${!!d.inline && ['VIDEO', 'IMAGE'].includes(d.kind)}, ${this.db.ctx.userId})
       RETURNING id`);
     return h;
   }
   async updateHotspot(id: string, d: any) {
     const { rows: [cur] } = await this.q.execute(sql`SELECT h.*, c.edition_id FROM page_hotspots h JOIN book_components c ON c.id = h.component_id WHERE h.id = ${id}`) as any;
     if (!cur) throw new NotFoundException('Hotspot not found');
-    const m = { ...cur, ...Object.fromEntries(Object.entries(d).filter(([, x]) => x !== undefined)), gameId: d.gameId !== undefined ? d.gameId : cur.game_id };
+    const m = { ...cur, ...Object.fromEntries(Object.entries(d).filter(([, x]) => x !== undefined)), gameId: d.gameId !== undefined ? d.gameId : cur.game_id, assetId: d.assetId !== undefined ? d.assetId : cur.asset_id };
     const v = await this.hotspotValues({ ...m, url: m.url }, cur.edition_id);
+    if ((m.kind === 'NOTE' || (m.kind === 'AUDIO' && !v.assetId)) && !String(m.body ?? '').trim()) throw new BadRequestException(m.kind === 'AUDIO' ? 'Type the words to read aloud, or upload an audio file' : 'Type the note');
     await this.q.execute(sql`UPDATE page_hotspots SET page = ${m.page}, x = ${m.x}, y = ${m.y}, w = ${m.w}, h = ${m.h}, kind = ${m.kind}, title = ${(m.title ?? '').trim()},
-      body = ${m.body ?? ''}, url = ${v.url ?? null}, game_id = ${v.gameId ?? null} WHERE id = ${id}`);
+      body = ${m.body ?? ''}, url = ${v.url ?? null}, game_id = ${v.gameId ?? null}, asset_id = ${v.assetId}, inline = ${!!m.inline && ['VIDEO', 'IMAGE'].includes(m.kind)} WHERE id = ${id}`);
     return { ok: true };
   }
   async removeHotspot(id: string) {
