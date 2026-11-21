@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 
-/** The 13 reusable game engines. Content is plain data, so one engine serves any book or lesson. */
-export const ENGINES = ['ALPHABET_MATCH', 'PICTURE_WORD', 'COUNTING', 'SORTING', 'MEMORY', 'FILL_BLANK', 'QUIZ', 'SHAPES', 'WORD_BUILD', 'PUZZLE', 'SPELLING_BEE', 'SENTENCE_BUILDER', 'LISTENING'] as const;
+/** The 15 reusable game engines. Content is plain data, so one engine serves any book or lesson. */
+export const ENGINES = ['ALPHABET_MATCH', 'PICTURE_WORD', 'COUNTING', 'SORTING', 'MEMORY', 'FILL_BLANK', 'QUIZ', 'SHAPES', 'WORD_BUILD', 'PUZZLE', 'SPELLING_BEE', 'SENTENCE_BUILDER', 'LISTENING', 'TRACING', 'COLORING'] as const;
 export type Engine = (typeof ENGINES)[number];
 export const SHAPES = ['circle', 'square', 'triangle', 'rectangle', 'star', 'heart', 'oval', 'diamond'] as const;
 
@@ -77,6 +77,23 @@ export function validateContent(engine: Engine, c: any): { content: any; maxScor
         .filter((r) => r.say && r.options.length >= 2 && r.answer >= 0 && r.answer < r.options.length);
       if (!rounds.length || rounds.length > 15) bad('Add 1–15 rounds: what is said, 2–4 choices and the right one');
       return { content: { rounds }, maxScore: rounds.length };
+    }
+    case 'TRACING': {
+      // letters, numbers or short words to trace (any script: English, Arabic, Urdu…), with dotted / faded guides
+      const items = arr(c?.items).map((x: any) => s(typeof x === 'string' ? x : x?.text, 14)).filter(Boolean).slice(0, 20);
+      const repeats = Math.max(1, Math.min(4, Math.round(Number(c?.repeats) || 2)));
+      const guide = ['DOTTED', 'FADED', 'OUTLINE'].includes(c?.guide) ? c.guide : 'DOTTED';
+      const lines = c?.lines !== false; const font = ['PRINT', 'ROUND', 'CURSIVE'].includes(c?.font) ? c.font : 'ROUND';
+      if (!items.length) bad('Add letters, numbers or words to trace');
+      return { content: { items, repeats, guide, lines, font }, maxScore: items.length };
+    }
+    case 'COLORING': {
+      // a picture to colour: a line drawing (PNG / JPEG, made in the editor from a drawing or a photo) and an optional task
+      const image = typeof c?.image === 'string' ? c.image : '';
+      if (!/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(image)) bad('Add a picture to colour');
+      if (image.length > 1_300_000) bad('The picture is too big — use a smaller picture (under about 1 MB)');
+      const task = s(c?.task, 160);
+      return { content: { image, task }, maxScore: 1 };
     }
   }
   return bad('Unknown game type');

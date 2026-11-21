@@ -13,7 +13,7 @@ export class HotspotDto {
   @Type(() => Number) @IsInt() @Min(1) @Max(5000) page: number;
   @IsNumber() @Min(0) @Max(1) x: number; @IsNumber() @Min(0) @Max(1) y: number;
   @IsNumber() @Min(0.01) @Max(1) w: number; @IsNumber() @Min(0.01) @Max(1) h: number;
-  @IsIn(['NOTE', 'AUDIO', 'VIDEO', 'LINK', 'GAME', 'IMAGE']) kind: 'NOTE' | 'AUDIO' | 'VIDEO' | 'LINK' | 'GAME' | 'IMAGE';
+  @IsIn(['NOTE', 'AUDIO', 'VIDEO', 'LINK', 'GAME', 'IMAGE', 'TRACE']) kind: 'NOTE' | 'AUDIO' | 'VIDEO' | 'LINK' | 'GAME' | 'IMAGE' | 'TRACE';
   @IsOptional() @IsString() @MaxLength(120) title?: string;
   @IsOptional() @IsString() @MaxLength(4000) body?: string;
   @IsOptional() @IsString() @MaxLength(500) url?: string | null;

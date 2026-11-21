@@ -1,3 +1,15 @@
+# What's new in Knowledge Gate 1.4.5
+
+## ✍️ Handwriting tracing
+- New activity **Handwriting tracing** (Games → New game, for publishers and teachers): type letters, numbers or words (English, Arabic, Urdu, Hindi…), choose the guide (dotted / light grey / outline), the letter style (rounded, print, joined) and how many times each is traced. Children trace with a finger, a stylus or the mouse on four writing lines; the app checks that they follow the letter (not scribbling around it), gives ⭐–⭐⭐⭐, and says the letter with the natural voice. Set it for a class like any game; stars go to their progress.
+- **🖨 Print as a worksheet:** the same letters as a paper sheet — a model, then lighter and dotted copies on writing lines, with name and date.
+- **On a book page:** new element **✍️ Tracing** (Add videos & elements → ✏️ Hotspots → draw a box). Put the box over letters printed in the book (e.g. dotted letters): children trace right on the page and the app checks their tracing against those printed letters. Or type letters to show your own dotted guide.
+
+## 🎨 Colouring
+- New activity **Colouring**: upload a picture — a **line drawing** is used as it is; a **photo** is turned into an outline automatically (slider: fewer / more lines). Add a task (e.g. “Colour the apple red”).
+- Children colour with **🪣 tap to fill** (the lines stop the colour), **🖍️ crayon** (sizes), **🧽 eraser** and **↶ undo**, with a bright palette; finishing gives the stars.
+- Put it in the book with a 🎮 Game element on a page.
+
 # What's new in Knowledge Gate 1.4.4
 
 ## 👥 Groups of students in a class

@@ -5,6 +5,8 @@ import { Button, Card, Dialog, ErrorBox, Field, Input, Select, Textarea, cn } fr
 import { BookScope } from '@/components/book-scope';
 import { ENGINE_INFO, Engine } from './engines';
 import { GamePlayer } from './player';
+import { printTracingSheet } from './tracing';
+import { LineArtMaker } from './coloring';
 
 const SHAPES = ['circle', 'square', 'triangle', 'rectangle', 'star', 'heart', 'oval', 'diamond'];
 export const EMPTY_CONTENT: Record<Engine, any> = {
@@ -21,6 +23,8 @@ export const EMPTY_CONTENT: Record<Engine, any> = {
   SPELLING_BEE: { words: [{ word: 'apple', sentence: 'I eat a red apple.', hint: '🍎' }, { word: 'school', sentence: 'I go to school.', hint: '🏫' }] },
   SENTENCE_BUILDER: { sentences: [{ text: 'The cat is on the mat', hint: '🐱' }, { text: 'I like to read books', hint: '📚' }] },
   LISTENING: { rounds: [{ say: 'dog', options: ['🐶', '🐱', '🐮'], answer: 0 }, { say: 'Find the apple', options: ['🍌', '🍎', '🍇'], answer: 1 }] },
+  TRACING: { items: ['A', 'a', 'B', 'b'], repeats: 2, guide: 'DOTTED', font: 'ROUND', lines: true },
+  COLORING: { image: '', task: 'Colour the picture' },
 };
 const list = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
 
@@ -73,6 +77,24 @@ export function ContentForm({ engine, value, onChange }: { engine: Engine; value
       return <Rows label="Add word" rows={v.words} blank={{ word: '', hint: '' }} onChange={(words) => onChange({ words })} render={(r, set) => <>
         <Input aria-label="Word" className="w-40" placeholder="cat" value={r.word} onChange={(e) => set({ word: e.target.value })} />
         <Input aria-label="Picture hint" className="w-32" placeholder="🐱" value={r.hint} onChange={(e) => set({ hint: e.target.value })} /></>} />;
+    case 'TRACING':
+      return <div className="space-y-3">
+        <Field label="Letters, numbers or words to trace (commas) — English, Arabic, Urdu, Hindi…"><Input value={v.items.join(', ')} placeholder="A, a, B, b, cat  or  ا, ب, ت" onChange={(e) => onChange({ ...v, items: list(e.target.value) })} /></Field>
+        <div className="grid gap-3 sm:grid-cols-4">
+          <Field label="Guide"><Select value={v.guide} onChange={(e) => onChange({ ...v, guide: e.target.value })}><option value="DOTTED">Dotted letters</option><option value="FADED">Light grey letters</option><option value="OUTLINE">Outline</option></Select></Field>
+          <Field label="Letter style"><Select value={v.font} onChange={(e) => onChange({ ...v, font: e.target.value })}><option value="ROUND">Rounded (for small children)</option><option value="PRINT">Print</option><option value="CURSIVE">Joined / cursive</option></Select></Field>
+          <Field label="Times each"><Input type="number" min={1} max={4} value={v.repeats} onChange={(e) => onChange({ ...v, repeats: Number(e.target.value) })} /></Field>
+          <label className="mt-6 flex items-center gap-2 text-sm"><input type="checkbox" checked={v.lines !== false} onChange={(e) => onChange({ ...v, lines: e.target.checked })} />Writing lines</label>
+        </div>
+        <Button type="button" size="sm" variant="secondary" disabled={!v.items.length} onClick={() => printTracingSheet(v, 'Handwriting practice')}>🖨 Print as a worksheet</Button>
+        <p className="text-xs text-slate-500">Children trace each one with a finger, a stylus or the mouse; the app checks that they follow the letters, gives stars and says the letter.</p>
+      </div>;
+    case 'COLORING':
+      return <div className="space-y-3">
+        <LineArtMaker onChange={(image) => onChange({ ...v, image })} />
+        {v.image && !v.image.startsWith('data:image/png') && !v.image.startsWith('data:image/jpeg') ? null : v.image && <p className="text-xs text-emerald-700">✅ Picture ready to colour.</p>}
+        <Field label="Task (optional)"><Input value={v.task} maxLength={160} placeholder="Colour the apple red and the leaf green" onChange={(e) => onChange({ ...v, task: e.target.value })} /></Field>
+      </div>;
     case 'PUZZLE':
       return <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Picture (emoji)"><Input value={v.picture} onChange={(e) => onChange({ ...v, picture: e.target.value })} /></Field>

@@ -9,11 +9,12 @@ import { useToast } from '@/components/ui/toast';
 import { embedUrl } from '@/components/training';
 import { uploadBig } from '@/lib/big-upload';
 import { speakText } from '@/lib/voice';
+import { TracingPad, cropPage } from '@/components/games/tracing';
 
 export interface Hotspot { id: string; page: number; x: number; y: number; w: number; h: number; kind: Kind; title: string; body: string; url: string | null; gameId: string | null; gameTitle?: string | null; assetId?: string | null; inline?: boolean; mime?: string | null; fileName?: string | null }
-type Kind = 'NOTE' | 'AUDIO' | 'VIDEO' | 'IMAGE' | 'LINK' | 'GAME';
+type Kind = 'NOTE' | 'AUDIO' | 'VIDEO' | 'IMAGE' | 'LINK' | 'GAME' | 'TRACE';
 const KINDS: Record<Kind, { icon: string; label: string }> = {
-  NOTE: { icon: '💬', label: 'Note or meaning' }, AUDIO: { icon: '🔊', label: 'Audio / read aloud' }, VIDEO: { icon: '🎬', label: 'Video' }, IMAGE: { icon: '🖼️', label: 'Picture' }, LINK: { icon: '🔗', label: 'Link' }, GAME: { icon: '🎮', label: 'Game' },
+  NOTE: { icon: '💬', label: 'Note or meaning' }, AUDIO: { icon: '🔊', label: 'Audio / read aloud' }, VIDEO: { icon: '🎬', label: 'Video' }, IMAGE: { icon: '🖼️', label: 'Picture' }, LINK: { icon: '🔗', label: 'Link' }, GAME: { icon: '🎮', label: 'Game' }, TRACE: { icon: '✍️', label: 'Tracing' },
 };
 /** A short-lived link to the publisher's own video / audio / picture (checked against the reader's licence). */
 export function useMedia(assetId?: string | null) {
@@ -61,13 +62,25 @@ export function HotspotLayer({ componentId, page, editing, kid, games, noFlip }:
           <span className={cn('absolute -right-2 -top-2 grid place-items-center rounded-full bg-white shadow', kid ? 'size-8 text-lg' : 'size-6 text-sm')}>{KINDS[h.kind].icon}</span>
         </button>))}
       {rect && <div className="pointer-events-none absolute rounded-lg border-2 border-dashed border-sky-600 bg-sky-400/20" style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.w * 100}%`, height: `${rect.h * 100}%` }} />}
-      {open && <HotspotView h={open} kid={kid} onClose={() => setOpen(null)} />}
+      {open && (open.kind === 'TRACE' ? <TraceView h={open} onClose={() => setOpen(null)} page={box.current?.parentElement?.querySelector('canvas') ?? null} />
+        : <HotspotView h={open} kid={kid} onClose={() => setOpen(null)} />)}
       {form && <HotspotForm componentId={componentId} value={form} games={games} onClose={() => setForm(null)} />}
     </div>
   );
 }
 
-function HotspotView({ h, kid, onClose }: { h: Hotspot; kid: boolean; onClose: () => void }) {
+/** Tracing on a book page: the letters printed in this part of the page (or the letters the publisher typed). */
+function TraceView({ h, onClose, page }: { h: Hotspot; onClose: () => void; page?: HTMLCanvasElement | null }) {
+  const [crop] = useState(() => (!h.body?.trim() && page ? cropPage(page, h) : null));
+  return (
+    <Dialog open onOpenChange={onClose} wide title={`✍️ ${h.title || 'Trace the letters'}`}>
+      {crop || h.body?.trim() ? <TracingPad backdrop={crop} text={crop ? undefined : h.body.trim()} lines={!crop} say={(t) => void speakText(t)} />
+        : <p className="text-slate-600">This page is still loading — close and try again.</p>}
+    </Dialog>
+  );
+}
+
+function HotspotView({ h, kid, onClose }: { h: Hotspot; kid: boolean; onClose: () => void; page?: HTMLCanvasElement | null }) {
   const embed = h.kind === 'VIDEO' && !h.assetId ? embedUrl(h.url) : null;
   const file = useMedia(h.assetId);
   return (
@@ -129,7 +142,8 @@ function HotspotForm({ componentId, value, games, onClose }: { componentId: stri
           Show {f.kind === 'VIDEO' ? 'the video' : 'the picture'} on the page itself (instead of a tappable icon)</label>}
         {((f.kind === 'VIDEO' && !f.assetId) || f.kind === 'LINK') && <Field label={f.kind === 'VIDEO' ? 'YouTube or Vimeo link' : 'Link (https://…)'}><Input required value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} /></Field>}
         {f.kind === 'GAME' && <Field label="Game"><Select required value={f.gameId} onChange={(e) => setF({ ...f, gameId: e.target.value })}><option value="">Choose a game…</option>{games.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}</Select></Field>}
-        <Field label={f.kind === 'AUDIO' ? (f.assetId ? 'Words (optional)' : 'Words read aloud') : f.kind === 'NOTE' ? 'Note' : f.kind === 'IMAGE' ? 'Caption (optional)' : 'Text (optional)'}><Textarea rows={3} maxLength={4000} required={(f.kind === 'AUDIO' && !f.assetId) || f.kind === 'NOTE'} value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} /></Field>
+        {f.kind === 'TRACE' && <p className="rounded-lg bg-sky-50 p-2 text-xs text-sky-900">Draw the box around letters printed on the page (e.g. dotted letters): children trace right over them and the app checks their tracing against those letters. Or type letters below to show your own dotted letters instead.</p>}
+        <Field label={f.kind === 'TRACE' ? 'Letters to trace (leave empty to trace what is printed in the box)' : f.kind === 'AUDIO' ? (f.assetId ? 'Words (optional)' : 'Words read aloud') : f.kind === 'NOTE' ? 'Note' : f.kind === 'IMAGE' ? 'Caption (optional)' : 'Text (optional)'}><Textarea rows={3} maxLength={4000} required={(f.kind === 'AUDIO' && !f.assetId) || f.kind === 'NOTE'} value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} /></Field>
         {err ? <ErrorBox error={err} /> : null}
         <div className="flex gap-2">
           {f.id && <Button type="button" variant="ghost" onClick={async () => { try { await api.del(`/reader/hotspots/${f.id}`); done('Hotspot deleted'); } catch (e) { setErr(e); } }}><Trash2 className="size-4" />Delete</Button>}

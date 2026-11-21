@@ -421,6 +421,13 @@
       "when": 1795710000000,
       "tag": "0059_student_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1795800000000,
+      "tag": "0060_tracing_coloring",
+      "breakpoints": true
     }
   ]
 }

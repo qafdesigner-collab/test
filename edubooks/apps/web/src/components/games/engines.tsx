@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/components/ui';
 import { useT } from '@/lib/i18n';
+import { Tracing } from './tracing';
+import { Coloring } from './coloring';
 
-export type Engine = 'ALPHABET_MATCH' | 'PICTURE_WORD' | 'COUNTING' | 'SORTING' | 'MEMORY' | 'FILL_BLANK' | 'QUIZ' | 'SHAPES' | 'WORD_BUILD' | 'PUZZLE' | 'SPELLING_BEE' | 'SENTENCE_BUILDER' | 'LISTENING';
+export type Engine = 'ALPHABET_MATCH' | 'PICTURE_WORD' | 'COUNTING' | 'SORTING' | 'MEMORY' | 'FILL_BLANK' | 'QUIZ' | 'SHAPES' | 'WORD_BUILD' | 'PUZZLE' | 'SPELLING_BEE' | 'SENTENCE_BUILDER' | 'LISTENING' | 'TRACING' | 'COLORING';
 export interface EngineProps { content: any; onFinish: (score: number) => void; say: (t: string) => void; onProgress?: (done: number, total: number) => void }
 export const ENGINE_INFO: Record<Engine, { label: string; icon: string; color: string }> = {
   ALPHABET_MATCH: { label: 'Alphabet match', icon: '🔤', color: '#f97316' }, PICTURE_WORD: { label: 'Picture & word', icon: '🖼️', color: '#ec4899' },
@@ -14,6 +16,7 @@ export const ENGINE_INFO: Record<Engine, { label: string; icon: string; color: s
   WORD_BUILD: { label: 'Word building', icon: '🧩', color: '#14b8a6' }, PUZZLE: { label: 'Picture puzzle', icon: '🧸', color: '#a855f7' },
   SPELLING_BEE: { label: 'Spelling bee', icon: '🐝', color: '#eab308' }, SENTENCE_BUILDER: { label: 'Sentence builder', icon: '🧱', color: '#f43f5e' },
   LISTENING: { label: 'Listen & choose', icon: '👂', color: '#0ea5e9' },
+  TRACING: { label: 'Handwriting tracing', icon: '✍️', color: '#2563eb' }, COLORING: { label: 'Colouring', icon: '🎨', color: '#d946ef' },
 };
 
 // ---------- helpers ----------
@@ -333,8 +336,8 @@ function Listening({ content, onFinish, say, onProgress }: EngineProps) {
 
 export const ENGINES: Record<Engine, (p: EngineProps) => React.JSX.Element> = {
   ALPHABET_MATCH: Match, PICTURE_WORD: Match, MEMORY: Memory, COUNTING: Counting, SORTING: Sorting, FILL_BLANK: FillBlank, QUIZ: Quiz, SHAPES: Shapes, WORD_BUILD: WordBuild, PUZZLE: Puzzle,
-  SPELLING_BEE: SpellingBee, SENTENCE_BUILDER: SentenceBuilder, LISTENING: Listening,
+  SPELLING_BEE: SpellingBee, SENTENCE_BUILDER: SentenceBuilder, LISTENING: Listening, TRACING: Tracing, COLORING: Coloring,
 };
 export const maxScore = (engine: Engine, c: any) => ({ ALPHABET_MATCH: c.pairs?.length, PICTURE_WORD: c.pairs?.length, MEMORY: c.pairs?.length, COUNTING: c.rounds,
   SORTING: c.categories?.reduce((n: number, k: any) => n + k.items.length, 0), FILL_BLANK: c.sentences?.length, QUIZ: c.questions?.length, SHAPES: c.rounds, WORD_BUILD: c.words?.length, PUZZLE: 3,
-  SPELLING_BEE: c.words?.length, SENTENCE_BUILDER: c.sentences?.length, LISTENING: c.rounds?.length }[engine] ?? 1);
+  SPELLING_BEE: c.words?.length, SENTENCE_BUILDER: c.sentences?.length, LISTENING: c.rounds?.length, TRACING: c.items?.length, COLORING: 1 }[engine] ?? 1);
