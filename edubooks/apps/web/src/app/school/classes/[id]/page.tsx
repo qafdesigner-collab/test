@@ -4,6 +4,7 @@ import { use, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, BarChart3, Plus, UserMinus } from 'lucide-react';
 import { api } from '@/lib/api';
+import { ClassGroups } from '@/components/groups';
 import { useAction } from '@/lib/hooks';
 import { className } from '@/lib/lms';
 import { Button, Card, Dialog, ErrorBox, PageLoader, Select } from '@/components/ui';
@@ -37,6 +38,7 @@ export default function SchoolClass({ params }: { params: Promise<{ id: string }
       {dlg === 'enrol' && <EnrolDialog classId={id} onClose={() => setDlg('')} />}
       {dlg === 'teachers' && <TeachersDialog classId={id} current={c.teachers} onClose={() => setDlg('')} />}
       {report && <StudentReportDialog studentId={report} classId={id} onClose={() => setReport(null)} />}
+      <ClassGroups classId={id} />
     </div>
   );
 }

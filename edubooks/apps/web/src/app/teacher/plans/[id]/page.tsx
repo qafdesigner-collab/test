@@ -1,5 +1,6 @@
 'use client';
 import { showPrintPreview } from '@/lib/print-preview';
+import { SpecialStudents, type SpecialStudent } from '@/components/groups';
 import Link from 'next/link';
 import { Suspense, use, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -15,7 +16,7 @@ import { useToast } from '@/components/ui/toast';
 import { AiNotices, SourceChips } from '@/components/ai-bits';
 
 type Step = { title: string; minutes: number; detail: string };
-type Content = { objectives: string; materials: string; warmUp: string; steps: Step[]; practice: string; assessment: string; homework: string; differentiation: string; notes: string };
+type Content = { objectives: string; materials: string; warmUp: string; steps: Step[]; practice: string; assessment: string; homework: string; differentiation: string; notes: string; specialStudents?: SpecialStudent[] };
 const EMPTY: Content = { objectives: '', materials: '', warmUp: '', steps: [{ title: 'Introduce the topic', minutes: 10, detail: '' }], practice: '', assessment: '', homework: '', differentiation: '', notes: '' };
 const SECTIONS: [keyof Content, string, string][] = [
   ['objectives', 'Learning objectives', 'By the end of the lesson, children will be able to…'], ['materials', 'Materials & resources', 'Book pages, flashcards, teacher cards…'],
@@ -64,7 +65,8 @@ function Editor({ id }: { id: string }) {
   const html = () => `<h1>${esc(f.title)}</h1><p>${esc([book.data?.title, lesson && `Unit ${lesson.unit.number} · Lesson ${lesson.number}: ${lesson.title}${lesson.pageStart ? ` (pages ${lesson.pageStart}–${lesson.pageEnd ?? lesson.pageStart})` : ''}`, f.planDate, `${f.durationMin} minutes`].filter(Boolean).join(' · '))}</p>`
     + SECTIONS.slice(0, 3).map(([k, l]) => (c[k] ? `<h3>${l}</h3><p>${esc(String(c[k])).replace(/\n/g, '<br>')}</p>` : '')).join('')
     + `<h3>Teaching steps</h3><ol>${c.steps.map((s) => `<li><b>${esc(s.title)}</b> (${s.minutes} min)${s.detail ? `<br>${esc(s.detail).replace(/\n/g, '<br>')}` : ''}</li>`).join('')}</ol>`
-    + SECTIONS.slice(3).map(([k, l]) => (c[k] ? `<h3>${l}</h3><p>${esc(String(c[k])).replace(/\n/g, '<br>')}</p>` : '')).join('');
+    + SECTIONS.slice(3).map(([k, l]) => (c[k] ? `<h3>${l}</h3><p>${esc(String(c[k])).replace(/\n/g, '<br>')}</p>` : '')).join('')
+    + (c.specialStudents?.length ? `<h3>Special students</h3><table border="1" cellpadding="6" style="border-collapse:collapse;width:100%"><tr><th align="left">Student</th><th align="left">Need</th><th align="left">How I will support</th></tr>${c.specialStudents.map((x) => `<tr><td>${esc(x.name)}</td><td>${esc(x.need)}</td><td>${esc(x.support)}</td></tr>`).join('')}</table>` : '');
   const print = () => showPrintPreview(f.title || 'Lesson plan', `<!doctype html><html><head><meta charset="utf-8"><title>${esc(f.title)}</title><style>body{font-family:system-ui;max-width:760px;margin:24px auto;padding:0 16mm;line-height:1.5;background:#fff}h3{margin-bottom:4px;color:#334155}</style></head><body>${html()}</body></html>`);
   const download = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([`<html><head><meta charset="utf-8"></head><body>${html()}</body></html>`], { type: 'application/msword' })); a.download = `${f.title || 'lesson-plan'}.doc`; a.click(); };
 
@@ -111,6 +113,7 @@ function Editor({ id }: { id: string }) {
             </div>
             {SECTIONS.slice(3).map(([k, label, ph]) => <Field key={k} label={label}><Textarea rows={2} value={String(c[k])} placeholder={ph} onChange={(e) => setC({ [k]: e.target.value } as any)} /></Field>)}
           </Card>
+          <Card className="p-5"><SpecialStudents classId={f.classId} value={c.specialStudents ?? []} onChange={(v) => setC({ specialStudents: v })} /></Card>
         </div>
         <aside className="space-y-4">
           <Card className="p-4 text-sm">

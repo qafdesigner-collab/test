@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { GroupPicker } from '@/components/groups';
 import { Suspense, use, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -61,6 +62,7 @@ function Builder({ initial, id }: { initial: any; id: string | null }) {
         <Field label="Instructions for children"><Textarea rows={2} value={f.instructions} onChange={(e) => setF({ ...f, instructions: e.target.value })} /></Field>
         {roster.data && (
           <details className="rounded-lg border border-slate-200 p-3 text-sm"><summary className="cursor-pointer font-medium">Assign to {f.studentIds?.length ? `${f.studentIds.length} selected student(s)` : 'the whole class'}</summary>
+            {f.classId && <div className="mt-2"><GroupPicker classId={f.classId} onPick={(ids) => setF({ ...f, studentIds: ids })} /></div>}
             <div className="mt-2 grid gap-1 sm:grid-cols-3">{roster.data.roster.map((s: any) => (
               <label key={s.id} className="flex items-center gap-2"><input type="checkbox" checked={f.studentIds?.includes(s.id) ?? false}
                 onChange={(e) => setF({ ...f, studentIds: e.target.checked ? [...(f.studentIds ?? []), s.id] : f.studentIds.filter((x: string) => x !== s.id) })} />{s.displayName}</label>))}</div>

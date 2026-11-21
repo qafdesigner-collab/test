@@ -1,3 +1,17 @@
+# What's new in Knowledge Gate 1.4.4
+
+## 👥 Groups of students in a class
+- Classes & reports → a class → **Groups in this class → New group**: a name (e.g. “Reading group A”, “Needs support”, “Fast finishers”), a colour, a note, and the students. A student can be in several groups.
+- Each group shows how it is doing next to the whole class: homework average, homework handed in, exam average, attendance and who was active this week.
+- **Set work for a group:** when making homework, a quiz or a test, open “Assign to…” and tap the group's name.
+- School admins see and manage the groups on the class page too.
+
+## ⭐ Special students in the lesson plan
+- Lesson planner → a plan → **Special students in this lesson**: add students one by one or a whole group, choose what each needs (extra help, reading support, language support, attention, gifted — needs challenge, seating, health, other) and write how you will support them. It is printed and saved to Word with the plan.
+
+## 📊 Compare classes
+- New menu item **Compare classes** (teachers and school admins): put sections side by side (e.g. KG1 A and KG1 B) or whole grades, on the same measures — students, homework average, homework handed in, exam average, attendance (30 days), active this week, pages read and stars per student. The best in each row is marked ⭐. Only class totals are shown, never student names.
+
 # What's new in Knowledge Gate 1.4.3
 
 ## Flipbooks: like your FlipHTML5 books
