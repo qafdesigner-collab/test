@@ -1,3 +1,12 @@
+# What's new in Knowledge Gate 1.4.1
+
+## 🗣️ Natural reading voice (Piper)
+- **Super admin → AI assistant → 🗣️ Natural reading voice → Install.** Choose the voices (English: Lessac, Amy, Ryan or Alba; Arabic: Kareem; Hindi: Priyamvada or Pratham; French: Siwis). The platform downloads Piper (free, open source) and the voices, checks each file against its published checksum, and keeps them in the app's own “voice” folder (it stays after updates). About 26 MB for Piper and 65 MB per voice.
+- Then **🔊 Read aloud** in the reader (both pages in the flipbook), **Owl's “Read to me”** and the **words on page elements** are read with a human-like voice made on your server. Each page is made once and kept, so the next child hears it at once.
+- Choose the voice for each language, the **speed** (slower is good for small children), **▶ Hear it** to try, or switch it off.
+- Languages without a natural voice (Urdu — Piper has no Urdu voice yet) use the device's voice; the device's most natural voice (“Natural”/“Neural” voices on Chrome, Edge and Android) is now chosen automatically.
+- Works without internet once installed; the server needs Linux (x64), as cPanel servers are. On a VPS, `PIPER_CMD` can point to a Piper installed with pip.
+
 # What's new in Knowledge Gate 1.4.0
 
 ## 📖 Make a flipbook from your PDF — with your own videos and elements

@@ -15,6 +15,7 @@ import { ContentGuard, useProtection } from '@/components/content-guard';
 import { AppPanel } from '@/components/app-panel';
 import { useRouter } from 'next/navigation';
 import { useMe } from '@/lib/session';
+import { speakPage, stopVoice } from '@/lib/voice';
 import { openPdf, type FileLink } from '@/lib/protected-pdf';
 import { isSaved, offlinePdf, offlineSupported, removeBook, saveBook } from '@/lib/offline';
 
@@ -124,7 +125,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   }, [doc, page, zoom, full, toc]);
 
   const pages = doc?.numPages ?? comp?.pageCount ?? 1;
-  const go = useCallback((n: number) => { window.speechSynthesis?.cancel(); setSpeaking(false); setPage(Math.min(Math.max(1, n), pages)); }, [pages]);
+  const go = useCallback((n: number) => { readRun.current++; stopVoice(); setSpeaking(false); setPage(Math.min(Math.max(1, n), pages)); }, [pages]);
   // next / previous: a whole spread in the flipbook view
   const layout: FlipLayout = comp?.flipLayout ?? 'COVER';
   const shape = usePageShapes(pdfFlip ? doc : null, page);
@@ -151,15 +152,19 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   useEffect(() => { const f = () => setFull(!!document.fullscreenElement); document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f); }, []);
   const toggleFull = () => (document.fullscreenElement ? document.exitFullscreen() : shell.current?.requestFullscreen());
 
-  // Optional narration: reads the page's text aloud with the device's voice.
+  // Narration: the page read aloud with the natural voice (the platform's own, or the device's best one).
+  const readRun = useRef(0);
   const speak = async () => {
-    if (speaking) { window.speechSynthesis.cancel(); setSpeaking(false); return; }
-    if (!doc || !window.speechSynthesis) return toast('Read-aloud is not available on this device', 'err');
-    const tc = await (await doc.getPage(page)).getTextContent();
-    const text = tc.items.map((i: any) => i.str).join(' ').trim();
-    if (!text) return toast('This page has no readable text', 'err');
-    const u = new SpeechSynthesisUtterance(text); u.rate = 0.85; u.onend = () => setSpeaking(false);
-    window.speechSynthesis.speak(u); setSpeaking(true);
+    if (speaking) { readRun.current++; stopVoice(); setSpeaking(false); return; }
+    if (!doc || !comp) return;
+    const my = ++readRun.current; setSpeaking(true);
+    try {
+      for (const n of spread) {
+        if (readRun.current !== my) break;
+        await speakPage(comp.id, n, async () => (await (await doc.getPage(n)).getTextContent()).items.map((i: any) => i.str).join(' ').trim());
+      }
+    } catch (e: any) { toast(e.message || 'Read-aloud is not available on this device', 'err'); }
+    finally { if (readRun.current === my) setSpeaking(false); }
   };
 
   const mark = comp?.bookmarks?.find((x: any) => x.page === page);

@@ -6,10 +6,11 @@ import { api, fmtDate } from '@/lib/api';
 import { Badge, Button, Card, ErrorBox, Field, Input, PageLoader, cn } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 import { useT } from '@/lib/i18n';
+import { speakText } from '@/lib/voice';
 
 type Turn = { who: 'me' | 'owl'; text: string; quiz?: { q: string; options: string[]; answer: number }[] | null; pages?: number[]; reading?: { score: number | null; words: { w: string; ok: boolean }[] } };
 const READ_LANGS: [string, string][] = [['en-US', 'English'], ['ar-SA', 'العربية'], ['ur-PK', 'اردو'], ['hi-IN', 'हिन्दी'], ['fr-FR', 'Français']];
-const speak = (t: string) => { try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t.replace(/[\u{1F300}-\u{1FAFF}]/gu, '')); u.rate = 0.9; window.speechSynthesis.speak(u); } catch { /* no voice */ } };
+const speak = (t: string) => { void speakText(t); };
 
 export function useTutorStatus(enabled: boolean) {
   return useQuery({ queryKey: ['tutorStatus'], queryFn: () => api.get<{ enabled: boolean; remaining: number }>('/tutor/status'), enabled, staleTime: 60_000 });

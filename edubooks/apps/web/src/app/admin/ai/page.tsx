@@ -29,6 +29,7 @@ export default function AdminAi() {
         {s.health.ok ? <Badge tone="PUBLISHED"><CheckCircle2 className="size-3" />Healthy</Badge> : <Badge tone="danger"><XCircle className="size-3" />Unavailable</Badge>}
       </Card>
       <OcrCard />
+      <VoiceCard />
       <ConnectAi />
       <SchoolsAi />
       <div className="grid gap-4 sm:grid-cols-4">
@@ -212,6 +213,82 @@ function OcrCard() {
           </div>
         </div>
       ) : d.linux ? <div className="flex justify-end"><Button size="sm" variant="ghost" onClick={() => setMore(true)}>Add more languages…</Button></div> : null}
+      {ins.state === 'failed' && !running && <p className="rounded-lg bg-red-50 p-2 text-red-700">The last installation failed: {ins.error}</p>}
+      {(ins.log?.length ?? 0) > 0 && <button type="button" className="text-xs text-slate-500 underline" onClick={() => setShowLog(!showLog)}>{showLog ? 'Hide' : 'Show'} installation log</button>}
+      {showLog && <pre className="max-h-48 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{(ins.log ?? []).join('\n')}</pre>}
+    </Card>
+  );
+}
+
+/** Natural reading voice (Piper on the server): installed from here, one voice per language, speed, and a sample. */
+const SAMPLES: Record<string, string> = { en: 'Hello! I am Owl. Let us read this page together. The cat sat on the mat.', ar: 'مرحبا! أنا البومة. هيا نقرأ هذه الصفحة معا.', hi: 'नमस्ते! मैं उल्लू हूँ। चलो यह पन्ना साथ में पढ़ें।', fr: 'Bonjour ! Je suis la chouette. Lisons cette page ensemble.' };
+function VoiceCard() {
+  const qc = useQueryClient(); const toast = useToast();
+  const q = useQuery({ queryKey: ['voiceAdmin'], queryFn: () => api.get<any>('/voice/admin'), refetchInterval: (x) => (x.state.data?.install?.state === 'running' ? 2000 : false) });
+  const [pick, setPick] = useState<string[]>(['en_US-lessac-medium', 'ar_JO-kareem-medium', 'hi_IN-priyamvada-medium']);
+  const [busy, setBusy] = useState(false); const [showLog, setShowLog] = useState(false); const [more, setMore] = useState(false); const [playing, setPlaying] = useState<string | null>(null);
+  const prev = useRef<string | undefined>(undefined);
+  useEffect(() => { const st = q.data?.install?.state; if (prev.current === 'running' && st === 'done') toast('Natural voice installed'); if (prev.current === 'running' && st === 'failed') toast('Installing the voice failed', 'err'); prev.current = st; }, [q.data?.install?.state]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!q.data) return null;
+  const d = q.data; const ins = d.install; const running = ins.state === 'running'; const s = d.settings;
+  const refresh = () => qc.invalidateQueries({ queryKey: ['voiceAdmin'] });
+  const install = async () => { setBusy(true); try { await api.post('/voice/install', { voices: pick }); refresh(); setMore(false); } catch (e: any) { toast(e.message, 'err'); } finally { setBusy(false); } };
+  const save = async (v: any) => { try { await api.put('/voice/settings', v); refresh(); } catch (e: any) { toast(e.message, 'err'); } };
+  const hear = async (lang: string) => {
+    setPlaying(lang);
+    try {
+      const r = await fetch('/api/voice/say', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: SAMPLES[lang], lang }) });
+      if (r.status !== 200 && r.status !== 201) throw new Error((await r.json().catch(() => ({}))).message || 'The voice could not be made');
+      const a = new Audio(URL.createObjectURL(await r.blob())); a.onended = () => setPlaying(null); await a.play();
+    } catch (e: any) { toast(e.message, 'err'); setPlaying(null); }
+  };
+  const langs = Object.keys(d.languages) as string[];
+  return (
+    <Card className={cn('space-y-3 p-4 text-sm', d.ready ? '' : 'border-sky-200 bg-sky-50')}>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xl" aria-hidden>🗣️</span>
+        <div className="min-w-0 flex-1"><b>Natural reading voice:</b> {d.ready
+          ? <>on. Pages (🔊 Read aloud), Owl's answers and notes on the pages are read with a human-like voice made on your server. Languages without a voice here (e.g. Urdu) use the device's voice.</>
+          : d.installed.length ? <>installed but switched off.</> : <>not installed — the device's own voice is used, which sounds robotic on many phones. Install a natural voice here (Piper, free and open source, works without internet once installed).</>}</div>
+        {d.ready ? <Badge tone="PUBLISHED"><CheckCircle2 className="size-3" />On</Badge> : <Badge tone="neutral">Off</Badge>}
+        {d.installed.length > 0 && <label className="flex items-center gap-1.5"><input type="checkbox" checked={s.enabled} onChange={(e) => save({ enabled: e.target.checked })} />Use it</label>}
+      </div>
+      {d.installed.length > 0 && !running && (
+        <div className="space-y-2 rounded-lg bg-white p-3">
+          {langs.filter((l) => d.installed.some((id: string) => d.catalog.find((c: any) => c.id === id)?.lang === l)).map((l) => (
+            <div key={l} className="flex flex-wrap items-center gap-2">
+              <span className="w-20 font-medium text-slate-700">{d.languages[l]}</span>
+              <select aria-label={`${d.languages[l]} voice`} className="h-8 rounded-lg border border-slate-300 bg-white px-2" value={s.voices[l] ?? ''} onChange={(e) => save({ voices: { [l]: e.target.value } })}>
+                {d.catalog.filter((c: any) => c.lang === l && d.installed.includes(c.id)).map((c: any) => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+              <Button size="sm" variant="secondary" loading={playing === l} onClick={() => hear(l)}>▶ Hear it</Button>
+            </div>))}
+          <label className="flex flex-wrap items-center gap-2"><span className="w-20 font-medium text-slate-700">Speed</span>
+            <input type="range" min={0.6} max={1.5} step={0.05} defaultValue={s.speed} onMouseUp={(e) => save({ speed: Number((e.target as HTMLInputElement).value) })} onTouchEnd={(e) => save({ speed: Number((e.target as HTMLInputElement).value) })} className="w-48" />
+            <span className="text-xs text-slate-500">{s.speed <= 0.85 ? 'slow (good for small children)' : s.speed >= 1.15 ? 'fast' : 'normal'}</span></label>
+        </div>)}
+      {running ? (
+        <div className="space-y-2 rounded-lg bg-white p-3">
+          <p className="flex items-center gap-2 font-medium text-slate-800"><span className="size-4 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />{ins.step}…</p>
+          <p className="text-xs text-slate-500">Each voice is about 65 MB. You can leave this page; it continues on the server.</p>
+        </div>
+      ) : (!d.installed.length || more) && d.linux ? (
+        <div className="space-y-2 rounded-lg bg-white p-3">
+          <p className="font-medium text-slate-800">Choose the voices to install (one per language is enough):</p>
+          {langs.map((l) => (
+            <div key={l} className="flex flex-wrap items-center gap-1.5"><span className="w-20 text-slate-600">{d.languages[l]}</span>
+              {d.catalog.filter((c: any) => c.lang === l).map((c: any) => (
+                <label key={c.id} className={cn('flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1 ring-1', pick.includes(c.id) ? 'bg-brand-50 ring-brand-300' : 'ring-slate-200', d.installed.includes(c.id) && 'opacity-60')}>
+                  <input type="checkbox" disabled={d.installed.includes(c.id)} checked={pick.includes(c.id) || d.installed.includes(c.id)} onChange={(e) => setPick(e.target.checked ? [...pick, c.id] : pick.filter((x) => x !== c.id))} />{c.label.replace(/^[^—]+— /, '')}</label>))}
+            </div>))}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="mr-auto text-xs text-slate-500">Downloads Piper (26 MB, from its official GitHub release) and the voices (about 65 MB each, from the official Piper voice collection), each checked against its published checksum, into the app's own “voice” folder. It stays after updates. Urdu has no Piper voice yet.</span>
+            {more && <Button size="sm" variant="ghost" onClick={() => setMore(false)}>Cancel</Button>}
+            <Button size="sm" loading={busy} disabled={!pick.filter((x) => !d.installed.includes(x)).length} onClick={install}>Install {pick.filter((x) => !d.installed.includes(x)).length} voice(s)</Button>
+          </div>
+        </div>
+      ) : d.linux ? <div className="flex justify-end"><Button size="sm" variant="ghost" onClick={() => setMore(true)}>Add more voices…</Button></div>
+        : <p className="text-xs text-slate-500">Installing from here works on Linux servers.</p>}
       {ins.state === 'failed' && !running && <p className="rounded-lg bg-red-50 p-2 text-red-700">The last installation failed: {ins.error}</p>}
       {(ins.log?.length ?? 0) > 0 && <button type="button" className="text-xs text-slate-500 underline" onClick={() => setShowLog(!showLog)}>{showLog ? 'Hide' : 'Show'} installation log</button>}
       {showLog && <pre className="max-h-48 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{(ins.log ?? []).join('\n')}</pre>}

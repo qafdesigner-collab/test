@@ -8,6 +8,7 @@ import { Button, Dialog, ErrorBox, Field, Input, Select, Textarea, cn } from '@/
 import { useToast } from '@/components/ui/toast';
 import { embedUrl } from '@/components/training';
 import { uploadBig } from '@/lib/big-upload';
+import { speakText } from '@/lib/voice';
 
 export interface Hotspot { id: string; page: number; x: number; y: number; w: number; h: number; kind: Kind; title: string; body: string; url: string | null; gameId: string | null; gameTitle?: string | null; assetId?: string | null; inline?: boolean; mime?: string | null; fileName?: string | null }
 type Kind = 'NOTE' | 'AUDIO' | 'VIDEO' | 'IMAGE' | 'LINK' | 'GAME';
@@ -35,7 +36,7 @@ function InlineMedia({ h, editing, onEdit }: { h: Hotspot; editing: boolean; onE
   );
 }
 
-const speak = (t: string) => { if (!window.speechSynthesis) return; window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.rate = 0.85; window.speechSynthesis.speak(u); };
+const speak = (t: string) => { void speakText(t); };
 
 /** Tappable areas drawn over a book page. Publisher staff can draw new ones in edit mode. */
 export function HotspotLayer({ componentId, page, editing, kid, games }: { componentId: string; page: number; editing: boolean; kid: boolean; games: { id: string; title: string }[] }) {

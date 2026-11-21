@@ -188,7 +188,7 @@ function SpaceCard() {
     ['Database backups', `${d.backups.count} · ${mb(d.backups.bytes)}`, 'made before each update; the 2 newest are kept'],
     ['Previous version', mb(d.previous), 'used by “Roll back”'],
     ['Temporary files', mb(d.temp), 'uploads and unpacked updates'],
-    ['Logs', mb(d.logs), ''], ['OCR', mb(d.ocr), 'if installed from the AI page'], ['Your files (books, resources)', mb(d.storage), 'never deleted here'],
+    ['Logs', mb(d.logs), ''], ['OCR', mb(d.ocr), 'if installed from the AI page'], ['Natural voice', mb(d.voice ?? 0), 'voices and spoken pages, if installed'], ['Your files (books, resources)', mb(d.storage), 'never deleted here'],
   ];
   return (
     <Card className="space-y-3 p-5">

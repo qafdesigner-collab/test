@@ -79,7 +79,7 @@ export class SystemController {
     let free: number | null = null; try { const st = (fs as any).statfsSync(r); free = st.bavail * st.bsize; } catch { /* old Node */ }
     return { free, backups: { count: files.length, bytes: files.reduce((n, f) => n + fileSize(path.join(backups, f)), 0) }, previous: size(path.join(r, '.previous-version')),
       temp: size(path.join(r, 'tmp')) + size(path.join(r, 'updates', 'incoming')) + (updater().status().state?.state === 'staged' ? 0 : size(path.join(r, 'updates', 'staging'))),
-      logs: size(path.join(r, 'logs')), storage: size(path.join(r, 'storage')), ocr: size(path.join(r, 'ocr')) };
+      logs: size(path.join(r, 'logs')), storage: size(path.join(r, 'storage')), ocr: size(path.join(r, 'ocr')), voice: size(path.join(r, 'voice')) };
   }
 
   /** Deletes temporary files and old database backups (the newest ones are kept). Your data and files are not touched. */
