@@ -1,3 +1,18 @@
+# What's new in Knowledge Gate 1.4.3
+
+## Flipbooks: like your FlipHTML5 books
+- **Simple questions when you make a flipbook** (after choosing 📖 Make a flipbook): **How is the book read?** ➡️ Left to right / ⬅️ Right to left (Arabic, Urdu) · **Page shape** 📕 Portrait / 📒 Landscape · **First page** 📘 Cover alone / 📖 Pages in pairs. Change them later on the part (Readers see it as, Page layout, Reading direction).
+- **Right-to-left books:** the cover is on the left, pages turn the other way, ⬅ goes forward (also the keyboard). “Automatic” finds Arabic/Urdu from the page text (for picture-only PDFs choose ⬅️ Right to left).
+- **Only the small outer corner turns the page** (click or drag). Clicking anywhere else on the page — buttons, videos, pictures near the corners — no longer turns it. On phones a clear swipe still turns the page.
+- **Faster page turn** (0.65 s), and the counter shows both open pages (e.g. 2–3 / 12).
+- **Your own page-turn sound:** Super admin → AI assistant → 🔊 Page-turn sound → Upload (MP3, M4A or WAV). Until then the built-in paper sound is used.
+
+## 📑 Make the index by hand (or with AI)
+- Book packages → the part → **📑 Make the index**: all pages are shown; click a page and choose **📘 A unit starts here** or **📗 A lesson starts here**, type the title, Save. Each lesson ends where the next one starts; remove a mark with ✕. **✨ Find with AI** is there too. Works on published editions.
+
+## 👁 Preview as student
+- Book packages → the part → **👁 Preview as student** opens the book exactly as students see it (no editing tools).
+
 # What's new in Knowledge Gate 1.4.2
 
 ## 📖 Flipbooks now turn like real paper (FlipHTML5 style)

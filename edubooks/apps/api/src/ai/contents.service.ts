@@ -86,6 +86,65 @@ export class ContentsService {
     return { unitsAdded, lessonsAdded, pagesSet };
   }
 
+  /** Marks by hand: “a unit / a lesson starts on this page”. Page ranges follow (each lesson ends where the next starts). */
+  async mark(componentId: string, d: { kind: 'UNIT' | 'LESSON'; page: number; title: string }) {
+    const [c] = await this.rows(sql`SELECT c.id, c.title, c.publisher_id AS pub, c.page_count AS "pageCount", e.status AS "edStatus" FROM book_components c JOIN book_editions e ON e.id = c.edition_id WHERE c.id = ${componentId}`);
+    if (!c) throw new NotFoundException('Book part not found');
+    if (c.edStatus === 'ARCHIVED') throw new ConflictException('This edition is archived and read-only.');
+    const title = d.title.trim().slice(0, 120); if (!title) throw new BadRequestException('Type a title');
+    const lessons = await this.lessonsOf(componentId);
+    if (lessons.some((l) => l.pageStart === d.page)) throw new ConflictException(`Something already starts on page ${d.page}. Remove it first.`);
+    if (d.kind === 'UNIT') {
+      const [{ n, s }] = await this.rows(sql`SELECT coalesce(max(number), 0)::int + 1 AS n, coalesce(max(sort), -1)::int + 1 AS s FROM book_units WHERE component_id = ${componentId}`);
+      const [u] = await this.rows(sql`INSERT INTO book_units (publisher_id, component_id, number, title, sort) VALUES (${c.pub}, ${componentId}, ${n}, ${title}, ${s}) RETURNING id`);
+      await this.db.q.execute(sql`INSERT INTO book_lessons (publisher_id, unit_id, number, title, page_start, page_end, sort) VALUES (${c.pub}, ${u.id}, 1, ${title}, ${d.page}, ${d.page}, 0)`);
+    } else {
+      // the unit that has started by this page (or the first unit; or a new one when there is none)
+      const before = lessons.filter((l) => l.pageStart !== null && l.pageStart < d.page).sort((a, b) => b.pageStart - a.pageStart)[0];
+      let unitId = before?.unitId ?? (await this.rows(sql`SELECT id FROM book_units WHERE component_id = ${componentId} ORDER BY sort, number LIMIT 1`))[0]?.id;
+      if (!unitId) unitId = (await this.rows(sql`INSERT INTO book_units (publisher_id, component_id, number, title, sort) VALUES (${c.pub}, ${componentId}, 1, ${c.title}, 0) RETURNING id`))[0].id;
+      const [{ n, s }] = await this.rows(sql`SELECT coalesce(max(number), 0)::int + 1 AS n, coalesce(max(sort), -1)::int + 1 AS s FROM book_lessons WHERE unit_id = ${unitId}`);
+      await this.db.q.execute(sql`INSERT INTO book_lessons (publisher_id, unit_id, number, title, page_start, page_end, sort) VALUES (${c.pub}, ${unitId}, ${n}, ${title}, ${d.page}, ${d.page}, ${s})`);
+    }
+    await this.reflow(componentId, c.pageCount);
+    await this.audit.log('publishing.contents.mark', 'book_component', componentId, `${d.kind === 'UNIT' ? 'Unit' : 'Lesson'} “${title}” starts on page ${d.page} of “${c.title}”`);
+    return this.lessonsOf(componentId);
+  }
+
+  /** Removes a lesson marked on a page (and its unit when nothing is left in it). */
+  async unmark(componentId: string, lessonId: string) {
+    const [l] = await this.rows(sql`SELECT l.id, l.unit_id AS "unitId", l.title FROM book_lessons l JOIN book_units u ON u.id = l.unit_id WHERE l.id = ${lessonId} AND u.component_id = ${componentId}`);
+    if (!l) throw new NotFoundException('Not found');
+    try {
+      await this.db.q.execute(sql`UPDATE book_pages SET lesson_id = NULL WHERE lesson_id = ${lessonId}`);
+      await this.db.q.execute(sql`DELETE FROM book_lessons WHERE id = ${lessonId}`);
+      await this.db.q.execute(sql`DELETE FROM book_units u WHERE u.id = ${l.unitId} AND NOT EXISTS (SELECT 1 FROM book_lessons x WHERE x.unit_id = u.id)`);
+    } catch { throw new ConflictException(`“${l.title}” is used by homework, plans or games, so it cannot be removed. Rename it in Book structure instead.`); }
+    const [c] = await this.rows(sql`SELECT page_count AS "pageCount", title FROM book_components WHERE id = ${componentId}`);
+    await this.reflow(componentId, c?.pageCount);
+    await this.audit.log('publishing.contents.unmark', 'book_component', componentId, `Removed “${l.title}” from the contents of “${c?.title}”`);
+    return this.lessonsOf(componentId);
+  }
+
+  async lessonsOf(componentId: string) {
+    return (await this.rows(sql`SELECT l.id, l.title, l.number, l.page_start AS "pageStart", l.page_end AS "pageEnd", u.id AS "unitId", u.number AS "unitNumber", u.title AS "unitTitle",
+        (l.number = (SELECT min(number) FROM book_lessons x WHERE x.unit_id = u.id)) AS "firstInUnit"
+      FROM book_lessons l JOIN book_units u ON u.id = l.unit_id WHERE u.component_id = ${componentId} ORDER BY l.page_start NULLS LAST, u.sort, l.sort`))
+      .map((r) => ({ ...r, pageStart: r.pageStart === null ? null : Number(r.pageStart), pageEnd: r.pageEnd === null ? null : Number(r.pageEnd) }));
+  }
+
+  /** Each lesson ends where the next one starts; pages are linked to their lesson. */
+  private async reflow(componentId: string, pageCount?: number | null) {
+    const ls = (await this.lessonsOf(componentId)).filter((l) => l.pageStart !== null);
+    const [{ last }] = await this.rows(sql`SELECT greatest(coalesce(${pageCount ?? null}::int, 0), coalesce((SELECT max(page_number) FROM book_pages WHERE component_id = ${componentId}), 0)) AS last`);
+    for (let i = 0; i < ls.length; i++) {
+      const end = Math.max(ls[i].pageStart!, (ls[i + 1]?.pageStart ?? (Number(last) || ls[i].pageStart!) + 1) - 1);
+      if (end !== ls[i].pageEnd) await this.db.q.execute(sql`UPDATE book_lessons SET page_end = ${end} WHERE id = ${ls[i].id}`);
+    }
+    await this.db.q.execute(sql`UPDATE book_pages bp SET lesson_id = l.id FROM book_lessons l JOIN book_units u ON u.id = l.unit_id
+      WHERE u.component_id = ${componentId} AND bp.component_id = ${componentId} AND l.page_start IS NOT NULL AND bp.page_number BETWEEN l.page_start AND coalesce(l.page_end, l.page_start)`);
+  }
+
   async save(componentId: string, found: Contents) {
     await this.db.q.execute(sql`UPDATE book_components SET contents_suggestion = ${JSON.stringify(found)}::jsonb WHERE id = ${componentId}`);
     return found;

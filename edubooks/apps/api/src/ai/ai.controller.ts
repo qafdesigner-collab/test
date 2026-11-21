@@ -51,6 +51,8 @@ class PageQuestionsDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) seed?: number;
 }
 
+class MarkDto { @IsIn(['UNIT', 'LESSON']) kind!: 'UNIT' | 'LESSON'; @Type(() => Number) @IsInt() @Min(1) @Max(5000) page!: number; @IsString() @MaxLength(120) title!: string; }
+
 @ApiTags('ai')
 @Controller('ai')
 export class AiController {
@@ -100,5 +102,8 @@ export class AiController {
     return { started: true };
   }
   @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Post('contents/components/:id/apply') applyContents(@Param('id', Id()) id: string) { return this.contents.apply(id); }
+  @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Get('contents/components/:id/marks') marks(@Param('id', Id()) id: string) { return this.contents.lessonsOf(id); }
+  @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Post('contents/components/:id/marks') mark(@Param('id', Id()) id: string, @Body() d: MarkDto) { return this.contents.mark(id, d); }
+  @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Delete('contents/components/:id/marks/:lesson') unmark(@Param('id', Id()) id: string, @Param('lesson', Id()) lesson: string) { return this.contents.unmark(id, lesson); }
   @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Delete('contents/components/:id') dismissContents(@Param('id', Id()) id: string) { return this.contents.dismiss(id); }
 }

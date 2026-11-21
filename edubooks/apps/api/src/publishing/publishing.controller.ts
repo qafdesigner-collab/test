@@ -92,6 +92,16 @@ export class PublishingController {
     const f = this.chunks.take(req.ctx.userId, d.uploadId);
     return this.db.withContext(req.ctx, async () => ({ ...(await this.svc.setBookPdf(id, f)), indexing: (await this.indexer.start(id)).started, compressing: !!ghostscript() })).finally(() => f.done());
   }
+  /** The page-turn sound of the flipbooks: the publisher's own audio file, or the built-in sound. */
+  @Get('flip-sound') flipSound() { return this.svc.flipSoundInfo(); }
+  @ManualTx()
+  @Post('flip-sound-from-upload')
+  flipSoundUpload(@Body() d: FromUploadDto, @Req() req: any) {
+    const f = this.chunks.take(req.ctx.userId, d.uploadId);
+    return this.db.withContext(req.ctx, () => this.svc.setFlipSound(f)).finally(() => f.done());
+  }
+  @Delete('flip-sound') flipSoundOff() { return this.svc.setFlipSound(null); }
+
   /** Video / audio / picture for the elements on a book's pages (sent in pieces first, see /uploads). */
   @ManualTx()
   @Post('components/:id/page-media-from-upload')

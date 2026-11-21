@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Cpu, Download, XCircle } from 'lucide-react';
 import { api, downloadCsv } from '@/lib/api';
+import { uploadBig } from '@/lib/big-upload';
 import { Badge, Button, Card, Dialog, Field, Input, PageLoader, cn } from '@/components/ui';
 import { AiConnectForm } from '@/components/ai-connect';
 import { Money, useMoney } from '@/lib/company';
@@ -30,6 +31,7 @@ export default function AdminAi() {
       </Card>
       <OcrCard />
       <VoiceCard />
+      <FlipSoundCard />
       <ConnectAi />
       <SchoolsAi />
       <div className="grid gap-4 sm:grid-cols-4">
@@ -216,6 +218,30 @@ function OcrCard() {
       {ins.state === 'failed' && !running && <p className="rounded-lg bg-red-50 p-2 text-red-700">The last installation failed: {ins.error}</p>}
       {(ins.log?.length ?? 0) > 0 && <button type="button" className="text-xs text-slate-500 underline" onClick={() => setShowLog(!showLog)}>{showLog ? 'Hide' : 'Show'} installation log</button>}
       {showLog && <pre className="max-h-48 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{(ins.log ?? []).join('\n')}</pre>}
+    </Card>
+  );
+}
+
+/** The sound flipbooks make when a page turns: the built-in one, or the publisher's own audio file. */
+function FlipSoundCard() {
+  const qc = useQueryClient(); const toast = useToast(); const input = useRef<HTMLInputElement>(null); const [pct, setPct] = useState<number | null>(null);
+  const q = useQuery({ queryKey: ['flipSound'], queryFn: () => api.get<any>('/publishing/flip-sound') });
+  const own = q.data?.flipSound;
+  const upload = async (f?: File) => {
+    if (!f) return; setPct(0);
+    try { const id = await uploadBig(f, (p) => setPct(p.pct)); await api.post('/publishing/flip-sound-from-upload', { uploadId: id }); toast('Page-turn sound saved'); qc.invalidateQueries({ queryKey: ['flipSound'] }); }
+    catch (e: any) { toast(e.message, 'err'); } finally { setPct(null); }
+  };
+  const hear = async () => { const r = await fetch('/api/reader/flip-sound', { credentials: 'same-origin' }); if (r.status !== 200) return toast('No sound file yet', 'err'); void new Audio(URL.createObjectURL(await r.blob())).play(); };
+  const builtIn = async () => { try { await api.del('/publishing/flip-sound'); qc.invalidateQueries({ queryKey: ['flipSound'] }); toast('Built-in sound restored'); } catch (e: any) { toast(e.message, 'err'); } };
+  return (
+    <Card className="flex flex-wrap items-center gap-3 p-4 text-sm">
+      <span className="text-xl" aria-hidden>🔊</span>
+      <div className="min-w-0 flex-1"><b>Page-turn sound (flipbooks):</b> {own ? <>your own sound “{own.name}”.</> : <>the built-in paper sound. Upload your own (MP3, M4A or WAV) — use a sound you have the right to use.</>}</div>
+      <input ref={input} type="file" accept="audio/*,.mp3,.m4a,.wav" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; void upload(f); }} />
+      {own && <Button size="sm" variant="secondary" onClick={hear}>▶ Hear it</Button>}
+      {own && <Button size="sm" variant="ghost" onClick={builtIn}>Use the built-in sound</Button>}
+      <Button size="sm" loading={pct !== null} onClick={() => input.current?.click()}>{pct !== null ? `Uploading ${pct}%` : own ? 'Change' : '⬆ Upload a sound'}</Button>
     </Card>
   );
 }

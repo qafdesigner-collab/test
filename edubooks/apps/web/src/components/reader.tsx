@@ -57,10 +57,14 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
       setSaved(true); toast(n ? 'Saved — this book now opens without internet' : 'This book has no pages to save yet');
     } catch (e: any) { toast(e.message || 'Could not save the book', 'err'); } finally { setSaving(null); }
   };
-  const me = useMe().data as any; const canEditHot = !!me?.roles?.some((r: string) => ['PUBLISHER_ADMIN', 'PUBLISHER_EDITOR'].includes(r));
+  const me = useMe().data as any;
+  // "Preview as student": publisher staff see the book exactly as students do (no editing tools)
+  const [preview, setPreview] = useState(false);
+  useEffect(() => { setPreview(new URLSearchParams(window.location.search).get('preview') === 'student'); }, []);
+  const canEditHot = !preview && !!me?.roles?.some((r: string) => ['PUBLISHER_ADMIN', 'PUBLISHER_EDITOR'].includes(r));
   const canvas = useRef<HTMLCanvasElement>(null); const wrap = useRef<HTMLDivElement>(null); const shell = useRef<HTMLDivElement>(null);
   const b = book.data;
-  const kid = !!b?.student;
+  const kid = !!b?.student || preview;
   const comps: any[] = b?.components ?? [];
   const comp = comps.find((c) => c.id === compId);
   const tutor = useTutorStatus(kid);
@@ -129,6 +133,21 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   const go = useCallback((n: number) => { readRun.current++; stopVoice(); setSpeaking(false); setPage(Math.min(Math.max(1, n), pages)); }, [pages]);
   // next / previous: a whole spread in the flipbook view
   const layout: FlipLayout = comp?.flipLayout ?? 'COVER';
+  // right-to-left books (Arabic, Urdu): set on the part, or found from the words on the first pages
+  const [autoRtl, setAutoRtl] = useState(false);
+  useEffect(() => {
+    setAutoRtl(false); if (!doc || comp?.readingDirection !== 'AUTO') return; let cancelled = false;
+    (async () => {
+      let ar = 0, la = 0;
+      for (let n = 1; n <= Math.min(doc.numPages, 6); n++) {
+        const t = (await (await doc.getPage(n)).getTextContent()).items.map((i: any) => i.str).join(' ');
+        ar += (t.match(/[\u0600-\u06FF]/g) ?? []).length; la += (t.match(/[A-Za-z]/g) ?? []).length;
+      }
+      if (!cancelled) setAutoRtl(ar > 40 && ar > la);
+    })().catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [doc, comp?.readingDirection]);
+  const rtl = comp?.readingDirection === 'RTL' || (comp?.readingDirection === 'AUTO' && autoRtl);
   const shape = usePageShapes(pdfFlip ? doc : null, page);
   const step = useCallback((dir: 1 | -1) => go(pdfFlip ? stepPage(page, pages, wide, dir, layout, shape) : page + dir), [go, pdfFlip, page, pages, wide, layout, shape]);
   const spread = pdfFlip ? spreadOf(page, pages, wide, layout, shape) : [page];
@@ -144,11 +163,13 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
-      if (e.key === 'ArrowRight' || e.key === 'PageDown') step(1);
-      if (e.key === 'ArrowLeft' || e.key === 'PageUp') step(-1);
+      // in a right-to-left flipbook the left arrow goes forward
+      const fwd = pdfFlip && rtl ? 'ArrowLeft' : 'ArrowRight'; const back = pdfFlip && rtl ? 'ArrowRight' : 'ArrowLeft';
+      if (e.key === fwd || e.key === 'PageDown') step(1);
+      if (e.key === back || e.key === 'PageUp') step(-1);
     };
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
-  }, [step]);
+  }, [step, pdfFlip, rtl]);
 
   useEffect(() => { const f = () => setFull(!!document.fullscreenElement); document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f); }, []);
   const toggleFull = () => (document.fullscreenElement ? document.exitFullscreen() : shell.current?.requestFullscreen());
@@ -188,6 +209,7 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
 
   return (
     <div ref={shell} className={cn('flex h-screen flex-col', kid ? 'bg-amber-50' : 'bg-slate-100')}>
+      {preview && <div className="flex items-center gap-2 bg-violet-600 px-3 py-1.5 text-sm font-medium text-white">👁 Student preview — this is how students see this book.<span className="flex-1" /><button onClick={() => window.close()} className="rounded bg-white/20 px-2 py-0.5 hover:bg-white/30">Close preview</button></div>}
       <header className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white/90 px-3 py-2 backdrop-blur">
         <Link href={backHref} className={btn} aria-label="Back"><ArrowLeft className="size-5" /></Link>
         <button className={btn} onClick={() => setToc(!toc)} aria-label="Contents" aria-pressed={toc}><PanelLeft className="size-5" /></button>
@@ -265,7 +287,8 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
           : !comp?.hasPdf ? <div className="m-auto max-w-sm text-center text-slate-500"><FileText className="mx-auto mb-2 size-10" />This part has resources only — see the files listed for it.</div>
             : docError ? <div className="m-auto"><ErrorBox error={new Error(docError)} /></div>
               : pdfFlip && doc && !editHot && (shape(page) > 1) === (shape(1) > 1) ? <ContentGuard className="absolute inset-0"><PdfCurlbook doc={doc} page={page} pages={pages} onPage={go} onWide={setWide} layout={layout} shape={shape}
-                  componentId={comp.id} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} onZoom={() => setAsBook(false)} /></ContentGuard>
+                  componentId={comp.id} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} onZoom={() => setAsBook(false)}
+                  rtl={rtl} soundUrl={b?.flipSound ? '/api/reader/flip-sound' : null} /></ContentGuard>
               : pdfFlip ? (!doc ? <Spinner className="m-auto size-8" /> : <ContentGuard className="absolute inset-0"><PdfFlipbook doc={doc} page={page} pages={pages} onPage={go} onWide={setWide} layout={layout} shape={shape} componentId={comp.id}
                   editing={editHot} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} /></ContentGuard>)
               : <>{loadingDoc && <Spinner className="absolute left-1/2 top-1/2 size-8" />}<ContentGuard className="relative"><canvas ref={canvas} className={cn('block bg-white shadow-xl', kid ? 'rounded-2xl' : 'rounded')} aria-label={`Page ${page} of ${pages}`} />{doc && comp && <HotspotLayer componentId={comp.id} page={page} editing={editHot} kid={kid} games={(b?.games ?? []).map((g: any) => ({ id: g.id, title: g.title }))} />}</ContentGuard></>}

@@ -229,6 +229,8 @@ export const bookComponents = pgTable('book_components', {
   displayMode: text('display_mode').notNull().default('PDF'),
   /** flipbook pages: COVER (page 1 alone, odd pages on the right), PAIRS (1–2, 3–4…) or SINGLE */
   flipLayout: text('flip_layout').notNull().default('COVER'),
+  /** AUTO (right-to-left for Arabic / Urdu pages), LTR or RTL */
+  readingDirection: text('reading_direction').notNull().default('AUTO'),
   /** ALL, TEACHER (hidden from students) or STUDENT (hidden from teachers). */
   visibleTo: audienceEnum('visible_to').notNull().default('ALL'),
 }, (t) => [index('components_edition_idx').on(t.editionId)]);

@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
@@ -32,6 +33,12 @@ const READERS = ['SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PUBLISHER_ADMIN', 'PUBLI
 export class ReaderController {
   constructor(private readonly svc: ReaderService) {}
   @Get('editions/:id') edition(@Param('id', Id()) id: string) { return this.svc.edition(id); }
+  @Get('flip-sound') async flipSound(@Res() res: Response) {
+    const f = await this.svc.flipSoundFile();
+    if (!f) { res.status(204).end(); return; }
+    res.setHeader('Content-Type', f.mime); res.setHeader('Content-Length', String(f.size)); res.setHeader('Cache-Control', 'private, max-age=86400');
+    f.stream.on('error', () => res.destroy()).pipe(res);
+  }
   @Get('components/:id/pdf') pdf(@Param('id', Id()) id: string) { return this.svc.pdfLink(id); }
   @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT') @Put('progress') progress(@Body() d: ProgressDto) { return this.svc.saveProgress(d.componentId, d.page); }
   @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT') @Post('bookmarks') bookmark(@Body() d: BookmarkDto) { return this.svc.addBookmark(d.componentId, d.page, d.note ?? ''); }

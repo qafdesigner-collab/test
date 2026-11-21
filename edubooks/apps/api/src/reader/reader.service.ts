@@ -23,7 +23,7 @@ export class ReaderService {
     if (!ed) throw new NotFoundException('Book not found');
     const vis = visibleFor(this.db.ctx);
     let comps = await this.q.select({ id: bookComponents.id, visibleTo: bookComponents.visibleTo, type: bookComponents.type, title: bookComponents.title, partNumber: bookComponents.partNumber,
-      pageCount: bookComponents.pageCount, indexedPages: bookComponents.indexedPages, indexStatus: bookComponents.indexStatus, hasPdf: sql<boolean>`${bookComponents.bookAssetId} IS NOT NULL`, displayMode: bookComponents.displayMode, flipLayout: bookComponents.flipLayout,
+      pageCount: bookComponents.pageCount, indexedPages: bookComponents.indexedPages, indexStatus: bookComponents.indexStatus, hasPdf: sql<boolean>`${bookComponents.bookAssetId} IS NOT NULL`, displayMode: bookComponents.displayMode, flipLayout: bookComponents.flipLayout, readingDirection: bookComponents.readingDirection,
       flipbook: sql<string | null>`(SELECT f.kind FROM flipbooks f WHERE f.component_id = ${qc(bookComponents.id)} ORDER BY (f.unit_title IS NOT NULL), f.sort LIMIT 1)`,
       flipUnits: sql<number>`(SELECT count(*)::int FROM flipbooks f WHERE f.component_id = ${qc(bookComponents.id)})`,
       hasApp: sql<boolean>`EXISTS (SELECT 1 FROM book_apps a WHERE a.component_id = ${qc(bookComponents.id)} AND (a.asset_id IS NOT NULL OR a.android_url IS NOT NULL OR a.ios_url IS NOT NULL))` })
@@ -56,8 +56,9 @@ export class ReaderService {
     // Published games for this book (publisher library + this school's own).
     const { rows: games } = await this.q.execute(sql`SELECT id, title, engine, lesson_id AS "lessonId" FROM game_activities
       WHERE edition_id = ${editionId} AND ((school_id IS NULL AND published) OR school_id = ${this.db.ctx.schoolId ?? '00000000-0000-0000-0000-000000000000'}) ORDER BY title`);
+    const { rows: [fs] } = await this.q.execute(sql`SELECT flip_sound() AS id`) as any;
     return {
-      ...ed, student, games,
+      ...ed, student, games, flipSound: !!fs?.id,
       components: comps.map((c) => ({
         ...c, progress: progress.find((p) => p.componentId === c.id) ?? null, bookmarks: marks.filter((b) => b.componentId === c.id),
         units: units.filter((u) => u.componentId === c.id).map((u) => ({ id: u.id, number: u.number, title: u.title,
@@ -73,6 +74,12 @@ export class ReaderService {
     await this.access.assertEdition(c.editionId);
     if (!sees(visibleFor(this.db.ctx), c.visibleTo)) throw new ForbiddenException(`This part is for ${c.visibleTo === 'TEACHER' ? 'teachers' : 'students'} only`);
     return c;
+  }
+
+  /** The publisher's own page-turn sound for the flipbooks (null when the built-in sound is used). */
+  async flipSoundFile() {
+    const { rows: [a] } = await this.q.execute(sql`SELECT storage_key AS key, mime_type AS mime, size_bytes AS size FROM digital_assets WHERE id = flip_sound()`) as any;
+    return a ? { stream: await this.assets.driver.read(a.key), mime: String(a.mime), size: Number(a.size) } : null;
   }
 
   // ---------- interactive page hotspots ----------

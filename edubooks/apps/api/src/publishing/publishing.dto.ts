@@ -56,6 +56,8 @@ export class CreateComponentDto {
   @ApiPropertyOptional({ enum: ['PDF', 'FLIP'] }) @IsOptional() @IsIn(['PDF', 'FLIP']) displayMode?: 'PDF' | 'FLIP';
   /** flipbook pages: COVER (page 1 alone on the right), PAIRS (1–2, 3–4…) or SINGLE (one page at a time) */
   @ApiPropertyOptional({ enum: ['COVER', 'PAIRS', 'SINGLE'] }) @IsOptional() @IsIn(['COVER', 'PAIRS', 'SINGLE']) flipLayout?: 'COVER' | 'PAIRS' | 'SINGLE';
+  /** AUTO (right-to-left when the pages are Arabic / Urdu), LTR or RTL */
+  @ApiPropertyOptional({ enum: ['AUTO', 'LTR', 'RTL'] }) @IsOptional() @IsIn(['AUTO', 'LTR', 'RTL']) readingDirection?: 'AUTO' | 'LTR' | 'RTL';
 }
 export class UpdateComponentDto extends PartialType(CreateComponentDto) {}
 

@@ -434,6 +434,20 @@ export class PublishingService {
   }
 
   // =============== the book's own PDF (digital reader) ===============
+  /** The publisher's own page-turn sound for the flipbooks (null: the built-in sound). */
+  async setFlipSound(file: UploadedTemp | null) {
+    if (!file) { await this.q.execute(sql`SELECT set_flip_sound(NULL)`); await this.audit.log('publishing.flip_sound', 'publisher', this.pub, 'Page-turn sound: back to the built-in sound'); return { flipSound: null }; }
+    const { asset, kind } = await this.assets.ingest(file);
+    if (kind.resourceType !== 'AUDIO') throw new BadRequestException('Choose an audio file (MP3, M4A or WAV).');
+    await this.q.execute(sql`SELECT set_flip_sound(${asset.id}::uuid)`);
+    await this.audit.log('publishing.flip_sound', 'publisher', this.pub, `Page-turn sound: “${asset.originalName}”`);
+    return { flipSound: { id: asset.id, name: asset.originalName } };
+  }
+  async flipSoundInfo() {
+    const { rows: [r] } = await this.q.execute(sql`SELECT a.id, a.original_name AS name FROM digital_assets a WHERE a.id = flip_sound()`) as any;
+    return { flipSound: r ?? null };
+  }
+
   /** A video, audio or picture file for the elements on a book's pages (flipbook / page hotspots). */
   async addPageMedia(componentId: string, file: UploadedTemp) {
     const c = await this.component(componentId);

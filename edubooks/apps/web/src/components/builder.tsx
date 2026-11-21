@@ -9,6 +9,7 @@ import { api, fmtBytes, fmtDate, qs } from '@/lib/api';
 import { AUDIENCES, COMPONENT_TYPES, RESOURCE_TYPES } from '@/lib/catalog';
 import { Badge, Button, Card, Confirm, Dialog, EmptyState, ErrorBox, Field, Input, Select, Textarea, cn } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
+import { IndexMaker } from '@/components/index-maker';
 
 // ---------- types ----------
 export type Visible = 'ALL' | 'TEACHER' | 'STUDENT';
@@ -16,7 +17,7 @@ export interface Lesson { id: string; number: number; title: string; objectives:
 export interface Unit { id: string; number: number; title: string; description: string; componentId: string; lessons: Lesson[]; visibleTo?: Visible }
 export interface Flipbook { id: string; kind: 'HTML' | 'SWF'; entry: string; fileCount: number; totalBytes: number; originalName: string; skippedFiles: number; createdAt: string }
 export interface FlipUnit { id: string; unitTitle: string; sort: number; kind: 'HTML' | 'SWF'; fileCount: number; totalBytes: number; originalName: string; createdAt: string }
-export interface Component { id: string; type: string; title: string; visibleTo?: Visible; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null; flipbook: Flipbook | null; flipUnits?: FlipUnit[]; indexStatus: string; indexedPages: number; indexError: string | null; contentsSuggestion?: FoundContents | null; displayMode?: 'PDF' | 'FLIP'; flipLayout?: 'COVER' | 'PAIRS' | 'SINGLE' }
+export interface Component { id: string; type: string; title: string; visibleTo?: Visible; partNumber: number | null; description: string; pageCount: number | null; units: Unit[]; bookFile: { id: string; name: string; size: number } | null; flipbook: Flipbook | null; flipUnits?: FlipUnit[]; indexStatus: string; indexedPages: number; indexError: string | null; contentsSuggestion?: FoundContents | null; displayMode?: 'PDF' | 'FLIP'; flipLayout?: 'COVER' | 'PAIRS' | 'SINGLE'; readingDirection?: 'AUTO' | 'LTR' | 'RTL' }
 export interface FoundContents { source: 'AI' | 'HEADINGS'; units: { number: number; title: string; page: number; lessons: { number: number; title: string; page: number; pageEnd?: number }[] }[]; foundAt: string; applied?: boolean; result?: string; running?: boolean; error?: string }
 export interface Resource {
   id: string; title: string; resourceType: string; audience: string; componentId: string | null; unitId: string | null; lessonId: string | null;
@@ -291,13 +292,18 @@ function BookPdf({ comp, editionId, editionStatus, readOnly }: { comp: Component
   const remove = useBuilderMutation(() => api.del(`/publishing/components/${comp.id}/book-pdf`), 'Book PDF removed');
   const canUpload = !readOnly && (editionStatus === 'DRAFT' || !comp.bookFile);
   // after choosing the PDF: show it as a flipbook (page turn, with videos and elements) or as simple PDF pages?
-  const [asking, setAsking] = useState<File | null>(null);
+  const [asking, setAsking] = useState<File | null>(null); const [indexing, setIndexing] = useState(false);
+  // the second, simple step for a flipbook: reading direction, page shape and cover
+  const [flipQs, setFlipQs] = useState<{ dir: 'LTR' | 'RTL'; shape: 'PORTRAIT' | 'LANDSCAPE'; cover: boolean } | null>(null);
+  useEffect(() => { if (!asking) setFlipQs(null); }, [asking]);
+  const setDir = useBuilderMutation((d: 'AUTO' | 'LTR' | 'RTL') => api.patch(`/publishing/components/${comp.id}`, { readingDirection: d }), 'Reading direction saved');
   const setMode = useBuilderMutation((m: 'PDF' | 'FLIP') => api.patch(`/publishing/components/${comp.id}`, { displayMode: m }), undefined);
   const setLayout = useBuilderMutation((l: 'COVER' | 'PAIRS' | 'SINGLE') => api.patch(`/publishing/components/${comp.id}`, { flipLayout: l }), 'Page layout saved');
-  const upload = async (file?: File, mode?: 'PDF' | 'FLIP') => {
+  const upload = async (file?: File, mode?: 'PDF' | 'FLIP', q?: { dir: 'LTR' | 'RTL'; shape: 'PORTRAIT' | 'LANDSCAPE'; cover: boolean } | null) => {
     if (!file) return;
     setAsking(null); setPct(0);
-    if (mode && mode !== comp.displayMode) await api.patch(`/publishing/components/${comp.id}`, { displayMode: mode }).catch(() => undefined);
+    const extra = mode === 'FLIP' && q ? { readingDirection: q.dir, flipLayout: q.shape === 'LANDSCAPE' ? 'SINGLE' : q.cover ? 'COVER' : 'PAIRS' } : {};
+    if (mode && (mode !== comp.displayMode || Object.keys(extra).length)) await api.patch(`/publishing/components/${comp.id}`, { displayMode: mode, ...extra }).catch(() => undefined);
     try {
       // sent in pieces: big books do not time out, and an interrupted upload continues where it stopped
       const uploadId = await uploadBig(file, (p) => setPct(Math.min(99, p.pct)));
@@ -313,6 +319,9 @@ function BookPdf({ comp, editionId, editionStatus, readOnly }: { comp: Component
         : <span className="text-slate-500">No digital pages yet — upload the PDF of this part for the digital reader.</span>}</div>
       {pct !== null && <span className="text-xs text-slate-600">{pct}%</span>}
       {comp.bookFile && <a href={`/read/${editionId}?component=${comp.id}`} target="_blank" rel="noopener" title="Open in the reader, press ✏️ Hotspots and drag on a page to add a video, audio, picture, link, game or note" className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-sm font-medium text-brand-700 hover:bg-brand-50">✏️ Add videos & elements</a>}
+      {comp.bookFile && <Button size="sm" variant="ghost" onClick={() => setIndexing(true)}>📑 Make the index</Button>}
+      {comp.bookFile && <a href={`/read/${editionId}?component=${comp.id}&preview=student`} target="_blank" rel="noopener" title="See the book exactly as a student sees it" className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-sm font-medium text-brand-700 hover:bg-brand-50">👁 Preview as student</a>}
+      {indexing && <IndexMaker componentId={comp.id} title={comp.title} onClose={() => setIndexing(false)} />}
       {comp.bookFile && <Button size="sm" variant="ghost" onClick={() => openAsset(comp.bookFile!.id).catch((e) => toast(e.message, 'err'))}><ExternalLink className="size-4" />Open</Button>}
       {canUpload && <><input ref={input} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setAsking(f); }} />
         <Button size="sm" variant="secondary" loading={pct !== null} onClick={() => input.current?.click()}><UploadCloud className="size-4" />{comp.bookFile ? 'Replace PDF' : 'Upload PDF'}</Button></>}
@@ -334,17 +343,42 @@ function BookPdf({ comp, editionId, editionStatus, readOnly }: { comp: Component
                   className={cn('rounded-md px-2.5 py-1 font-medium', (comp.flipLayout ?? 'COVER') === l ? 'bg-violet-600 text-white' : 'text-slate-700 hover:bg-slate-50')}>{t}</button>))}
             </div>
             <span className="text-slate-500">Choose so left-hand pages (inner margin on the right) sit on the left. Landscape pages are always shown alone, full width.</span>
+            <span className="w-full" />
+            <span className="font-medium text-slate-700">Reading direction:</span>
+            <div role="radiogroup" aria-label="Reading direction" className="flex flex-wrap rounded-lg bg-white p-0.5 ring-1 ring-slate-200">
+              {([['AUTO', '🔤 Automatic'], ['LTR', '➡️ Left to right'], ['RTL', '⬅️ Right to left (Arabic, Urdu)']] as const).map(([d, t]) => (
+                <button key={d} type="button" role="radio" aria-checked={(comp.readingDirection ?? 'AUTO') === d} disabled={readOnly || setDir.isPending} onClick={() => setDir.mutate(d)}
+                  className={cn('rounded-md px-2.5 py-1 font-medium', (comp.readingDirection ?? 'AUTO') === d ? 'bg-violet-600 text-white' : 'text-slate-700 hover:bg-slate-50')}>{t}</button>))}
+            </div>
           </div>}
         </div>)}
       {comp.bookFile && <AiIndexStatus comp={comp} />}
       <Dialog open={!!asking} onOpenChange={(o) => !o && setAsking(null)} title="How should readers see this book?" description={asking ? `${asking.name} · ${fmtBytes(asking.size)}` : ''}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <button type="button" onClick={() => upload(asking!, 'FLIP')} className="rounded-xl border-2 border-brand-200 bg-brand-50 p-4 text-left hover:border-brand-500">
+          <button type="button" onClick={() => setFlipQs({ dir: 'LTR', shape: 'PORTRAIT', cover: true })} className={cn('rounded-xl border-2 border-brand-200 bg-brand-50 p-4 text-left hover:border-brand-500', flipQs && 'hidden')}>
             <div className="text-3xl">📖</div><div className="mt-1 font-bold text-slate-900">Make a flipbook</div>
             <p className="mt-1 text-sm text-slate-600">Pages turn like a real book (two pages side by side, swipe on phones). Add your own videos, audio, pictures, links and games on the pages.</p></button>
-          <button type="button" onClick={() => upload(asking!, 'PDF')} className="rounded-xl border-2 border-slate-200 bg-white p-4 text-left hover:border-slate-400">
+          <button type="button" onClick={() => upload(asking!, 'PDF')} className={cn('rounded-xl border-2 border-slate-200 bg-white p-4 text-left hover:border-slate-400', flipQs && 'hidden')}>
             <div className="text-3xl">📄</div><div className="mt-1 font-bold text-slate-900">Keep as a simple PDF</div>
             <p className="mt-1 text-sm text-slate-600">One page at a time with zoom. You can still add elements, and switch to a flipbook later.</p></button>
+          {flipQs && (
+            <div className="space-y-4 sm:col-span-2">
+              {([
+                ['How is the book read?', 'dir', [['LTR', '➡️ Left to right', 'English, French…'], ['RTL', '⬅️ Right to left', 'Arabic, Urdu']]],
+                ['Page shape', 'shape', [['PORTRAIT', '📕 Portrait', 'tall pages'], ['LANDSCAPE', '📒 Landscape', 'wide pages, shown one at a time']]],
+              ] as const).map(([q, key, opts]) => (
+                <div key={key}><p className="mb-1.5 font-semibold text-slate-800">{q}</p>
+                  <div className="grid grid-cols-2 gap-2">{opts.map(([v, l, d]) => (
+                    <button key={v} type="button" onClick={() => setFlipQs({ ...flipQs, [key]: v } as any)}
+                      className={cn('rounded-xl border-2 p-3 text-left', (flipQs as any)[key] === v ? 'border-brand-600 bg-brand-50' : 'border-slate-200 hover:border-slate-400')}>
+                      <div className="font-bold text-slate-900">{l}</div><div className="text-xs text-slate-500">{d}</div></button>))}</div></div>))}
+              {flipQs.shape === 'PORTRAIT' && <div><p className="mb-1.5 font-semibold text-slate-800">First page</p>
+                <div className="grid grid-cols-2 gap-2">{([[true, '📘 Cover alone', 'page 1 alone, then 2–3, 4–5…'], [false, '📖 Pages in pairs', '1–2, 3–4… (no cover page)']] as const).map(([v, l, d]) => (
+                  <button key={String(v)} type="button" onClick={() => setFlipQs({ ...flipQs, cover: v })}
+                    className={cn('rounded-xl border-2 p-3 text-left', flipQs.cover === v ? 'border-brand-600 bg-brand-50' : 'border-slate-200 hover:border-slate-400')}>
+                    <div className="font-bold text-slate-900">{l}</div><div className="text-xs text-slate-500">{d}</div></button>))}</div></div>}
+              <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setFlipQs(null)}>Back</Button><Button onClick={() => upload(asking!, 'FLIP', flipQs)}>📖 Make the flipbook</Button></div>
+            </div>)}
         </div>
       </Dialog>
     </div>
