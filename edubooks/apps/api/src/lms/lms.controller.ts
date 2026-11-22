@@ -50,6 +50,7 @@ export class StudentController {
   constructor(private readonly svc: LmsService) {}
   @Get('homework') list() { return this.svc.studentList(); }
   @Get('homework/:id') get(@Param('id', Id()) id: string) { return this.svc.studentGet(id); }
+  @Post('homework/:id/start') start(@Param('id', Id()) id: string) { return this.svc.startAttempt(id); }
   @Post('homework/:id/submit') submit(@Param('id', Id()) id: string, @Body() d: SubmitDto) { return this.svc.submit(id, d); }
   @Get('report') report() { return this.svc.studentReport(this.svc.db.ctx.userId); }
 }

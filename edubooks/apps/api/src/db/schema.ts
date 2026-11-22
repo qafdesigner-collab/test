@@ -606,6 +606,10 @@ export const assessments = pgTable('assessments', {
   instructions: text('instructions').notNull().default(''),
   dueAt: timestamp('due_at', { withTimezone: true }),
   allowLate: boolean('allow_late').notNull().default(true),
+  /** how many times a student may hand it in (1–3) */
+  maxAttempts: integer('max_attempts').notNull().default(1),
+  /** minutes allowed once a student starts (null: no limit) */
+  timeLimitMin: integer('time_limit_min'),
   status: assessmentStatusEnum('status').notNull().default('DRAFT'),
   publishedAt: timestamp('published_at', { withTimezone: true }),
   createdAt: createdAt(),
@@ -644,6 +648,9 @@ export const submissions = pgTable('submissions', {
   submittedAt: createdAt(),
   gradedAt: timestamp('graded_at', { withTimezone: true }),
   gradedBy: uuid('graded_by').references(() => users.id, { onDelete: 'set null' }),
+  /** which try this is (1–3); earlier tries are kept in history */
+  attempt: integer('attempt').notNull().default(1),
+  history: jsonb('history').notNull().default([]),
 }, (t) => [uniqueIndex('submission_uq').on(t.assessmentId, t.studentId)]);
 
 export const evaluations = pgTable('evaluations', {

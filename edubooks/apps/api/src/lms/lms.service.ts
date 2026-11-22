@@ -202,7 +202,8 @@ export class LmsService {
     const refs = await this.checkBookRefs(d);
     const studentIds = await this.targets(d.classId, d.studentIds);
     const [a] = await this.q.insert(assessments).values({ ...this.base(), teacherId: this.ctx.userId, classId: d.classId, kind: d.kind, title: d.title.trim(),
-      instructions: d.instructions ?? '', ...refs, ...(await this.pageRef(refs.editionId, d)), dueAt: d.dueAt ? new Date(d.dueAt) : null, allowLate: d.allowLate ?? true }).returning();
+      instructions: d.instructions ?? '', ...refs, ...(await this.pageRef(refs.editionId, d)), dueAt: d.dueAt ? new Date(d.dueAt) : null, allowLate: d.allowLate ?? true,
+      maxAttempts: d.maxAttempts ?? 1, timeLimitMin: d.timeLimitMin ?? null }).returning();
     if (d.items?.length) await this.writeItems(a, d.items);
     if (studentIds.length) await this.q.insert(assessmentStudents).values(studentIds.map((studentId) => ({ ...this.base(), assessmentId: a.id, studentId })));
     await this.audit.log('lms.assessment.create', 'assessment', a.id, `Created ${d.kind.toLowerCase()} “${a.title}”`);
@@ -230,6 +231,8 @@ export class LmsService {
     if (d.instructions !== undefined) patch.instructions = d.instructions;
     if (d.dueAt !== undefined) patch.dueAt = d.dueAt ? new Date(d.dueAt) : null;
     if (d.allowLate !== undefined) patch.allowLate = d.allowLate;
+    if (d.maxAttempts !== undefined) patch.maxAttempts = d.maxAttempts;
+    if (d.timeLimitMin !== undefined) patch.timeLimitMin = d.timeLimitMin;
     if (d.bookComponentId !== undefined || d.bookPage !== undefined) Object.assign(patch, await this.pageRef(a.editionId, { bookComponentId: d.bookComponentId ?? a.bookComponentId, bookPage: d.bookPage === undefined ? a.bookPage : d.bookPage }));
     await this.q.update(assessments).set(patch).where(eq(assessments.id, id));
     if (d.items) await this.writeItems(a, d.items);
@@ -282,7 +285,11 @@ export class LmsService {
     const targeted = (await this.q.select({ id: assessmentStudents.studentId }).from(assessmentStudents).where(eq(assessmentStudents.assessmentId, id))).map((r) => r.id);
     const roster = await this.q.execute(sql`SELECT u.id, u.display_name AS "displayName", u.username FROM enrolments e JOIN users u ON u.id = e.student_id WHERE e.class_id = ${a.classId} ORDER BY u.display_name`);
     const subs = await this.q.select().from(submissions).where(eq(submissions.assessmentId, id));
-    const students = (roster.rows as any[]).filter((s) => !targeted.length || targeted.includes(s.id)).map((s) => ({ ...s, submission: subs.find((x) => x.studentId === s.id) ?? null }));
+    const tries = (await this.q.execute(sql`SELECT student_id AS "studentId", attempt, started_at AS "startedAt", submitted_at AS "submittedAt", over_time AS "overTime",
+        CASE WHEN submitted_at IS NOT NULL THEN extract(epoch FROM submitted_at - started_at)::int END AS seconds
+      FROM assessment_attempts WHERE assessment_id = ${id} ORDER BY attempt`)).rows as any[];
+    const students = (roster.rows as any[]).filter((s) => !targeted.length || targeted.includes(s.id))
+      .map((s) => ({ ...s, submission: subs.find((x) => x.studentId === s.id) ?? null, attempts: tries.filter((t) => t.studentId === s.id) }));
     const maxScore = items.reduce((n, i) => n + i.points, 0);
     const graded = subs.filter((s) => s.score !== null);
     const itemStats = items.map((it) => {
@@ -348,15 +355,45 @@ export class LmsService {
     if (!a || !(await this.visibleToStudent(a))) throw new NotFoundException('Homework not found');
     const items = await this.q.select().from(assessmentItems).where(eq(assessmentItems.assessmentId, id)).orderBy(asc(assessmentItems.position));
     const [sub] = await this.q.select().from(submissions).where(and(eq(submissions.assessmentId, id), eq(submissions.studentId, this.ctx.userId)));
-    const reveal = sub && ['GRADED', 'RETURNED'].includes(sub.status);
+    const used = sub?.attempt ?? 0; const triesLeft = Math.max(0, a.maxAttempts - used);
+    // answers are shown only when no tries are left (or the work is closed) — otherwise the next try would be easy
+    const reveal = sub && ['GRADED', 'RETURNED'].includes(sub.status) && (triesLeft === 0 || a.status === 'CLOSED');
+    const open = await this.openAttempt(id);
     return {
       id: a.id, title: a.title, kind: a.kind, instructions: a.instructions, dueAt: a.dueAt, status: a.status, allowLate: a.allowLate,
+      maxAttempts: a.maxAttempts, timeLimitMin: a.timeLimitMin, attemptsUsed: used, triesLeft: a.status === 'PUBLISHED' ? triesLeft : 0,
+      current: open ? { attempt: open.attempt, startedAt: open.startedAt, endsAt: a.timeLimitMin ? new Date(new Date(open.startedAt).getTime() + a.timeLimitMin * 60_000) : null } : null,
       editionId: a.editionId, bookComponentId: a.bookComponentId, bookPage: a.bookPage,
       // Answers are NEVER sent before the work is marked.
       items: items.map((i) => ({ id: i.id, type: i.type, prompt: i.prompt, options: i.options, points: i.points, ...(reveal && i.type !== 'SHORT' && i.type !== 'READING' ? { answer: i.answer } : {}) })),
       submission: sub ? { status: sub.status, submittedAt: sub.submittedAt, answers: reveal ? sub.answers : (sub.answers as any[]).map((x) => ({ itemId: x.itemId, response: x.response })),
-        score: reveal ? sub.score : null, maxScore: sub.maxScore, feedback: reveal ? sub.feedback : '' } : null,
+        score: reveal || (sub.status === 'GRADED' || sub.status === 'RETURNED') ? sub.score : null, maxScore: sub.maxScore, feedback: reveal ? sub.feedback : '', attempt: sub.attempt } : null,
     };
+  }
+
+  /** The try the student has started but not handed in yet. */
+  private async openAttempt(id: string) {
+    const { rows: [r] } = await this.q.execute(sql`SELECT attempt, started_at AS "startedAt" FROM assessment_attempts WHERE assessment_id = ${id} AND student_id = ${this.ctx.userId} AND submitted_at IS NULL ORDER BY attempt DESC LIMIT 1`) as any;
+    return r as { attempt: number; startedAt: string } | undefined;
+  }
+
+  /** The student starts (or goes on with) a try: the timer starts now and the start time is kept for the teacher. */
+  async startAttempt(id: string) {
+    const [a] = await this.q.select().from(assessments).where(eq(assessments.id, id));
+    if (!a || !(await this.visibleToStudent(a))) throw new NotFoundException('Homework not found');
+    if (a.status !== 'PUBLISHED') throw new ConflictException('This homework is closed.');
+    const open = await this.openAttempt(id);
+    let attempt = open?.attempt; let startedAt = open?.startedAt;
+    if (!open) {
+      const [sub] = await this.q.select({ attempt: submissions.attempt }).from(submissions).where(and(eq(submissions.assessmentId, id), eq(submissions.studentId, this.ctx.userId)));
+      attempt = (sub?.attempt ?? 0) + 1;
+      if (attempt > a.maxAttempts) throw new ConflictException(a.maxAttempts > 1 ? 'You have used all your tries.' : 'You have already handed this in.');
+      const { rows: [r] } = await this.q.execute(sql`INSERT INTO assessment_attempts (publisher_id, school_id, assessment_id, student_id, attempt)
+        VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${id}, ${this.ctx.userId}, ${attempt})
+        ON CONFLICT (assessment_id, student_id, attempt) DO UPDATE SET attempt = EXCLUDED.attempt RETURNING started_at AS "startedAt"`) as any;
+      startedAt = r.startedAt;
+    }
+    return { attempt, startedAt, endsAt: a.timeLimitMin ? new Date(new Date(startedAt!).getTime() + a.timeLimitMin * 60_000) : null, timeLimitMin: a.timeLimitMin, serverNow: new Date() };
   }
 
   async submit(id: string, d: SubmitDto) {
@@ -378,14 +415,31 @@ export class LmsService {
     const pending = answers.some((x) => x.awarded === null);
     const maxScore = items.reduce((n, i) => n + i.points, 0);
     const score = pending ? null : answers.reduce((n, x) => n + (x.awarded ?? 0), 0);
-    try {
-      await this.q.insert(submissions).values({ ...this.base(), assessmentId: id, studentId: this.ctx.userId, answers, maxScore, score, late,
-        status: pending ? 'SUBMITTED' : 'GRADED', gradedAt: pending ? null : new Date() });
-    } catch (e: any) {
-      if ((e?.cause ?? e)?.code === '23505') throw new ConflictException('You have already handed this in.');
-      throw e;
+    const [prev] = await this.q.select().from(submissions).where(and(eq(submissions.assessmentId, id), eq(submissions.studentId, this.ctx.userId)));
+    const attempt = (prev?.attempt ?? 0) + 1;
+    if (prev && attempt > a.maxAttempts) throw new ConflictException(a.maxAttempts > 1 ? 'You have used all your tries.' : 'You have already handed this in.');
+    const now = new Date(); const status = pending ? 'SUBMITTED' as const : 'GRADED' as const;
+    if (!prev) {
+      try {
+        await this.q.insert(submissions).values({ ...this.base(), assessmentId: id, studentId: this.ctx.userId, answers, maxScore, score, late, status, gradedAt: pending ? null : now, attempt: 1 });
+      } catch (e: any) {
+        if ((e?.cause ?? e)?.code === '23505') throw new ConflictException('You have already handed this in.');
+        throw e;
+      }
+    } else {
+      // another try: the earlier one is kept (for the teacher), the new one counts
+      const before = { attempt: prev.attempt, answers: prev.answers, score: prev.score, maxScore: prev.maxScore, status: prev.status, late: prev.late, feedback: prev.feedback, submittedAt: prev.submittedAt };
+      const [u] = await this.q.update(submissions).set({ answers, maxScore, score, late, status, gradedAt: pending ? null : now, gradedBy: null, feedback: '', submittedAt: now, attempt,
+        history: sql`${submissions.history} || ${JSON.stringify([before])}::jsonb` }).where(and(eq(submissions.id, prev.id), eq(submissions.attempt, prev.attempt))).returning({ id: submissions.id });
+      if (!u) throw new ConflictException('This was already handed in — please reload.');
     }
-    return { ok: true, status: pending ? 'SUBMITTED' : 'GRADED', score, maxScore };
+    // the timer: when this try was started and handed in
+    const { rows: done } = await this.q.execute(sql`UPDATE assessment_attempts SET submitted_at = now(),
+        over_time = ${a.timeLimitMin ? sql`now() > started_at + make_interval(mins => ${a.timeLimitMin}) + interval '2 minutes'` : sql`false`}
+      WHERE assessment_id = ${id} AND student_id = ${this.ctx.userId} AND attempt = ${attempt} AND submitted_at IS NULL RETURNING attempt`);
+    if (!done.length) await this.q.execute(sql`INSERT INTO assessment_attempts (publisher_id, school_id, assessment_id, student_id, attempt, submitted_at)
+      VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${id}, ${this.ctx.userId}, ${attempt}, now()) ON CONFLICT DO NOTHING`);
+    return { ok: true, status, score, maxScore, attempt, triesLeft: Math.max(0, a.maxAttempts - attempt) };
   }
 
   // ======================= evaluations & reports =======================

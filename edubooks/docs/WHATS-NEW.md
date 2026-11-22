@@ -1,3 +1,11 @@
+# What's new in Knowledge Gate 1.4.7
+
+## ⏱️ Timer and tries for homework, quizzes and tests
+- **Time limit (minutes)** — new setting when you make an assessment. Students see “You have 10 minutes” and press **▶ Start**; a countdown shows at the top (yellow in the last 5 minutes, red in the last minute). When the time is up, their answers are **handed in automatically**. Without a time limit, students still see a clock counting how long they have been working.
+- **Start and hand-in times** — the app keeps when each student started and when they handed in, measured on the server (changing the device clock does not help). Closing the page does not restart the clock.
+- **Up to 3 tries** — new setting **Tries allowed** (1, 2 or 3). After handing in, students see their score and **🔁 Try again**. The correct answers are shown only after the last try, so the next try is not just copying. The last try counts.
+- **For the teacher** — the results table has a new **Time taken** column: for every try, when it started, when it was handed in, how long it took, and its score. Work handed in long after the time limit is marked **over time**. Very short times, or a much better score on a later try after a long gap, can show that a student had help.
+
 # What's new in Knowledge Gate 1.4.6
 
 ## 〰️ Tracing along a path you draw

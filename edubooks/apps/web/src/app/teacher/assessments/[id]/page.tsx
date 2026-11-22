@@ -33,6 +33,7 @@ function Builder({ initial, id }: { initial: any; id: string | null }) {
       items: list.map((i, n) => ({ id: String(n), section: 'A', type: i.type, prompt: i.prompt, options: i.options, answer: i.answer, marks: i.points || 0, lines: i.type === 'SHORT' ? 3 : 0 })) }, brand, { key });
   };
   const body = () => ({ title: f.title, instructions: f.instructions, bookComponentId: f.bookComponentId || null, bookPage: f.bookComponentId ? f.bookPage || null : null, dueAt: f.dueAt ? new Date(f.dueAt).toISOString() : null, allowLate: f.allowLate, studentIds: f.studentIds ?? [],
+    maxAttempts: Number(f.maxAttempts) || 1, timeLimitMin: Number(f.timeLimitMin) > 0 ? Math.min(600, Math.round(Number(f.timeLimitMin))) : null,
     // Send only question fields (server rows also carry ids/positions, which the API rightly rejects).
     items: items.map(({ type, prompt, options, answer, points }) => ({ type, prompt, options, points, answer: type === 'FILL_BLANK' ? answer.filter((x: string) => x) : answer })) });
   const save = useAction(() => (id ? api.patch(`/teacher/assessments/${id}`, body()) : api.post('/teacher/assessments', { ...body(), classId: f.classId, kind: f.kind, editionId: f.editionId || null, lessonId: f.lessonId || null })),
@@ -57,6 +58,12 @@ function Builder({ initial, id }: { initial: any; id: string | null }) {
           <Field label="Class"><Select disabled={!!id} value={f.classId ?? ''} onChange={(e) => setF({ ...f, classId: e.target.value, studentIds: [] })}><option value="">Select…</option>{classes.data?.map((c) => <option key={c.id} value={c.id}>{className(c)}</option>)}</Select></Field>
           <Field label="Due"><Input type="datetime-local" value={f.dueAt ?? ''} onChange={(e) => setF({ ...f, dueAt: e.target.value })} /></Field>
           <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={f.allowLate} onChange={(e) => setF({ ...f, allowLate: e.target.checked })} />Accept late work</label>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="Time limit (minutes)" hint="Empty: no limit. The clock starts when the student presses Start; answers are handed in when the time is up.">
+            <Input type="number" min={1} max={600} placeholder="No limit" value={f.timeLimitMin ?? ''} onChange={(e) => setF({ ...f, timeLimitMin: e.target.value })} /></Field>
+          <Field label="Tries allowed" hint="With 2 or 3 tries, students see only their score until the last try; you see every try and its time.">
+            <Select value={String(f.maxAttempts ?? 1)} onChange={(e) => setF({ ...f, maxAttempts: Number(e.target.value) })}><option value="1">1 — hand in once</option><option value="2">2 tries</option><option value="3">3 tries</option></Select></Field>
         </div>
         {!id ? <BookScope editionId={f.editionId} lessonId={f.lessonId} onChange={(v) => setF({ ...f, ...v })} /> : f.bookTitle && <p className="text-sm text-slate-500">Book: {f.bookTitle}</p>}
         <Field label="Instructions for children"><Textarea rows={2} value={f.instructions} onChange={(e) => setF({ ...f, instructions: e.target.value })} /></Field>
@@ -213,7 +220,7 @@ function Results({ a }: { a: any }) {
   return (
     <div className="space-y-6">
       <Link href="/teacher/assessments" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"><ArrowLeft className="size-4" />Assessments</Link>
-      <PageHeader title={a.title} sub={`${KIND_LABEL[a.kind]} · ${a.items.length} questions · ${a.maxScore} points${a.dueAt ? ` · due ${fmtDate(a.dueAt)}` : ''}`}>
+      <PageHeader title={a.title} sub={`${KIND_LABEL[a.kind]} · ${a.items.length} questions · ${a.maxScore} points${a.dueAt ? ` · due ${fmtDate(a.dueAt)}` : ''}${a.timeLimitMin ? ` · ⏱ ${a.timeLimitMin} min` : ''}${a.maxAttempts > 1 ? ` · ${a.maxAttempts} tries` : ''}`}>
         <Status s={a.status} />
         {waiting.length > 0 && <Button onClick={() => setMark(waiting[0])}><PenLine className="size-4" />Mark next ({waiting.length})</Button>}
         <Button variant="secondary" onClick={printResults}><Printer className="size-4" />Print results</Button>
@@ -230,14 +237,14 @@ function Results({ a }: { a: any }) {
         <>
         <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">Pass mark <Input type="number" min={0} max={100} className="h-8 w-20" value={pass} onChange={(e) => setPass(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} aria-label="Pass mark (%)" />%
           <span className="text-xs text-slate-500">— used for Pass / Fail on this page and on the printed sheet.</span></div>
-        <Table head={['Student', 'Status', 'Score', '%', 'Grade', 'Result', 'Handed in', '']}>
+        <Table head={['Student', 'Status', 'Score', '%', 'Grade', 'Result', 'Time taken', '']}>
           {a.students.map((s: any) => (
             <tr key={s.id}><Td className="font-medium">{s.displayName}</Td>
               <Td>{s.submission ? <><Status s={s.submission.status} />{s.submission.late && <Badge tone="danger" className="ml-1">late</Badge>}</> : <span className="text-xs text-slate-500">not handed in</span>}</Td>
               <Td className="tabular-nums">{s.submission?.score ?? (s.submission ? '…' : '')}{s.submission && ` / ${a.maxScore}`}</Td>
               {(() => { const r = res(s); return <><Td className="tabular-nums">{r.pct === null ? '' : `${r.pct}%`}</Td><Td className="font-semibold">{r.grade ?? ''}</Td>
                 <Td>{r.result === 'PASS' ? <Badge tone="PUBLISHED">Pass</Badge> : r.result === 'FAIL' ? <Badge tone="danger">Fail</Badge> : r.result === 'PENDING' ? <span className="text-xs text-amber-700">to mark</span> : ''}</Td></>; })()}
-              <Td className="text-slate-500">{s.submission ? fmtDate(s.submission.submittedAt) : ''}</Td>
+              <Td className="text-slate-500"><Timings s={s} timeLimit={a.timeLimitMin} /></Td>
               <Td className="text-right">{s.submission && <Button size="sm" variant={s.submission.status === 'SUBMITTED' ? 'primary' : 'ghost'} onClick={() => setMark(s)}>{s.submission.status === 'SUBMITTED' ? 'Mark' : 'View'}</Button>}</Td></tr>))}
         </Table>
         </>
@@ -254,10 +261,26 @@ function Results({ a }: { a: any }) {
   );
 }
 
+const mins = (sec: number) => (sec < 60 ? `${sec}s` : `${Math.floor(sec / 60)}m ${String(sec % 60).padStart(2, '0')}s`);
+const hhmm = (d: string) => new Date(d).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+/** When each try was started and handed in, how long it took, and its score — very quick tries or long gaps can show a student had help. */
+function Timings({ s }: { s: any; timeLimit?: number | null }) {
+  const tries: any[] = s.attempts ?? []; const sub = s.submission; const hist: any[] = sub?.history ?? [];
+  if (!tries.length) return sub ? <span>{fmtDate(sub.submittedAt)}</span> : null;
+  const scoreOf = (n: number) => (sub && n === sub.attempt ? sub.score : hist.find((x) => x.attempt === n)?.score);
+  return <ul className="space-y-0.5 text-xs">{tries.map((t) => (
+    <li key={t.attempt} className="whitespace-nowrap">
+      {tries.length > 1 || (sub?.attempt ?? 1) > 1 ? <b className="text-slate-700">Try {t.attempt}: </b> : null}
+      {hhmm(t.startedAt)} → {t.submittedAt ? <>{new Date(t.submittedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} <b className="text-slate-800">({mins(t.seconds)})</b></> : <span className="text-amber-700">not handed in</span>}
+      {t.submittedAt && scoreOf(t.attempt) != null && tries.length > 1 && <span> · score {scoreOf(t.attempt)}/{sub.maxScore}</span>}
+      {t.overTime && <Badge tone="danger" className="ml-1">over time</Badge>}
+    </li>))}</ul>;
+}
+
 function Page({ id }: { id: string }) {
   const params = useSearchParams();
   const q = useQuery({ queryKey: ['assessment', id], queryFn: () => api.get(`/teacher/assessments/${id}`), enabled: id !== 'new' });
-  if (id === 'new') return <Builder id={null} initial={{ title: '', kind: 'HOMEWORK', classId: params.get('classId') ?? '', editionId: params.get('editionId'), lessonId: params.get('lessonId'), instructions: '', dueAt: '', allowLate: true, studentIds: [] }} />;
+  if (id === 'new') return <Builder id={null} initial={{ title: '', kind: 'HOMEWORK', classId: params.get('classId') ?? '', editionId: params.get('editionId'), lessonId: params.get('lessonId'), instructions: '', dueAt: '', allowLate: true, studentIds: [], maxAttempts: 1, timeLimitMin: '' }} />;
   if (q.isLoading) return <PageLoader />;
   if (q.error) return <ErrorBox error={q.error} />;
   const a = q.data;

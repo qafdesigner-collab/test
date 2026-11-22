@@ -48,6 +48,10 @@ export class AssessmentDto {
   @IsOptional() @IsArray() @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => ItemDto) items?: ItemDto[];
   @IsOptional() @IsUUID() bookComponentId?: string | null;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5000) bookPage?: number | null;
+  /** how many times a student may hand it in (1–3) */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(3) maxAttempts?: number;
+  /** minutes allowed once a student starts (null: no limit) */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(600) timeLimitMin?: number | null;
 }
 export class UpdateAssessmentDto {
   @IsOptional() @IsString() @Length(2, 200) title?: string;
@@ -58,6 +62,10 @@ export class UpdateAssessmentDto {
   @IsOptional() @IsArray() @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => ItemDto) items?: ItemDto[];
   @IsOptional() @IsUUID() bookComponentId?: string | null;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5000) bookPage?: number | null;
+  /** how many times a student may hand it in (1–3) */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(3) maxAttempts?: number;
+  /** minutes allowed once a student starts (null: no limit) */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(600) timeLimitMin?: number | null;
 }
 
 export class ResponseDto { @IsUUID() itemId: string; @IsDefined() response: string | number | boolean; }

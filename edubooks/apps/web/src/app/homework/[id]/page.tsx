@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { use, useState } from 'react';
+import { use, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Volume2, XCircle } from 'lucide-react';
 import { LangScope, useT } from '@/lib/i18n';
@@ -17,7 +17,7 @@ export default function Homework(props: { params: Promise<{ id: string }> }) { r
 function HomeworkPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params); const qc = useQueryClient(); const toast = useToast(); const { t } = useT();
   const q = useQuery({ queryKey: ['homework', id], queryFn: () => api.get(`/student/homework/${id}`) });
-  const [i, setI] = useState(0); const [answers, setAnswers] = useState<Record<string, any>>({}); const [clips, setClips] = useState<Record<string, Clip>>({}); const [busy, setBusy] = useState(false);
+  const [retry, setRetry] = useState(false);
   if (q.isLoading) return <PageLoader />;
   if (q.error) return <div className="p-6"><ErrorBox error={q.error} /></div>;
   const h = q.data; const sub = h.submission;
@@ -30,7 +30,7 @@ function HomeworkPage({ params }: { params: Promise<{ id: string }> }) {
         className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-2 text-base font-bold text-white shadow hover:bg-violet-700">📖 {t('Open page {n} of the book', { n: h.bookPage })}</Link>}
       {children}</div></main>);
 
-  if (sub) {
+  if (sub && !((retry || h.current) && h.triesLeft > 0)) {
     const shown = (it: any, r: any) => (it.type === 'MCQ' ? it.options[r] : it.type === 'TRUE_FALSE' ? (r ? t('True') : t('False')) : r) ?? '—';
     return shell(<>
       <div className="my-6 rounded-3xl bg-white p-6 text-center shadow-sm">
@@ -38,8 +38,11 @@ function HomeworkPage({ params }: { params: Promise<{ id: string }> }) {
           <div className="mt-2 text-3xl font-extrabold text-amber-600">{sub.score} / {sub.maxScore}</div>
           {sub.feedback && <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-lg text-slate-700">💬 {sub.feedback}</p>}</>
           : <><div className="text-6xl">⏳</div><p className="mt-2 text-xl font-bold">{t('Handed in! Your teacher is checking it.')}</p></>}
+        {h.triesLeft > 0 && <div className="mt-5 border-t border-slate-200 pt-4">
+          <p className="text-slate-600">{t('You can try again to get a better score.')} ({t('Try {a} of {b}', { a: sub.attempt + 1, b: h.maxAttempts })})</p>
+          <button onClick={() => setRetry(true)} className="mt-3 rounded-2xl bg-sky-700 px-6 py-3 text-lg font-bold text-white shadow">🔁 {t('Try again')}</button></div>}
       </div>
-      {sub.score !== null && <div className="space-y-3">{h.items.map((it: any, n: number) => {
+      {sub.score !== null && h.triesLeft === 0 && <div className="space-y-3">{h.items.map((it: any, n: number) => {
         const a = sub.answers.find((x: any) => x.itemId === it.id);
         return <div key={it.id} className="rounded-3xl bg-white p-4 shadow-sm"><div className="flex items-start gap-2"><span className="font-bold">{n + 1}.</span><span className="flex-1 font-semibold">{it.prompt}</span>
           {a?.correct === true ? <CheckCircle2 className="size-6 text-emerald-500" /> : a?.correct === false ? <XCircle className="size-6 text-red-400" /> : null}</div>
@@ -49,19 +52,60 @@ function HomeworkPage({ params }: { params: Promise<{ id: string }> }) {
   }
   if (h.status !== 'PUBLISHED') return shell(<p className="mt-6 rounded-3xl bg-white p-6 text-center text-lg shadow-sm">{t('This homework is closed.')}</p>);
 
+  return shell(<Doing h={h} id={id} key={h.attemptsUsed} onDone={() => { setRetry(false); qc.invalidateQueries({ queryKey: ['homework'] }); qc.invalidateQueries({ queryKey: ['myReport'] }); }} />);
+}
+
+const clock = (sec: number) => { const s = Math.max(0, Math.floor(sec)); const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); return `${h ? `${h}:` : ''}${String(m).padStart(h ? 2 : 1, '0')}:${String(s % 60).padStart(2, '0')}`; };
+
+/** Answering: the timer starts when the student starts (the start time is kept for the teacher); with a time limit it counts down and hands in by itself. */
+function Doing({ h, id, onDone }: { h: any; id: string; onDone: () => void }) {
+  const toast = useToast(); const { t } = useT();
+  const [i, setI] = useState(0); const [answers, setAnswers] = useState<Record<string, any>>({}); const [clips, setClips] = useState<Record<string, Clip>>({}); const [busy, setBusy] = useState(false);
+  const [run, setRun] = useState<{ startedAt: number; endsAt: number | null; skew: number } | null>(null); const [now, setNow] = useState(Date.now());
+  const sent = useRef(false); const answersRef = useRef(answers); answersRef.current = answers;
+  const start = async () => {
+    try {
+      const r = await api.post<any>(`/student/homework/${id}/start`);
+      const skew = Date.now() - new Date(r.serverNow).getTime(); // the device clock may be wrong: count from the server's time
+      setRun({ startedAt: new Date(r.startedAt).getTime() + skew, endsAt: r.endsAt ? new Date(r.endsAt).getTime() + skew : null, skew });
+    } catch (e: any) { toast(e.message, 'err'); }
+  };
+  // no time limit, or a try already started: start (or go on) straight away
+  useEffect(() => { if (!h.timeLimitMin || h.current) void start(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!run) return; const k = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(k); }, [run]);
+  const submit = async (auto = false) => {
+    if (sent.current) return;
+    const ans = answersRef.current;
+    const missing = h.items.filter((x: any) => ans[x.id] === undefined || ans[x.id] === '').length;
+    if (!auto && missing && !confirm(t('You skipped {n} question(s). Hand in anyway?', { n: missing }))) return;
+    sent.current = true; setBusy(true);
+    try {
+      const r = await api.post<any>(`/student/homework/${id}/submit`, { answers: Object.entries(ans).map(([itemId, response]) => ({ itemId, response })) });
+      toast(auto ? t('Time is up — your answers were handed in.') : r.status === 'GRADED' ? t('You got {a} out of {b}! 🎉', { a: r.score, b: r.maxScore }) : t('Handed in! 🎉'));
+      onDone();
+    } catch (e: any) { sent.current = false; toast(e.message, 'err'); } finally { setBusy(false); }
+  };
+  const left = run?.endsAt ? (run.endsAt - now) / 1000 : null;
+  useEffect(() => { if (left !== null && left <= 0) void submit(true); }, [left !== null && left <= 0]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!run) return h.timeLimitMin && !h.current ? (
+    <div className="mt-6 rounded-3xl bg-white p-6 text-center shadow-sm">
+      {h.instructions && <p className="mb-4 text-lg text-slate-600">{h.instructions}</p>}
+      <div className="text-5xl">⏱️</div>
+      <p className="mt-2 text-xl font-bold text-slate-800">{t('You have {n} minutes.', { n: h.timeLimitMin })}</p>
+      <p className="mt-1 text-slate-600">{t('The clock starts when you press Start. When the time is up, your answers are handed in by themselves.')}</p>
+      {h.maxAttempts > 1 && <p className="mt-1 text-sm text-slate-500">{t('Try {a} of {b}', { a: h.attemptsUsed + 1, b: h.maxAttempts })}</p>}
+      <button onClick={start} className="mt-5 rounded-2xl bg-emerald-700 px-8 py-3 text-xl font-bold text-white shadow">▶ {t('Start')}</button>
+    </div>) : <PageLoader />;
+
   const it = h.items[i]; const last = i === h.items.length - 1; const val = answers[it.id];
   const set = (v: any) => setAnswers({ ...answers, [it.id]: v });
-  const submit = async () => {
-    const missing = h.items.filter((x: any) => answers[x.id] === undefined || answers[x.id] === '').length;
-    if (missing && !confirm(t('You skipped {n} question(s). Hand in anyway?', { n: missing }))) return;
-    setBusy(true);
-    try {
-      const r = await api.post(`/student/homework/${id}/submit`, { answers: Object.entries(answers).map(([itemId, response]) => ({ itemId, response })) });
-      toast(r.status === 'GRADED' ? t('You got {a} out of {b}! 🎉', { a: r.score, b: r.maxScore }) : t('Handed in! 🎉'));
-      qc.invalidateQueries({ queryKey: ['homework'] }); qc.invalidateQueries({ queryKey: ['myReport'] });
-    } catch (e: any) { toast(e.message, 'err'); } finally { setBusy(false); }
-  };
-  return shell(<>
+  return <>
+    <div className={cn('sticky top-2 z-10 mt-3 flex w-fit items-center gap-2 rounded-full px-4 py-1.5 text-lg font-bold tabular-nums shadow', left === null ? 'bg-white text-slate-700' : left < 60 ? 'animate-pulse bg-red-600 text-white' : left < 300 ? 'bg-amber-400 text-amber-950' : 'bg-white text-slate-700')}
+      role="timer" aria-live={left !== null && left < 60 ? 'assertive' : 'off'}>
+      {left === null ? <>⏱ {clock((now - run.startedAt) / 1000)}</> : <>⏳ {clock(left)} {t('left')}</>}
+      {h.maxAttempts > 1 && <span className="text-sm font-medium opacity-80">· {t('Try {a} of {b}', { a: h.attemptsUsed + 1, b: h.maxAttempts })}</span>}
+    </div>
     {h.instructions && i === 0 && <p className="mt-2 text-lg text-slate-600">{h.instructions}</p>}
     {h.dueAt && <p className="mt-1 text-sm text-slate-500">Due {fmtDay(h.dueAt)}</p>}
     <div className="my-5 flex gap-1.5" aria-label={`Question ${i + 1} of ${h.items.length}`}>{h.items.map((x: any, n: number) => (
@@ -82,7 +126,7 @@ function HomeworkPage({ params }: { params: Promise<{ id: string }> }) {
     <div className="mt-6 flex justify-between">
       <button disabled={i === 0} onClick={() => setI(i - 1)} className="flex items-center gap-1 rounded-2xl bg-white px-5 py-3 text-lg font-bold text-slate-600 shadow disabled:opacity-30"><ChevronLeft className="size-6 rtl:rotate-180" />{t('Back')}</button>
       {!last ? <button onClick={() => setI(i + 1)} className="flex items-center gap-1 rounded-2xl bg-sky-700 px-6 py-3 text-lg font-bold text-white shadow">{t('Next')}<ChevronRight className="size-6 rtl:rotate-180" /></button>
-        : <button onClick={submit} disabled={busy} className="rounded-2xl bg-emerald-700 px-6 py-3 text-lg font-bold text-white shadow disabled:opacity-50">{busy ? '…' : `🚀 ${t('Hand in')}`}</button>}
+        : <button onClick={() => submit()} disabled={busy} className="rounded-2xl bg-emerald-700 px-6 py-3 text-lg font-bold text-white shadow disabled:opacity-50">{busy ? '…' : `🚀 ${t('Hand in')}`}</button>}
     </div>
-  </>);
+  </>;
 }
