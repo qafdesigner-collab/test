@@ -1,3 +1,11 @@
+# What's new in Knowledge Gate 1.4.13
+
+## ✋ “Show me fingers” — counts correctly, and shows the child's real hand
+- **More accurate counting.** Fingers are now counted from the hand's 3D shape (is each finger straight, and does it reach out from the palm), so it works however the hand is turned: palm or back of the hand to the camera, tilted, sideways or upside down. On our test photos (fists, 1, 2 and 5 fingers, both hands, turned 0°, ±35° and 90°) every finger was counted correctly; before, an open hand seen from the back often counted as 4.
+- **Steadier.** The count is smoothed over half a second, and a short wobble no longer empties the “hold” bar.
+- **The real hand is shown — only the hand.** In this game the child sees their own hand, cut out along the tracked hand with a coloured outline (yellow, and purple for a second hand). The face, the room and the background are never shown, recorded or sent.
+- Air writing uses the same better finger check for the “pen” (one finger up).
+
 # What's new in Knowledge Gate 1.4.12
 
 ## 📷 Camera games — better, and the child's picture is never shown

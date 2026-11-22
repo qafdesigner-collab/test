@@ -13,7 +13,7 @@ import type { EngineProps } from './engines';
 import { scoreTrace } from './tracing';
 
 type Pt = { x: number; y: number; z?: number };
-export type Hand = { pts: Pt[]; side: string };
+export type Hand = { pts: Pt[]; world?: Pt[]; side: string };
 let landmarker: Promise<any> | null = null;
 function loadLandmarker() {
   landmarker ??= (async () => {
@@ -26,17 +26,22 @@ function loadLandmarker() {
 }
 
 const d = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
-/** How many fingers a hand holds up (thumb included). */
-export function fingersUp(p: Pt[]) {
-  if (!p || p.length < 21) return 0;
-  const palm = d(p[0], p[9]) || 0.1;
-  let n = 0;
-  // a finger is up when its tip is clearly farther from the wrist than its middle joint
-  for (const [tip, pip] of [[8, 6], [12, 10], [16, 14], [20, 18]]) if (d(p[tip], p[0]) > d(p[pip], p[0]) + palm * 0.12) n++;
-  // the thumb is up when its tip is far from the side of the hand (the base of the little finger) and from the index base
-  if (d(p[4], p[17]) > d(p[2], p[17]) * 1.15 && d(p[4], p[5]) > palm * 0.45) n++;
-  return n;
+const d3 = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y, (a.z ?? 0) - (b.z ?? 0));
+/**
+ * Which fingers a hand holds up: [thumb, index, middle, ring, little]. Uses the 3D points (in metres), so it works
+ * however the hand is turned — palm or back to the camera, tilted or upside down. A finger is up when it is straight
+ * and its tip reaches well beyond its base; the thumb when it is straight and away from the palm.
+ * (Tested on photos of fists, one, two and five fingers, turned 0°, ±35° and 90°.)
+ */
+export function fingerStates(hand: Hand | Pt[]): number[] {
+  const p = Array.isArray(hand) ? hand : hand.world?.length === 21 ? hand.world : hand.pts;
+  if (!p || p.length < 21) return [0, 0, 0, 0, 0];
+  const straight = (m: number, a: number, b: number, t: number) => d3(p[m], p[t]) / ((d3(p[m], p[a]) + d3(p[a], p[b]) + d3(p[b], p[t])) || 1);
+  const thumb = straight(1, 2, 3, 4) > 0.89 && d3(p[4], p[9]) / (d3(p[0], p[9]) || 1) > 0.6 ? 1 : 0;
+  return [thumb, ...[[5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16], [17, 18, 19, 20]].map(([m, a, b, t]) => (straight(m, a, b, t) > 0.72 && d3(p[t], p[0]) / (d3(p[m], p[0]) || 1) > 1.25 ? 1 : 0))];
 }
+/** How many fingers a hand holds up (thumb included). */
+export const fingersUp = (hand: Hand | Pt[]) => fingerStates(hand).reduce((a, b) => a + b, 0);
 /** Only the index finger up: the "pen" for writing in the air. */
 export const pointing = (p: Pt[]) => {
   if (!p || p.length < 21) return false;
@@ -44,6 +49,8 @@ export const pointing = (p: Pt[]) => {
   const up = (tip: number, pip: number) => d(p[tip], p[0]) > d(p[pip], p[0]) + palm * 0.12;
   return up(8, 6) && !up(12, 10) && !up(16, 14) && !up(20, 18);
 };
+/** The pen for air writing: the index finger up and the other three down (thumb free), from the 3D points when known. */
+export const pointingHand = (hand: Hand) => { if (hand.world?.length !== 21) return pointing(hand.pts); const f = fingerStates(hand); return f[1] === 1 && f[2] + f[3] + f[4] === 0; };
 
 // ---------- sounds (made on the device, no files) ----------
 let audio: AudioContext | null = null;
@@ -96,7 +103,7 @@ export function useHands(enabled = true) {
           last = v.currentTime;
           try {
             const r = lm.detectForVideo(v, t0);
-            hands.current = (r.landmarks ?? []).map((pts: Pt[], i: number) => ({ pts: pts.map((q) => ({ x: 1 - q.x, y: q.y, z: q.z })), side: r.handedness?.[i]?.[0]?.categoryName ?? '' }));
+            hands.current = (r.landmarks ?? []).map((pts: Pt[], i: number) => ({ pts: pts.map((q) => ({ x: 1 - q.x, y: q.y, z: q.z })), world: r.worldLandmarks?.[i], side: r.handedness?.[i]?.[0]?.categoryName ?? '' }));
           } catch { /* skip this frame */ }
           next = t0 + Math.max(50, (performance.now() - t0) * 3);
         }
@@ -136,6 +143,30 @@ export function drawHand(g: CanvasRenderingContext2D, pts: Pt[], w: number, h: n
   g.fillStyle = '#1e293b'; g.beginPath(); g.arc(cx - r, cy - r * 0.3, r * 0.28, 0, Math.PI * 2); g.arc(cx + r, cy - r * 0.3, r * 0.28, 0, Math.PI * 2); g.fill();
   g.strokeStyle = '#1e293b'; g.lineWidth = r * 0.3; g.beginPath(); g.arc(cx, cy + r * 0.1, r * 0.7, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
   g.restore();
+}
+/**
+ * The child's real hand, cut out of the camera picture along the tracked hand — nothing else (no face, no room) is drawn.
+ * The cut-out is a little wider than the hand so it still fits while the hand moves.
+ */
+let cutCanvas: HTMLCanvasElement | null = null;
+export function drawRealHand(g: CanvasRenderingContext2D, video: HTMLVideoElement | null, pts: Pt[], w: number, h: number, i = 0) {
+  if (!video || video.readyState < 2) return drawHand(g, pts, w, h, i);
+  cutCanvas ??= document.createElement('canvas');
+  if (cutCanvas.width !== w || cutCanvas.height !== h) { cutCanvas.width = w; cutCanvas.height = h; }
+  const m = cutCanvas.getContext('2d')!; const P = pts.map((p) => ({ x: p.x * w, y: p.y * h }));
+  const size = Math.hypot(P[0].x - P[9].x, P[0].y - P[9].y) || 40;
+  const shape = (ctx: CanvasRenderingContext2D, grow: number) => {
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = size * 0.42 + grow;
+    ctx.beginPath(); for (const [a, b] of BONES) { ctx.moveTo(P[a].x, P[a].y); ctx.lineTo(P[b].x, P[b].y); } ctx.stroke();
+    ctx.beginPath(); [0, 1, 5, 9, 13, 17].forEach((k, n) => (n ? ctx.lineTo(P[k].x, P[k].y) : ctx.moveTo(P[k].x, P[k].y))); ctx.closePath(); ctx.lineWidth = size * 0.5 + grow; ctx.stroke(); ctx.fill();
+    // a little of the wrist
+    const wx = P[0].x + (P[0].x - P[9].x) * 0.35, wy = P[0].y + (P[0].y - P[9].y) * 0.35; ctx.lineWidth = size * 0.75 + grow; ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y); ctx.lineTo(wx, wy); ctx.stroke();
+  };
+  m.save(); m.clearRect(0, 0, w, h); m.fillStyle = '#fff'; m.strokeStyle = '#fff'; shape(m, 0);
+  m.globalCompositeOperation = 'source-in'; m.translate(w, 0); m.scale(-1, 1); m.drawImage(video, 0, 0, w, h); m.restore();
+  // a glowing outline, then the hand itself
+  g.save(); g.strokeStyle = GLOVES[i % GLOVES.length].fill; g.fillStyle = GLOVES[i % GLOVES.length].fill; g.globalAlpha = 0.9; shape(g, size * 0.16); g.restore();
+  g.drawImage(cutCanvas, 0, 0);
 }
 type Scene = 'sky' | 'sea' | 'board' | 'party';
 function drawScene(g: CanvasRenderingContext2D, w: number, h: number, scene: Scene, t: number) {
@@ -221,7 +252,7 @@ function Stage({ cam, ready, setReady, children }: { cam: Cam; ready: boolean; s
             <p className="text-2xl font-black">{cam.status === 'ready' ? t('Camera check') : `📷 ${t('Starting the camera…')}`}</p>
             {cam.status === 'ready' && <p className="text-lg font-bold">{t(tip || 'Show your hand to the camera.')}</p>}
             {cam.status === 'ready' && <div className="mx-auto h-3 w-56 overflow-hidden rounded-full bg-white/30"><div className="h-full bg-emerald-400 transition-[width]" style={{ width: `${seen * 100}%` }} /></div>}
-            <p className="text-xs text-white/80">🔒 {t('Only your hand is used. Your picture is not shown, recorded or sent anywhere.')}</p>
+            <p className="text-xs text-white/80">🔒 {t('Only your hand is used. Your face and your room are never shown, recorded or sent anywhere.')}</p>
             <button type="button" onClick={() => setReady(true)} className="rounded-xl bg-white/20 px-3 py-1 text-xs font-bold hover:bg-white/30">{t('Play with touch instead')}</button>
           </div>
         </div>)}
@@ -232,7 +263,7 @@ function Stage({ cam, ready, setReady, children }: { cam: Cam; ready: boolean; s
 }
 function CameraNote() {
   const { t } = useT();
-  return <p className="text-center text-xs text-slate-500">🔒 {t('The camera only finds your hand. Your picture is not shown, recorded or sent anywhere.')}</p>;
+  return <p className="text-center text-xs text-slate-500">🔒 {t('The camera only looks at your hand. Your face and your room are never shown, recorded or sent anywhere.')}</p>;
 }
 
 // ---------- Bubble pop ----------
@@ -325,12 +356,13 @@ export function ShowFingers({ content, onFinish, say, onProgress }: EngineProps)
   const rounds: { show: string; answer: number }[] = content.rounds ?? [];
   const [k, setK] = useState(0); const [seen, setSeen] = useState(0); const [hold, setHold] = useState(0); const [done, setDone] = useState<'' | 'ok' | 'skip'>('');
   const right = useRef(0); const since = useRef<number | null>(null); const fx = useRef<Fx[]>([]);
+  const hist = useRef<{ t: number; n: number }[]>([]); const miss = useRef<number | null>(null);
   const r = rounds[k];
   useEffect(() => { if (!ready) return; onProgress?.(k, rounds.length); if (r) say(/^\d+$/.test(r.show) ? `Show me ${r.show}` : r.show); }, [k, ready]); // eslint-disable-line react-hooks/exhaustive-deps
   const next = useCallback((ok: boolean) => {
     if (ok) { right.current++; sfx.good(); const f = fit(); if (f) for (let i = 0; i < 4; i++) burst(fx.current, f.w * (0.2 + i * 0.2), f.h * 0.3, f.k, ['#f472b6', '#60a5fa', '#34d399', '#fbbf24'], 18); }
     setDone(ok ? 'ok' : 'skip'); if (ok) say(['Great!', 'Well done!', 'Yes!'][Math.floor(Math.random() * 3)]);
-    setTimeout(() => { setDone(''); setHold(0); since.current = null; if (k + 1 < rounds.length) setK(k + 1); else { sfx.win(); onFinish(right.current); } }, 1400);
+    setTimeout(() => { setDone(''); setHold(0); since.current = null; miss.current = null; hist.current = []; if (k + 1 < rounds.length) setK(k + 1); else { sfx.win(); onFinish(right.current); } }, 1400);
   }, [k, rounds.length, onFinish, say, fit]);
   useEffect(() => {
     let raf = 0; let prev = performance.now();
@@ -339,13 +371,19 @@ export function ShowFingers({ content, onFinish, say, onProgress }: EngineProps)
       if (f) {
         const { g, w, h, k: px } = f; const dt = Math.min(0.25, (now - prev) / 1000); prev = now;
         drawScene(g, w, h, 'party', now);
-        let n = 0;
-        cam.hands.current.forEach((hd, i) => { n += fingersUp(hd.pts); drawHand(g, hd.pts, w, h, i); });
+        let raw = 0;
+        cam.hands.current.forEach((hd, i) => { raw += fingersUp(hd); drawRealHand(g, cam.video.current, hd.pts, w, h, i); });
+        // a steady count: the most common count of the last half second (one shaky moment does not change it)
+        hist.current.push({ t: now, n: cam.hands.current.length ? raw : -1 }); hist.current = hist.current.filter((x) => now - x.t < 500);
+        const votes = new Map<number, number>(); for (const x of hist.current) votes.set(x.n, (votes.get(x.n) ?? 0) + 1);
+        const n = Math.max(0, [...votes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0);
         fx.current = stepFx(g, fx.current, dt, px);
         setSeen((x) => (x === n ? x : n));
-        if (r && ready && !done && cam.hands.current.length) {
-          if (n === r.answer) { since.current ??= now; const p = Math.min(1, (now - since.current) / 900); setHold(p); if (p >= 1) next(true); }
-          else { since.current = null; setHold(0); }
+        if (r && ready && !done) {
+          if (cam.hands.current.length && n === r.answer) { miss.current = null; since.current ??= now; const p = Math.min(1, (now - since.current) / 900); setHold(p); if (p >= 1) next(true); }
+          else if (since.current !== null) { // forgive a short wobble; reset only when it stays wrong
+            miss.current ??= now; if (now - miss.current > 400) { since.current = null; miss.current = null; setHold(0); }
+          }
         }
       }
       raf = requestAnimationFrame(loop);
@@ -417,7 +455,7 @@ export function AirWriting({ content, onFinish, say, onProgress }: EngineProps) 
       if (hd && size.w && ready && stars === null) {
         const raw = { x: hd.pts[8].x * size.w, y: hd.pts[8].y * size.h };
         const s = smooth.current ? { x: smooth.current.x * 0.55 + raw.x * 0.45, y: smooth.current.y * 0.55 + raw.y * 0.45 } : raw; smooth.current = s;
-        const down = pointing(hd.pts); setPen((x) => (x === down ? x : down));
+        const down = pointingHand(hd); setPen((x) => (x === down ? x : down));
         if (down) { if (last.current) line(last.current, s); last.current = s; } else last.current = null;
         if (tg) {
           drawHand(tg, hd.pts, size.w, size.h, 0, 0.45);
