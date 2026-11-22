@@ -25,6 +25,9 @@ export const EMPTY_CONTENT: Record<Engine, any> = {
   LISTENING: { rounds: [{ say: 'dog', options: ['🐶', '🐱', '🐮'], answer: 0 }, { say: 'Find the apple', options: ['🍌', '🍎', '🍇'], answer: 1 }] },
   TRACING: { items: ['A', 'a', 'B', 'b'], repeats: 2, guide: 'DOTTED', font: 'ROUND', lines: true },
   COLORING: { image: '', task: 'Colour the picture' },
+  BUBBLE_POP: { task: 'Pop the letter B!', targets: ['B', 'b'], others: ['D', 'P', 'd', 'p', 'R'], goal: 8, seconds: 60 },
+  FINGERS: { rounds: [{ show: '3', answer: 3 }, { show: '🍎🍎🍎🍎🍎', answer: 5 }, { show: '2 + 2', answer: 4 }, { show: '1', answer: 1 }] },
+  AIR_WRITING: { items: ['A', 'B', 'C', '1', '2'] },
 };
 const list = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
 
@@ -88,6 +91,31 @@ export function ContentForm({ engine, value, onChange }: { engine: Engine; value
         </div>
         <Button type="button" size="sm" variant="secondary" disabled={!v.items.length} onClick={() => printTracingSheet(v, 'Handwriting practice')}>🖨 Print as a worksheet</Button>
         <p className="text-xs text-slate-500">Children trace each one with a finger, a stylus or the mouse; the app checks that they follow the letters, gives stars and says the letter.</p>
+      </div>;
+    case 'BUBBLE_POP':
+      return <div className="space-y-3">
+        <Field label="Task (read aloud)"><Input value={v.task} maxLength={120} placeholder="Pop the letter B!" onChange={(e) => onChange({ ...v, task: e.target.value })} /></Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Pop these (commas)"><Input value={v.targets.join(', ')} placeholder="B, b   or   5   or   🍎" onChange={(e) => onChange({ ...v, targets: list(e.target.value) })} /></Field>
+          <Field label="Not these (commas)"><Input value={v.others.join(', ')} placeholder="D, P, d, p" onChange={(e) => onChange({ ...v, others: list(e.target.value) })} /></Field>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Bubbles to pop to win"><Input type="number" min={3} max={20} value={v.goal} onChange={(e) => onChange({ ...v, goal: Number(e.target.value) })} /></Field>
+          <Field label="Time (seconds)"><Input type="number" min={30} max={180} value={v.seconds} onChange={(e) => onChange({ ...v, seconds: Number(e.target.value) })} /></Field>
+        </div>
+        <p className="text-xs text-slate-500">📷 Children point with a finger in the air in front of the camera to pop the right bubbles (or tap them on the screen). The camera picture stays on the device.</p>
+      </div>;
+    case 'FINGERS':
+      return <div className="space-y-2">
+        <Rows label="Add round" rows={v.rounds} blank={{ show: '', answer: 1 }} onChange={(rounds) => onChange({ rounds })} render={(r, set) => <>
+          <Input aria-label="What is shown" className="min-w-40 flex-1" placeholder="3   or   2 + 1   or   🍎🍎🍎" value={r.show} onChange={(e) => set({ show: e.target.value })} />
+          <Input aria-label="Fingers" type="number" min={0} max={10} className="w-24" value={r.answer} onChange={(e) => set({ answer: Number(e.target.value) })} /></>} />
+        <p className="text-xs text-slate-500">✋ Write a number (“Show me 3!”), a sum or pictures to count, and how many fingers is right (0–10, both hands). The camera counts the fingers; children can also tap the number.</p>
+      </div>;
+    case 'AIR_WRITING':
+      return <div className="space-y-2">
+        <Field label="Letters or numbers to write in the air (commas)"><Input value={v.items.join(', ')} placeholder="A, B, C, 1, 2   or   ا, ب" onChange={(e) => onChange({ ...v, items: list(e.target.value) })} /></Field>
+        <p className="text-xs text-slate-500">☝️ Children point with one finger to write over the dotted letter in the air, and open the hand to lift the pen. The app checks the writing like tracing and gives stars.</p>
       </div>;
     case 'COLORING':
       return <div className="space-y-3">

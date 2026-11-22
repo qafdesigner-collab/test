@@ -1,3 +1,13 @@
+# What's new in Knowledge Gate 1.4.11
+
+## 📷 Camera games — play with your hands
+Three new games (Games → New game). The camera sees the child's hands; **hand tracking runs on the device itself** (built into the LMS — no outside service), and the camera picture is **never recorded or sent anywhere**. Every game also works with a finger on the screen or a mouse, so devices without a camera can play too.
+- **🫧 Bubble pop** — bubbles with letters, numbers, words or pictures float up. The child points a finger in the air to pop the right ones (e.g. “Pop the letter B!”), and not the others. You choose what to pop, what not to pop, how many to win and the time.
+- **✋ Show me fingers** — “Show me 3!”, “2 + 2”, or pictures to count (🍎🍎🍎). The child holds up fingers (one or both hands, 0–10); the camera counts them and accepts the answer when it is held for a moment. Children can also tap the number.
+- **☝️ Air writing** — write a letter or number in the air over a dotted letter: point with one finger to write, open the hand to lift the pen. The writing is checked like tracing and gives stars (any script: English, Arabic…).
+- Works best on a laptop or tablet with a front camera, in good light, with the hand about half a metre from the camera. On slower computers the tracking automatically runs less often so the game stays smooth.
+- Assign them to a class like any other game, or put them on a book page with a 🎮 Game element.
+
 # What's new in Knowledge Gate 1.4.10
 
 ## 🇦🇪 UAE academic calendar

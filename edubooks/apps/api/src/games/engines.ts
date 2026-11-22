@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 
 /** The 15 reusable game engines. Content is plain data, so one engine serves any book or lesson. */
-export const ENGINES = ['ALPHABET_MATCH', 'PICTURE_WORD', 'COUNTING', 'SORTING', 'MEMORY', 'FILL_BLANK', 'QUIZ', 'SHAPES', 'WORD_BUILD', 'PUZZLE', 'SPELLING_BEE', 'SENTENCE_BUILDER', 'LISTENING', 'TRACING', 'COLORING'] as const;
+export const ENGINES = ['ALPHABET_MATCH', 'PICTURE_WORD', 'COUNTING', 'SORTING', 'MEMORY', 'FILL_BLANK', 'QUIZ', 'SHAPES', 'WORD_BUILD', 'PUZZLE', 'SPELLING_BEE', 'SENTENCE_BUILDER', 'LISTENING', 'TRACING', 'COLORING', 'BUBBLE_POP', 'FINGERS', 'AIR_WRITING'] as const;
 export type Engine = (typeof ENGINES)[number];
 export const SHAPES = ['circle', 'square', 'triangle', 'rectangle', 'star', 'heart', 'oval', 'diamond'] as const;
 
@@ -94,6 +94,28 @@ export function validateContent(engine: Engine, c: any): { content: any; maxScor
       if (image.length > 1_300_000) bad('The picture is too big — use a smaller picture (under about 1 MB)');
       const task = s(c?.task, 160);
       return { content: { image, task }, maxScore: 1 };
+    }
+    case 'BUBBLE_POP': {
+      // bubbles with letters, numbers, words or pictures float up; the child pops the right ones (fingertip in the air, or a tap)
+      const items = (x: unknown) => [...new Set(arr(x).map((v: any) => s(v, 12)).filter(Boolean))].slice(0, 20);
+      const targets = items(c?.targets); const others = items(c?.others).filter((x) => !targets.includes(x));
+      const goal = Math.max(3, Math.min(20, Math.round(Number(c?.goal) || 8)));
+      const seconds = Math.max(30, Math.min(180, Math.round(Number(c?.seconds) || 60)));
+      if (!targets.length) bad('Add what to pop (e.g. B, or 5, or 🍎)');
+      return { content: { task: s(c?.task, 120), targets, others, goal, seconds }, maxScore: goal };
+    }
+    case 'FINGERS': {
+      // "Show me 3!", "2 + 1", "🍎🍎🍎" — the camera counts the fingers held up (0–10)
+      const rounds = arr(c?.rounds).map((r: any) => ({ show: s(typeof r === 'number' ? String(r) : r?.show, 40), answer: Math.round(Number(typeof r === 'number' ? r : r?.answer)) }))
+        .filter((r) => r.show && Number.isInteger(r.answer) && r.answer >= 0 && r.answer <= 10).slice(0, 15);
+      if (!rounds.length) bad('Add rounds: what is shown and how many fingers (0–10)');
+      return { content: { rounds }, maxScore: rounds.length };
+    }
+    case 'AIR_WRITING': {
+      // letters or numbers written in the air with a finger (any script)
+      const items = arr(c?.items).map((x: any) => s(typeof x === 'string' ? x : x?.text, 3)).filter(Boolean).slice(0, 12);
+      if (!items.length) bad('Add letters or numbers to write (up to 3 characters each)');
+      return { content: { items }, maxScore: items.length };
     }
   }
   return bad('Unknown game type');
