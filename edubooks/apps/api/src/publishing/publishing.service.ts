@@ -1,3 +1,4 @@
+import { extractPdfPages } from '../ai/extract';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, count, desc, eq, getTableColumns, ilike, inArray, max, or, sql, SQL } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
@@ -468,9 +469,12 @@ export class PublishingService {
       if (e.status === 'PUBLISHED' && c.bookAssetId) throw new ConflictException('This edition is published — its book PDF cannot be replaced. Create a new edition.');
       if (!/\.pdf$/i.test(file.originalname)) throw new BadRequestException('The digital book must be a PDF file');
       const head = require('fs').readFileSync(file.path);
-      const pages = (head.toString('latin1').match(/\/Type\s*\/Page(?!s)/g) ?? []).length || null;
+      // the real number of pages (modern PDFs keep their pages in compressed parts the quick count cannot see)
+      let checked = false;
+      let pages = (head.toString('latin1').match(/\/Type\s*\/Page(?!s)/g) ?? []).length || null;
+      try { const n = (await extractPdfPages(file.path, { maxPages: 1, timeoutMs: 60_000 })).numPages; if (n) { pages = n; checked = true; } } catch { /* keep the quick count */ }
       const { asset, reused } = await this.assets.ingest(file);
-      await this.q.update(bookComponents).set({ bookAssetId: asset.id, pageCount: c.pageCount && e.status === 'PUBLISHED' ? c.pageCount : pages ?? c.pageCount })
+      await this.q.update(bookComponents).set({ bookAssetId: asset.id, pageCount: pages ?? c.pageCount, pagesChecked: checked })
         .where(eq(bookComponents.id, componentId));
       await this.touch(c.editionId);
       await this.audit.log('publishing.component.book_pdf', 'book_component', componentId, `Attached the book PDF to "${c.title}" (${pages ?? '?'} pages${reused ? ', existing file reused' : ''})`);

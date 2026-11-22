@@ -36,6 +36,21 @@ describe('Book page work: drawing areas, tracing paths and sending work to the t
     expect(h.data).toEqual({});
   });
 
+  it('accepts elements on every page of the PDF even when an old typed page count is too small', async () => {
+    const o = ownerPool();
+    const { rows: [c] } = await o.query('SELECT page_count, pages_checked FROM book_components WHERE id = $1', [part1]);
+    await o.query('UPDATE book_components SET page_count = 10, pages_checked = false WHERE id = $1', [part1]);
+    const r = await editor.post(`/api/reader/components/${part1}/hotspots`).send({ ...box, page: 21, kind: 'NOTE', body: 'p21' });
+    expect(r.status).toBe(201); made.push(r.body.id);
+    // the one-time check reads the real page count from the PDF; then it is used again
+    const { IndexerService } = require('../src/ai/indexer.service');
+    expect(await app.get(IndexerService).recountPages()).toBeGreaterThanOrEqual(1);
+    const { rows: [after] } = await o.query('SELECT page_count, pages_checked FROM book_components WHERE id = $1', [part1]);
+    expect(after.pages_checked).toBe(true); expect(after.page_count).toBeGreaterThan(10);
+    expect((await editor.post(`/api/reader/components/${part1}/hotspots`).send({ ...box, page: 99, kind: 'NOTE', body: 'x' })).status).toBe(400);
+    await o.query('UPDATE book_components SET page_count = $2, pages_checked = $3 WHERE id = $1', [part1, c.page_count, c.pages_checked]); await o.end();
+  });
+
   it('lets a student send their tracing or drawing; the teacher sees it, comments and gives stars; the student sees the comment', async () => {
     const [trace, draw] = made;
     expect((await student.post(`/api/reader/hotspots/${trace}/work`).send({ image: 'data:text/html;base64,PHNjcmlwdD4=' })).status).toBe(400);

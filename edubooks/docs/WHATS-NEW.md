@@ -1,3 +1,20 @@
+# What's new in Knowledge Gate 1.4.10
+
+## 🇦🇪 UAE academic calendar
+- The academic calendar now follows the **UAE only**. The old “typical dates” (other countries' terms and holidays) are gone; entries you added or edited yourself are kept.
+- It holds the **UAE Ministry of Education unified school calendar** for **2026–27, 2027–28 and 2028–29**, shown to every school:
+  - **2026–27:** school starts **31 Aug 2026** · mid-term break **12–18 Oct** · winter break **14 Dec 2026 – 3 Jan 2027** · Term 2 from **4 Jan** · spring break **5–11 Apr 2027** · last day **2 Jul 2027**.
+  - **2027–28:** starts **30 Aug 2027** · mid-term **11–17 Oct** · winter **13 Dec 2027 – 2 Jan 2028** · spring **27 Mar – 2 Apr 2028** · last day **30 Jun 2028**.
+  - **2028–29:** starts **28 Aug 2028** · winter **11 Dec 2028 – 1 Jan 2029** · spring **29 Mar – 1 Apr 2029** · last day **29 Jun 2029** (some dates still to be confirmed by the Ministry).
+- **UAE public holidays:** Commemoration Day (1 Dec), **National Day — Eid Al Etihad** (2–3 Dec), **Eid Al Fitr**, **Arafat Day**, **Eid Al Adha** and **Hijri New Year**. Islamic holidays are marked **(expected)** — they depend on the moon sighting, so check the official announcement.
+- UAE school days: **Flag Day** (3 Nov), **Emirati Children's Day** (15 Mar) and the start of **Ramadan** (shorter school hours).
+- Super admin: the new **🇦🇪 UAE calendar** button loads the calendar again (for example after deleting entries by mistake).
+- Note: private schools following the Indian, Pakistani or Bangladeshi curriculum use their own year; their school admin can add their own terms as school events.
+
+## 🛠 Fixed: “Page out of range” when adding an element
+- Adding an element (tracing, video, note…) on a later page (e.g. page 21) could fail with **“Page out of range”**. The book part still had the page count typed when it was created, because the app could not count the pages of modern (compressed) PDFs.
+- The page count now always comes from the PDF itself. After the update, the app checks the page count of every PDF already uploaded, once, in the background — and until a book is checked, no page of it is refused.
+
 # What's new in Knowledge Gate 1.4.9
 
 ## 🔎 Copy-paste and AI-writing check (teachers only)

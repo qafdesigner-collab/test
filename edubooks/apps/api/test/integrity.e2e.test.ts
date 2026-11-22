@@ -31,6 +31,8 @@ describe('Copy-paste and AI-writing check (teachers only)', () => {
     const { createApp, login } = require('./helpers');
     app = await createApp(); teacher = await login(app, 'teacher1', 'Teacher@12345', 'SUN01'); student = await login(app, 'student1', 'Student@123', 'SUN01');
     classId = (await teacher.get('/api/classes?mine=true')).body[0].id;
+    // earlier test files may have used up this month's AI requests of the school
+    { const { ownerPool } = require('./helpers'); const o = ownerPool(); await o.query(`DELETE FROM ai_generations WHERE created_at >= date_trunc('month', now())`); await o.end(); }
     const r = await teacher.post('/api/teacher/assessments').send({ classId, kind: 'HOMEWORK', title: `Water cycle ${Date.now()}`, maxAttempts: 2,
       items: [{ type: 'SHORT', prompt: 'How does rain happen?', answer: [], points: 2 }, { type: 'SHORT', prompt: 'Explain it again in your own words', answer: [], points: 2 }, { type: 'TRUE_FALSE', prompt: 'Rain is water', answer: [true], points: 1 }] });
     id = r.body.id; await teacher.post(`/api/teacher/assessments/${id}/publish`);

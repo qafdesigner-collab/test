@@ -58,14 +58,18 @@ describe('Curricula, grades by curriculum, school curriculum and academic calend
   it('academic calendar: templates per curriculum, school events private to the school, only admins edit', async () => {
     const range = `from=${year - 1}-01-01&to=${year + 2}-12-31`;
     const staffAll = (await admin.get(`/api/calendar?${range}`)).body;
-    expect(staffAll.filter((e: any) => e.isTemplate).length).toBeGreaterThan(40);
+    expect(staffAll.filter((e: any) => e.isTemplate).length).toBeGreaterThan(30);
+    // the calendar is the UAE one only: MoE terms and breaks, UAE public holidays, for all schools
+    expect(staffAll.find((e: any) => e.title === 'Winter break' && e.startsOn === '2026-12-14')).toMatchObject({ endsOn: '2027-01-03', kind: 'HOLIDAY', curriculumId: null });
+    expect(staffAll.some((e: any) => e.title === 'UAE National Day (Eid Al Etihad)' && e.startsOn === '2026-12-02')).toBe(true);
+    expect(staffAll.some((e: any) => /Thanksgiving|Summer vacation|half term|Easter/i.test(e.title))).toBe(false);
     const p1 = await login(app, 'principal', 'School@12345', 'SUN01'); // Pakistan curriculum
     const p2 = await login(app, 'principal', 'School@12345', 'GVS02');
     const t1 = await login(app, 'teacher1', 'Teacher@12345', 'SUN01');
     const kid = await login(app, 'student1', 'Student@123', 'SUN01');
     const seen = (await p1.get(`/api/calendar?${range}`)).body;
-    expect(seen.some((e: any) => e.title === 'Summer vacation')).toBe(true);          // Pakistan template
-    expect(seen.some((e: any) => e.title === 'Autumn half term')).toBe(false);        // British template
+    expect(seen.some((e: any) => e.title === 'Spring break')).toBe(true);             // UAE calendar reaches every school
+    expect(seen.some((e: any) => e.title === 'Eid Al Fitr (expected)')).toBe(true);
     const ev = await p1.post('/api/calendar').send({ title: 'Annual Day', kind: 'EVENT', startsOn: `${year + 1}-02-20`, endsOn: `${year + 1}-02-20` });
     expect(ev.status).toBe(201);
     expect(ev.body.schoolId).toBeTruthy();
@@ -74,13 +78,19 @@ describe('Curricula, grades by curriculum, school curriculum and academic calend
     expect((await p2.get(`/api/calendar?${range}`)).body.some((e: any) => e.id === ev.body.id)).toBe(false); // other school
     expect((await admin.get(`/api/calendar?${range}`)).body.some((e: any) => e.id === ev.body.id)).toBe(false); // publisher view: school events only when the school is chosen
     expect((await t1.post('/api/calendar').send({ title: 'x', kind: 'EVENT', startsOn: `${year}-05-01`, endsOn: `${year}-05-01` })).status).toBe(403);
-    const pubEvent = staffAll.find((e: any) => e.title === 'Summer vacation');
+    const pubEvent = staffAll.find((e: any) => e.title === 'Spring break');
     expect((await p1.patch(`/api/calendar/${pubEvent.id}`).send({ title: 'mine' })).status).toBe(403);
     expect((await p1.post('/api/calendar').send({ title: 'x', kind: 'EVENT', startsOn: `${year}-05-02`, endsOn: `${year}-05-01` })).status).toBe(400);
-    expect((await p1.post('/api/calendar').send({ title: 'x', kind: 'EVENT', startsOn: `${year}-05-01`, endsOn: `${year}-05-01`, curriculumId: pubEvent.curriculumId })).status).toBe(403);
+    expect((await p1.post('/api/calendar').send({ title: 'x', kind: 'EVENT', startsOn: `${year}-05-01`, endsOn: `${year}-05-01`, curriculumId: (await admin.get('/api/catalog/curricula')).body[0].id })).status).toBe(403);
     expect((await p2.delete(`/api/calendar/${ev.body.id}`)).status).toBe(404); // invisible to the other school (RLS)
     expect((await p1.delete(`/api/calendar/${ev.body.id}`)).status).toBe(200);
     const staffEv = await admin.post('/api/calendar').send({ title: 'Book fair', kind: 'EVENT', startsOn: `${year + 1}-01-15`, endsOn: `${year + 1}-01-16` });
     expect((await p2.get(`/api/calendar?${range}`)).body.some((e: any) => e.id === staffEv.body.id)).toBe(true); // all schools
+    // reloading the UAE calendar replaces the loaded entries but keeps what was added or edited
+    expect((await p1.post('/api/calendar/uae')).status).toBe(403);
+    const again = await admin.post('/api/calendar/uae'); expect(again.status).toBe(201); expect(again.body.added).toBeGreaterThan(40);
+    const after = (await admin.get(`/api/calendar?${range}`)).body;
+    expect(after.filter((e: any) => e.title === 'Spring break' && e.startsOn === '2027-04-05')).toHaveLength(1);
+    expect(after.some((e: any) => e.id === staffEv.body.id)).toBe(true);
   });
 });

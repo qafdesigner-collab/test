@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -18,7 +18,25 @@ import { appTmp } from '../common/tmp';
 
 /** Builds the searchable text index of a book part (book_pages) from its PDF. */
 @Injectable()
-export class IndexerService {
+export class IndexerService implements OnModuleInit {
+  /** Once after an update: read the real page count of PDFs uploaded before the count came from the PDF itself. */
+  onModuleInit() {
+    if (process.env.NODE_ENV === 'test' || process.env.DISABLE_JOBS === '1') return;
+    setTimeout(() => this.recountPages().catch((e) => this.log.warn(`page count check failed: ${e.message}`)), 20_000).unref();
+  }
+  async recountPages(limit = 200) {
+    const { rows } = await this.db.root.execute(sql`SELECT * FROM pdf_pages_to_check(${limit})`);
+    let n = 0;
+    for (const r of rows as { id: string; storage_key: string }[]) {
+      const tmp = path.join(appTmp(), `cnt-${randomBytes(8).toString('hex')}.pdf`);
+      let pages = 0;
+      try { await pipeline(await this.assets.driver.read(r.storage_key), fs.createWriteStream(tmp)); pages = (await extractPdfPages(tmp, { maxPages: 1, timeoutMs: 60_000 })).numPages; }
+      catch { /* unreadable: mark as checked so it is not retried forever */ }
+      finally { await fs.promises.rm(tmp, { force: true }); }
+      await this.db.root.execute(sql`SELECT set_pdf_pages(${r.id}, ${pages})`); n++;
+    }
+    return n;
+  }
   private readonly log = new Logger('BookIndexer');
   private readonly running = new Set<string>();
   constructor(private readonly db: DbService, private readonly assets: AssetsService, private readonly audit: AuditService, private readonly ai: AiProviderService, private readonly contents: ContentsService) {}
@@ -53,7 +71,7 @@ export class IndexerService {
     const tmp = path.join(appTmp(), `idx-${randomBytes(8).toString('hex')}.pdf`);
     try {
       await pipeline(await this.assets.driver.read(asset.storageKey), fs.createWriteStream(tmp));
-      const { pages } = await extractPdfPages(tmp);
+      const { pages, numPages } = await extractPdfPages(tmp);
       // Scanned pages have no text layer: read them with OCR when the server has it installed.
       const blank = pages.map((p, i) => (p.trim().length > 20 ? 0 : i + 1)).filter(Boolean);
       const ocr = await ocrAvailable();
@@ -64,7 +82,7 @@ export class IndexerService {
       }
       const n = await this.store(c.id, c.publisherId, pages);
       const withText = pages.filter((p) => p.trim().length > 20).length;
-      await this.db.q.update(bookComponents).set({ indexStatus: withText ? 'DONE' : 'NO_TEXT', indexedPages: withText, indexedAt: new Date(),
+      await this.db.q.update(bookComponents).set({ indexStatus: withText ? 'DONE' : 'NO_TEXT', indexedPages: withText, indexedAt: new Date(), ...(numPages ? { pageCount: numPages, pagesChecked: true } : {}),
         indexError: withText ? null : ocr.ok ? 'No readable text found, even with OCR — check the scan quality.' : 'No selectable text found — the PDF may be scanned images and OCR is not installed on the server.' })
         .where(eq(bookComponents.id, c.id));
       await this.audit.log('ai.index', 'book_component', c.id, `Indexed “${c.title}” for the AI assistant: ${withText} of ${n} pages with text${ocrCount ? ` (${ocrCount} read with OCR)` : ''}`);
@@ -150,7 +168,7 @@ export class IndexerService {
       const pages = Array.from({ length: max }, (_, i) => text.get(i + 1) ?? '');
       await this.store(c.id, c.publisherId, pages);
       const withText = pages.filter((p) => p.trim().length > 20).length;
-      await this.db.q.update(bookComponents).set({ indexStatus: withText ? 'DONE' : 'NO_TEXT', indexedPages: withText, indexedAt: new Date(), pageCount: c.pageCount ?? max,
+      await this.db.q.update(bookComponents).set({ indexStatus: withText ? 'DONE' : 'NO_TEXT', indexedPages: withText, indexedAt: new Date(), pageCount: max || c.pageCount,
         indexError: withText ? null : 'No readable text found on the flipbook pages.' }).where(eq(bookComponents.id, c.id));
       await this.audit.log('ai.index', 'book_component', c.id, `Read the flipbook pages of “${c.title}” with OCR for the AI assistant: ${withText} of ${max} pages with text`);
       if (withText && this.ai.embeddingsEnabled) await this.embed(c.id).catch((e) => this.log.warn(`embeddings skipped: ${e.message}`));

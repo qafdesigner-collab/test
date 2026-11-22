@@ -218,6 +218,8 @@ export const bookComponents = pgTable('book_components', {
   description: text('description').notNull().default(''),
   bookAssetId: uuid('book_asset_id').references(() => digitalAssets.id, { onDelete: 'set null' }),
   pageCount: integer('page_count'),
+  /** page_count was read from the PDF itself (not typed) */
+  pagesChecked: boolean('pages_checked').notNull().default(false),
   sort: integer('sort').notNull().default(0),
   // AI text index of the book PDF (Phase 5): NONE | RUNNING | DONE | NO_TEXT | ERROR
   indexStatus: text('index_status').notNull().default('NONE'),

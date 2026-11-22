@@ -108,6 +108,13 @@ export class CalendarService {
     return row;
   }
 
+  /** (Re)loads the UAE school calendar and public holidays for all schools of the publisher. */
+  async loadUae() {
+    const { rows: [r] } = await this.q.execute(sql`SELECT seed_uae_calendar(${this.db.ctx.publisherId}) AS n`) as any;
+    await this.audit.log('calendar.uae', 'calendar_event', this.db.ctx.publisherId, `Loaded the UAE school calendar (${r.n} entries)`);
+    return { added: Number(r.n) };
+  }
+
   async remove(id: string) {
     const e = await this.own(id);
     await this.q.delete(calendarEvents).where(eq(calendarEvents.id, id));
@@ -121,6 +128,7 @@ export class CalendarService {
 export class CalendarController {
   constructor(private readonly svc: CalendarService) {}
   @Get() list(@Query() r: RangeDto) { return this.svc.list(r); }
+  @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Post('uae') uae() { return this.svc.loadUae(); }
   @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR', 'SCHOOL_ADMIN') @Post() create(@Body() d: EventDto) { return this.svc.create(d); }
   @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR', 'SCHOOL_ADMIN') @Patch(':id') update(@Param('id', ParseUUIDPipe) id: string, @Body() d: UpdateEventDto) { return this.svc.update(id, d); }
   @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR', 'SCHOOL_ADMIN') @Delete(':id') remove(@Param('id', ParseUUIDPipe) id: string) { return this.svc.remove(id); }

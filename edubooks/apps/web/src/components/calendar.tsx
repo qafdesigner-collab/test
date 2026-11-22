@@ -46,6 +46,8 @@ export function useCalendar(from: string, to: string, curriculumId = '') {
 export function AcademicCalendar({ canEdit, publisher }: { canEdit: boolean; publisher?: boolean }) {
   const [month, setMonth] = useState(() => { const t = today(); return `${t.slice(0, 7)}-01`; });
   const [curriculumId, setCurriculumId] = useState('');
+  const [uae, setUae] = useState(false);
+  const loadUae = useAction(() => api.post<{ added: number }>('/calendar/uae'), { ok: 'The UAE school calendar is loaded', keys: ['calendar'], after: () => setUae(false) });
   const [kind, setKind] = useState('');
   const [edit, setEdit] = useState<Partial<CalEvent> | null>(null);
   // grid: Monday before the 1st … Sunday after the last day
@@ -72,6 +74,7 @@ export function AcademicCalendar({ canEdit, publisher }: { canEdit: boolean; pub
         <div className="ml-auto flex flex-wrap gap-2">
           {publisher && <CurriculumSelect className="w-56" emptyLabel="All curricula" value={curriculumId} onChange={setCurriculumId} />}
           <Select aria-label="Type" className="w-36" value={kind} onChange={(e) => setKind(e.target.value)}><option value="">All types</option>{Object.entries(KINDS).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}</Select>
+          {canEdit && publisher && <Button size="sm" variant="secondary" onClick={() => setUae(true)}>🇦🇪 UAE calendar</Button>}
           {canEdit && <Button size="sm" onClick={() => setEdit({ title: '', kind: 'EVENT', startsOn: t, endsOn: t, description: '', curriculumId: curriculumId || null })}><Plus className="size-4" />Add</Button>}
         </div>
       </Card>
@@ -110,6 +113,8 @@ export function AcademicCalendar({ canEdit, publisher }: { canEdit: boolean; pub
           <div className="flex flex-wrap gap-1.5 border-t border-slate-100 p-3">{Object.entries(KINDS).map(([k, v]) => <span key={k} className={cn('rounded border px-1.5 text-[11px]', v.cls)}>{v.emoji} {v.label}</span>)}</div>
         </Card>
       </div>
+      <Confirm open={uae} onOpenChange={setUae} title="Load the UAE school calendar?" confirmLabel="Load" loading={loadUae.isPending} onConfirm={() => loadUae.mutate()}
+        body="Adds the UAE Ministry of Education calendar for 2026–27, 2027–28 and 2028–29 (terms, mid-term, winter and spring breaks) and UAE public holidays (National Day, Commemoration Day, Eid). Entries loaded earlier and not changed are replaced; entries you added or edited stay." />
       {edit && <EventDialog ev={edit} canEdit={canEdit && (!edit.id || !!edit.editable)} publisher={publisher} onClose={() => setEdit(null)} />}
     </div>
   );
@@ -140,7 +145,7 @@ function EventDialog({ ev, canEdit, publisher, onClose }: { ev: Partial<CalEvent
         </div>
         {publisher && <Field label="Shown to" hint="Schools see entries for all schools plus those for their own curriculum"><CurriculumSelect className="w-full" emptyLabel="All schools" value={f.curriculumId} onChange={(v) => setF({ ...f, curriculumId: v })} /></Field>}
         <Field label="Notes"><Textarea rows={3} maxLength={1000} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
-        {ev.isTemplate && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">This is a typical date filled in automatically. Please check it against your school's real calendar.</p>}
+        {ev.isTemplate && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">🇦🇪 From the UAE school calendar. Eid and other Islamic holidays depend on the moon sighting — check the official announcement.</p>}
         {save.error ? <ErrorBox error={save.error} /> : null}
         <div className="flex justify-between gap-2">
           {ev.id ? <Button type="button" variant="ghost" onClick={() => setDel(true)}><Trash2 className="size-4" />Delete</Button> : <span />}

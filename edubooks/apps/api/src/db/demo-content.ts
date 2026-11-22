@@ -132,7 +132,7 @@ export async function demoContent(db: NodePgDatabase<typeof s>, P: string, admin
         ? [`${p.title} - Student Book Part 1`, 'SAMPLE PLACEHOLDER BOOK', 'Upload the real PDF in the Package Builder.']
         : [`${p.title} - Part 1`, `Page ${i + 1}`, 'Sample placeholder page', '(not publisher content)']), p.color === '#3b82f6' ? '0.23 0.51 0.96' : p.color === '#10b981' ? '0.06 0.73 0.5' : p.color === '#f59e0b' ? '0.96 0.62 0.04' : '0.94 0.27 0.27');
       const bookAsset = await putAsset(`${p.title} Part 1 (sample).pdf`, pagesPdf, 'pdf', 'application/pdf');
-      await db.update(s.bookComponents).set({ bookAssetId: bookAsset.id, pageCount: 26 }).where(sql`id = ${part1.id}`);
+      await db.update(s.bookComponents).set({ bookAssetId: bookAsset.id, pageCount: 26, pagesChecked: true }).where(sql`id = ${part1.id}`);
       const pdfTmp = path.join(os.tmpdir(), `seed-index-${part1.id}.pdf`); fs.writeFileSync(pdfTmp, pagesPdf);
       // Text for search and Ask Owl; demo loading still works if the server cannot read PDFs.
       const extracted = (await extractPdfPages(pdfTmp).catch(() => ({ pages: [] as string[] }))).pages; fs.rmSync(pdfTmp, { force: true });

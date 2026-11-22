@@ -120,7 +120,7 @@ export class ReaderService {
 
   async addHotspot(componentId: string, d: any) {
     const c = await this.component(componentId);
-    if (c.pageCount && d.page > c.pageCount) throw new BadRequestException('Page out of range');
+    if (outOfRange(c, d.page)) throw new BadRequestException('Page out of range');
     const v = await this.hotspotValues(d, c.editionId);
     if ((d.kind === 'NOTE' || (d.kind === 'AUDIO' && !v.assetId)) && !d.body?.trim()) throw new BadRequestException(d.kind === 'AUDIO' ? 'Type the words to read aloud, or upload an audio file' : 'Type the note');
     const { rows: [h] } = await this.q.execute(sql`INSERT INTO page_hotspots (publisher_id, component_id, page, x, y, w, h, kind, title, body, url, game_id, asset_id, inline, data, created_by)
@@ -200,7 +200,7 @@ export class ReaderService {
 
   async saveProgress(componentId: string, page: number) {
     const c = await this.component(componentId);
-    if (c.pageCount && page > c.pageCount) throw new BadRequestException('Page out of range');
+    if (outOfRange(c, page)) throw new BadRequestException('Page out of range');
     const ctx = this.db.ctx;
     await this.q.insert(readerProgress).values({ publisherId: ctx.publisherId, schoolId: ctx.schoolId!, userId: ctx.userId, componentId, lastPage: page, maxPage: page })
       .onConflictDoUpdate({ target: [readerProgress.userId, readerProgress.componentId],
@@ -219,4 +219,12 @@ export class ReaderService {
     await this.q.delete(bookmarks).where(and(eq(bookmarks.id, id), eq(bookmarks.userId, this.db.ctx.userId)));
     return { ok: true };
   }
+}
+
+/** A page beyond the part's pages. */
+function outOfRange(c: { pageCount: number | null; bookAssetId: string | null; pagesChecked: boolean }, page: number) {
+  if (!Number.isInteger(page) || page < 1 || page > 5000) return true;
+  // a PDF whose pages were not counted yet: the stored number may be an old typed one, so it is not trusted
+  if (c.bookAssetId && !c.pagesChecked) return false;
+  return !!c.pageCount && page > c.pageCount;
 }
