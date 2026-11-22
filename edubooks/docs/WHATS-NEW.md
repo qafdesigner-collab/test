@@ -1,3 +1,12 @@
+# What's new in Knowledge Gate 1.4.12
+
+## 📷 Camera games — better, and the child's picture is never shown
+- **No camera picture on screen.** The camera is only used to find the hands. The child, the room and the background are never shown (and still never recorded or sent). Instead, a **cartoon hand** (a happy yellow glove; a purple one for the second hand) moves exactly like the child's hand, on a game scene.
+- **Camera check first.** Before each game: “Show your hand to the camera”. It helps the child get ready — “Come a little closer”, “Move back a little”, “It is too dark — turn on a light” — and starts the game when the hand is found (👍). “Play with touch instead” skips it.
+- **Bubble pop:** a sunny sky with drifting clouds, pop sounds and bursts, “+1” and 🔥 streaks for several right pops in a row, a shake for a wrong bubble, and bubbles that get a little faster as the game goes on. The timer starts after the camera check.
+- **Show me fingers:** a party scene, the cartoon hand(s), the number of fingers seen with ☝️ icons, a progress bar while holding, confetti and a happy sound for the right answer.
+- **Air writing:** a green **chalkboard** with glowing yellow chalk, a chalk tip that shows where the finger is (bright when writing, faint when the hand is open), and sounds for stars.
+
 # What's new in Knowledge Gate 1.4.11
 
 ## 📷 Camera games — play with your hands
