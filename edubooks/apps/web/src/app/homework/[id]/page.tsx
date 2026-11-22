@@ -64,6 +64,16 @@ function Doing({ h, id, onDone }: { h: any; id: string; onDone: () => void }) {
   const [i, setI] = useState(0); const [answers, setAnswers] = useState<Record<string, any>>({}); const [clips, setClips] = useState<Record<string, Clip>>({}); const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<{ startedAt: number; endsAt: number | null; skew: number } | null>(null); const [now, setNow] = useState(Date.now());
   const sent = useRef(false); const answersRef = useRef(answers); answersRef.current = answers;
+  // how each written answer was made (typed, pasted, time) — sent with the answers for the teacher
+  const sig = useRef<Record<string, { pasted: number; pastes: number; typed: number; ms: number; len: number; since: number | null }>>({});
+  const sigOf = (k: string) => (sig.current[k] ??= { pasted: 0, pastes: 0, typed: 0, ms: 0, len: 0, since: null });
+  const track = (k: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const r = sigOf(k); const kind = String((e.nativeEvent as InputEvent).inputType ?? ''); const len = e.target.value.length; const delta = len - r.len; r.len = len;
+    if (delta <= 0) return;
+    if (kind.startsWith('insertFromPaste') || kind === 'insertFromDrop' || kind === 'insertFromYank') { r.pasted += delta; r.pastes++; } else r.typed += delta;
+  };
+  const focusOn = (k: string) => { sigOf(k).since = Date.now(); };
+  const focusOff = (k: string) => { const r = sigOf(k); if (r.since) { r.ms += Date.now() - r.since; r.since = null; } };
   const guard = watched(h.proctor); const [streams, setStreams] = useState<Streams | null>(null);
   const pr = useProctor(id, h.proctor, streams, !!run && !!streams);
   const start = async () => {
@@ -83,7 +93,9 @@ function Doing({ h, id, onDone }: { h: any; id: string; onDone: () => void }) {
     if (!auto && missing && !confirm(t('You skipped {n} question(s). Hand in anyway?', { n: missing }))) return;
     sent.current = true; setBusy(true);
     try {
-      const r = await api.post<any>(`/student/homework/${id}/submit`, { answers: Object.entries(ans).map(([itemId, response]) => ({ itemId, response })) });
+      Object.keys(sig.current).forEach(focusOff);
+      const signals = Object.entries(sig.current).map(([itemId, x]) => ({ itemId, pasted: x.pasted, pastes: x.pastes, typed: x.typed, ms: x.ms }));
+      const r = await api.post<any>(`/student/homework/${id}/submit`, { answers: Object.entries(ans).map(([itemId, response]) => ({ itemId, response })), signals });
       pr.stopAll();
       toast(auto ? t('Time is up — your answers were handed in.') : r.status === 'GRADED' ? t('You got {a} out of {b}! 🎉', { a: r.score, b: r.maxScore }) : t('Handed in! 🎉'));
       onDone();
@@ -131,7 +143,8 @@ function Doing({ h, id, onDone }: { h: any; id: string; onDone: () => void }) {
         {it.type === 'TRUE_FALSE' && <div className="grid grid-cols-2 gap-3">{[true, false].map((v) => (
           <button key={String(v)} onClick={() => set(v)} aria-pressed={val === v} className={cn('rounded-2xl py-6 text-2xl font-extrabold text-white shadow', v ? 'bg-emerald-700' : 'bg-red-600', val === v ? 'scale-105 ring-4 ring-slate-800' : '')}>{v ? '👍 True' : '👎 False'}</button>))}</div>}
         {it.type === 'READING' && <ReadAloud playful value={clips[it.id] ?? null} onChange={(c: Clip | null) => { setClips({ ...clips, [it.id]: c as Clip }); set(c ? c.id : undefined); }} />}
-        {(it.type === 'FILL_BLANK' || it.type === 'SHORT') && <input autoFocus aria-label="Your answer" value={val ?? ''} onChange={(e) => set(e.target.value)} placeholder="Type your answer ✏️"
+        {(it.type === 'FILL_BLANK' || it.type === 'SHORT') && <input key={it.id} autoFocus aria-label="Your answer" value={val ?? ''} onChange={(e) => { track(it.id, e); set(e.target.value); }}
+          onFocus={() => focusOn(it.id)} onBlur={() => focusOff(it.id)} placeholder="Type your answer ✏️"
           className="w-full rounded-2xl border-4 border-sky-200 px-5 py-4 text-2xl outline-none focus:border-sky-400" />}
       </div>
     </div>

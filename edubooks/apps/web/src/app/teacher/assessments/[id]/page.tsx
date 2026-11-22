@@ -193,6 +193,7 @@ function MarkDialog({ a, student, onClose, onNext, left }: { a: any; student: an
                 {it.type === 'SHORT' && it.answer[0] && <span className="text-xs text-slate-500">Model: {it.answer[0]}</span>}
                 <span className="flex-1" /><label className="flex items-center gap-1">Points<Input type="number" min={0} max={it.points} className="h-8 w-16" value={scores[it.id] ?? ''}
                   onChange={(e) => setScores({ ...scores, [it.id]: Math.min(it.points, Math.max(0, Number(e.target.value))) })} />/ {it.points}</label></div>
+              <AnswerCheck c={s.integrity?.items?.[it.id]} />
             </div>);
         })}
         <Field label="Feedback for the student"><Textarea rows={2} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Well done! …" /></Field>
@@ -210,6 +211,7 @@ function Results({ a }: { a: any }) {
   const [pass, setPass] = useState(40);
   const watchedOn = !!(a.proctor?.camera || a.proctor?.screen || a.proctor?.roomScan) || a.students.some((s: any) => s.watch);
   const [watchOf, setWatchOf] = useState<any>(null);
+  const checkOn = a.students.some((s: any) => Object.keys(s.submission?.integrity?.items ?? {}).length);
   const res = (s: any) => {
     const sc = s.submission?.score; const pct = sc === null || sc === undefined || !a.maxScore ? null : Math.round((sc / a.maxScore) * 1000) / 10;
     const g = pct === null ? null : gradeFor(pct)?.[1] ?? null;
@@ -248,7 +250,7 @@ function Results({ a }: { a: any }) {
         <>
         <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">Pass mark <Input type="number" min={0} max={100} className="h-8 w-20" value={pass} onChange={(e) => setPass(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} aria-label="Pass mark (%)" />%
           <span className="text-xs text-slate-500">— used for Pass / Fail on this page and on the printed sheet.</span></div>
-        <Table head={['Student', 'Status', 'Score', '%', 'Grade', 'Result', 'Time taken', ...(watchedOn ? ['Watch'] : []), '']}>
+        <Table head={['Student', 'Status', 'Score', '%', 'Grade', 'Result', 'Time taken', ...(checkOn ? ['Check'] : []), ...(watchedOn ? ['Watch'] : []), '']}>
           {a.students.map((s: any) => (
             <tr key={s.id}><Td className="font-medium">{s.displayName}</Td>
               <Td>{s.submission ? <><Status s={s.submission.status} />{s.submission.late && <Badge tone="danger" className="ml-1">late</Badge>}</> : <span className="text-xs text-slate-500">not handed in</span>}</Td>
@@ -256,6 +258,7 @@ function Results({ a }: { a: any }) {
               {(() => { const r = res(s); return <><Td className="tabular-nums">{r.pct === null ? '' : `${r.pct}%`}</Td><Td className="font-semibold">{r.grade ?? ''}</Td>
                 <Td>{r.result === 'PASS' ? <Badge tone="PUBLISHED">Pass</Badge> : r.result === 'FAIL' ? <Badge tone="danger">Fail</Badge> : r.result === 'PENDING' ? <span className="text-xs text-amber-700">to mark</span> : ''}</Td></>; })()}
               <Td className="text-slate-500"><Timings s={s} timeLimit={a.timeLimitMin} /></Td>
+              {checkOn && <Td><CheckCell s={s} /></Td>}
               {watchedOn && <Td>{s.watch ? <button onClick={() => setWatchOf(s)} className="flex flex-wrap items-center gap-1 rounded-lg px-1 py-0.5 text-left text-xs hover:bg-slate-100">
                 {s.watch.photos > 0 && <Badge>📷 {s.watch.photos}</Badge>}{s.watch.screens > 0 && <Badge>🖥️ {s.watch.screens}</Badge>}
                 {s.watch.away > 0 && <Badge tone={s.watch.awaySeconds >= 30 ? 'danger' : 'DRAFT'}>↗ left {s.watch.away}× ({mins(s.watch.awaySeconds)})</Badge>}
@@ -293,6 +296,27 @@ function Timings({ s }: { s: any; timeLimit?: number | null }) {
     </li>))}</ul>;
 }
 
+const aiTone = (n: number) => (n >= 70 ? 'danger' : n >= 40 ? 'DRAFT' : 'neutral');
+/** How a written answer was made and the AI-writing estimate — for teachers only (students never see this). */
+function AnswerCheck({ c }: { c?: any }) {
+  if (!c) return null;
+  const secs = Math.round((c.ms ?? 0) / 1000);
+  return <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1.5 text-xs text-slate-600" title="Only teachers see this">
+    <span className="font-medium text-slate-500">🔎 Check:</span>
+    {c.copied ? <Badge tone="danger">📋 copied in{c.pasted ? ` (${c.pasted} of ${c.length} letters pasted)` : ' (appeared without typing)'}</Badge> : <span>⌨️ typed</span>}
+    {secs > 0 && <span>· {mins(secs)} on this answer</span>}
+    {c.ai && c.length >= 60 && <Badge tone={aiTone(c.ai.score)}>🤖 AI-written: {c.ai.score}%{c.ai.by === 'ai' ? '' : ' (rules)'}</Badge>}
+    {c.ai?.reasons?.length > 0 && c.length >= 60 && <span className="text-slate-500">— {c.ai.reasons.join('; ')}</span>}
+  </div>;
+}
+/** The strongest signs in a submission, for the results table. */
+function CheckCell({ s }: { s: any }) {
+  const items: any[] = Object.values(s.submission?.integrity?.items ?? {});
+  if (!items.length) return null;
+  const copied = items.filter((x) => x.copied).length; const ai = Math.max(0, ...items.filter((x) => x.length >= 60).map((x) => x.ai?.score ?? 0));
+  if (!copied && ai < 40) return <span className="text-xs text-emerald-700">✓ looks own work</span>;
+  return <span className="flex flex-wrap gap-1">{copied > 0 && <Badge tone="danger">📋 copied {copied}</Badge>}{ai >= 40 && <Badge tone={aiTone(ai)}>🤖 AI {ai}%</Badge>}</span>;
+}
 const WATCH: Record<string, string> = { ROOM: '🔄 Room scan', CAMERA: '📷 Camera photo', SCREEN: '🖥️ Screen picture', AWAY: '↗ Left the page', SCREEN_OFF: '⚠ Stopped sharing the screen',
   CAMERA_OFF: '⚠ Camera turned off', SCREEN_PART: '⚠ Shared only a window, not the whole screen', NO_SCREEN: '⚠ Device cannot share its screen', NO_CAMERA: '⚠ No camera', FULLSCREEN_OFF: '⚠ Left full screen' };
 /** Everything recorded while a student did watched work: a timeline, and the photos and screen pictures. */

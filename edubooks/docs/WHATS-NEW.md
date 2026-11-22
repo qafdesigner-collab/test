@@ -1,3 +1,14 @@
+# What's new in Knowledge Gate 1.4.9
+
+## 🔎 Copy-paste and AI-writing check (teachers only)
+- For every written answer (short answer, fill in the blank) in homework, quizzes and tests, the app notes **how the answer was made**: how much was **pasted** (or dropped in), how much was **typed**, and how long the student spent on it.
+- Every longer answer (60+ letters) gets an **AI-written estimate (0–100%)** with the reasons, e.g. “typical AI words: furthermore, moreover”, “long dashes (—)”, “writing level well above the class”, “pasted in”. It takes the class's grade into account.
+- If your school has an AI service connected, the AI also reads the answers (one request per hand-in, counted in the monthly AI limit; no names are sent). Without one, the built-in rules are used — shown as “(rules)”.
+- **Students never see any of this.** Nothing changes on their screen, pasting is not blocked, and the check is not in their results or reports.
+- **Where teachers see it:** a new **Check** column in the results (📋 copied, 🤖 AI %, or ✓ looks own work), and under each answer when marking.
+- Earlier tries keep their own check.
+- Please treat it as a **hint, not proof**: talk with the student before deciding. It is a good idea to mention in your school's exam rules that online work may be checked for copying.
+
 # What's new in Knowledge Gate 1.4.8
 
 ## 🛡️ Online exam safety

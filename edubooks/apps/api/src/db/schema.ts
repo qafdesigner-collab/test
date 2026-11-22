@@ -653,6 +653,8 @@ export const submissions = pgTable('submissions', {
   /** which try this is (1–3); earlier tries are kept in history */
   attempt: integer('attempt').notNull().default(1),
   history: jsonb('history').notNull().default([]),
+  /** how written answers were made and an AI-writing estimate — teachers only, never sent to students */
+  integrity: jsonb('integrity').notNull().default({}),
 }, (t) => [uniqueIndex('submission_uq').on(t.assessmentId, t.studentId)]);
 
 export const evaluations = pgTable('evaluations', {

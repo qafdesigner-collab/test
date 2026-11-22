@@ -84,7 +84,18 @@ export class UpdateAssessmentDto {
 }
 
 export class ResponseDto { @IsUUID() itemId: string; @IsDefined() response: string | number | boolean; }
-export class SubmitDto { @IsArray() @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => ResponseDto) answers: ResponseDto[]; }
+export class SignalDto {
+  @IsUUID() itemId: string;
+  @Type(() => Number) @IsInt() @Min(0) @Max(1_000_000) pasted: number;
+  @Type(() => Number) @IsInt() @Min(0) @Max(100_000) pastes: number;
+  @Type(() => Number) @IsInt() @Min(0) @Max(1_000_000) typed: number;
+  @Type(() => Number) @IsInt() @Min(0) @Max(86_400_000) ms: number;
+}
+export class SubmitDto {
+  @IsArray() @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => ResponseDto) answers: ResponseDto[];
+  /** how each written answer was made (sent by the app) */
+  @IsOptional() @IsArray() @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => SignalDto) signals?: SignalDto[];
+}
 
 export class ItemScoreDto { @IsUUID() itemId: string; @Type(() => Number) @IsInt() @Min(0) @Max(100) awarded: number; }
 export class GradeDto {

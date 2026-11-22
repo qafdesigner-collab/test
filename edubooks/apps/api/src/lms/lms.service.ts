@@ -13,6 +13,7 @@ import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { config } from '../config';
+import { checkItem, gradeNumber } from './integrity';
 import { AssessmentDto, ProctorEventDto, EvaluationDto, GradeDto, ItemDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
 
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.!?]+$/, '');
@@ -75,6 +76,8 @@ export class LmsService {
 
   private get q() { return this.db.q; }
   private get ctx() { return this.db.ctx; }
+  /** Run after a student hands in (e.g. the AI-writing check). They never delay or fail the hand-in. */
+  readonly afterSubmit: ((submissionId: string) => Promise<unknown>)[] = [];
   private base() { return { publisherId: this.ctx.publisherId, schoolId: this.ctx.schoolId! }; }
 
   /** Lesson/unit must belong to the edition, and the edition must be licensed to the teacher. */
@@ -472,6 +475,17 @@ export class LmsService {
     });
     const pending = answers.some((x) => x.awarded === null);
     const maxScore = items.reduce((n, i) => n + i.points, 0);
+    // how written answers were made — for the teacher only
+    const { rows: [g] } = await this.q.execute(sql`SELECT gr.name FROM classes c LEFT JOIN grades gr ON gr.id = c.grade_id WHERE c.id = ${a.classId}`) as any;
+    const grade = gradeNumber(g?.name);
+    const checks: Record<string, unknown> = {};
+    for (const it of items) {
+      if (it.type !== 'SHORT' && it.type !== 'FILL_BLANK') continue;
+      const text = answers.find((x) => x.itemId === it.id)?.response;
+      if (typeof text !== 'string' || !text.trim()) continue;
+      checks[it.id] = checkItem(text, d.signals?.find((x) => x.itemId === it.id), grade);
+    }
+    const integrity = { items: checks, grade, checkedAt: new Date().toISOString() };
     const score = pending ? null : answers.reduce((n, x) => n + (x.awarded ?? 0), 0);
     const [prev] = await this.q.select().from(submissions).where(and(eq(submissions.assessmentId, id), eq(submissions.studentId, this.ctx.userId)));
     const attempt = (prev?.attempt ?? 0) + 1;
@@ -479,15 +493,15 @@ export class LmsService {
     const now = new Date(); const status = pending ? 'SUBMITTED' as const : 'GRADED' as const;
     if (!prev) {
       try {
-        await this.q.insert(submissions).values({ ...this.base(), assessmentId: id, studentId: this.ctx.userId, answers, maxScore, score, late, status, gradedAt: pending ? null : now, attempt: 1 });
+        await this.q.insert(submissions).values({ ...this.base(), assessmentId: id, studentId: this.ctx.userId, answers, maxScore, score, late, status, gradedAt: pending ? null : now, attempt: 1, integrity });
       } catch (e: any) {
         if ((e?.cause ?? e)?.code === '23505') throw new ConflictException('You have already handed this in.');
         throw e;
       }
     } else {
       // another try: the earlier one is kept (for the teacher), the new one counts
-      const before = { attempt: prev.attempt, answers: prev.answers, score: prev.score, maxScore: prev.maxScore, status: prev.status, late: prev.late, feedback: prev.feedback, submittedAt: prev.submittedAt };
-      const [u] = await this.q.update(submissions).set({ answers, maxScore, score, late, status, gradedAt: pending ? null : now, gradedBy: null, feedback: '', submittedAt: now, attempt,
+      const before = { attempt: prev.attempt, answers: prev.answers, score: prev.score, maxScore: prev.maxScore, status: prev.status, late: prev.late, feedback: prev.feedback, submittedAt: prev.submittedAt, integrity: prev.integrity };
+      const [u] = await this.q.update(submissions).set({ answers, maxScore, score, late, status, gradedAt: pending ? null : now, gradedBy: null, feedback: '', submittedAt: now, attempt, integrity,
         history: sql`${submissions.history} || ${JSON.stringify([before])}::jsonb` }).where(and(eq(submissions.id, prev.id), eq(submissions.attempt, prev.attempt))).returning({ id: submissions.id });
       if (!u) throw new ConflictException('This was already handed in — please reload.');
     }
@@ -497,6 +511,10 @@ export class LmsService {
       WHERE assessment_id = ${id} AND student_id = ${this.ctx.userId} AND attempt = ${attempt} AND submitted_at IS NULL RETURNING attempt`);
     if (!done.length) await this.q.execute(sql`INSERT INTO assessment_attempts (publisher_id, school_id, assessment_id, student_id, attempt, submitted_at)
       VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${id}, ${this.ctx.userId}, ${attempt}, now()) ON CONFLICT DO NOTHING`);
+    if (Object.keys(checks).length) {
+      const [row] = await this.q.select({ id: submissions.id }).from(submissions).where(and(eq(submissions.assessmentId, id), eq(submissions.studentId, this.ctx.userId)));
+      for (const h of this.afterSubmit) h(row.id).catch(() => undefined);
+    }
     return { ok: true, status, score, maxScore, attempt, triesLeft: Math.max(0, a.maxAttempts - attempt) };
   }
 
