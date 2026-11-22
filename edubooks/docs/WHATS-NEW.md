@@ -1,3 +1,16 @@
+# What's new in Knowledge Gate 1.4.6
+
+## 〰️ Tracing along a path you draw
+- In a **✍️ Tracing** element, choose what children trace: **📄 what is printed here** (letters in the book), **🔤 letters I type**, or **〰️ a path I draw** — draw the way the pen should go right over the page (lines, curves, letters, mazes). A green dot shows where each line starts. Children follow the dotted path and the app gives ⭐–⭐⭐⭐ for how closely they followed it.
+
+## 🖍️ Drawing area on book pages
+- New element **🖍️ Drawing area** (✏️ Hotspots → draw a box → Drawing area). Add what to draw (e.g. “Draw your family”). Children draw and colour inside that part of the page — fill, crayon, eraser, undo — and what is printed there stays as lines.
+
+## 📤 Send to teacher
+- Students can press **📤 Send to teacher** after tracing or drawing on a book page.
+- Teachers see everything sent in the new **Book work** page (menu → Book work): the picture, the student, the book and page, and the stars. New work is marked **New**. Choose a class to see only that class.
+- Open one to give **stars** and write a **comment** — the student sees the comment the next time they open that element. School admins see all book work of the school.
+
 # What's new in Knowledge Gate 1.4.5
 
 ## ✍️ Handwriting tracing

@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsObject, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 import { PartialType } from '@nestjs/swagger';
 import { Roles } from '../common/decorators';
 import { ReaderService } from './reader.service';
@@ -13,7 +13,7 @@ export class HotspotDto {
   @Type(() => Number) @IsInt() @Min(1) @Max(5000) page: number;
   @IsNumber() @Min(0) @Max(1) x: number; @IsNumber() @Min(0) @Max(1) y: number;
   @IsNumber() @Min(0.01) @Max(1) w: number; @IsNumber() @Min(0.01) @Max(1) h: number;
-  @IsIn(['NOTE', 'AUDIO', 'VIDEO', 'LINK', 'GAME', 'IMAGE', 'TRACE']) kind: 'NOTE' | 'AUDIO' | 'VIDEO' | 'LINK' | 'GAME' | 'IMAGE' | 'TRACE';
+  @IsIn(['NOTE', 'AUDIO', 'VIDEO', 'LINK', 'GAME', 'IMAGE', 'TRACE', 'DRAW']) kind: 'NOTE' | 'AUDIO' | 'VIDEO' | 'LINK' | 'GAME' | 'IMAGE' | 'TRACE' | 'DRAW';
   @IsOptional() @IsString() @MaxLength(120) title?: string;
   @IsOptional() @IsString() @MaxLength(4000) body?: string;
   @IsOptional() @IsString() @MaxLength(500) url?: string | null;
@@ -22,7 +22,11 @@ export class HotspotDto {
   @IsOptional() @IsUUID() assetId?: string | null;
   /** show the video or picture on the page itself instead of as a tappable icon */
   @IsOptional() @IsBoolean() inline?: boolean;
+  /** extra settings, e.g. the writing path of a tracing area */
+  @IsOptional() @IsObject() data?: Record<string, unknown>;
 }
+class WorkDto { @IsString() @MaxLength(1_500_000) image: string; @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(3) stars?: number; }
+class CommentDto { @IsOptional() @IsString() @MaxLength(500) comment?: string; @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(3) stars?: number; }
 class UpdateHotspotDto extends PartialType(HotspotDto) {}
 const Id = () => new ParseUUIDPipe();
 const READERS = ['SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PUBLISHER_ADMIN', 'PUBLISHER_EDITOR'];
@@ -46,5 +50,12 @@ export class ReaderController {
   @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Post('components/:id/hotspots') addHotspot(@Param('id', Id()) id: string, @Body() d: HotspotDto) { return this.svc.addHotspot(id, d); }
   @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Patch('hotspots/:id') updHotspot(@Param('id', Id()) id: string, @Body() d: UpdateHotspotDto) { return this.svc.updateHotspot(id, d); }
   @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Delete('hotspots/:id') delHotspot(@Param('id', Id()) id: string) { return this.svc.removeHotspot(id); }
+  @Roles('STUDENT') @Post('hotspots/:id/work') sendWork(@Param('id', Id()) id: string, @Body() d: WorkDto) { return this.svc.sendWork(id, d); }
+  @Roles('STUDENT') @Get('hotspots/:id/my-work') myWork(@Param('id', Id()) id: string) { return this.svc.myWork(id); }
+  @Roles('SCHOOL_ADMIN', 'TEACHER') @Get('work') work(@Query('classId') classId?: string) { return this.svc.workList(classId || undefined); }
+  @Roles('SCHOOL_ADMIN', 'TEACHER') @Get('work/:id/image') async workImage(@Param('id', Id()) id: string, @Res() res: Response) {
+    const w = await this.svc.workImage(id); res.setHeader('Content-Type', w.mime); res.setHeader('Cache-Control', 'private, max-age=3600'); res.end(w.bytes);
+  }
+  @Roles('SCHOOL_ADMIN', 'TEACHER') @Patch('work/:id') comment(@Param('id', Id()) id: string, @Body() d: CommentDto) { return this.svc.commentWork(id, d); }
   @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT') @Delete('bookmarks/:id') unbookmark(@Param('id', Id()) id: string) { return this.svc.removeBookmark(id); }
 }

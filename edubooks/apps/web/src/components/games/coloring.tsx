@@ -11,7 +11,7 @@ type Tool = 'fill' | 'brush' | 'eraser';
  * Colouring a line drawing: tap an area to fill it (the lines stop the colour), or use the crayon; eraser and undo.
  * The drawing's lines stay on top, so colours never cover them.
  */
-export function ColoringBoard({ image, onDone, say }: { image: string; onDone?: (png: string) => void; say?: (t: string) => void }) {
+export function ColoringBoard({ image, onDone, say, doneLabel }: { image: string; onDone?: (png: string) => void; say?: (t: string) => void; doneLabel?: string }) {
   const { t } = useT();
   const wrap = useRef<HTMLDivElement>(null); const color = useRef<HTMLCanvasElement>(null); const lines = useRef<HTMLCanvasElement>(null);
   const wall = useRef<Uint8Array | null>(null); const [size, setSize] = useState({ w: 0, h: 0 }); const [img, setImg] = useState<HTMLImageElement | null>(null);
@@ -85,7 +85,7 @@ export function ColoringBoard({ image, onDone, say }: { image: string; onDone?: 
           <canvas ref={lines} className="pointer-events-none absolute inset-0 size-full rounded-xl" />
         </div>
       </div>
-      {onDone && <div className="flex justify-center"><button type="button" onClick={finish} className="rounded-2xl bg-emerald-500 px-8 py-3 text-xl font-black text-white shadow">✅ {t('I finished!')}</button></div>}
+      {onDone && <div className="flex justify-center"><button type="button" onClick={finish} className="rounded-2xl bg-emerald-500 px-8 py-3 text-xl font-black text-white shadow">{doneLabel ?? `✅ ${t('I finished!')}`}</button></div>}
     </div>
   );
 }

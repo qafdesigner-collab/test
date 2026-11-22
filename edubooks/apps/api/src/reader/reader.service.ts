@@ -86,7 +86,7 @@ export class ReaderService {
   async hotspots(componentId: string) {
     await this.component(componentId);
     const { rows } = await this.q.execute(sql`SELECT h.id, h.page, h.x, h.y, h.w, h.h, h.kind, h.title, h.body, h.url, h.game_id AS "gameId", g.title AS "gameTitle", g.engine AS "gameEngine",
-        h.asset_id AS "assetId", h.inline, a.mime_type AS "mime", a.original_name AS "fileName"
+        h.asset_id AS "assetId", h.inline, h.data, a.mime_type AS "mime", a.original_name AS "fileName"
       FROM page_hotspots h LEFT JOIN game_activities g ON g.id = h.game_id LEFT JOIN digital_assets a ON a.id = h.asset_id WHERE h.component_id = ${componentId} ORDER BY h.page, h.y, h.x`);
     return rows;
   }
@@ -110,13 +110,21 @@ export class ReaderService {
     }
     return { url, assetId, gameId: d.kind === 'GAME' ? d.gameId! : d.kind ? null : undefined };
   }
+  /** Extra settings of an element: the writing path of a tracing area (lines drawn by the publisher, 0–1 inside the box). */
+  private hotspotData(kind: string, d: any) {
+    if (kind !== 'TRACE' || !Array.isArray(d?.paths)) return {};
+    const n = (v: unknown) => Math.round(Math.min(1, Math.max(0, Number(v) || 0)) * 10000) / 10000;
+    const paths = d.paths.slice(0, 40).map((p: any) => (Array.isArray(p) ? p.slice(0, 500).map((pt: any) => [n(pt?.[0]), n(pt?.[1])]) : [])).filter((p: number[][]) => p.length >= 2);
+    return paths.length ? { paths } : {};
+  }
+
   async addHotspot(componentId: string, d: any) {
     const c = await this.component(componentId);
     if (c.pageCount && d.page > c.pageCount) throw new BadRequestException('Page out of range');
     const v = await this.hotspotValues(d, c.editionId);
     if ((d.kind === 'NOTE' || (d.kind === 'AUDIO' && !v.assetId)) && !d.body?.trim()) throw new BadRequestException(d.kind === 'AUDIO' ? 'Type the words to read aloud, or upload an audio file' : 'Type the note');
-    const { rows: [h] } = await this.q.execute(sql`INSERT INTO page_hotspots (publisher_id, component_id, page, x, y, w, h, kind, title, body, url, game_id, asset_id, inline, created_by)
-      VALUES (${this.db.ctx.publisherId}, ${componentId}, ${d.page}, ${d.x}, ${d.y}, ${d.w}, ${d.h}, ${d.kind}, ${d.title?.trim() ?? ''}, ${d.body ?? ''}, ${v.url ?? null}, ${v.gameId ?? null}, ${v.assetId}, ${!!d.inline && ['VIDEO', 'IMAGE'].includes(d.kind)}, ${this.db.ctx.userId})
+    const { rows: [h] } = await this.q.execute(sql`INSERT INTO page_hotspots (publisher_id, component_id, page, x, y, w, h, kind, title, body, url, game_id, asset_id, inline, data, created_by)
+      VALUES (${this.db.ctx.publisherId}, ${componentId}, ${d.page}, ${d.x}, ${d.y}, ${d.w}, ${d.h}, ${d.kind}, ${d.title?.trim() ?? ''}, ${d.body ?? ''}, ${v.url ?? null}, ${v.gameId ?? null}, ${v.assetId}, ${!!d.inline && ['VIDEO', 'IMAGE'].includes(d.kind)}, ${JSON.stringify(this.hotspotData(d.kind, d.data))}::jsonb, ${this.db.ctx.userId})
       RETURNING id`);
     return h;
   }
@@ -127,9 +135,57 @@ export class ReaderService {
     const v = await this.hotspotValues({ ...m, url: m.url }, cur.edition_id);
     if ((m.kind === 'NOTE' || (m.kind === 'AUDIO' && !v.assetId)) && !String(m.body ?? '').trim()) throw new BadRequestException(m.kind === 'AUDIO' ? 'Type the words to read aloud, or upload an audio file' : 'Type the note');
     await this.q.execute(sql`UPDATE page_hotspots SET page = ${m.page}, x = ${m.x}, y = ${m.y}, w = ${m.w}, h = ${m.h}, kind = ${m.kind}, title = ${(m.title ?? '').trim()},
-      body = ${m.body ?? ''}, url = ${v.url ?? null}, game_id = ${v.gameId ?? null}, asset_id = ${v.assetId}, inline = ${!!m.inline && ['VIDEO', 'IMAGE'].includes(m.kind)} WHERE id = ${id}`);
+      body = ${m.body ?? ''}, url = ${v.url ?? null}, game_id = ${v.gameId ?? null}, asset_id = ${v.assetId}, inline = ${!!m.inline && ['VIDEO', 'IMAGE'].includes(m.kind)},
+      data = ${JSON.stringify(this.hotspotData(m.kind, d.data !== undefined ? d.data : cur.data))}::jsonb WHERE id = ${id}`);
     return { ok: true };
   }
+  // ---------- work students send from book pages (tracing, drawing) ----------
+  async sendWork(hotspotId: string, d: { image: string; stars?: number }) {
+    const { rows: [h] } = await this.q.execute(sql`SELECT id, component_id AS "componentId", page, kind FROM page_hotspots WHERE id = ${hotspotId}`) as any;
+    if (!h || !['TRACE', 'DRAW'].includes(h.kind)) throw new NotFoundException('Not found');
+    await this.component(h.componentId);
+    if (!/^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(d.image) || d.image.length > 1_500_000) throw new BadRequestException('The picture could not be sent — please try again');
+    const { rows: [w] } = await this.q.execute(sql`INSERT INTO page_work (publisher_id, school_id, student_id, hotspot_id, component_id, page, kind, image, stars)
+      VALUES (${this.db.ctx.publisherId}, ${this.db.ctx.schoolId}, ${this.db.ctx.userId}, ${h.id}, ${h.componentId}, ${h.page}, ${h.kind}, ${d.image}, ${d.stars ?? null}) RETURNING id, created_at AS "createdAt"`) as any;
+    return w;
+  }
+  /** The student's own last work on this element, with the teacher's comment. */
+  async myWork(hotspotId: string) {
+    const { rows } = await this.q.execute(sql`SELECT id, stars, comment, created_at AS "createdAt" FROM page_work WHERE hotspot_id = ${hotspotId} AND student_id = ${this.db.ctx.userId} ORDER BY created_at DESC LIMIT 1`);
+    return rows[0] ?? null;
+  }
+  private async workScope(classId?: string) {
+    if (classId) { await this.access.assertTeaches(classId); return sql`w.student_id IN (SELECT student_id FROM enrolments WHERE class_id = ${classId})`; }
+    if (this.access.is('SCHOOL_ADMIN')) return sql`true`;
+    const mine = await this.access.teacherClassIds();
+    return sql`w.student_id IN (SELECT student_id FROM enrolments WHERE class_id = ANY(${`{${(mine.length ? mine : ['00000000-0000-0000-0000-000000000000']).join(',')}}`}::uuid[]))`;
+  }
+  /** Book work sent by students of the teacher's classes (newest first). */
+  async workList(classId?: string) {
+    const { rows } = await this.q.execute(sql`SELECT w.id, w.kind, w.page, w.stars, w.comment, w.seen_at AS "seenAt", w.created_at AS "createdAt", u.display_name AS student,
+        c.title AS part, b.title AS book, h.title AS element
+      FROM page_work w JOIN users u ON u.id = w.student_id LEFT JOIN book_components c ON c.id = w.component_id LEFT JOIN book_editions e ON e.id = c.edition_id
+      LEFT JOIN book_packages b ON b.id = e.package_id LEFT JOIN page_hotspots h ON h.id = w.hotspot_id
+      WHERE ${await this.workScope(classId)} ORDER BY w.created_at DESC LIMIT 300`);
+    return rows;
+  }
+  private async workFor(id: string) {
+    const { rows: [w] } = await this.q.execute(sql`SELECT w.* FROM page_work w WHERE w.id = ${id} AND ${await this.workScope()}`) as any;
+    if (!w) throw new NotFoundException('Not found');
+    return w;
+  }
+  async workImage(id: string) {
+    const w = await this.workFor(id);
+    if (!w.seen_at) await this.q.execute(sql`UPDATE page_work SET seen_at = now() WHERE id = ${id}`);
+    const m = /^data:(image\/(?:jpeg|png));base64,(.*)$/.exec(w.image)!;
+    return { mime: m[1], bytes: Buffer.from(m[2], 'base64') };
+  }
+  async commentWork(id: string, d: { comment?: string; stars?: number }) {
+    await this.workFor(id);
+    await this.q.execute(sql`UPDATE page_work SET comment = coalesce(${d.comment?.trim().slice(0, 500) ?? null}, comment), stars = coalesce(${d.stars ?? null}, stars), commented_by = ${this.db.ctx.userId}, seen_at = coalesce(seen_at, now()) WHERE id = ${id}`);
+    return { ok: true };
+  }
+
   async removeHotspot(id: string) {
     const { rows } = await this.q.execute(sql`DELETE FROM page_hotspots WHERE id = ${id} RETURNING id`);
     if (!rows.length) throw new NotFoundException('Hotspot not found');

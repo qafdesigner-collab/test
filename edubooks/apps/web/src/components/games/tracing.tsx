@@ -48,13 +48,17 @@ export function scoreTrace(template: HTMLCanvasElement, ink: HTMLCanvasElement, 
  * A tracing pad. Either draws the letters itself (dotted / faded / outline, on four writing lines), or shows a part of a
  * book page (`backdrop`) and checks the tracing against the letters printed on it.
  */
-export function TracingPad({ text, guide = 'DOTTED', font = 'ROUND', lines = true, backdrop, fade = 0, onChecked, say, height = 260 }: {
+export function TracingPad({ text, guide = 'DOTTED', font = 'ROUND', lines = true, backdrop, paths, fade = 0, onChecked, onSend, say, height = 260 }: {
   text?: string; guide?: TraceGuide; font?: TraceFont; lines?: boolean; backdrop?: HTMLCanvasElement | null; fade?: number;
+  /** a writing path drawn by the publisher (0–1 inside the pad): shown dotted, and the tracing is checked against it */
+  paths?: number[][][] | null;
   onChecked?: (r: { stars: number; coverage: number; precision: number }) => void; say?: (t: string) => void; height?: number;
+  /** shows “Send to teacher”: gets the picture of the page part with the child's tracing (JPEG data URL) and the stars, if checked */
+  onSend?: (image: string, stars: number | null) => Promise<unknown>;
 }) {
   const { t } = useT();
   const wrap = useRef<HTMLDivElement>(null); const bg = useRef<HTMLCanvasElement>(null); const ink = useRef<HTMLCanvasElement>(null); const tpl = useRef<HTMLCanvasElement | null>(null);
-  const [w, setW] = useState(0); const [result, setResult] = useState<number | null>(null); const drawing = useRef(false); const last = useRef<{ x: number; y: number } | null>(null);
+  const [w, setW] = useState(0); const [result, setResult] = useState<number | null>(null); const [sending, setSending] = useState<'' | 'busy' | 'sent'>(''); const drawing = useRef(false); const last = useRef<{ x: number; y: number } | null>(null);
   const h = backdrop ? Math.round((w || 600) * (backdrop.height / backdrop.width)) : height;
   useLayoutEffect(() => { const el = wrap.current; if (!el) return; const ro = new ResizeObserver(() => setW(el.clientWidth)); ro.observe(el); setW(el.clientWidth); return () => ro.disconnect(); }, []);
   const size = Math.round(h * 0.55); const base = Math.round(h * 0.72); const pen = Math.max(8, Math.round(size * 0.11));
@@ -63,6 +67,18 @@ export function TracingPad({ text, guide = 'DOTTED', font = 'ROUND', lines = tru
   useEffect(() => {
     const c = bg.current; if (!c || w < 20) return; c.width = w; c.height = h; const g = c.getContext('2d')!; g.clearRect(0, 0, w, h);
     const tc = document.createElement('canvas'); tc.width = w; tc.height = h; const tg = tc.getContext('2d')!; tpl.current = tc;
+    if (paths?.length) {
+      const along = (ctx: CanvasRenderingContext2D) => { for (const p of paths) { ctx.beginPath(); p.forEach(([x, y], i) => (i ? ctx.lineTo(x * w, y * h) : ctx.moveTo(x * w, y * h))); ctx.stroke(); } };
+      const thick = backdrop ? Math.max(6, w * 0.014) : pen;
+      if (backdrop) g.drawImage(backdrop, 0, 0, w, h);
+      g.lineCap = 'round'; g.lineJoin = 'round';
+      g.strokeStyle = 'rgba(148,163,184,0.35)'; g.lineWidth = thick * 1.6; along(g);
+      g.strokeStyle = 'rgba(51,65,85,0.85)'; g.lineWidth = Math.max(2, thick * 0.3); g.setLineDash([2, Math.max(7, thick)]); along(g); g.setLineDash([]);
+      // where to start: a green dot at the beginning of each line
+      g.fillStyle = '#16a34a'; for (const p of paths) { g.beginPath(); g.arc(p[0][0] * w, p[0][1] * h, Math.max(5, thick * 0.6), 0, Math.PI * 2); g.fill(); }
+      tg.lineCap = 'round'; tg.lineJoin = 'round'; tg.strokeStyle = '#000'; tg.lineWidth = thick; along(tg);
+      return;
+    }
     if (backdrop) { g.drawImage(backdrop, 0, 0, w, h); tg.drawImage(backdrop, 0, 0, w, h); return; }
     if (lines) {
       const top = base - size * 0.75, mid = base - size * 0.42, low = base + size * 0.28;
@@ -83,24 +99,31 @@ export function TracingPad({ text, guide = 'DOTTED', font = 'ROUND', lines = tru
       g.setLineDash(guide === 'DOTTED' ? [2, Math.max(6, fs * 0.06)] : []); g.lineCap = 'round'; g.strokeText(text, x, base); g.setLineDash([]);
     }
     tg.fillStyle = '#000'; tg.fillText(text, x, base);
-  }, [w, h, text, guide, font, lines, backdrop, fade, size, base]);
-  useEffect(() => { const c = ink.current; if (!c || w < 20) return; c.width = w; c.height = h; setResult(null); }, [w, h, text, backdrop, fade]);
+  }, [w, h, text, guide, font, lines, backdrop, paths, fade, size, base, pen]);
+  useEffect(() => { const c = ink.current; if (!c || w < 20) return; c.width = w; c.height = h; setResult(null); setSending(''); }, [w, h, text, backdrop, paths, fade]);
 
   const pos = (e: React.PointerEvent) => { const r = ink.current!.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * ink.current!.width, y: ((e.clientY - r.top) / r.height) * ink.current!.height }; };
   const line = (a: { x: number; y: number }, b: { x: number; y: number }) => {
     const g = ink.current!.getContext('2d')!; g.strokeStyle = '#2563eb'; g.lineWidth = backdrop ? Math.max(6, w * 0.014) : pen; g.lineCap = 'round'; g.lineJoin = 'round';
     g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
   };
-  const clear = () => { const c = ink.current; if (c) c.getContext('2d')!.clearRect(0, 0, c.width, c.height); setResult(null); };
+  const clear = () => { const c = ink.current; if (c) c.getContext('2d')!.clearRect(0, 0, c.width, c.height); setResult(null); setSending(''); };
   const check = useCallback(() => {
     if (!tpl.current || !ink.current) return;
-    const r = scoreTrace(tpl.current, ink.current, !!backdrop); setResult(r.stars); onChecked?.(r);
+    const r = scoreTrace(tpl.current, ink.current, !!backdrop && !paths?.length); setResult(r.stars); onChecked?.(r);
     say?.(r.stars >= 3 ? 'Excellent!' : r.stars === 2 ? 'Very good!' : r.stars === 1 ? 'Good try!' : 'Try again, follow the dots.');
-  }, [backdrop, onChecked, say]);
+  }, [backdrop, paths, onChecked, say]);
+  const send = async () => {
+    if (!onSend || !bg.current || !ink.current) return;
+    const out = document.createElement('canvas'); const k = Math.min(1, 900 / bg.current.width); out.width = Math.round(bg.current.width * k); out.height = Math.round(bg.current.height * k);
+    const g = out.getContext('2d')!; g.fillStyle = '#fff'; g.fillRect(0, 0, out.width, out.height); g.drawImage(bg.current, 0, 0, out.width, out.height); g.drawImage(ink.current, 0, 0, out.width, out.height);
+    setSending('busy');
+    try { await onSend(out.toDataURL('image/jpeg', 0.8), result); setSending('sent'); say?.('Sent to your teacher!'); } catch { setSending(''); }
+  };
 
   return (
     <div className="space-y-3">
-      <div ref={wrap} className="relative w-full touch-none select-none overflow-hidden rounded-2xl bg-white shadow-inner ring-2 ring-sky-200" style={{ height: h }}>
+      <div ref={wrap} className="relative mx-auto w-full touch-none select-none overflow-hidden rounded-2xl bg-white shadow-inner ring-2 ring-sky-200" style={{ height: h, maxWidth: backdrop ? `calc(62vh * ${backdrop.width / backdrop.height})` : undefined }}>
         <canvas ref={bg} className="absolute inset-0 size-full" />
         <canvas ref={ink} className="absolute inset-0 size-full cursor-crosshair" aria-label={t('Trace here')}
           onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); drawing.current = true; last.current = pos(e); line(last.current, last.current); }}
@@ -112,6 +135,8 @@ export function TracingPad({ text, guide = 'DOTTED', font = 'ROUND', lines = tru
         {text && say && <button type="button" onClick={() => say(text)} className="rounded-2xl bg-amber-100 px-4 py-2 text-lg font-bold text-amber-900">🔊 {t('Listen')}</button>}
         <button type="button" onClick={clear} className="rounded-2xl bg-slate-100 px-4 py-2 text-lg font-bold text-slate-700">↺ {t('Again')}</button>
         <button type="button" onClick={check} className="rounded-2xl bg-emerald-500 px-6 py-2 text-lg font-black text-white shadow">✅ {t('Done')}</button>
+        {onSend && <button type="button" onClick={send} disabled={sending !== ''} className="rounded-2xl bg-violet-600 px-5 py-2 text-lg font-black text-white shadow disabled:opacity-70">
+          {sending === 'sent' ? `✔ ${t('Sent')}` : sending === 'busy' ? `⏳ ${t('Sending…')}` : `📤 ${t('Send to teacher')}`}</button>}
       </div>
     </div>
   );

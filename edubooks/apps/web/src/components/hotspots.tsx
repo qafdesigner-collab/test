@@ -10,11 +10,13 @@ import { embedUrl } from '@/components/training';
 import { uploadBig } from '@/lib/big-upload';
 import { speakText } from '@/lib/voice';
 import { TracingPad, cropPage } from '@/components/games/tracing';
+import { ColoringBoard } from '@/components/games/coloring';
+import { hasRole, useMe } from '@/lib/session';
 
-export interface Hotspot { id: string; page: number; x: number; y: number; w: number; h: number; kind: Kind; title: string; body: string; url: string | null; gameId: string | null; gameTitle?: string | null; assetId?: string | null; inline?: boolean; mime?: string | null; fileName?: string | null }
-type Kind = 'NOTE' | 'AUDIO' | 'VIDEO' | 'IMAGE' | 'LINK' | 'GAME' | 'TRACE';
+export interface Hotspot { id: string; page: number; x: number; y: number; w: number; h: number; kind: Kind; title: string; body: string; url: string | null; gameId: string | null; gameTitle?: string | null; assetId?: string | null; inline?: boolean; mime?: string | null; fileName?: string | null; data?: { paths?: number[][][] } | null }
+type Kind = 'NOTE' | 'AUDIO' | 'VIDEO' | 'IMAGE' | 'LINK' | 'GAME' | 'TRACE' | 'DRAW';
 const KINDS: Record<Kind, { icon: string; label: string }> = {
-  NOTE: { icon: '💬', label: 'Note or meaning' }, AUDIO: { icon: '🔊', label: 'Audio / read aloud' }, VIDEO: { icon: '🎬', label: 'Video' }, IMAGE: { icon: '🖼️', label: 'Picture' }, LINK: { icon: '🔗', label: 'Link' }, GAME: { icon: '🎮', label: 'Game' }, TRACE: { icon: '✍️', label: 'Tracing' },
+  NOTE: { icon: '💬', label: 'Note or meaning' }, AUDIO: { icon: '🔊', label: 'Audio / read aloud' }, VIDEO: { icon: '🎬', label: 'Video' }, IMAGE: { icon: '🖼️', label: 'Picture' }, LINK: { icon: '🔗', label: 'Link' }, GAME: { icon: '🎮', label: 'Game' }, TRACE: { icon: '✍️', label: 'Tracing' }, DRAW: { icon: '🖍️', label: 'Drawing area' },
 };
 /** A short-lived link to the publisher's own video / audio / picture (checked against the reader's licence). */
 export function useMedia(assetId?: string | null) {
@@ -48,6 +50,7 @@ export function HotspotLayer({ componentId, page, editing, kid, games, noFlip }:
   const here = (q.data ?? []).filter((h) => h.page === page);
   const pos = (e: React.PointerEvent) => { const r = box.current!.getBoundingClientRect(); return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) }; };
   const activate = (h: Hotspot) => { if (editing) return setForm(h); if (h.kind === 'AUDIO') return h.assetId ? void playFile(h.assetId) : speak(h.body); setOpen(h); };
+  const pageCanvas = () => box.current?.parentElement?.querySelector('canvas') ?? null;
   const rect = draw && { x: Math.min(draw.x0, draw.x), y: Math.min(draw.y0, draw.y), w: Math.abs(draw.x - draw.x0), h: Math.abs(draw.y - draw.y0) };
   return (
     <div ref={box} className={cn('absolute inset-0', editing && 'cursor-crosshair bg-sky-500/5 ring-2 ring-inset ring-sky-400')}
@@ -62,21 +65,68 @@ export function HotspotLayer({ componentId, page, editing, kid, games, noFlip }:
           <span className={cn('absolute -right-2 -top-2 grid place-items-center rounded-full bg-white shadow', kid ? 'size-8 text-lg' : 'size-6 text-sm')}>{KINDS[h.kind].icon}</span>
         </button>))}
       {rect && <div className="pointer-events-none absolute rounded-lg border-2 border-dashed border-sky-600 bg-sky-400/20" style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.w * 100}%`, height: `${rect.h * 100}%` }} />}
-      {open && (open.kind === 'TRACE' ? <TraceView h={open} onClose={() => setOpen(null)} page={box.current?.parentElement?.querySelector('canvas') ?? null} />
+      {open && (open.kind === 'TRACE' || open.kind === 'DRAW' ? <WorkView h={open} onClose={() => setOpen(null)} page={pageCanvas()} />
         : <HotspotView h={open} kid={kid} onClose={() => setOpen(null)} />)}
-      {form && <HotspotForm componentId={componentId} value={form} games={games} onClose={() => setForm(null)} />}
+      {form && <HotspotForm componentId={componentId} value={form} games={games} page={pageCanvas()} onClose={() => setForm(null)} />}
     </div>
   );
 }
 
-/** Tracing on a book page: the letters printed in this part of the page (or the letters the publisher typed). */
-function TraceView({ h, onClose, page }: { h: Hotspot; onClose: () => void; page?: HTMLCanvasElement | null }) {
-  const [crop] = useState(() => (!h.body?.trim() && page ? cropPage(page, h) : null));
+/** A blank white picture of the box's shape (for a drawing area when the page is not ready). */
+function blank(w: number, h: number) { const c = document.createElement('canvas'); c.width = 800; c.height = Math.max(100, Math.round(800 * h / w)); const g = c.getContext('2d')!; g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); return c; }
+
+/**
+ * Tracing or drawing on a book page. Tracing: the letters printed in this part of the page, the letters the publisher typed,
+ * or the writing path the publisher drew. Drawing: colour and draw on this part of the page. Students can send it to their teacher.
+ */
+function WorkView({ h, onClose, page }: { h: Hotspot; onClose: () => void; page?: HTMLCanvasElement | null }) {
+  const me = useMe(); const student = hasRole(me.data, 'STUDENT'); const toast = useToast(); const qc = useQueryClient();
+  const paths = h.data?.paths?.length ? h.data.paths : null;
+  const [crop] = useState(() => (page && (h.kind === 'DRAW' || paths || !h.body?.trim()) ? cropPage(page, h) : null));
+  const [drawing] = useState(() => (h.kind === 'DRAW' ? (crop ?? blank(h.w, h.h)).toDataURL('image/png') : ''));
+  const mine = useQuery({ queryKey: ['my-work', h.id], queryFn: () => api.get<{ stars: number | null; comment: string; createdAt: string } | null>(`/reader/hotspots/${h.id}/my-work`), enabled: student });
+  const send = async (image: string, stars: number | null) => {
+    try { await api.post(`/reader/hotspots/${h.id}/work`, { image, ...(stars !== null ? { stars } : {}) }); toast('Sent to your teacher 📤'); qc.invalidateQueries({ queryKey: ['my-work', h.id] }); }
+    catch (e: any) { toast(e.message, 'err'); throw e; }
+  };
+  const last = mine.data;
   return (
-    <Dialog open onOpenChange={onClose} wide title={`✍️ ${h.title || 'Trace the letters'}`}>
-      {crop || h.body?.trim() ? <TracingPad backdrop={crop} text={crop ? undefined : h.body.trim()} lines={!crop} say={(t) => void speakText(t)} />
+    <Dialog open onOpenChange={onClose} wide title={`${KINDS[h.kind].icon} ${h.title || (h.kind === 'DRAW' ? 'Draw and colour' : 'Trace the letters')}`}>
+      {h.kind === 'DRAW' && h.body?.trim() && <p className="mb-3 whitespace-pre-wrap text-lg text-slate-800">{h.body}</p>}
+      {last && <p className="mb-3 rounded-xl bg-violet-50 p-3 text-sm text-violet-900">📤 You sent this on {new Date(last.createdAt).toLocaleDateString()}.
+        {last.comment ? <> <b>Your teacher says:</b> {last.comment}</> : ' Your teacher has not answered yet.'}</p>}
+      {h.kind === 'DRAW' ? <ColoringBoard image={drawing} say={(t) => void speakText(t)} doneLabel="📤 Send to teacher"
+          onDone={student ? (img) => void send(img, null).catch(() => undefined) : undefined} />
+        : crop || h.body?.trim() || paths ? <TracingPad backdrop={crop} paths={paths} text={crop ? undefined : h.body.trim()} lines={!crop} say={(t) => void speakText(t)} onSend={student ? send : undefined} />
         : <p className="text-slate-600">This page is still loading — close and try again.</p>}
     </Dialog>
+  );
+}
+
+/** The publisher draws the writing path (the way the pen should go) over this part of the page. */
+function PathDrawer({ page, box, value, onChange }: { page?: HTMLCanvasElement | null; box: { x: number; y: number; w: number; h: number }; value: number[][][]; onChange: (p: number[][][]) => void }) {
+  const [bgUrl] = useState(() => (page ? cropPage(page, box).toDataURL('image/png') : null));
+  const ref = useRef<SVGSVGElement>(null); const [cur, setCur] = useState<number[][] | null>(null);
+  const ratio = page ? (box.h * page.height) / (box.w * page.width) : box.h / box.w;
+  const pt = (e: React.PointerEvent) => { const r = ref.current!.getBoundingClientRect(); return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))]; };
+  const d = (p: number[][]) => p.map(([x, y], i) => `${i ? 'L' : 'M'}${(x * 1000).toFixed(1)} ${(y * 1000 * ratio).toFixed(1)}`).join(' ');
+  return (
+    <div className="space-y-2">
+      <div className="relative w-full touch-none overflow-hidden rounded-lg bg-white ring-1 ring-slate-300" style={{ aspectRatio: `${1 / ratio}` }}>
+        {bgUrl && <img src={bgUrl} alt="" className="absolute inset-0 size-full" />}
+        <svg ref={ref} viewBox={`0 0 1000 ${1000 * ratio}`} className="absolute inset-0 size-full cursor-crosshair" aria-label="Draw the writing path"
+          onPointerDown={(e) => { (e.target as Element).setPointerCapture(e.pointerId); setCur([pt(e)]); }}
+          onPointerMove={(e) => { if (!cur) return; const p = pt(e); const l = cur[cur.length - 1]; if (Math.hypot(p[0] - l[0], p[1] - l[1]) > 0.006) setCur([...cur, p]); }}
+          onPointerUp={() => { if (cur && cur.length > 1 && value.length < 40) onChange([...value, cur.slice(0, 500)]); setCur(null); }}>
+          {[...value, ...(cur ? [cur] : [])].map((p, i) => <g key={i}>
+            <path d={d(p)} fill="none" stroke="#2563eb" strokeWidth={10} strokeLinecap="round" strokeLinejoin="round" opacity={0.75} />
+            <circle cx={p[0][0] * 1000} cy={p[0][1] * 1000 * ratio} r={9} fill="#16a34a" /></g>)}
+        </svg>
+      </div>
+      <div className="flex items-center gap-2 text-xs text-slate-600"><span className="flex-1">Draw each line the way the pen should go — the green dot shows where to start. {value.length} line{value.length === 1 ? '' : 's'}.</span>
+        <Button type="button" size="sm" variant="ghost" disabled={!value.length} onClick={() => onChange(value.slice(0, -1))}>↶ Undo</Button>
+        <Button type="button" size="sm" variant="ghost" disabled={!value.length} onClick={() => onChange([])}>Clear</Button></div>
+    </div>
   );
 }
 
@@ -98,8 +148,10 @@ function HotspotView({ h, kid, onClose }: { h: Hotspot; kid: boolean; onClose: (
   );
 }
 
-function HotspotForm({ componentId, value, games, onClose }: { componentId: string; value: Partial<Hotspot>; games: { id: string; title: string }[]; onClose: () => void }) {
+function HotspotForm({ componentId, value, games, page, onClose }: { componentId: string; value: Partial<Hotspot>; games: { id: string; title: string }[]; page?: HTMLCanvasElement | null; onClose: () => void }) {
   const [f, setF] = useState<any>({ ...value, url: value.url ?? '', gameId: value.gameId ?? '', assetId: value.assetId ?? null, inline: !!value.inline, fileName: value.fileName ?? '' });
+  const [paths, setPaths] = useState<number[][][]>(value.data?.paths ?? []);
+  const [trace, setTrace] = useState<'PRINTED' | 'TEXT' | 'PATH'>(value.data?.paths?.length ? 'PATH' : value.body?.trim() ? 'TEXT' : 'PRINTED');
   const [up, setUp] = useState<string | null>(null); const fileIn = useRef<HTMLInputElement>(null);
   const media = ['VIDEO', 'AUDIO', 'IMAGE'].includes(f.kind);
   const accept = f.kind === 'VIDEO' ? 'video/mp4,video/webm' : f.kind === 'AUDIO' ? 'audio/mpeg,audio/mp4,.mp3,.m4a' : 'image/png,image/jpeg,image/gif,image/webp';
@@ -118,7 +170,10 @@ function HotspotForm({ componentId, value, games, onClose }: { componentId: stri
     setBusy(true); setErr(null);
     const own = media && f.assetId;
     const body = { page: f.page, x: f.x, y: f.y, w: f.w, h: f.h, kind: f.kind, title: f.title, body: f.body, url: (f.kind === 'VIDEO' && !own) || f.kind === 'LINK' ? f.url : null,
-      gameId: f.kind === 'GAME' ? f.gameId || null : null, assetId: own ? f.assetId : null, inline: (f.kind === 'VIDEO' || f.kind === 'IMAGE') && !!f.inline };
+      gameId: f.kind === 'GAME' ? f.gameId || null : null, assetId: own ? f.assetId : null, inline: (f.kind === 'VIDEO' || f.kind === 'IMAGE') && !!f.inline,
+      data: f.kind === 'TRACE' && trace === 'PATH' ? { paths } : {} };
+    if (f.kind === 'TRACE' && trace === 'PRINTED') body.body = '';
+    if (f.kind === 'TRACE' && trace === 'PATH' && !paths.length) { setBusy(false); setErr(new Error('Draw the writing path first.')); return; }
     try { f.id ? await api.patch(`/reader/hotspots/${f.id}`, body) : await api.post(`/reader/components/${componentId}/hotspots`, body); done('Hotspot saved'); }
     catch (e) { setErr(e); } finally { setBusy(false); }
   };
@@ -142,8 +197,14 @@ function HotspotForm({ componentId, value, games, onClose }: { componentId: stri
           Show {f.kind === 'VIDEO' ? 'the video' : 'the picture'} on the page itself (instead of a tappable icon)</label>}
         {((f.kind === 'VIDEO' && !f.assetId) || f.kind === 'LINK') && <Field label={f.kind === 'VIDEO' ? 'YouTube or Vimeo link' : 'Link (https://…)'}><Input required value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} /></Field>}
         {f.kind === 'GAME' && <Field label="Game"><Select required value={f.gameId} onChange={(e) => setF({ ...f, gameId: e.target.value })}><option value="">Choose a game…</option>{games.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}</Select></Field>}
-        {f.kind === 'TRACE' && <p className="rounded-lg bg-sky-50 p-2 text-xs text-sky-900">Draw the box around letters printed on the page (e.g. dotted letters): children trace right over them and the app checks their tracing against those letters. Or type letters below to show your own dotted letters instead.</p>}
-        <Field label={f.kind === 'TRACE' ? 'Letters to trace (leave empty to trace what is printed in the box)' : f.kind === 'AUDIO' ? (f.assetId ? 'Words (optional)' : 'Words read aloud') : f.kind === 'NOTE' ? 'Note' : f.kind === 'IMAGE' ? 'Caption (optional)' : 'Text (optional)'}><Textarea rows={3} maxLength={4000} required={(f.kind === 'AUDIO' && !f.assetId) || f.kind === 'NOTE'} value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} /></Field>
+        {f.kind === 'TRACE' && <>
+          <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="What children trace">{([['PRINTED', '📄 What is printed here', 'The dotted letters or shapes printed in this box'], ['TEXT', '🔤 Letters I type', 'The app shows them dotted on writing lines'], ['PATH', '〰️ A path I draw', 'Draw the way the pen should go, over the page']] as const).map(([k, l, hint]) => (
+            <button key={k} type="button" role="radio" aria-checked={trace === k} onClick={() => setTrace(k)} className={cn('rounded-lg border-2 p-2 text-left text-sm', trace === k ? 'border-brand-600 bg-brand-50' : 'border-slate-200 hover:bg-slate-50')}>
+              <b className="block">{l}</b><span className="text-xs text-slate-600">{hint}</span></button>))}</div>
+          {trace === 'PATH' && <PathDrawer page={page} box={{ x: f.x, y: f.y, w: f.w, h: f.h }} value={paths} onChange={setPaths} />}
+          <p className="rounded-lg bg-sky-50 p-2 text-xs text-sky-900">Children trace with their finger or mouse and get stars; they can send their work to their teacher (Teacher → Book work).</p></>}
+        {f.kind === 'DRAW' && <p className="rounded-lg bg-sky-50 p-2 text-xs text-sky-900">Children draw and colour in this part of the page (what is printed here stays as lines), then send it to their teacher (Teacher → Book work).</p>}
+        {!(f.kind === 'TRACE' && trace !== 'TEXT') && <Field label={f.kind === 'TRACE' ? 'Letters to trace' : f.kind === 'DRAW' ? 'What to draw (optional), e.g. Draw your family' : f.kind === 'AUDIO' ? (f.assetId ? 'Words (optional)' : 'Words read aloud') : f.kind === 'NOTE' ? 'Note' : f.kind === 'IMAGE' ? 'Caption (optional)' : 'Text (optional)'}><Textarea rows={3} maxLength={4000} required={(f.kind === 'AUDIO' && !f.assetId) || f.kind === 'NOTE' || f.kind === 'TRACE'} value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} /></Field>}
         {err ? <ErrorBox error={err} /> : null}
         <div className="flex gap-2">
           {f.id && <Button type="button" variant="ghost" onClick={async () => { try { await api.del(`/reader/hotspots/${f.id}`); done('Hotspot deleted'); } catch (e) { setErr(e); } }}><Trash2 className="size-4" />Delete</Button>}
