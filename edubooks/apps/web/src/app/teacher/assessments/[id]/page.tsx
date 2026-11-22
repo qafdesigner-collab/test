@@ -33,6 +33,7 @@ function Builder({ initial, id }: { initial: any; id: string | null }) {
       items: list.map((i, n) => ({ id: String(n), section: 'A', type: i.type, prompt: i.prompt, options: i.options, answer: i.answer, marks: i.points || 0, lines: i.type === 'SHORT' ? 3 : 0 })) }, brand, { key });
   };
   const body = () => ({ title: f.title, instructions: f.instructions, bookComponentId: f.bookComponentId || null, bookPage: f.bookComponentId ? f.bookPage || null : null, dueAt: f.dueAt ? new Date(f.dueAt).toISOString() : null, allowLate: f.allowLate, studentIds: f.studentIds ?? [],
+    proctor: { camera: !!f.proctor?.camera, roomScan: !!f.proctor?.roomScan, screen: !!f.proctor?.screen },
     maxAttempts: Number(f.maxAttempts) || 1, timeLimitMin: Number(f.timeLimitMin) > 0 ? Math.min(600, Math.round(Number(f.timeLimitMin))) : null,
     // Send only question fields (server rows also carry ids/positions, which the API rightly rejects).
     items: items.map(({ type, prompt, options, answer, points }) => ({ type, prompt, options, points, answer: type === 'FILL_BLANK' ? answer.filter((x: string) => x) : answer })) });
@@ -65,6 +66,14 @@ function Builder({ initial, id }: { initial: any; id: string | null }) {
           <Field label="Tries allowed" hint="With 2 or 3 tries, students see only their score until the last try; you see every try and its time.">
             <Select value={String(f.maxAttempts ?? 1)} onChange={(e) => setF({ ...f, maxAttempts: Number(e.target.value) })}><option value="1">1 — hand in once</option><option value="2">2 tries</option><option value="3">3 tries</option></Select></Field>
         </div>
+        <fieldset className="rounded-lg border border-slate-200 p-3">
+          <legend className="px-1 text-sm font-medium text-slate-800">🛡️ Online exam safety (optional)</legend>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            {([['roomScan', '🔄 Room scan before starting'], ['camera', '📷 Camera photos at random times'], ['screen', '🖥️ Whole-screen pictures at random times']] as const).map(([k, l]) => (
+              <label key={k} className="flex items-center gap-2"><input type="checkbox" checked={!!f.proctor?.[k]} onChange={(e) => setF({ ...f, proctor: { ...f.proctor, [k]: e.target.checked } })} />{l}</label>))}
+          </div>
+          <p className="mt-2 text-xs text-slate-500">Students are told exactly what is recorded before they start. Leaving the page or switching apps is always logged for watched work. Screen sharing works on computers (Chrome, Edge, Firefox), not on phones or iPads — you will see “no screen” for those. Photos are deleted automatically after 90 days, or when you delete them.</p>
+        </fieldset>
         {!id ? <BookScope editionId={f.editionId} lessonId={f.lessonId} onChange={(v) => setF({ ...f, ...v })} /> : f.bookTitle && <p className="text-sm text-slate-500">Book: {f.bookTitle}</p>}
         <Field label="Instructions for children"><Textarea rows={2} value={f.instructions} onChange={(e) => setF({ ...f, instructions: e.target.value })} /></Field>
         {roster.data && (
@@ -199,6 +208,8 @@ function Results({ a }: { a: any }) {
   const close = useAction(() => api.post(`/teacher/assessments/${a.id}/close`), { ok: 'Closed', keys: ['assessment', 'assessments'], after: () => setCloseAsk(false) });
   const brand = usePrintBrand(); const me = useMe().data; const classes = useMyClasses();
   const [pass, setPass] = useState(40);
+  const watchedOn = !!(a.proctor?.camera || a.proctor?.screen || a.proctor?.roomScan) || a.students.some((s: any) => s.watch);
+  const [watchOf, setWatchOf] = useState<any>(null);
   const res = (s: any) => {
     const sc = s.submission?.score; const pct = sc === null || sc === undefined || !a.maxScore ? null : Math.round((sc / a.maxScore) * 1000) / 10;
     const g = pct === null ? null : gradeFor(pct)?.[1] ?? null;
@@ -237,7 +248,7 @@ function Results({ a }: { a: any }) {
         <>
         <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">Pass mark <Input type="number" min={0} max={100} className="h-8 w-20" value={pass} onChange={(e) => setPass(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} aria-label="Pass mark (%)" />%
           <span className="text-xs text-slate-500">— used for Pass / Fail on this page and on the printed sheet.</span></div>
-        <Table head={['Student', 'Status', 'Score', '%', 'Grade', 'Result', 'Time taken', '']}>
+        <Table head={['Student', 'Status', 'Score', '%', 'Grade', 'Result', 'Time taken', ...(watchedOn ? ['Watch'] : []), '']}>
           {a.students.map((s: any) => (
             <tr key={s.id}><Td className="font-medium">{s.displayName}</Td>
               <Td>{s.submission ? <><Status s={s.submission.status} />{s.submission.late && <Badge tone="danger" className="ml-1">late</Badge>}</> : <span className="text-xs text-slate-500">not handed in</span>}</Td>
@@ -245,6 +256,10 @@ function Results({ a }: { a: any }) {
               {(() => { const r = res(s); return <><Td className="tabular-nums">{r.pct === null ? '' : `${r.pct}%`}</Td><Td className="font-semibold">{r.grade ?? ''}</Td>
                 <Td>{r.result === 'PASS' ? <Badge tone="PUBLISHED">Pass</Badge> : r.result === 'FAIL' ? <Badge tone="danger">Fail</Badge> : r.result === 'PENDING' ? <span className="text-xs text-amber-700">to mark</span> : ''}</Td></>; })()}
               <Td className="text-slate-500"><Timings s={s} timeLimit={a.timeLimitMin} /></Td>
+              {watchedOn && <Td>{s.watch ? <button onClick={() => setWatchOf(s)} className="flex flex-wrap items-center gap-1 rounded-lg px-1 py-0.5 text-left text-xs hover:bg-slate-100">
+                {s.watch.photos > 0 && <Badge>📷 {s.watch.photos}</Badge>}{s.watch.screens > 0 && <Badge>🖥️ {s.watch.screens}</Badge>}
+                {s.watch.away > 0 && <Badge tone={s.watch.awaySeconds >= 30 ? 'danger' : 'DRAFT'}>↗ left {s.watch.away}× ({mins(s.watch.awaySeconds)})</Badge>}
+                {s.watch.warnings > 0 && <Badge tone="danger">⚠ {s.watch.warnings}</Badge>}</button> : s.attempts?.length ? <span className="text-xs text-slate-400">nothing</span> : null}</Td>}
               <Td className="text-right">{s.submission && <Button size="sm" variant={s.submission.status === 'SUBMITTED' ? 'primary' : 'ghost'} onClick={() => setMark(s)}>{s.submission.status === 'SUBMITTED' ? 'Mark' : 'View'}</Button>}</Td></tr>))}
         </Table>
         </>
@@ -255,6 +270,7 @@ function Results({ a }: { a: any }) {
             {st?.correctRate !== null && st?.correctRate !== undefined && <span className={`font-semibold ${st.correctRate < 0.5 ? 'text-red-600' : 'text-emerald-600'}`}>{Math.round(st.correctRate * 100)}% correct</span>}</Card>;
         })}</div>
       )}
+      {watchOf && <WatchDialog a={a} student={watchOf} onClose={() => setWatchOf(null)} />}
       {mark && <MarkDialog key={mark.id} a={a} student={mark} onClose={() => setMark(null)} onNext={mark.submission?.status === 'SUBMITTED' ? () => nextAfter(mark) : undefined} left={waiting.filter((s: any) => s.id !== mark.id).length} />}
       <Confirm open={closeAsk} onOpenChange={setCloseAsk} title="Close this work?" confirmLabel="Close" loading={close.isPending} onConfirm={() => close.mutate()} body="Students can no longer hand it in. Marks stay visible." />
     </div>
@@ -277,10 +293,41 @@ function Timings({ s }: { s: any; timeLimit?: number | null }) {
     </li>))}</ul>;
 }
 
+const WATCH: Record<string, string> = { ROOM: '🔄 Room scan', CAMERA: '📷 Camera photo', SCREEN: '🖥️ Screen picture', AWAY: '↗ Left the page', SCREEN_OFF: '⚠ Stopped sharing the screen',
+  CAMERA_OFF: '⚠ Camera turned off', SCREEN_PART: '⚠ Shared only a window, not the whole screen', NO_SCREEN: '⚠ Device cannot share its screen', NO_CAMERA: '⚠ No camera', FULLSCREEN_OFF: '⚠ Left full screen' };
+/** Everything recorded while a student did watched work: a timeline, and the photos and screen pictures. */
+function WatchDialog({ a, student, onClose }: { a: any; student: any; onClose: () => void }) {
+  const q = useQuery({ queryKey: ['watch', a.id, student.id], queryFn: () => api.get<any[]>(`/teacher/assessments/${a.id}/watch/${student.id}`) });
+  const [big, setBig] = useState<string | null>(null); const [ask, setAsk] = useState(false);
+  const clear = useAction(() => api.del(`/teacher/assessments/${a.id}/watch`), { ok: 'Exam photos deleted', keys: ['assessment', 'watch'], after: () => { setAsk(false); onClose(); } });
+  const ev = q.data ?? []; const pics = ev.filter((e) => e.hasImage);
+  const time = (d: string) => new Date(d).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return (
+    <Dialog open onOpenChange={onClose} wide title={`🛡️ ${student.displayName} — what was recorded`} description="Look at the pictures and the timeline together: leaving the page for a long time, other apps on the screen or another person in the photos can show the student had help.">
+      {q.error ? <ErrorBox error={q.error} /> : !q.data ? <PageLoader /> : !ev.length ? <p className="text-slate-500">Nothing was recorded.</p> : (
+        <div className="grid max-h-[65vh] gap-4 overflow-y-auto md:grid-cols-[1fr_16rem]">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] content-start gap-2">{pics.map((e) => (
+            <button key={e.id} onClick={() => setBig(e.id)} className="overflow-hidden rounded-lg bg-slate-100 text-left ring-1 ring-slate-200 hover:ring-brand-400">
+              <img src={`/api/teacher/watch/${e.id}/image`} alt={WATCH[e.kind]} loading="lazy" className="h-24 w-full object-cover" />
+              <span className="block px-1.5 py-1 text-[11px] text-slate-600">{WATCH[e.kind]} · {time(e.createdAt)}{e.attempt > 1 ? ` · try ${e.attempt}` : ''}</span></button>))}
+            {!pics.length && <p className="text-sm text-slate-500">No pictures.</p>}</div>
+          <ol className="space-y-1 text-xs">{ev.filter((e) => !e.hasImage || e.kind === 'ROOM').filter((e, i, all) => e.kind !== 'ROOM' || all.findIndex((x) => x.kind === 'ROOM') === i).map((e) => (
+            <li key={e.id} className={`rounded px-2 py-1 ${e.kind.includes('_') || (e.kind === 'AWAY' && e.detail?.seconds >= 30) ? 'bg-red-50 text-red-800' : 'bg-slate-50 text-slate-700'}`}>
+              <b>{time(e.createdAt)}</b> {WATCH[e.kind] ?? e.kind}{e.kind === 'AWAY' ? ` for ${mins(e.detail?.seconds ?? 0)}` : ''}{e.attempt > 1 ? ` (try ${e.attempt})` : ''}</li>))}</ol>
+        </div>)}
+      {big && <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4" onClick={() => setBig(null)}><img src={`/api/teacher/watch/${big}/image`} alt="Recorded picture" className="max-h-full max-w-full rounded-lg" /></div>}
+      <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
+        <Button variant="ghost" onClick={() => setAsk(true)}><Trash2 className="size-4" />Delete all photos of this assessment</Button>
+        <Button variant="secondary" onClick={onClose}>Close</Button></div>
+      <Confirm open={ask} onOpenChange={setAsk} danger title="Delete all exam photos?" body="All camera photos, screen pictures and the timeline of every student for this assessment are deleted. Scores stay." confirmLabel="Delete" loading={clear.isPending} onConfirm={() => clear.mutate()} />
+    </Dialog>
+  );
+}
+
 function Page({ id }: { id: string }) {
   const params = useSearchParams();
   const q = useQuery({ queryKey: ['assessment', id], queryFn: () => api.get(`/teacher/assessments/${id}`), enabled: id !== 'new' });
-  if (id === 'new') return <Builder id={null} initial={{ title: '', kind: 'HOMEWORK', classId: params.get('classId') ?? '', editionId: params.get('editionId'), lessonId: params.get('lessonId'), instructions: '', dueAt: '', allowLate: true, studentIds: [], maxAttempts: 1, timeLimitMin: '' }} />;
+  if (id === 'new') return <Builder id={null} initial={{ title: '', kind: 'HOMEWORK', classId: params.get('classId') ?? '', editionId: params.get('editionId'), lessonId: params.get('lessonId'), instructions: '', dueAt: '', allowLate: true, studentIds: [], maxAttempts: 1, timeLimitMin: '', proctor: {} }} />;
   if (q.isLoading) return <PageLoader />;
   if (q.error) return <ErrorBox error={q.error} />;
   const a = q.data;

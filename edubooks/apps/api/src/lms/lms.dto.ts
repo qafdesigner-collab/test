@@ -34,6 +34,19 @@ export class QuestionDto extends ItemDto {
   @IsOptional() @IsBoolean() shared?: boolean;
 }
 
+export class ProctorDto {
+  /** camera photos at random times */
+  @IsOptional() @IsBoolean() camera?: boolean;
+  /** turn the camera around the room before starting */
+  @IsOptional() @IsBoolean() roomScan?: boolean;
+  /** share the whole screen; pictures of it at random times */
+  @IsOptional() @IsBoolean() screen?: boolean;
+}
+export class ProctorEventDto {
+  @IsIn(['ROOM', 'CAMERA', 'SCREEN', 'AWAY', 'SCREEN_OFF', 'CAMERA_OFF', 'SCREEN_PART', 'NO_SCREEN', 'NO_CAMERA', 'FULLSCREEN_OFF']) kind: string;
+  @IsOptional() @IsString() @MaxLength(800_000) image?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(86400) seconds?: number;
+}
 export class AssessmentDto {
   @IsUUID() classId: string;
   @IsEnum(['HOMEWORK', 'QUIZ', 'TEST']) kind: 'HOMEWORK' | 'QUIZ' | 'TEST';
@@ -52,6 +65,7 @@ export class AssessmentDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(3) maxAttempts?: number;
   /** minutes allowed once a student starts (null: no limit) */
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(600) timeLimitMin?: number | null;
+  @IsOptional() @ValidateNested() @Type(() => ProctorDto) proctor?: ProctorDto;
 }
 export class UpdateAssessmentDto {
   @IsOptional() @IsString() @Length(2, 200) title?: string;
@@ -66,6 +80,7 @@ export class UpdateAssessmentDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(3) maxAttempts?: number;
   /** minutes allowed once a student starts (null: no limit) */
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(600) timeLimitMin?: number | null;
+  @IsOptional() @ValidateNested() @Type(() => ProctorDto) proctor?: ProctorDto;
 }
 
 export class ResponseDto { @IsUUID() itemId: string; @IsDefined() response: string | number | boolean; }

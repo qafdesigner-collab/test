@@ -1,3 +1,18 @@
+# What's new in Knowledge Gate 1.4.8
+
+## 🛡️ Online exam safety
+- New section **Online exam safety** when you make an assessment. Turn on any of:
+  - **🔄 Room scan before starting** — the student turns the camera slowly around the room (6 guided photos: left, behind, right, desk and floor, hands).
+  - **📷 Camera photos at random times** — about one photo every 35–100 seconds while they work. A small **● REC** camera picture stays in the corner, so the student always knows.
+  - **🖥️ Whole-screen pictures at random times** — the student must share the **entire screen** (not one window or tab); a picture is taken about every 45–120 seconds, so you can see if another app, website or chat was open.
+- For every watched test the app also logs when the student **leaves the page or switches to another app**, and for how long.
+- Before starting, students see exactly what will be recorded. Nothing is recorded before **Start**, and recording stops when they hand in.
+- If the student stops screen sharing or the camera during the test, a red bar asks them to turn it on again, and you see **⚠ Stopped sharing the screen**.
+- **For the teacher:** the results table gets a **Watch** column (📷 photos, 🖥️ screen pictures, ↗ how often and how long they left the page, ⚠ warnings). Click it to see all pictures (click one to enlarge) and the timeline.
+- **Privacy:** photos are kept for 90 days and then deleted automatically (change with `PROCTOR_KEEP_DAYS`). You can delete all photos of an assessment at any time. Only the student's teachers and the school admin can see them.
+- Limits: screen sharing works on computers (Chrome, Edge, Firefox), not on phones and iPads — you see **⚠ Device cannot share its screen** for those. A website cannot see other devices (e.g. a second phone) — the camera photos help there.
+- Fixed: the website did not allow the camera at all (security setting). It now allows the camera and screen sharing for this site only.
+
 # What's new in Knowledge Gate 1.4.7
 
 ## ⏱️ Timer and tries for homework, quizzes and tests

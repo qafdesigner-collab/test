@@ -610,6 +610,8 @@ export const assessments = pgTable('assessments', {
   maxAttempts: integer('max_attempts').notNull().default(1),
   /** minutes allowed once a student starts (null: no limit) */
   timeLimitMin: integer('time_limit_min'),
+  /** online exam safety: { camera, roomScan, screen } */
+  proctor: jsonb('proctor').notNull().default({}),
   status: assessmentStatusEnum('status').notNull().default('DRAFT'),
   publishedAt: timestamp('published_at', { withTimezone: true }),
   createdAt: createdAt(),

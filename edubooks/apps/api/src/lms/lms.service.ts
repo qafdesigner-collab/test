@@ -9,7 +9,11 @@ import { AuditService } from '../audit/audit.service';
 import { examResultsFor } from '../exams/results';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AccessService } from './access.service';
-import { AssessmentDto, EvaluationDto, GradeDto, ItemDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
+import { promises as fsp } from 'node:fs';
+import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { config } from '../config';
+import { AssessmentDto, ProctorEventDto, EvaluationDto, GradeDto, ItemDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
 
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.!?]+$/, '');
 
@@ -203,7 +207,7 @@ export class LmsService {
     const studentIds = await this.targets(d.classId, d.studentIds);
     const [a] = await this.q.insert(assessments).values({ ...this.base(), teacherId: this.ctx.userId, classId: d.classId, kind: d.kind, title: d.title.trim(),
       instructions: d.instructions ?? '', ...refs, ...(await this.pageRef(refs.editionId, d)), dueAt: d.dueAt ? new Date(d.dueAt) : null, allowLate: d.allowLate ?? true,
-      maxAttempts: d.maxAttempts ?? 1, timeLimitMin: d.timeLimitMin ?? null }).returning();
+      maxAttempts: d.maxAttempts ?? 1, timeLimitMin: d.timeLimitMin ?? null, proctor: cleanProctor(d.proctor) }).returning();
     if (d.items?.length) await this.writeItems(a, d.items);
     if (studentIds.length) await this.q.insert(assessmentStudents).values(studentIds.map((studentId) => ({ ...this.base(), assessmentId: a.id, studentId })));
     await this.audit.log('lms.assessment.create', 'assessment', a.id, `Created ${d.kind.toLowerCase()} “${a.title}”`);
@@ -233,6 +237,7 @@ export class LmsService {
     if (d.allowLate !== undefined) patch.allowLate = d.allowLate;
     if (d.maxAttempts !== undefined) patch.maxAttempts = d.maxAttempts;
     if (d.timeLimitMin !== undefined) patch.timeLimitMin = d.timeLimitMin;
+    if (d.proctor !== undefined) patch.proctor = cleanProctor(d.proctor);
     if (d.bookComponentId !== undefined || d.bookPage !== undefined) Object.assign(patch, await this.pageRef(a.editionId, { bookComponentId: d.bookComponentId ?? a.bookComponentId, bookPage: d.bookPage === undefined ? a.bookPage : d.bookPage }));
     await this.q.update(assessments).set(patch).where(eq(assessments.id, id));
     if (d.items) await this.writeItems(a, d.items);
@@ -288,8 +293,12 @@ export class LmsService {
     const tries = (await this.q.execute(sql`SELECT student_id AS "studentId", attempt, started_at AS "startedAt", submitted_at AS "submittedAt", over_time AS "overTime",
         CASE WHEN submitted_at IS NOT NULL THEN extract(epoch FROM submitted_at - started_at)::int END AS seconds
       FROM assessment_attempts WHERE assessment_id = ${id} ORDER BY attempt`)).rows as any[];
+    const watch = (await this.q.execute(sql`SELECT student_id AS "studentId", count(*) FILTER (WHERE kind IN ('ROOM','CAMERA'))::int AS photos, count(*) FILTER (WHERE kind = 'SCREEN')::int AS screens,
+        count(*) FILTER (WHERE kind = 'AWAY')::int AS away, coalesce(sum((detail->>'seconds')::int) FILTER (WHERE kind = 'AWAY'), 0)::int AS "awaySeconds",
+        count(*) FILTER (WHERE kind IN ('SCREEN_OFF','CAMERA_OFF','SCREEN_PART','NO_SCREEN','NO_CAMERA','FULLSCREEN_OFF'))::int AS warnings
+      FROM proctor_events WHERE assessment_id = ${id} GROUP BY student_id`)).rows as any[];
     const students = (roster.rows as any[]).filter((s) => !targeted.length || targeted.includes(s.id))
-      .map((s) => ({ ...s, submission: subs.find((x) => x.studentId === s.id) ?? null, attempts: tries.filter((t) => t.studentId === s.id) }));
+      .map((s) => ({ ...s, submission: subs.find((x) => x.studentId === s.id) ?? null, attempts: tries.filter((t) => t.studentId === s.id), watch: watch.find((w) => w.studentId === s.id) ?? null }));
     const maxScore = items.reduce((n, i) => n + i.points, 0);
     const graded = subs.filter((s) => s.score !== null);
     const itemStats = items.map((it) => {
@@ -361,7 +370,7 @@ export class LmsService {
     const open = await this.openAttempt(id);
     return {
       id: a.id, title: a.title, kind: a.kind, instructions: a.instructions, dueAt: a.dueAt, status: a.status, allowLate: a.allowLate,
-      maxAttempts: a.maxAttempts, timeLimitMin: a.timeLimitMin, attemptsUsed: used, triesLeft: a.status === 'PUBLISHED' ? triesLeft : 0,
+      maxAttempts: a.maxAttempts, timeLimitMin: a.timeLimitMin, proctor: a.proctor, attemptsUsed: used, triesLeft: a.status === 'PUBLISHED' ? triesLeft : 0,
       current: open ? { attempt: open.attempt, startedAt: open.startedAt, endsAt: a.timeLimitMin ? new Date(new Date(open.startedAt).getTime() + a.timeLimitMin * 60_000) : null } : null,
       editionId: a.editionId, bookComponentId: a.bookComponentId, bookPage: a.bookPage,
       // Answers are NEVER sent before the work is marked.
@@ -369,6 +378,55 @@ export class LmsService {
       submission: sub ? { status: sub.status, submittedAt: sub.submittedAt, answers: reveal ? sub.answers : (sub.answers as any[]).map((x) => ({ itemId: x.itemId, response: x.response })),
         score: reveal || (sub.status === 'GRADED' || sub.status === 'RETURNED') ? sub.score : null, maxScore: sub.maxScore, feedback: reveal ? sub.feedback : '', attempt: sub.attempt } : null,
     };
+  }
+
+  // ---------- online exam safety ----------
+  /** Saves what the student's device reports during a try: photos, screen pictures, leaving the page. The student was told before starting. */
+  async proctorEvent(id: string, d: ProctorEventDto) {
+    const [a] = await this.q.select().from(assessments).where(eq(assessments.id, id));
+    if (!a || !(await this.visibleToStudent(a))) throw new NotFoundException('Homework not found');
+    const p = (a.proctor ?? {}) as { camera?: boolean; roomScan?: boolean; screen?: boolean };
+    if (!p.camera && !p.roomScan && !p.screen) throw new BadRequestException('This work is not watched');
+    const open = await this.openAttempt(id);
+    if (!open) throw new ConflictException('Press Start first');
+    const LIMIT: Record<string, number> = { ROOM: 12, CAMERA: 150, SCREEN: 150 };
+    const { rows: [n] } = await this.q.execute(sql`SELECT count(*)::int AS all, count(*) FILTER (WHERE kind = ${d.kind})::int AS same FROM proctor_events
+      WHERE assessment_id = ${id} AND student_id = ${this.ctx.userId} AND attempt = ${open.attempt}`) as any;
+    if (n.all >= 800 || n.same >= (LIMIT[d.kind] ?? 300)) return { ok: true, skipped: true };
+    let file: string | null = null;
+    if (['ROOM', 'CAMERA', 'SCREEN'].includes(d.kind)) {
+      const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(d.image ?? '');
+      if (!m) throw new BadRequestException('The picture could not be sent');
+      const bytes = Buffer.from(m[1], 'base64');
+      if (bytes.length > 600_000 || bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new BadRequestException('The picture could not be sent');
+      file = path.join('proctor', a.id, `${randomUUID()}.jpg`);
+      await fsp.mkdir(path.join(config.storageDir, 'proctor', a.id), { recursive: true });
+      await fsp.writeFile(path.join(config.storageDir, file), bytes);
+    }
+    await this.q.execute(sql`INSERT INTO proctor_events (publisher_id, school_id, assessment_id, student_id, attempt, kind, file, detail)
+      VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${id}, ${this.ctx.userId}, ${open.attempt}, ${d.kind}, ${file}, ${JSON.stringify(d.seconds !== undefined ? { seconds: d.seconds } : {})}::jsonb)`);
+    return { ok: true };
+  }
+  /** Everything recorded for one student (teacher). */
+  async proctorLog(id: string, studentId: string) {
+    await this.assessment(id);
+    const { rows } = await this.q.execute(sql`SELECT id, attempt, kind, detail, created_at AS "createdAt", file IS NOT NULL AS "hasImage" FROM proctor_events
+      WHERE assessment_id = ${id} AND student_id = ${studentId} ORDER BY created_at`);
+    return rows;
+  }
+  async proctorImage(eventId: string) {
+    const { rows: [e] } = await this.q.execute(sql`SELECT assessment_id AS "assessmentId", file FROM proctor_events WHERE id = ${eventId}`) as any;
+    if (!e?.file) throw new NotFoundException('Not found');
+    await this.assessment(e.assessmentId);
+    try { return await fsp.readFile(path.join(config.storageDir, e.file)); } catch { throw new NotFoundException('This picture was removed'); }
+  }
+  /** Removes all photos and records of an assessment (e.g. after the results are final). */
+  async proctorClear(id: string) {
+    const a = await this.assessment(id);
+    const { rows } = await this.q.execute(sql`DELETE FROM proctor_events WHERE assessment_id = ${id} RETURNING file`);
+    await fsp.rm(path.join(config.storageDir, 'proctor', a.id), { recursive: true, force: true });
+    await this.audit.log('lms.proctor.clear', 'assessment', id, `Deleted the exam photos of “${a.title}”`);
+    return { removed: rows.length };
   }
 
   /** The try the student has started but not handed in yet. */
@@ -534,4 +592,9 @@ export class LmsService {
     });
     return { class: { id: c.id, name: c.name, section: c.section }, columns, students };
   }
+}
+
+/** Which safety checks are on (only known keys, only true/false). */
+function cleanProctor(p?: { camera?: boolean; roomScan?: boolean; screen?: boolean } | null) {
+  return { camera: !!p?.camera, roomScan: !!p?.roomScan, screen: !!p?.screen };
 }

@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsUUID } from 'class-validator';
 import { Roles } from '../common/decorators';
 import { LmsService } from './lms.service';
-import { AssessmentDto, EvaluationDto, GradeDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
+import { AssessmentDto, ProctorEventDto, EvaluationDto, GradeDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
 import { LicensingService } from '../licensing/licensing.service';
 
 class FromBankDto { @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100) @IsUUID('all', { each: true }) questionIds: string[]; }
@@ -35,6 +36,11 @@ export class TeacherController {
   @Roles('TEACHER') @Post('assessments/:id/close') close(@Param('id', Id()) id: string) { return this.svc.close(id); }
   @Roles('TEACHER') @Post('assessments/:id/from-bank') fromBank(@Param('id', Id()) id: string, @Body() d: FromBankDto) { return this.svc.addFromBank(id, d.questionIds); }
   @Roles('TEACHER') @Delete('assessments/:id') del(@Param('id', Id()) id: string) { return this.svc.deleteAssessment(id); }
+  @Roles(...STAFF) @Get('assessments/:id/watch/:studentId') watch(@Param('id', Id()) id: string, @Param('studentId', Id()) sid: string) { return this.svc.proctorLog(id, sid); }
+  @Roles(...STAFF) @Get('watch/:eventId/image') async watchImage(@Param('eventId', Id()) eid: string, @Res() res: Response) {
+    const b = await this.svc.proctorImage(eid); res.setHeader('Content-Type', 'image/jpeg'); res.setHeader('Cache-Control', 'private, max-age=3600'); res.end(b);
+  }
+  @Roles('TEACHER', 'SCHOOL_ADMIN') @Delete('assessments/:id/watch') clearWatch(@Param('id', Id()) id: string) { return this.svc.proctorClear(id); }
   @Roles('TEACHER') @Patch('submissions/:id') grade(@Param('id', Id()) id: string, @Body() d: GradeDto) { return this.svc.grade(id, d); }
 
   @Roles(...STAFF) @Get('classes/:id/gradebook') gradebook(@Param('id', Id()) id: string) { return this.svc.gradebook(id); }
@@ -51,6 +57,7 @@ export class StudentController {
   @Get('homework') list() { return this.svc.studentList(); }
   @Get('homework/:id') get(@Param('id', Id()) id: string) { return this.svc.studentGet(id); }
   @Post('homework/:id/start') start(@Param('id', Id()) id: string) { return this.svc.startAttempt(id); }
+  @Post('homework/:id/watch') watch(@Param('id', Id()) id: string, @Body() d: ProctorEventDto) { return this.svc.proctorEvent(id, d); }
   @Post('homework/:id/submit') submit(@Param('id', Id()) id: string, @Body() d: SubmitDto) { return this.svc.submit(id, d); }
   @Get('report') report() { return this.svc.studentReport(this.svc.db.ctx.userId); }
 }

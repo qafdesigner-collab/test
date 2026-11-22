@@ -8,6 +8,7 @@ import { Clip, ReadAloud } from '@/components/voice';
 import { api, fmtDay } from '@/lib/api';
 import { cn, ErrorBox, PageLoader } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
+import { CamBadge, ProctorGate, Streams, useProctor, watched } from '@/components/proctor';
 
 const COLORS = ['bg-sky-700', 'bg-pink-600', 'bg-emerald-700', 'bg-amber-700', 'bg-violet-600', 'bg-orange-700'];
 const say = (t: string) => { try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.rate = 0.85; window.speechSynthesis.speak(u); } catch { /* not available */ } };
@@ -63,6 +64,8 @@ function Doing({ h, id, onDone }: { h: any; id: string; onDone: () => void }) {
   const [i, setI] = useState(0); const [answers, setAnswers] = useState<Record<string, any>>({}); const [clips, setClips] = useState<Record<string, Clip>>({}); const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<{ startedAt: number; endsAt: number | null; skew: number } | null>(null); const [now, setNow] = useState(Date.now());
   const sent = useRef(false); const answersRef = useRef(answers); answersRef.current = answers;
+  const guard = watched(h.proctor); const [streams, setStreams] = useState<Streams | null>(null);
+  const pr = useProctor(id, h.proctor, streams, !!run && !!streams);
   const start = async () => {
     try {
       const r = await api.post<any>(`/student/homework/${id}/start`);
@@ -71,7 +74,7 @@ function Doing({ h, id, onDone }: { h: any; id: string; onDone: () => void }) {
     } catch (e: any) { toast(e.message, 'err'); }
   };
   // no time limit, or a try already started: start (or go on) straight away
-  useEffect(() => { if (!h.timeLimitMin || h.current) void start(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!guard && (!h.timeLimitMin || h.current)) void start(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!run) return; const k = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(k); }, [run]);
   const submit = async (auto = false) => {
     if (sent.current) return;
@@ -81,6 +84,7 @@ function Doing({ h, id, onDone }: { h: any; id: string; onDone: () => void }) {
     sent.current = true; setBusy(true);
     try {
       const r = await api.post<any>(`/student/homework/${id}/submit`, { answers: Object.entries(ans).map(([itemId, response]) => ({ itemId, response })) });
+      pr.stopAll();
       toast(auto ? t('Time is up — your answers were handed in.') : r.status === 'GRADED' ? t('You got {a} out of {b}! 🎉', { a: r.score, b: r.maxScore }) : t('Handed in! 🎉'));
       onDone();
     } catch (e: any) { sent.current = false; toast(e.message, 'err'); } finally { setBusy(false); }
@@ -88,6 +92,10 @@ function Doing({ h, id, onDone }: { h: any; id: string; onDone: () => void }) {
   const left = run?.endsAt ? (run.endsAt - now) / 1000 : null;
   useEffect(() => { if (left !== null && left <= 0) void submit(true); }, [left !== null && left <= 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (!run && guard) return <>
+    {h.timeLimitMin && !h.current && <p className="mt-4 rounded-2xl bg-white p-3 text-center font-bold text-slate-700 shadow-sm">⏱️ {t('You have {n} minutes.', { n: h.timeLimitMin })} {t('The clock starts when you press Start.')}</p>}
+    <ProctorGate p={h.proctor} resume={!!h.current} onReady={(s) => { setStreams(s); void start(); }} />
+  </>;
   if (!run) return h.timeLimitMin && !h.current ? (
     <div className="mt-6 rounded-3xl bg-white p-6 text-center shadow-sm">
       {h.instructions && <p className="mb-4 text-lg text-slate-600">{h.instructions}</p>}
@@ -101,6 +109,10 @@ function Doing({ h, id, onDone }: { h: any; id: string; onDone: () => void }) {
   const it = h.items[i]; const last = i === h.items.length - 1; const val = answers[it.id];
   const set = (v: any) => setAnswers({ ...answers, [it.id]: v });
   return <>
+    {guard && <CamBadge stream={pr.cam.current} />}
+    {pr.lost && <div role="alert" className="fixed inset-x-0 top-0 z-30 flex flex-wrap items-center justify-center gap-3 bg-red-600 p-3 text-white shadow-lg">
+      <b>{pr.lost === 'screen' ? t('Screen sharing stopped — your teacher can see this.') : t('The camera stopped — your teacher can see this.')}</b>
+      <button onClick={pr.reshare} className="rounded-xl bg-white px-4 py-1.5 font-bold text-red-700">{pr.lost === 'screen' ? t('Share the screen again') : t('Turn the camera on again')}</button></div>}
     <div className={cn('sticky top-2 z-10 mt-3 flex w-fit items-center gap-2 rounded-full px-4 py-1.5 text-lg font-bold tabular-nums shadow', left === null ? 'bg-white text-slate-700' : left < 60 ? 'animate-pulse bg-red-600 text-white' : left < 300 ? 'bg-amber-400 text-amber-950' : 'bg-white text-slate-700')}
       role="timer" aria-live={left !== null && left < 60 ? 'assertive' : 'off'}>
       {left === null ? <>⏱ {clock((now - run.startedAt) / 1000)}</> : <>⏳ {clock(left)} {t('left')}</>}
