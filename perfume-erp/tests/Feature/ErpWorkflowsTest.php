@@ -377,4 +377,26 @@ class ErpWorkflowsTest extends TestCase
         $this->assertSame(4000, (int) DB::table('documents')->where('kind', 'Return')->value('cash_refund_cents'));
         $this->getJson('/api/shifts')->assertJsonPath('shifts.0.expected_cents', 5000);
     }
+
+    public function test_quotation_converts_once_to_invoice_at_quoted_prices(): void
+    {
+        $quote = $this->postOnce('/api/documents', ['kind' => 'Quotation', 'contact_id' => 1, 'location_id' => 1, 'method' => 'Credit', 'paid' => '0', 'lines' => [['product_id' => 1, 'quantity' => '2', 'price' => '120.00', 'discount' => '10.00']]])->assertOk()->json();
+        DB::table('products')->where('id', 1)->update(['price_cents' => 99900]);
+        $stock = (int) DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli');
+
+        $this->actingAs(User::factory()->create(['role' => 'cashier']));
+        $this->postOnce('/api/documents/'.$quote['id'], ['action' => 'convert'])->assertForbidden();
+        $this->actingAs($this->owner);
+
+        $invoice = $this->postOnce('/api/documents/'.$quote['id'], ['action' => 'convert'])->assertOk()->json();
+        $this->assertSame(23000, $invoice['total_cents']);
+        $line = DB::table('document_lines')->where('document_id', $invoice['id'])->first();
+        $this->assertSame([2000, 12000, 1000], [(int) $line->quantity_milli, (int) $line->price_cents, (int) $line->discount_cents]);
+        $this->assertSame('Invoiced', DB::table('documents')->where('id', $quote['id'])->value('status'));
+        $this->assertSame($quote['id'], (int) DB::table('documents')->where('id', $invoice['id'])->value('quotation_id'));
+        $this->assertSame($stock - 2000, (int) DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli'));
+        $this->getJson('/api/documents/'.$quote['id'])->assertJsonPath('invoice.number', $invoice['number']);
+
+        $this->postOnce('/api/documents/'.$quote['id'], ['action' => 'convert'])->assertUnprocessable();
+    }
 }

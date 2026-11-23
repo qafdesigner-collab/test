@@ -132,6 +132,41 @@ final class Documents
         });
     }
 
+    /**
+     * Turn a draft or accepted quotation into a posted invoice at the quoted prices.
+     * Stock, credit limit and product checks run exactly as for a new invoice.
+     */
+    public static function convertQuotation(int $id, int $user): array
+    {
+        return DB::transaction(function () use ($id, $user) {
+            $quote = DB::table('documents')->where('id', $id)->lockForUpdate()->first();
+            if (! $quote || $quote->kind !== 'Quotation' || ! in_array($quote->status, ['Draft', 'Accepted'])) {
+                self::fail('Only a draft or accepted quotation can become an invoice, once.');
+            }
+            if (! $quote->contact_id) {
+                self::fail('Add a customer to the quotation before invoicing it.');
+            }
+            $terms = (int) DB::table('contacts')->where('id', $quote->contact_id)->value('terms_days');
+            $lines = DB::table('document_lines')->where('document_id', $id)->orderBy('id')->get()->map(fn ($l) => [
+                'product_id' => $l->product_id,
+                'quantity' => Amounts::format((int) $l->quantity_milli, 3),
+                'price' => Amounts::format((int) $l->price_cents),
+                'discount' => Amounts::format((int) $l->discount_cents),
+            ])->all();
+            $invoice = self::create([
+                'kind' => 'Invoice', 'contact_id' => $quote->contact_id, 'location_id' => $quote->location_id,
+                'method' => 'Credit', 'paid' => '0', 'lines' => $lines,
+                'notes' => trim('From quotation '.$quote->number.($quote->notes ? "\n".$quote->notes : '')),
+                'bill_reference' => $quote->bill_reference, 'due_date' => $terms > 0 ? now()->addDays($terms)->toDateString() : null,
+            ], $user);
+            DB::table('documents')->where('id', $invoice['id'])->update(['quotation_id' => $id]);
+            DB::table('documents')->where('id', $id)->update(['status' => 'Invoiced', 'updated_at' => now()]);
+            DB::table('audit')->insert(['user_id' => $user, 'action' => 'quotation.invoiced', 'subject' => $quote->number, 'details' => json_encode(['invoice' => $invoice['number']]), 'created_at' => now()]);
+
+            return $invoice;
+        });
+    }
+
     public static function returnSale(int $id, string $condition, int $user): array
     {
         return DB::transaction(function () use ($id, $condition, $user) {

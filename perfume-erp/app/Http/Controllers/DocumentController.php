@@ -47,7 +47,7 @@ class DocumentController extends ErpBaseController
             }
         }
 
-        return ['document' => $d, 'lines' => $lines, 'profit' => $finance ? Profitability::document($d, $lines) : null, 'payments' => DB::table('payments')->where('document_id', $id)->get(), 'contact' => $d->contact_snapshot ? json_decode($d->contact_snapshot, true) : ($d->contact_id ? DB::table('contacts')->find($d->contact_id) : null)];
+        return ['document' => $d, 'lines' => $lines, 'profit' => $finance ? Profitability::document($d, $lines) : null, 'payments' => DB::table('payments')->where('document_id', $id)->get(), 'quotation' => $d->quotation_id ? DB::table('documents')->select('id', 'number')->find($d->quotation_id) : null, 'invoice' => $d->kind === 'Quotation' ? DB::table('documents')->select('id', 'number')->where('quotation_id', $d->id)->first() : null, 'contact' => $d->contact_snapshot ? json_decode($d->contact_snapshot, true) : ($d->contact_id ? DB::table('contacts')->find($d->contact_id) : null)];
     }
 
     public function createDocument(Request $r)
@@ -84,6 +84,8 @@ class DocumentController extends ErpBaseController
             $r->validate(['condition' => ['required', Rule::in(['Restock', 'Do not restock'])]]);
 
             return $this->once($r, 'return', fn () => Documents::returnSale($id, $r->input('condition'), Auth::id()));
+        }if ($action === 'convert') {
+            return $this->once($r, 'quotation.convert', fn () => Documents::convertQuotation($id, Auth::id()));
         }if (in_array($action, ['accept', 'decline'])) {
             return DB::transaction(function () use ($id, $action) {
                 $doc = DB::table('documents')->where('id', $id)->lockForUpdate()->first();
