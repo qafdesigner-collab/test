@@ -118,3 +118,42 @@ Scan tree: `/tmp/edubooks-scan/edubooks` (HEAD `4b23abf`). All 44 `*controller.t
 | Login-as | `login-as.controller.ts`, `0032_login_as.sql` | Start = PUBLISHER_ADMIN + school user; return unbound is known #17 only with XSS |
 
 Do not re-open excluded items (timetable onlineUrl IDOR #10, login-as+XSS #17, games/exams answer keys, mustChangePassword, admin reset revoke, commerce/erasure if gated, etc.).
+
+---
+
+## Crypto / secrets / infra re-hunt (2026-11-23, very thorough) — NONE
+
+Scan trees: `/tmp/edubooks-scan/edubooks` (packaging/cpanel, packaging/public_html, infra/, compose.prod.yml, docker-compose.yml, apps/api crypto+auth), `/tmp/edubooks-scan/lms`, `/tmp/edubooks-scan/.github/workflows`.
+
+**Result: NONE** — no new MEDIUM+ crypto/secrets/infrastructure finding with a complete attack chain beyond already-known exclusions (#11 demo/secret-box/HMAC, LMS seed passwords, cPanel demo admin password, #16 public_html updater RCE, LMS plaintext sessions, LMS login rate limit).
+
+### Surfaces reviewed (held)
+
+| Area | Primary files | Why it held |
+|---|---|---|
+| Session / cookie flags | `auth.controller.ts`, `login-as.controller.ts`, `config.ts`, cPanel `app.js` | `httpOnly` + `sameSite: 'lax'`; `COOKIE_SECURE` forced `1` in compose.prod and when installer `siteUrl` is https; session token `randomBytes(32)` hashed at rest (SHA-256) |
+| Password hashing | `auth/password.ts`, LMS `db.js` | Argon2id OWASP params; LMS bcrypt cost 10; lockout via `auth_login_result` (≥5 failures) |
+| secret-box / file HMAC / PDF AES-CTR / app-download | `secret-box.ts`, `assets.service.ts`, `apps.controller.ts`, `flipbook.service.ts` | Known #11 (FILE_URL_SECRET keying); uses `createCipheriv` AES-GCM/CTR (not legacy `createCipher`); `timingSafeEqual` on HMACs |
+| Publisher SMTP at-rest password | `0035_mail.sql`, `mail.controller.ts` `saveSettings` | Plaintext column vs sealed mailbox/AI keys — no low-priv read path (`@Roles('PUBLISHER_ADMIN')`, API returns `hasPassword` only); needs DB/backup read already |
+| Embedded Postgres | `packaging/cpanel/embedded-db.js` | `listen_addresses=''`, unix socket `0700`, `auth-host=reject`, scram-sha-256; passwords `randomBytes` |
+| cPanel installer | `packaging/cpanel/app.js` | Install key `randomBytes(9)` + timingSafeEqual; `.env` mode `0o600`; `FILE_URL_SECRET` generated at install; no static serve of `install-key.txt` |
+| public_html wizard | `packaging/public_html/index.php` | CSRF on POST; `autoinstall.json` chmod 0600 then deleted; emergency update path = known #16 |
+| Docker / compose | `compose.prod.yml`, Dockerfiles, `docker-compose.yml` | Prod: no DB ports published; `USER node`; secrets required via `${…:?}`; local compose weak creds intentional for localhost |
+| GitHub Actions | `.github/workflows/edubooks-ci.yml` | `permissions: contents: read`; no `pull_request_target`; no `secrets.*` exfil; CI dummy env only |
+| Caddy / backups | `infra/prod/Caddyfile`, `infra/backup/*` | HSTS; GPG encrypt optional; umask 077; no privileged/cap_add/docker.sock |
+| LMS tokens / PINs | `lms/src/auth.js`, `routes.js` bulk students | Session `randomBytes(32)` (plaintext store = already known); 4-digit student PINs intentional for kids — spraying needs known no-rate-limit |
+
+### Discarded candidates (below MEDIUM / incomplete chain / excluded)
+
+- Publisher SMTP password plaintext at rest (defense-in-depth only; no unauth/low-priv exfil)
+- `mail_smtp_config()` SECURITY DEFINER returns password to app role (server-side mailer only; school API paths select `site_url` only)
+- `open()` plaintext passthrough when value lacks `v1:` prefix (needs prior write of unsealed secret)
+- AES-CTR PDF stream without AEAD (DRM convenience; key returned to licensed reader by design — #11 family)
+- cPanel `LOGIN_RATE_LIMIT=600` / `RATE_LIMIT_PER_IP_PER_MIN=30000` (account lockout still applies)
+- `docker-compose.yml` exposed Postgres/MinIO weak passwords (local-dev labeled)
+- Default `DATABASE_URL`/`DATABASE_OWNER_URL` in `config.ts` when env unset (compose.prod/cPanel override; no prod boot with published DB)
+- LMS bulk `randomInt(1000,10000)` student passwords (product choice; rate-limit gap already known)
+- Host-header `site_url()` in public_html installer (known #12 class; no password-reset email chain)
+- health/ready `e.message` (known #13)
+- System update `POST .../download` https SSRF (known #3)
+- No `createCipher`/`md5`-as-MAC/`Math.random` for auth tokens; Piper MD5 is vendor checksum only
