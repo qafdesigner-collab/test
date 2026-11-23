@@ -92,29 +92,29 @@ Publisher admin (and school admin when AI access is `OWN`) can set `preset` to `
 
 ---
 
-## AuthZ re-hunt (2026-11-23) — no new MEDIUM+ findings
+## AuthZ re-hunt (2026-11-23, thorough) — NONE
 
-Scan tree: `/tmp/edubooks-scan/edubooks/edubooks` (product HEAD `4b23abf`, includes 1.4.17 panorama/proctor). Focus: login-as, files/chunked uploads, reader PDF/hotspots/work, school-admin resets, licensing pools, exams/proctor live view, parent-child, progress override, publishing/reader license gates, broad `@Roles` (`SCHOOL`/`ANY`/`ALLIN`), student→teacher/admin data.
+Scan tree: `/tmp/edubooks-scan/edubooks` (HEAD `4b23abf`). All 44 `*controller.ts` files reviewed with service/guard/SQL follow-through.
 
-**Result: none** (no new validated MEDIUM/HIGH/CRITICAL authorization bug with a complete attack chain beyond already-known exclusions).
+**Result: NONE** — no new validated MEDIUM+ authorization/IDOR/privilege-escalation bug with a complete attack chain beyond already-known exclusions.
 
-### Paths checked (controller → service → DB / RLS)
+### Paths checked (why they held)
 
 | Area | Primary files | Gate that held |
 |---|---|---|
-| Login-as / return | `auth/login-as.controller.ts`, `drizzle/0032_login_as.sql`, `auth.guard.ts` | `start_impersonation` = PUBLISHER_ADMIN + school user only; return unbound to impersonator is known #17 only with XSS |
-| Files / signed URLs | `storage/files.controller.ts`, `storage/assets.service.ts`, `licensing.service.ts` `canAccessAsset` | `sameUser` + entitlement/`visibleTo` checker; staff bypass intentional |
-| Chunked uploads | `storage/chunked.controller.ts` | PUBLISHER_STAFF + `meta.userId` bind + hex32 id |
-| Reader PDF / hotspots / work | `reader/reader.controller.ts`, `reader/reader.service.ts` | `assertEdition` + `sees(visibleTo)`; workScope via `assertTeaches` / `teacherClassIds` |
-| Apps / flipbook | `apps/apps.controller.ts`, `flipbook/flipbook.controller.ts` | `assertEdition` on reader paths; flip HMAC + sameUser on document navigations |
-| School-admin users/passwords | `school-admin/school-admin.controller.ts`, `schools/school-users.service.ts` | `@Roles('SCHOOL_ADMIN')` + `users.schoolId`; peer admin reset = intentional school IT |
-| Licensing pools / assign | `licensing/licensing.service.ts`, school-admin pool routes | RLS `school_id = app_school()` on pool SELECT; `lockablePool` / `assignment()` schoolId checks; seat FOR UPDATE SKIP LOCKED |
-| Exams / LMS / proctor / live | `lms/lms.controller.ts`, `lms/lms.service.ts`, `exams/exams.controller.ts` | `assessment()` → `assertTeaches`; student `visibleToStudent`; proctor RLS own-row for students |
-| Parents / child | `parents/parents.controller.ts` | `assertChild` / `parent_students`; AuthGuard parent allowlist |
-| Progress override | `progress/progress.controller.ts` | `assertTeaches` + enrolment membership |
-| Messaging / live lessons / whiteboard | `messaging/messaging.controller.ts`, `whiteboard/whiteboard.controller.ts` | `contacts()`/`myClassIds`/`canSee`/`assertTeaches` (unlike timetable #10) |
-| Audio | `audio/audio.controller.ts` | `allowed()` owner / peer / teacherClassIds / parent |
-| Calendar / groups / checklists / attendance | respective controllers | list scoped; writes `assertTeaches` or SCHOOL_ADMIN; timetable teacher IDOR already #10 |
-| Auth core | `auth/auth.guard.ts`, `common/tenant.interceptor.ts`, `lms/access.service.ts` | session hash, `@Roles`, parent default-deny, TenantCtx RLS |
+| `canSeeClass` vs `assertTeaches` | `attendance/attendance.controller.ts` | Only timetable uses `canSeeClass` (known #10). Attendance register/save/report, LMS, exams, whiteboard, progress, groups, checklists, live lessons all use `assertTeaches` / `myClassIds` / `canSee` |
+| Broad `@Roles` (`SCHOOL`/`ANY`/`ALLIN`) | messaging, school-brand, calendar, covers, catalog GETs | Messaging scopes via `contacts`/`myClassIds`; calendar/catalog/covers are non-sensitive lists; parent default-deny allowlist still applies |
+| Files / signed URLs / chunked | `storage/files.controller.ts`, `assets.service.ts`, `chunked.controller.ts` | `sameUser` + `canAccessAsset` (entitlement + `visibleTo`); chunked `meta.userId` bind + hex32 |
+| Reader PDF / hotspots / work | `reader/reader.controller.ts`, `reader.service.ts` | `assertEdition` + `sees(visibleTo)`; `workScope` → `assertTeaches` / `teacherClassIds`; SCHOOL_ADMIN school-wide intentional |
+| Apps / flipbook | `apps/apps.controller.ts`, `flipbook/*` | Reader paths `assertEdition`; flip HMAC + sameUser on document navigations; cookie-less subframe loads intentional |
+| School-admin password / users | `school-admin.controller.ts`, `school-users.service.ts` | `@Roles('SCHOOL_ADMIN')` + `users.schoolId` match; CreateUsersDto TEACHER\|STUDENT only; peer admin reset = school IT |
+| Licensing seat theft | `licensing.service.ts` | RLS `school_id = app_school()`; `lockablePool`/`assignment` schoolId checks; seats `FOR UPDATE SKIP LOCKED` |
+| Proctor / live / exams | `lms.service.ts`, `exams.controller.ts` | `assessment()` → `assertTeaches`; student `visibleToStudent`; proctor RESTRICTIVE RLS own-row; images only via teacher watch routes |
+| Parent → other children | `parents.controller.ts`, attendance/checklists parent routes | `assertChild` / `parent_students`; AuthGuard parent allowlist |
+| Progress override | `progress.controller.ts` | `assertTeaches` + enrolment membership |
+| Mass assignment role/schoolId | DTOs + `main.ts` ValidationPipe | `whitelist` + `forbidNonWhitelisted`; update DTOs lack privileged fields |
+| Unauth / Public leaks | registration, company public, health, branding, ruffle, app-download, files token | Registration throttled/honeypot; company tax/IBAN known #5; file/app tokens capability URLs; below new MEDIUM |
+| RLS / owner SQL | `db.service.ts`, `demo.controller.ts`, `erase_student_data`, `start_impersonation` | Request path uses tenant TX + `set_config`; owner URL only demo load (PUBLISHER_ADMIN) / migrate; SECURITY DEFINER funcs re-check publisher/school |
+| Login-as | `login-as.controller.ts`, `0032_login_as.sql` | Start = PUBLISHER_ADMIN + school user; return unbound is known #17 only with XSS |
 
-Do not re-open excluded items (timetable onlineUrl IDOR, games/exams answer keys, mustChangePassword, admin reset revoke, commerce/erasure/training/checklists/analytics, login-as+XSS #17, etc.).
+Do not re-open excluded items (timetable onlineUrl IDOR #10, login-as+XSS #17, games/exams answer keys, mustChangePassword, admin reset revoke, commerce/erasure if gated, etc.).
