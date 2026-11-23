@@ -21,7 +21,7 @@
         <nav id="navigation"></nav>
         <div class="sidebar-bottom">
             <div class="connection"><i></i><span>Connected to this server</span></div>
-            <div class="build-badge">Development release · {{ config('erp.version') }}</div>
+            <div class="build-badge">Development release · {{ \Illuminate\Support\Str::before(config('erp.version'), '-') }}</div>
             <button class="user-card" onclick="passwordDialog()">
                 <span class="avatar" id="avatar">A</span>
                 <span><b id="user-name"></b><small id="user-role"></small></span>

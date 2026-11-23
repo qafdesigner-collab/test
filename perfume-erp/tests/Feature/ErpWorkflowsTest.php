@@ -337,4 +337,22 @@ class ErpWorkflowsTest extends TestCase
         $this->assertIsInt($dashboard['revenue_cents']);
         $this->assertIsInt($dashboard['outstanding_cents']);
     }
+
+    public function test_dashboard_sales_metrics_and_role_restriction(): void
+    {
+        $sale = $this->postOnce('/api/documents', $this->sale())->assertOk()->json();
+        $total = DB::table('documents')->where('id', $sale['id'] ?? DB::table('documents')->max('id'))->value('total_cents');
+        DB::table('documents')->insert(['uuid' => (string) Str::uuid(), 'number' => 'OLD-1', 'kind' => 'Invoice', 'status' => 'Posted', 'location_id' => 1, 'user_id' => $this->owner->id, 'subtotal_cents' => 5000, 'tax_cents' => 0, 'total_cents' => 5000, 'created_at' => now()->subDays(40), 'updated_at' => now()->subDays(40)]);
+
+        $sales = $this->getJson('/api/dashboard')->assertOk()->json('sales');
+        $this->assertSame((int) $total, $sales['period']['revenue_cents']);
+        $this->assertSame(5000, $sales['period']['previous_revenue_cents']);
+        $this->assertSame(1, $sales['period']['documents']);
+        $this->assertCount(14, $sales['trend']);
+        $this->assertSame((int) $total, end($sales['trend'])['total']);
+        $this->assertSame(1, $sales['top_products'][0]['id']);
+
+        $this->actingAs(User::factory()->create(['role' => 'cashier']));
+        $this->assertNull($this->getJson('/api/dashboard')->assertOk()->json('sales'));
+    }
 }
