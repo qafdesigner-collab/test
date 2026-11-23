@@ -150,13 +150,13 @@ async function documentDetail(id) {
       : state.boot.settings;
     modal(
       p.number,
-      `<article class="document-preview"><div class="document-header"><div>${state.boot.settings.logo_path ? `<img class="doc-logo" src="${logoUrl()}" alt="">` : ''}<p class="eyebrow">${esc(s.company_name)}</p><h1>${esc(p.kind === 'Sale' ? 'SALES RECEIPT' : p.kind === 'PurchaseOrder' ? 'PURCHASE ORDER' : p.kind === 'SupplierReturn' ? 'RETURN TO SUPPLIER' : p.kind.toUpperCase())}</h1><p class="muted tiny">${esc(s.address || '')}<br>${esc(s.phone || '')} · ${esc(s.email || '')}<br>${s.tax_id ? 'Tax ID: ' + esc(s.tax_id) : ''}</p></div><div class="right"><h2>${esc(p.number)}</h2>${badge(p.status)}<p class="tiny muted" style="margin-top:10px">${date(p.created_at)}${p.due_date ? '<br>Due ' + date(p.due_date) : ''}${p.bill_reference ? '<br>Reference: ' + esc(p.bill_reference) : ''}${d.original ? `<br>${p.kind === 'SupplierReturn' ? 'From receipt' : 'Return of'} <button class="subtle" onclick="documentDetail(${d.original.id})">${esc(d.original.number)}</button>` : ''}${d.purchase_order ? `<br>Against order <button class="subtle" onclick="documentDetail(${d.purchase_order.id})">${esc(d.purchase_order.number)}</button>` : ''}${p.kind === 'PurchaseOrder' && p.due_date ? '<br>Expected ' + date(p.due_date) : ''}${d.quotation ? `<br>From quotation <button class="subtle" onclick="documentDetail(${d.quotation.id})">${esc(d.quotation.number)}</button>` : ''}${d.invoice ? `<br>Invoiced as <button class="subtle" onclick="documentDetail(${d.invoice.id})">${esc(d.invoice.number)}</button>` : ''}</p></div></div><div class="document-meta"><div><small class="muted">${['Purchase', 'PurchaseOrder', 'SupplierReturn'].includes(p.kind) ? 'Supplier' : 'Customer'}</small><br><b>${esc(d.contact?.name || 'Walk-in customer')}</b><br><small>${esc(d.contact?.address || '')}<br>${esc(d.contact?.phone || '')} ${esc(d.contact?.email || '')}${d.contact?.tax_id ? '<br>Tax ID: ' + esc(d.contact.tax_id) : ''}</small></div><div class="right">${p.kind === 'PurchaseOrder' ? `<small class="muted">Deliver to</small><br>${esc(state.boot.locations.find(l => l.id === p.location_id)?.name || '')}</div>` : `<small class="muted">Payment</small><br>${(d.payments || []).length > 1 ? d.payments.map(pay => `${esc(pay.method)} ${money(pay.amount_cents)}`).join('<br>') : esc(p.method)}${p.tendered_cents ? `<br><small class="muted">Cash received ${money(p.tendered_cents)} · change ${money(p.change_cents)}</small>` : ''}</div>`}</div>${table(
+      `${["Sale", "Invoice", "Quotation", "Return"].includes(p.kind) ? relatedLinks(d) + taxInvoiceMarkup(d, s) : `<article class="document-preview"><div class="document-header"><div>${state.boot.settings.logo_path ? `<img class="doc-logo" src="${logoUrl()}" alt="">` : ''}<p class="eyebrow">${esc(s.company_name)}</p><h1>${esc(p.kind === 'Sale' ? 'SALES RECEIPT' : p.kind === 'PurchaseOrder' ? 'PURCHASE ORDER' : p.kind === 'SupplierReturn' ? 'RETURN TO SUPPLIER' : p.kind.toUpperCase())}</h1><p class="muted tiny">${esc(s.address || '')}<br>${esc(s.phone || '')} · ${esc(s.email || '')}<br>${s.tax_id ? 'Tax ID: ' + esc(s.tax_id) : ''}</p></div><div class="right"><h2>${esc(p.number)}</h2>${badge(p.status)}<p class="tiny muted" style="margin-top:10px">${date(p.created_at)}${p.due_date ? '<br>Due ' + date(p.due_date) : ''}${p.bill_reference ? '<br>Reference: ' + esc(p.bill_reference) : ''}${d.original ? `<br>${p.kind === 'SupplierReturn' ? 'From receipt' : 'Return of'} <button class="subtle" onclick="documentDetail(${d.original.id})">${esc(d.original.number)}</button>` : ''}${d.purchase_order ? `<br>Against order <button class="subtle" onclick="documentDetail(${d.purchase_order.id})">${esc(d.purchase_order.number)}</button>` : ''}${p.kind === 'PurchaseOrder' && p.due_date ? '<br>Expected ' + date(p.due_date) : ''}${d.quotation ? `<br>From quotation <button class="subtle" onclick="documentDetail(${d.quotation.id})">${esc(d.quotation.number)}</button>` : ''}${d.invoice ? `<br>Invoiced as <button class="subtle" onclick="documentDetail(${d.invoice.id})">${esc(d.invoice.number)}</button>` : ''}</p></div></div><div class="document-meta"><div><small class="muted">${['Purchase', 'PurchaseOrder', 'SupplierReturn'].includes(p.kind) ? 'Supplier' : 'Customer'}</small><br><b>${esc(d.contact?.name || 'Walk-in customer')}</b><br><small>${esc(d.contact?.address || '')}<br>${esc(d.contact?.phone || '')} ${esc(d.contact?.email || '')}${d.contact?.tax_id ? '<br>Tax ID: ' + esc(d.contact.tax_id) : ''}</small></div><div class="right">${p.kind === 'PurchaseOrder' ? `<small class="muted">Deliver to</small><br>${esc(state.boot.locations.find(l => l.id === p.location_id)?.name || '')}</div>` : `<small class="muted">Payment</small><br>${(d.payments || []).length > 1 ? d.payments.map(pay => `${esc(pay.method)} ${money(pay.amount_cents)}`).join('<br>') : esc(p.method)}${p.tendered_cents ? `<br><small class="muted">Cash received ${money(p.tendered_cents)} · change ${money(p.change_cents)}</small>` : ''}</div>`}</div>${table(
         ['Item', 'Qty / unit', 'Unit price', 'Discount', 'Tax', 'Total'],
         d.lines.map(
           l =>
             `<tr><td>${esc(l.name)}${p.kind === 'PurchaseOrder' ? `<small class="returned-note">${quantity(l.received_milli || 0)} of ${quantity(l.quantity_milli)} received</small>` : ''}${Number(l.returned_milli) ? `<small class="returned-note">${quantity(l.returned_milli)} ${esc(l.unit)} returned</small>` : ''}</td><td>${quantity(l.quantity_milli)} ${esc(l.unit)}</td><td>${money(l.price_cents)}</td><td>${money(l.discount_cents)}</td><td>${money(l.tax_cents)}</td><td>${money(l.total_cents)}</td></tr>`,
         ),
-      )}<div class="document-total"><p>Subtotal ${money(p.subtotal_cents)} · Tax ${money(p.tax_cents)}</p><strong>${money(p.total_cents)}</strong>${Number(p.returned_cents) ? `<small>Items returned ${money(p.returned_cents)}${Number(p.refunded_cents) ? ' · refunded ' + money(p.refunded_cents) : ''}</small>` : ''}${p.kind === 'PurchaseOrder' ? '<small>Order value · billed on each delivery receipt</small>' : ''}<small ${p.kind === 'PurchaseOrder' ? 'hidden' : ''}>Paid ${money(p.paid_cents)} · ${p.status === 'Returned' ? 'Returned' : `Balance ${money(p.total_cents - p.paid_cents - Number(p.returned_cents || 0) + Number(p.refunded_cents || 0))}`}</small></div>${p.notes ? `<p class="tiny muted" style="margin-top:20px">${esc(p.notes)}</p>` : ''}<p class="doc-footer">${p.kind === 'PurchaseOrder' ? 'Please quote this order number on your delivery note and invoice.' : esc(state.boot.settings.invoice_footer || 'Thank you for your business.')}</p></article>${p.kind === 'PurchaseOrder' && d.receipts.length ? `<div class="section-label">Deliveries received</div>${table(['Receipt', 'Date', 'Value'], d.receipts.map(r => `<tr><td><button class="subtle" onclick="documentDetail(${r.id})">${esc(r.number)}</button></td><td>${date(r.created_at)}</td><td>${money(r.total_cents)}</td></tr>`))}` : ''}${invoiceCostView(d)}<div class="form-actions"><button class="secondary" onclick="window.print()">Print A4 / save PDF</button>${['Sale', 'Invoice', 'Return'].includes(p.kind) ? `<button class="secondary" onclick="printReceipt(${id})">Print receipt · 80 mm</button>` : ''}${can('manager', 'accountant') && p.status === 'Draft' && p.kind === 'Quotation' ? `<button class="secondary" onclick="quotationAction(${id},'decline')">Decline</button><button class="secondary" onclick="quotationAction(${id},'accept')">Accept quotation</button>` : ''}${p.kind === 'Purchase' && p.status === 'Posted' && can('manager', 'warehouse') && d.lines.some(l => Number(l.quantity_milli) > Number(l.returned_milli || 0)) ? `<button class="secondary" onclick="supplierReturnDialog(${id})">Return to supplier</button>` : ''}${p.kind === 'PurchaseOrder' && ['Ordered', 'Partially received'].includes(p.status) ? `${can('manager', 'accountant') ? `<button class="secondary" onclick="closeOrder(${id})">${p.status === 'Ordered' ? 'Cancel order' : 'Close · stop waiting for the rest'}</button>` : ''}${can('manager', 'warehouse') ? `<button class="primary" onclick="receiveOrderDialog(${id})">Receive goods →</button>` : ''}` : ''}${can('manager', 'accountant') && ['Draft', 'Accepted'].includes(p.status) && p.kind === 'Quotation' ? `<button class="primary" onclick="convertQuotation(${id})">Convert to invoice →</button>` : ''}${can('manager', 'accountant') && p.status === 'Posted' && p.kind !== 'Return' ? `${p.paid_cents < p.total_cents ? `<button class="primary" onclick="paymentDialog(${id},${p.total_cents - p.paid_cents})">Record payment</button>` : ''}${['Sale', 'Invoice'].includes(p.kind) && d.lines.some(l => Number(l.quantity_milli) > Number(l.returned_milli || 0)) ? `<button class="secondary" onclick="partialReturnDialog(${id})">Return items</button>` : ''}${['Sale', 'Invoice'].includes(p.kind) && !Number(p.returned_cents) ? `<button class="danger" onclick="returnDialog(${id})">Full return</button>` : ''}` : ''}</div>`,
+      )}<div class="document-total"><p>Subtotal ${money(p.subtotal_cents)} · Tax ${money(p.tax_cents)}</p><strong>${money(p.total_cents)}</strong>${Number(p.returned_cents) ? `<small>Items returned ${money(p.returned_cents)}${Number(p.refunded_cents) ? ' · refunded ' + money(p.refunded_cents) : ''}</small>` : ''}${p.kind === 'PurchaseOrder' ? '<small>Order value · billed on each delivery receipt</small>' : ''}<small ${p.kind === 'PurchaseOrder' ? 'hidden' : ''}>Paid ${money(p.paid_cents)} · ${p.status === 'Returned' ? 'Returned' : `Balance ${money(p.total_cents - p.paid_cents - Number(p.returned_cents || 0) + Number(p.refunded_cents || 0))}`}</small></div>${p.notes ? `<p class="tiny muted" style="margin-top:20px">${esc(p.notes)}</p>` : ''}<p class="doc-footer">${p.kind === 'PurchaseOrder' ? 'Please quote this order number on your delivery note and invoice.' : esc(state.boot.settings.invoice_footer || 'Thank you for your business.')}</p></article>`}${p.kind === 'PurchaseOrder' && d.receipts.length ? `<div class="section-label">Deliveries received</div>${table(['Receipt', 'Date', 'Value'], d.receipts.map(r => `<tr><td><button class="subtle" onclick="documentDetail(${r.id})">${esc(r.number)}</button></td><td>${date(r.created_at)}</td><td>${money(r.total_cents)}</td></tr>`))}` : ''}${invoiceCostView(d)}<div class="form-actions"><button class="secondary" onclick="window.print()">Print A4 / save PDF</button>${['Sale', 'Invoice', 'Return'].includes(p.kind) ? `<button class="secondary" onclick="printReceipt(${id})">Print receipt · 80 mm</button>` : ''}${can('manager', 'accountant') && p.status === 'Draft' && p.kind === 'Quotation' ? `<button class="secondary" onclick="quotationAction(${id},'decline')">Decline</button><button class="secondary" onclick="quotationAction(${id},'accept')">Accept quotation</button>` : ''}${p.kind === 'Purchase' && p.status === 'Posted' && can('manager', 'warehouse') && d.lines.some(l => Number(l.quantity_milli) > Number(l.returned_milli || 0)) ? `<button class="secondary" onclick="supplierReturnDialog(${id})">Return to supplier</button>` : ''}${p.kind === 'PurchaseOrder' && ['Ordered', 'Partially received'].includes(p.status) ? `${can('manager', 'accountant') ? `<button class="secondary" onclick="closeOrder(${id})">${p.status === 'Ordered' ? 'Cancel order' : 'Close · stop waiting for the rest'}</button>` : ''}${can('manager', 'warehouse') ? `<button class="primary" onclick="receiveOrderDialog(${id})">Receive goods →</button>` : ''}` : ''}${can('manager', 'accountant') && ['Draft', 'Accepted'].includes(p.status) && p.kind === 'Quotation' ? `<button class="primary" onclick="convertQuotation(${id})">Convert to invoice →</button>` : ''}${can('manager', 'accountant') && p.status === 'Posted' && p.kind !== 'Return' ? `${p.paid_cents < p.total_cents ? `<button class="primary" onclick="paymentDialog(${id},${p.total_cents - p.paid_cents})">Record payment</button>` : ''}${['Sale', 'Invoice'].includes(p.kind) && d.lines.some(l => Number(l.quantity_milli) > Number(l.returned_milli || 0)) ? `<button class="secondary" onclick="partialReturnDialog(${id})">Return items</button>` : ''}${['Sale', 'Invoice'].includes(p.kind) && !Number(p.returned_cents) ? `<button class="danger" onclick="returnDialog(${id})">Full return</button>` : ''}` : ''}</div>`,
       true,
     );
   } catch (e) {
@@ -268,7 +268,7 @@ async function printReceipt(id) {
   const snapshot = p.seller_snapshot ? (typeof p.seller_snapshot === 'string' ? JSON.parse(p.seller_snapshot) : p.seller_snapshot) : state.boot.settings;
   const logo = state.boot.settings.logo_path ? `<img src="${location.origin}${logoUrl()}" alt="" class="logo">` : '';
   const lines = d.lines
-    .map(l => `<tr><td colspan="2">${esc(l.name)}</td></tr><tr class="sub"><td>${quantity(l.quantity_milli)} ${esc(l.unit)} × ${money(l.price_cents)}${l.discount_cents ? ' − ' + money(l.discount_cents) : ''}</td><td class="r">${money(l.total_cents)}</td></tr>`)
+    .map(l => `<tr><td colspan="2">${esc(l.name)}</td></tr>${l.name_ar ? `<tr><td colspan="2" dir="rtl">${esc(l.name_ar)}</td></tr>` : ''}<tr class="sub"><td>${quantity(l.quantity_milli)} ${esc(l.unit)} × ${money(l.price_cents)}${Number(l.discount_cents) ? '<br>Discount / خصم −' + money(l.discount_cents) : ''}</td><td class="r">${money(l.total_cents)}</td></tr>`)
     .join('');
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(p.number)}</title><style>
     @page { size: 80mm auto; margin: 4mm; }
@@ -282,11 +282,11 @@ async function printReceipt(id) {
     tr.sub td { padding-bottom: 4px; }
     .total td { font-size: 15px; font-weight: 700; padding-top: 4px; }
   </style></head><body>
-    <div class="c">${logo}<h1>${esc(snapshot.company_name)}</h1><p>${esc(snapshot.address || '')}</p><p>${esc(snapshot.phone || '')}</p>${snapshot.tax_id ? `<p>Tax ID ${esc(snapshot.tax_id)}</p>` : ''}</div>
-    <hr><p>${esc(p.kind === 'Return' ? 'RETURN' : 'RECEIPT')} ${esc(p.number)}</p><p>${new Date(p.created_at).toLocaleString('en')}</p>${d.contact ? `<p>Customer: ${esc(d.contact.name)}</p>` : ''}<hr>
+    <div class="c">${logo}<h1>${esc(snapshot.company_name)}</h1>${snapshot.company_name_ar ? `<h1 dir="rtl">${esc(snapshot.company_name_ar)}</h1>` : ''}<p>${esc(snapshot.address || '')}</p><p>${esc(snapshot.phone || '')}</p>${snapshot.tax_id ? `<p>TRN / الرقم الضريبي: ${esc(snapshot.tax_id)}</p>` : ''}</div>
+    <hr><p class="c"><b>${String(snapshot.vat_registered ?? state.boot.settings.vat_registered) === '1' ? (p.kind === 'Return' ? 'TAX CREDIT NOTE<br>إشعار دائن ضريبي' : 'SIMPLIFIED TAX INVOICE<br>فاتورة ضريبية مبسطة') : (p.kind === 'Return' ? 'CREDIT NOTE<br>إشعار دائن' : 'RECEIPT<br>إيصال')}</b></p><p>No. / رقم: ${esc(p.number)}</p><p>${new Date(p.created_at).toLocaleString('en')}</p>${d.contact ? `<p>Customer: ${esc(d.contact.name)}</p>` : ''}<hr>
     <table>${lines}</table><hr>
-    <table><tr><td>Subtotal</td><td class="r">${money(p.subtotal_cents)}</td></tr><tr><td>Tax</td><td class="r">${money(p.tax_cents)}</td></tr><tr class="total"><td>TOTAL</td><td class="r">${money(p.total_cents)}</td></tr>${(d.payments || []).map(pay => `<tr><td>Paid · ${esc(pay.method)}</td><td class="r">${money(pay.amount_cents)}</td></tr>`).join('') || `<tr><td>Paid</td><td class="r">${money(p.paid_cents)}</td></tr>`}${p.tendered_cents ? `<tr><td>Cash received</td><td class="r">${money(p.tendered_cents)}</td></tr><tr><td><b>Change</b></td><td class="r"><b>${money(p.change_cents)}</b></td></tr>` : ''}${p.total_cents > p.paid_cents ? `<tr><td>Balance due</td><td class="r">${money(p.total_cents - p.paid_cents)}</td></tr>` : ''}</table>
-    <hr><p class="c">${esc(state.boot.settings.invoice_footer || 'Thank you for your visit.')}</p>
+    <table><tr><td>Subtotal / المجموع</td><td class="r">${money(p.subtotal_cents)}</td></tr><tr><td>VAT / الضريبة</td><td class="r">${money(p.tax_cents)}</td></tr><tr class="total"><td>TOTAL / الإجمالي</td><td class="r">${money(p.total_cents)}</td></tr>${(d.payments || []).map(pay => `<tr><td>Paid / مدفوع · ${esc(pay.method)}</td><td class="r">${money(pay.amount_cents)}</td></tr>`).join('') || `<tr><td>Paid</td><td class="r">${money(p.paid_cents)}</td></tr>`}${p.tendered_cents ? `<tr><td>Cash received / النقد المستلم</td><td class="r">${money(p.tendered_cents)}</td></tr><tr><td><b>Change / الباقي</b></td><td class="r"><b>${money(p.change_cents)}</b></td></tr>` : ''}${p.total_cents > p.paid_cents ? `<tr><td>Balance due / الرصيد</td><td class="r">${money(p.total_cents - p.paid_cents)}</td></tr>` : ''}</table>
+    <hr><p class="c">${esc(state.boot.settings.invoice_footer || 'Thank you for your visit.')}</p><p class="c" dir="rtl">شكرًا لزيارتكم</p>
     <script>window.addEventListener('load', () => { window.print(); });<\/script>
   </body></html>`;
   const w = window.open('', '_blank', 'width=420,height=720');
@@ -297,11 +297,7 @@ async function printReceipt(id) {
   w.document.open();
   w.document.write(html);
   w.document.close();
-  if (state.lang !== 'en') {
-    w.document.documentElement.dir = 'rtl';
-    w.document.documentElement.lang = state.lang;
-    translateTree(w.document.body);
-  }
+
 }
 
 
@@ -402,4 +398,90 @@ async function supplierReturnDialog(id) {
     await render();
     await documentDetail(id);
   });
+}
+
+
+/* ── UAE tax invoice: English first, Arabic second ─────────────────────────── */
+
+/** Bilingual label: English, then Arabic underneath. */
+function bi(en, ar) {
+  return `<span class="bi"><span class="bi-en">${en}</span><span class="bi-ar" lang="ar" dir="rtl">${ar}</span></span>`;
+}
+
+function docTitle(kind, vat) {
+  if (kind === 'Quotation') return ['QUOTATION', 'عرض سعر'];
+  if (kind === 'Return') return vat ? ['TAX CREDIT NOTE', 'إشعار دائن ضريبي'] : ['CREDIT NOTE', 'إشعار دائن'];
+  return vat ? ['TAX INVOICE', 'فاتورة ضريبية'] : ['INVOICE', 'فاتورة'];
+}
+
+/** Links to related documents, shown on screen only. */
+function relatedLinks(d) {
+  const links = [];
+  if (d.original) links.push(`Return of <button class="subtle" onclick="documentDetail(${d.original.id})">${esc(d.original.number)}</button>`);
+  if (d.quotation) links.push(`From quotation <button class="subtle" onclick="documentDetail(${d.quotation.id})">${esc(d.quotation.number)}</button>`);
+  if (d.invoice) links.push(`Invoiced as <button class="subtle" onclick="documentDetail(${d.invoice.id})">${esc(d.invoice.number)}</button>`);
+  return links.length ? `<p class="related-links dossier-actions">${links.join(' · ')}</p>` : '';
+}
+
+function taxInvoiceMarkup(d, s) {
+  const p = d.document;
+  const vat = String(s.vat_registered ?? state.boot.settings.vat_registered) === '1';
+  const [titleEn, titleAr] = docTitle(p.kind, vat);
+  const c = d.contact || {};
+  const currency = esc(s.currency || 'AED');
+  const rates = {};
+  d.lines.forEach(l => {
+    const r = (rates[l.tax_bp] ||= { net: 0, tax: 0 });
+    r.net += Number(l.subtotal_cents);
+    r.tax += Number(l.tax_cents);
+  });
+  const balance = p.total_cents - p.paid_cents - Number(p.returned_cents || 0) + Number(p.refunded_cents || 0);
+  const row = (en, ar, value, cls = '') => `<tr class="${cls}"><th>${bi(en, ar)}</th><td>${value}</td></tr>`;
+  return `<article class="document-preview tax-invoice" data-no-translate>
+    <header class="ti-head">
+      <div class="ti-seller">
+        ${state.boot.settings.logo_path ? `<img class="doc-logo" src="${logoUrl()}" alt="">` : ''}
+        <b class="ti-company">${esc(s.company_name)}</b>${s.company_name_ar ? `<b class="ti-company" lang="ar" dir="rtl">${esc(s.company_name_ar)}</b>` : ''}
+        <small>${esc(s.address || '')}</small>${s.address_ar ? `<small lang="ar" dir="rtl">${esc(s.address_ar)}</small>` : ''}
+        <small>${[s.phone, s.email].filter(Boolean).map(esc).join(' · ')}</small>
+        ${s.tax_id ? `<small class="ti-trn">TRN · الرقم الضريبي: <b>${esc(s.tax_id)}</b></small>` : ''}
+      </div>
+      <div class="ti-title"><h1>${titleEn}</h1><h2 lang="ar" dir="rtl">${titleAr}</h2>${badge(p.status)}</div>
+    </header>
+    <section class="ti-meta">
+      <div class="ti-billto"><small>${bi('Bill to', 'العميل')}</small><b>${esc(c.name || 'Walk-in customer')}</b>${c.name === undefined || c.name ? '' : ''}<small>${esc(c.address || '')}</small><small>${[c.phone, c.email].filter(Boolean).map(esc).join(' · ')}</small>${c.tax_id ? `<small class="ti-trn">TRN · الرقم الضريبي: <b>${esc(c.tax_id)}</b></small>` : ''}</div>
+      <table class="ti-facts">
+        ${row(p.kind === 'Quotation' ? 'Quotation no.' : p.kind === 'Return' ? 'Credit note no.' : 'Invoice no.', p.kind === 'Quotation' ? 'رقم العرض' : p.kind === 'Return' ? 'رقم الإشعار' : 'رقم الفاتورة', `<b>${esc(p.number)}</b>`)}
+        ${row('Date of issue', 'تاريخ الإصدار', date(p.created_at))}
+        ${p.due_date ? row(p.kind === 'Quotation' ? 'Valid until' : 'Due date', p.kind === 'Quotation' ? 'صالح حتى' : 'تاريخ الاستحقاق', date(p.due_date)) : ''}
+        ${p.bill_reference ? row('Reference', 'المرجع', esc(p.bill_reference)) : ''}
+        ${d.original ? row('Original invoice', 'الفاتورة الأصلية', esc(d.original.number)) : ''}
+        ${p.kind !== 'Quotation' ? row('Payment', 'الدفع', (d.payments || []).length ? d.payments.map(x => `${esc(x.method)} ${money(x.amount_cents)}`).join('<br>') : esc(p.method)) : ''}
+      </table>
+    </section>
+    <table class="ti-lines">
+      <thead><tr><th>#</th><th>${bi('Description', 'الوصف')}</th><th>${bi('Qty', 'الكمية')}</th><th>${bi('Unit price', 'سعر الوحدة')}</th><th>${bi('Discount', 'الخصم')}</th><th>${bi('Taxable amount', 'المبلغ الخاضع')}</th><th>${bi('VAT %', 'نسبة الضريبة')}</th><th>${bi('VAT', 'الضريبة')}</th><th>${bi('Total', 'الإجمالي')}</th></tr></thead>
+      <tbody>${d.lines
+        .map(
+          (l, i) =>
+            `<tr><td>${i + 1}</td><td><b>${esc(l.name)}</b>${l.name_ar ? `<span class="ti-ar" lang="ar" dir="rtl">${esc(l.name_ar)}</span>` : ''}${Number(l.returned_milli) ? `<small class="returned-note">${quantity(l.returned_milli)} ${esc(l.unit)} returned · مُرتجع</small>` : ''}</td><td>${quantity(l.quantity_milli)} ${esc(l.unit)}</td><td>${money(l.price_cents)}</td><td>${Number(l.discount_cents) ? money(l.discount_cents) : '—'}</td><td>${money(l.subtotal_cents)}</td><td>${(Number(l.tax_bp) / 100).toFixed(2).replace(/\.00$/, '')}%</td><td>${money(l.tax_cents)}</td><td>${money(l.total_cents)}</td></tr>`,
+        )
+        .join('')}</tbody>
+    </table>
+    <section class="ti-bottom">
+      ${vat ? `<table class="ti-vat"><thead><tr><th>${bi('VAT rate', 'نسبة الضريبة')}</th><th>${bi('Taxable amount', 'المبلغ الخاضع')}</th><th>${bi('VAT amount', 'مبلغ الضريبة')}</th></tr></thead><tbody>${Object.entries(rates)
+        .map(([bp, r]) => `<tr><td>${(Number(bp) / 100).toFixed(2).replace(/\.00$/, '')}%</td><td>${money(r.net)}</td><td>${money(r.tax)}</td></tr>`)
+        .join('')}</tbody></table>` : '<div></div>'}
+      <table class="ti-totals">
+        ${row('Total excluding VAT', 'الإجمالي قبل الضريبة', money(p.subtotal_cents))}
+        ${row('VAT', 'ضريبة القيمة المضافة', money(p.tax_cents))}
+        ${row(`Total including VAT (${currency})`, `الإجمالي شامل الضريبة (${currency})`, `<b>${money(p.total_cents)}</b>`, 'grand')}
+        ${Number(p.returned_cents) ? row('Items returned', 'أصناف مرتجعة', '−' + money(p.returned_cents)) : ''}
+        ${p.kind !== 'Quotation' && p.kind !== 'Return' ? row('Paid', 'المدفوع', money(p.paid_cents - Number(p.refunded_cents || 0))) + row('Balance due', 'الرصيد المستحق', `<b>${money(Math.max(0, balance))}</b>`) : ''}
+        ${p.tendered_cents ? row('Cash received / change', 'النقد المستلم / الباقي', `${money(p.tendered_cents)} / ${money(p.change_cents)}`) : ''}
+      </table>
+    </section>
+    ${p.notes ? `<p class="ti-notes">${esc(p.notes)}</p>` : ''}
+    <p class="doc-footer">${esc(state.boot.settings.invoice_footer || 'Thank you for your business.')}<br><span lang="ar" dir="rtl">شكرًا لتعاملكم معنا.</span></p>
+  </article>`;
 }

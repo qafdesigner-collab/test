@@ -545,4 +545,12 @@ const I18N_DICT = {
   'Daily automatic backup (cPanel → Cron Jobs → once per day):': 'نسخ احتياطي يومي تلقائي (cPanel ← Cron Jobs ← مرة يوميًا):',
   'Automatic backup': 'نسخة احتياطية تلقائية',
   Database: 'قاعدة البيانات',
+  "Arabic name · printed on invoices (optional)": "الاسم بالعربية · يُطبع على الفواتير (اختياري)",
+  "TRN · tax registration number": "الرقم الضريبي (TRN)",
+  "VAT registered": "مسجّل في ضريبة القيمة المضافة",
+  "No · plain invoices": "لا · فواتير عادية",
+  "Yes · tax invoices with VAT summary": "نعم · فواتير ضريبية مع ملخص الضريبة",
+  "Company name in Arabic": "اسم الشركة بالعربية",
+  "Address in Arabic": "العنوان بالعربية",
+  "Return of": "إرجاع للفاتورة",
 };

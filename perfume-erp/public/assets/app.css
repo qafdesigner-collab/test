@@ -2539,3 +2539,52 @@ tr[hidden] { display: none; }
 [dir="rtl"] .payment-row input, [dir="rtl"] .count-qty, [dir="rtl"] .return-qty, [dir="rtl"] .receive-qty { direction: ltr; text-align: right; }
 .language-link { float: right; font-size: 13px; color: var(--accent); text-decoration: none; font-weight: 600; }
 [dir="rtl"] .language-link { float: left; }
+
+/* ── 0.5 bilingual tax invoice (English first, Arabic second) ─────────── */
+.tax-invoice { font-size: 13px; color: var(--ink); }
+.tax-invoice .bi { display: inline-flex; flex-direction: column; line-height: 1.25; }
+.tax-invoice .bi-ar { font-size: 0.85em; color: var(--muted); font-family: "Segoe UI", "Noto Sans Arabic", Tahoma, sans-serif; }
+.ti-head { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; padding-bottom: 16px; border-bottom: 2px solid var(--accent); }
+.ti-seller { display: flex; flex-direction: column; gap: 2px; }
+.ti-seller small, .ti-billto small { color: var(--muted); }
+.ti-company { font-size: 16px; }
+.ti-trn { color: var(--ink) !important; }
+.ti-title { text-align: right; }
+.ti-title h1 { font-size: 24px; margin: 0; letter-spacing: .04em; }
+.ti-title h2 { font-size: 20px; margin: 2px 0 8px; font-family: "Segoe UI", "Noto Sans Arabic", Tahoma, sans-serif; }
+.ti-meta { display: grid; grid-template-columns: 1fr auto; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.ti-billto { display: flex; flex-direction: column; gap: 2px; }
+.ti-billto b { font-size: 15px; margin-top: 4px; }
+.ti-facts th, .ti-totals th { text-align: left; font-weight: 500; padding: 4px 16px 4px 0; background: none !important; color: var(--muted) !important; text-transform: none; letter-spacing: 0; font-size: 12px; }
+.ti-facts td, .ti-totals td { text-align: right; padding: 4px 0; border: 0 !important; font-variant-numeric: tabular-nums; }
+.ti-lines { width: 100%; border-collapse: collapse; margin: 16px 0; }
+.ti-lines th { font-size: 11px; text-transform: none; letter-spacing: 0; text-align: left; padding: 8px 6px; vertical-align: bottom; }
+.ti-lines td { padding: 8px 6px; vertical-align: top; font-variant-numeric: tabular-nums; }
+.ti-lines td:nth-child(n+3), .ti-lines th:nth-child(n+3) { text-align: right; }
+.ti-ar { display: block; color: var(--muted); font-family: "Segoe UI", "Noto Sans Arabic", Tahoma, sans-serif; }
+.ti-bottom { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: start; }
+.ti-vat { border-collapse: collapse; font-size: 12px; }
+.ti-vat th, .ti-vat td { padding: 4px 10px; text-align: right; }
+.ti-totals .grand th, .ti-totals .grand td { font-size: 15px; color: var(--ink) !important; border-top: 1px solid var(--line) !important; padding-top: 8px; }
+.ti-notes { margin-top: 16px; color: var(--muted); }
+.related-links { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+[dir="rtl"] .ti-title { text-align: left; }
+@media (max-width: 760px) { .ti-head, .ti-meta, .ti-bottom { grid-template-columns: 1fr; flex-direction: column; } .ti-title { text-align: left; } .ti-lines { font-size: 11px; } }
+@media print {
+  .tax-invoice { font-size: 11px; }
+  .tax-invoice .bi-ar, .ti-ar, .ti-billto small, .ti-seller small { color: #444; }
+  .ti-head { border-bottom-color: #000; }
+  .related-links { display: none; }
+}
+@media print {
+  html, body { overflow: visible !important; height: auto !important; }
+  .modal-overlay { position: static !important; inset: auto !important; overflow: visible !important; height: auto !important; backdrop-filter: none !important; }
+  .modal, .modal-body { max-height: none !important; height: auto !important; overflow: visible !important; }
+  .ti-head { display: flex !important; flex-direction: row !important; }
+  .ti-title { text-align: right !important; }
+  .ti-meta, .ti-bottom { grid-template-columns: 1fr auto !important; }
+  .ti-lines { font-size: 10px !important; }
+  .tax-invoice .badge { display: none; }
+  .ti-lines tr, .ti-bottom { break-inside: avoid; }
+}
+@media print { .modal, .modal-body, .document-preview, .modal-overlay { background: #fff !important; box-shadow: none !important; } }

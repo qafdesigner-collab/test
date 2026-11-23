@@ -544,4 +544,18 @@ class ErpWorkflowsTest extends TestCase
         $this->withUnencryptedCookie('atelier_lang', 'ar')->get('/login')->assertOk()->assertSee('dir="rtl"', false)->assertSee('الدخول إلى مساحة العمل');
         $this->withUnencryptedCookie('atelier_lang', 'en')->get('/login')->assertSee('Sign in to your workspace');
     }
+
+    public function test_tax_invoice_keeps_arabic_names_and_vat_settings(): void
+    {
+        $this->postJson('/api/settings', ['company_name' => 'Noor Perfumes', 'currency' => 'AED', 'tax_id' => '100123456700003', 'vat_registered' => '1', 'company_name_ar' => 'عطور نور', 'address_ar' => 'دبي'])->assertOk();
+        $this->postJson('/api/settings', ['company_name' => 'Noor Perfumes', 'currency' => 'AED', 'vat_registered' => 'yes'])->assertUnprocessable();
+        DB::table('products')->where('id', 1)->update(['name_ar' => 'نسيم المحيط']);
+
+        $invoice = $this->postOnce('/api/documents', $this->sale())->assertOk()->json();
+        DB::table('products')->where('id', 1)->update(['name_ar' => 'اسم جديد']);
+        $document = $this->getJson('/api/documents/'.$invoice['id'])->assertOk();
+        $document->assertJsonPath('lines.0.name_ar', 'نسيم المحيط');
+        $snapshot = json_decode($document->json('document.seller_snapshot'), true);
+        $this->assertSame(['1', 'عطور نور', '100123456700003'], [$snapshot['vat_registered'], $snapshot['company_name_ar'], $snapshot['tax_id']]);
+    }
 }

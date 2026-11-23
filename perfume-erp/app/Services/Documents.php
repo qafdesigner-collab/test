@@ -49,7 +49,7 @@ final class Documents
                 $ltax = Amounts::roundDivide($net * $p->tax_bp, 10000);
                 $sub += $net;
                 $tax += $ltax;
-                $lines[] = ['product_id' => $p->id, 'name' => $p->name, 'unit' => $p->unit, 'quantity_milli' => $q, 'price_cents' => $price, 'discount_cents' => $discount, 'tax_bp' => $p->tax_bp, 'subtotal_cents' => $net, 'tax_cents' => $ltax, 'total_cents' => $net + $ltax];
+                $lines[] = ['product_id' => $p->id, 'name' => $p->name, 'name_ar' => $p->name_ar, 'unit' => $p->unit, 'quantity_milli' => $q, 'price_cents' => $price, 'discount_cents' => $discount, 'tax_bp' => $p->tax_bp, 'subtotal_cents' => $net, 'tax_cents' => $ltax, 'total_cents' => $net + $ltax];
             }
             $total = $sub + $tax;
             $payments = self::payments($data);
@@ -297,7 +297,7 @@ final class Documents
                 $sub += $lineSub;
                 $tax += $lineTax;
                 $updates[] = [$line, $q, $lineSub, $lineTax, $lineCogs];
-                $returnLines[] = ['product_id' => $line->product_id, 'name' => $line->name, 'unit' => $line->unit, 'quantity_milli' => $q, 'price_cents' => $line->price_cents, 'discount_cents' => $isLast ? $line->discount_cents - Amounts::roundDivide($line->discount_cents * $line->returned_milli, $line->quantity_milli) : Amounts::roundDivide($line->discount_cents * $q, $line->quantity_milli), 'tax_bp' => $line->tax_bp, 'subtotal_cents' => $lineSub, 'tax_cents' => $lineTax, 'total_cents' => $lineSub + $lineTax, 'cogs_cents' => $lineCogs, 'cost_allocations' => json_encode([['cost_basis' => 'Partial return of '.$d->number]])];
+                $returnLines[] = ['product_id' => $line->product_id, 'name' => $line->name, 'name_ar' => $line->name_ar, 'unit' => $line->unit, 'quantity_milli' => $q, 'price_cents' => $line->price_cents, 'discount_cents' => $isLast ? $line->discount_cents - Amounts::roundDivide($line->discount_cents * $line->returned_milli, $line->quantity_milli) : Amounts::roundDivide($line->discount_cents * $q, $line->quantity_milli), 'tax_bp' => $line->tax_bp, 'subtotal_cents' => $lineSub, 'tax_cents' => $lineTax, 'total_cents' => $lineSub + $lineTax, 'cogs_cents' => $lineCogs, 'cost_allocations' => json_encode([['cost_basis' => 'Partial return of '.$d->number]])];
             }
             if (! $returnLines) {
                 self::fail(__('Choose at least one item to return.'));
@@ -456,7 +456,7 @@ final class Documents
             foreach ($plan as [$line, $q, $lineSub, $lineTax]) {
                 $product = DB::table('products')->find($line->product_id);
                 $value = $product->kind === 'service' ? 0 : Stock::move($product->id, $d->location_id, $d->number, -$q, 'Returned to supplier', $number, $user);
-                DB::table('document_lines')->insert(['document_id' => $rid, 'product_id' => $line->product_id, 'name' => $line->name, 'unit' => $line->unit, 'quantity_milli' => $q, 'price_cents' => $line->price_cents, 'discount_cents' => 0, 'tax_bp' => $line->tax_bp, 'subtotal_cents' => $lineSub, 'tax_cents' => $lineTax, 'total_cents' => $lineSub + $lineTax, 'cogs_cents' => $value, 'cost_allocations' => json_encode([['cost_basis' => 'Stock value removed', 'lot' => $d->number]])]);
+                DB::table('document_lines')->insert(['document_id' => $rid, 'product_id' => $line->product_id, 'name' => $line->name, 'name_ar' => $line->name_ar, 'unit' => $line->unit, 'quantity_milli' => $q, 'price_cents' => $line->price_cents, 'discount_cents' => 0, 'tax_bp' => $line->tax_bp, 'subtotal_cents' => $lineSub, 'tax_cents' => $lineTax, 'total_cents' => $lineSub + $lineTax, 'cogs_cents' => $value, 'cost_allocations' => json_encode([['cost_basis' => 'Stock value removed', 'lot' => $d->number]])]);
                 DB::table('document_lines')->where('id', $line->id)->update(['returned_milli' => $line->returned_milli + $q, 'returned_subtotal_cents' => $line->returned_subtotal_cents + $lineSub, 'returned_tax_cents' => $line->returned_tax_cents + $lineTax]);
             }
             DB::table('documents')->where('id', $id)->update(['returned_cents' => $d->returned_cents + $total, 'refunded_cents' => $d->refunded_cents + $refund, 'updated_at' => now()]);
