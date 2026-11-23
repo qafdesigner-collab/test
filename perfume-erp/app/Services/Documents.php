@@ -1,0 +1,158 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+
+final class Documents
+{
+    public static function create(array $data, int $user): array
+    {
+        return DB::transaction(function () use ($data, $user) {
+            $kind = $data['kind'];
+            $lines = [];
+            $sub = 0;
+            $tax = 0;
+            if ($kind === 'Sale' && ! DB::table('shifts')->where('user_id', $user)->whereNull('closed_at')->exists()) {
+                self::fail('Open a cashier shift before selling.');
+            }
+            foreach ($data['lines'] as $line) {
+                $p = DB::table('products')->where('id', $line['product_id'])->where('active', true)->first();
+                if (! $p) {
+                    self::fail('Product is unavailable.');
+                }
+                if (in_array($kind, ['Sale', 'Invoice', 'Quotation']) && ! $p->sales_allowed) {
+                    self::fail('Enable Sell individually on this product before selling or quoting it.');
+                }
+                $q = Amounts::parse($line['quantity'], 3);
+                if ($q <= 0 || $q > 1000000000) {
+                    self::fail('Quantity must be positive and within the supported limit.');
+                }
+                if (in_array($p->unit, ['piece', 'bottle', 'box', 'carton']) && $q % 1000) {
+                    self::fail('Counted products require whole quantities.');
+                }
+                $price = isset($line['price']) ? Amounts::parse($line['price']) : ($kind === 'Purchase' ? $p->cost_cents : $p->price_cents);
+                if ($price > 100000000) {
+                    self::fail('Unit price is too large.');
+                }
+                $discount = Amounts::parse($line['discount'] ?? '0');
+                $gross = Amounts::roundDivide($q * $price, 1000);
+                if ($discount > $gross) {
+                    self::fail('Discount exceeds the line value.');
+                }
+                $net = $gross - $discount;
+                $ltax = Amounts::roundDivide($net * $p->tax_bp, 10000);
+                $sub += $net;
+                $tax += $ltax;
+                $lines[] = ['product_id' => $p->id, 'name' => $p->name, 'unit' => $p->unit, 'quantity_milli' => $q, 'price_cents' => $price, 'discount_cents' => $discount, 'tax_bp' => $p->tax_bp, 'subtotal_cents' => $net, 'tax_cents' => $ltax, 'total_cents' => $net + $ltax];
+            }
+            $total = $sub + $tax;
+            $paid = Amounts::parse($data['paid'] ?? '0');
+            if ($paid > $total) {
+                self::fail('Payment cannot exceed the document total. Record tender/change separately.');
+            }
+            if ($paid > 0 && ($data['method'] ?? 'Credit') === 'Credit') {
+                self::fail('Choose Cash, Card, or Bank for a payment.');
+            }
+            $contact = $data['contact_id'] ?? null;
+            if ($contact) {
+                $c = DB::table('contacts')->where('id', $contact)->lockForUpdate()->first();
+                if (! $c) {
+                    self::fail('Contact not found.');
+                }if ($kind === 'Purchase' && $c->kind !== 'supplier') {
+                    self::fail('Choose a supplier.');
+                }if ($kind !== 'Purchase' && $c->kind !== 'customer') {
+                    self::fail('Choose a customer.');
+                }
+            }
+            if (in_array($kind, ['Sale', 'Invoice']) && $total > $paid) {
+                if (! $contact) {
+                    self::fail('A customer is required for credit sales.');
+                }$outstanding = DB::table('documents')->where('contact_id', $contact)->whereIn('kind', ['Sale', 'Invoice'])->where('status', 'Posted')->selectRaw('COALESCE(SUM(total_cents-paid_cents),0) AS balance')->value('balance');
+                if ($outstanding + $total - $paid > $c->credit_cents) {
+                    self::fail('Customer credit limit would be exceeded.');
+                }
+            }
+            if ($kind === 'Quotation' && $paid) {
+                self::fail('Quotations cannot receive payment.');
+            }
+            $id = DB::table('documents')->insertGetId(['uuid' => (string) Str::uuid(), 'kind' => $kind, 'status' => $kind === 'Quotation' ? 'Draft' : 'Posted', 'contact_id' => $contact, 'location_id' => $data['location_id'], 'user_id' => $user, 'subtotal_cents' => $sub, 'tax_cents' => $tax, 'total_cents' => $total, 'paid_cents' => $paid, 'method' => $data['method'] ?? 'Credit', 'notes' => $data['notes'] ?? null, 'seller_snapshot' => json_encode(DB::table('settings')->pluck('value', 'key')->all()), 'contact_snapshot' => $contact ? json_encode((array) $c) : null, 'bill_reference' => $data['bill_reference'] ?? null, 'due_date' => $data['due_date'] ?? null, 'created_at' => now(), 'updated_at' => now()]);
+            $number = match ($kind) {
+                'Sale' => 'POS','Invoice' => 'INV','Quotation' => 'QUO','Purchase' => 'PUR'
+            }.'-'.str_pad((string) $id, 6, '0', STR_PAD_LEFT);
+            DB::table('documents')->where('id', $id)->update(['number' => $number]);
+            foreach ($lines as $line) {
+                $p = DB::table('products')->find($line['product_id']);
+                if ($p->kind !== 'service') {
+                    if ($kind === 'Purchase') {
+                        Stock::move($p->id, $data['location_id'], $number, $line['quantity_milli'], 'Purchase receipt', $number, $user, $line['subtotal_cents'], 'Purchase invoice');
+                    } elseif (in_array($kind, ['Sale', 'Invoice'])) {
+                        $used = Stock::consume($p->id, $data['location_id'], $line['quantity_milli'], 'Sale', $number, $user);
+                        $line['cogs_cents'] = array_sum(array_column($used, 'cost_cents'));
+                        $line['cost_allocations'] = json_encode($used);
+                    }
+                }
+                if ($p->kind === 'service' && in_array($kind, ['Sale', 'Invoice'])) {
+                    $line['cogs_cents'] = Amounts::roundDivide($line['quantity_milli'] * $p->cost_cents, 1000);
+                    $line['cost_allocations'] = json_encode([['cost_basis' => 'Service cost estimate']]);
+                }
+                DB::table('document_lines')->insert($line + ['document_id' => $id]);
+            }
+            if ($paid) {
+                DB::table('payments')->insert(['document_id' => $id, 'amount_cents' => $paid, 'method' => $data['method'], 'user_id' => $user, 'created_at' => now(), 'updated_at' => now()]);
+            }
+            DB::table('audit')->insert(['user_id' => $user, 'action' => 'document.create', 'subject' => $number, 'details' => json_encode(['kind' => $kind, 'total_cents' => $total]), 'created_at' => now()]);
+
+            return ['id' => $id, 'number' => $number, 'total_cents' => $total];
+        }, 3);
+    }
+
+    public static function payment(int $id, int $amount, string $method, int $user): array
+    {
+        return DB::transaction(function () use ($id, $amount, $method, $user) {
+            $doc = DB::table('documents')->where('id', $id)->lockForUpdate()->first();
+            if (! $doc || ! in_array($doc->kind, ['Sale', 'Invoice', 'Purchase']) || $doc->status !== 'Posted') {
+                self::fail('This document cannot receive payments.');
+            }if ($amount <= 0 || $doc->paid_cents + $amount > $doc->total_cents) {
+                self::fail('Payment must be positive and not exceed the balance.');
+            }DB::table('documents')->where('id', $id)->increment('paid_cents', $amount);
+            DB::table('payments')->insert(['document_id' => $id, 'amount_cents' => $amount, 'method' => $method, 'user_id' => $user, 'created_at' => now(), 'updated_at' => now()]);
+
+            return ['id' => $id];
+        });
+    }
+
+    public static function returnSale(int $id, string $condition, int $user): array
+    {
+        return DB::transaction(function () use ($id, $condition, $user) {
+            $d = DB::table('documents')->where('id', $id)->lockForUpdate()->first();
+            if (! $d || ! in_array($d->kind, ['Sale', 'Invoice']) || $d->status !== 'Posted') {
+                self::fail('Only a posted sale/invoice can be returned, once.');
+            }
+            $rid = DB::table('documents')->insertGetId(['uuid' => (string) Str::uuid(), 'kind' => 'Return', 'status' => 'Posted', 'original_id' => $id, 'contact_id' => $d->contact_id, 'location_id' => $d->location_id, 'user_id' => $user, 'subtotal_cents' => $d->subtotal_cents, 'tax_cents' => $d->tax_cents, 'total_cents' => $d->total_cents, 'paid_cents' => $d->paid_cents, 'method' => $d->method, 'notes' => 'Full return: '.$condition, 'seller_snapshot' => $d->seller_snapshot, 'contact_snapshot' => $d->contact_snapshot, 'created_at' => now(), 'updated_at' => now()]);
+            $num = 'RET-'.str_pad((string) $rid, 6, '0', STR_PAD_LEFT);
+            DB::table('documents')->where('id', $rid)->update(['number' => $num]);
+            foreach (DB::table('document_lines')->where('document_id', $id)->get() as $line) {
+                $l = (array) $line;
+                unset($l['id']);
+                $l['document_id'] = $rid;
+                DB::table('document_lines')->insert($l);
+                $p = DB::table('products')->find($line->product_id);
+                if ($p->kind !== 'service' && $condition === 'Restock') {
+                    Stock::move($p->id, $d->location_id, $num, $line->quantity_milli, 'Customer return', $num, $user, $line->cogs_cents, collect(json_decode($line->cost_allocations ?? '[]', true))->contains(fn ($lot) => str_contains(strtolower($lot['cost_basis'] ?? ''), 'estimate') || ($lot['cost_basis'] ?? '') === 'Mixed cost basis') ? 'Returned cost with estimates' : 'Returned sale cost');
+                }
+            }
+            DB::table('documents')->where('id', $id)->update(['status' => 'Returned', 'updated_at' => now()]);
+            DB::table('audit')->insert(['user_id' => $user, 'action' => 'sale.return', 'subject' => $num, 'details' => json_encode(['original' => $d->number, 'refund_recorded_cents' => $d->paid_cents, 'condition' => $condition]), 'created_at' => now()]);
+
+            return ['id' => $rid, 'number' => $num, 'refund_cents' => $d->paid_cents];
+        });
+    }
+
+    public static function fail(string $message): never
+    {
+        throw ValidationException::withMessages(['document' => $message]);
+    }
+}
