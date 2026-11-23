@@ -13,7 +13,7 @@ export class HotspotDto {
   @Type(() => Number) @IsInt() @Min(1) @Max(5000) page: number;
   @IsNumber() @Min(0) @Max(1) x: number; @IsNumber() @Min(0) @Max(1) y: number;
   @IsNumber() @Min(0.01) @Max(1) w: number; @IsNumber() @Min(0.01) @Max(1) h: number;
-  @IsIn(['NOTE', 'AUDIO', 'VIDEO', 'LINK', 'GAME', 'IMAGE', 'TRACE', 'DRAW']) kind: 'NOTE' | 'AUDIO' | 'VIDEO' | 'LINK' | 'GAME' | 'IMAGE' | 'TRACE' | 'DRAW';
+  @IsIn(['NOTE', 'AUDIO', 'VIDEO', 'LINK', 'GAME', 'IMAGE', 'TRACE', 'DRAW', 'READ']) kind: 'NOTE' | 'AUDIO' | 'VIDEO' | 'LINK' | 'GAME' | 'IMAGE' | 'TRACE' | 'DRAW' | 'READ';
   @IsOptional() @IsString() @MaxLength(120) title?: string;
   @IsOptional() @IsString() @MaxLength(4000) body?: string;
   @IsOptional() @IsString() @MaxLength(500) url?: string | null;
@@ -25,8 +25,8 @@ export class HotspotDto {
   /** extra settings, e.g. the writing path of a tracing area */
   @IsOptional() @IsObject() data?: Record<string, unknown>;
 }
-class WorkDto { @IsString() @MaxLength(1_500_000) image: string; @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(3) stars?: number; }
-class CommentDto { @IsOptional() @IsString() @MaxLength(500) comment?: string; @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(3) stars?: number; }
+class WorkDto { @IsOptional() @IsString() @MaxLength(1_500_000) image?: string; @IsOptional() @IsUUID() audioId?: string; @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(3) stars?: number; }
+class CommentDto { @IsOptional() @IsIn(['OK', 'REDO']) verdict?: 'OK' | 'REDO'; @IsOptional() @IsString() @MaxLength(500) comment?: string; @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(3) stars?: number; }
 class UpdateHotspotDto extends PartialType(HotspotDto) {}
 const Id = () => new ParseUUIDPipe();
 const READERS = ['SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PUBLISHER_ADMIN', 'PUBLISHER_EDITOR'];

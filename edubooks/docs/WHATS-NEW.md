@@ -1,3 +1,18 @@
+# What's new in Knowledge Gate 1.4.15
+
+## 🎤 Read aloud on book pages — and the teacher answers
+- New page element **🎤 Read aloud** (✏️ Hotspots → draw a box → Read aloud). Put the box over the words to read (or type them). The student sees the words, taps **🎤 Tap to start reading**, reads, listens back, and presses **📤 Send to teacher**.
+- **Teacher → Book work** now has tracing, drawings **and readings**: press ▶ to listen. For every piece of work the teacher answers **✅ Well done** or **🔁 Do it again**, gives ⭐–⭐⭐⭐ and writes a comment. The student sees the answer the next time they open that element (e.g. “🔁 Your teacher asks you to do it again ⭐⭐ ‘Read a little slower.’”).
+- Staff opening tracing, drawing or read-aloud elements now see a note that students get **📤 Send to teacher** there (the button only sends for students).
+- Read-aloud questions in homework, quizzes and tests work as before: the student records, the teacher listens when marking and gives the points.
+
+## 🎮 Games fit the screen
+- Every game has a **⛶ Full screen** button; camera games open full screen automatically. The play area now fits the screen on **phones, iPads and computers** without scrolling (checked on iPhone, iPad and a 1366×768 laptop).
+- Camera games are lighter on iPads and phones (less drawing work on high-resolution screens), pause when the app is in the background, and switch to the safe tracking engine if the fast one does not start within 10 seconds. While loading, they show “the first time, hand tracking takes a few seconds”.
+
+## 🛠 Fixed: back button after making a flipbook
+- “✏️ Add videos & elements” and “👁 Preview as student” opened the book in a new browser tab, so Back did not work there, and the reader's ← went to the home page. The book now opens in the same tab, and ← returns to the page you came from (e.g. the book builder).
+
 # What's new in Knowledge Gate 1.4.14
 
 ## 🛡️ Watched tests: live view for the teacher, better camera preview

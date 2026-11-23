@@ -17,12 +17,17 @@ export class IntegrityService implements OnModuleInit {
   private readonly log = new Logger('AnswerCheck');
   constructor(private readonly db: DbService, private readonly lms: LmsService, private readonly providers: AiProviderService) {}
   onModuleInit() {
+    // only once, even if the module is set up again
+    const lmsAny = this.lms as any; if (lmsAny.__answerCheck) return; lmsAny.__answerCheck = true;
     this.lms.afterSubmit.push(async (id) => {
       const ctx = { ...this.db.ctx };
       // wait until the hand-in is saved, then check in the background
       // the hand-in may still be saving: try again a few times until it is there
       const run = (tries: number) => setTimeout(() => {
-        this.db.detached(ctx, () => this.check(id)).then((r) => { if (r === 'not-saved' && tries > 0) run(tries - 1); })
+        this.db.detached(ctx, () => this.check(id)).then((r) => {
+          if (r === 'not-saved' && tries > 0) run(tries - 1);
+          else if (r === 'no-ai' || r === 'limit') this.log.log(`AI answer check skipped (${r === 'limit' ? 'monthly AI limit reached' : 'no AI service for this school'}); the rule-based check is kept`);
+        })
           .catch((e) => this.log.warn(`check failed: ${e.message}`));
       }, Number(process.env.INTEGRITY_DELAY_MS ?? 1500) + (5 - tries) * 300).unref?.();
       run(5);
@@ -55,11 +60,14 @@ export class IntegrityService implements OnModuleInit {
     await q.execute(sql`INSERT INTO ai_generations (publisher_id, school_id, user_id, task, provider, model, params, sources, grounded, output, status, input_tokens, output_tokens, latency_ms)
       VALUES (${this.db.ctx.publisherId}, ${this.db.ctx.schoolId}, ${this.db.ctx.userId}, 'ANSWER_CHECK', ${provider.name}, ${res.model ?? provider.model}, ${JSON.stringify({ answers: list.length })}::jsonb, '[]'::jsonb, false, null, 'OK', ${res.inputTokens ?? 0}, ${res.outputTokens ?? 0}, ${Date.now() - started})`);
     const out = parseJson(res.text);
-    const next = { ...items };
+    // merge into what is saved now (locked), so a parallel save can never undo the result
+    const { rows: [cur] } = await q.execute(sql`SELECT integrity FROM submissions WHERE id = ${submissionId} FOR UPDATE`) as any;
+    const next = { ...(cur?.integrity?.items ?? items) };
     for (const a of Array.isArray(out?.answers) ? out.answers : []) {
-      const it = list.find((x) => x.n === Number(a?.n)); if (!it) continue;
+      const it = list.find((x) => x.n === Number(a?.n)); if (!it || !next[it.id]) continue;
       const score = Math.max(0, Math.min(100, Math.round(Number(a.score) || 0)));
-      next[it.id] = { ...next[it.id], ai: { score, reasons: [String(a.reason ?? '').slice(0, 200)].filter(Boolean), by: 'ai', rules: next[it.id].ai } };
+      const rules = next[it.id].ai?.by === 'ai' ? next[it.id].ai.rules : next[it.id].ai;
+      next[it.id] = { ...next[it.id], ai: { score, reasons: [String(a.reason ?? '').slice(0, 200)].filter(Boolean), by: 'ai', rules } };
     }
     await q.execute(sql`UPDATE submissions SET integrity = jsonb_set(integrity, '{items}', ${JSON.stringify(next)}::jsonb) WHERE id = ${submissionId}`);
     return 'checked';

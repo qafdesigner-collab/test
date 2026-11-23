@@ -12,11 +12,12 @@ import { speakText } from '@/lib/voice';
 import { TracingPad, cropPage } from '@/components/games/tracing';
 import { ColoringBoard } from '@/components/games/coloring';
 import { hasRole, useMe } from '@/lib/session';
+import { Clip, ReadAloud } from '@/components/voice';
 
 export interface Hotspot { id: string; page: number; x: number; y: number; w: number; h: number; kind: Kind; title: string; body: string; url: string | null; gameId: string | null; gameTitle?: string | null; assetId?: string | null; inline?: boolean; mime?: string | null; fileName?: string | null; data?: { paths?: number[][][] } | null }
-type Kind = 'NOTE' | 'AUDIO' | 'VIDEO' | 'IMAGE' | 'LINK' | 'GAME' | 'TRACE' | 'DRAW';
+type Kind = 'NOTE' | 'AUDIO' | 'VIDEO' | 'IMAGE' | 'LINK' | 'GAME' | 'TRACE' | 'DRAW' | 'READ';
 const KINDS: Record<Kind, { icon: string; label: string }> = {
-  NOTE: { icon: '💬', label: 'Note or meaning' }, AUDIO: { icon: '🔊', label: 'Audio / read aloud' }, VIDEO: { icon: '🎬', label: 'Video' }, IMAGE: { icon: '🖼️', label: 'Picture' }, LINK: { icon: '🔗', label: 'Link' }, GAME: { icon: '🎮', label: 'Game' }, TRACE: { icon: '✍️', label: 'Tracing' }, DRAW: { icon: '🖍️', label: 'Drawing area' },
+  NOTE: { icon: '💬', label: 'Note or meaning' }, AUDIO: { icon: '🔊', label: 'Audio / read aloud' }, VIDEO: { icon: '🎬', label: 'Video' }, IMAGE: { icon: '🖼️', label: 'Picture' }, LINK: { icon: '🔗', label: 'Link' }, GAME: { icon: '🎮', label: 'Game' }, TRACE: { icon: '✍️', label: 'Tracing' }, DRAW: { icon: '🖍️', label: 'Drawing area' }, READ: { icon: '🎤', label: 'Read aloud' },
 };
 /** A short-lived link to the publisher's own video / audio / picture (checked against the reader's licence). */
 export function useMedia(assetId?: string | null) {
@@ -65,7 +66,7 @@ export function HotspotLayer({ componentId, page, editing, kid, games, noFlip }:
           <span className={cn('absolute -right-2 -top-2 grid place-items-center rounded-full bg-white shadow', kid ? 'size-8 text-lg' : 'size-6 text-sm')}>{KINDS[h.kind].icon}</span>
         </button>))}
       {rect && <div className="pointer-events-none absolute rounded-lg border-2 border-dashed border-sky-600 bg-sky-400/20" style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.w * 100}%`, height: `${rect.h * 100}%` }} />}
-      {open && (open.kind === 'TRACE' || open.kind === 'DRAW' ? <WorkView h={open} onClose={() => setOpen(null)} page={pageCanvas()} />
+      {open && (open.kind === 'TRACE' || open.kind === 'DRAW' || open.kind === 'READ' ? <WorkView h={open} onClose={() => setOpen(null)} page={pageCanvas()} />
         : <HotspotView h={open} kid={kid} onClose={() => setOpen(null)} />)}
       {form && <HotspotForm componentId={componentId} value={form} games={games} page={pageCanvas()} onClose={() => setForm(null)} />}
     </div>
@@ -82,22 +83,45 @@ function blank(w: number, h: number) { const c = document.createElement('canvas'
 function WorkView({ h, onClose, page }: { h: Hotspot; onClose: () => void; page?: HTMLCanvasElement | null }) {
   const me = useMe(); const student = hasRole(me.data, 'STUDENT'); const toast = useToast(); const qc = useQueryClient();
   const paths = h.data?.paths?.length ? h.data.paths : null;
-  const [crop] = useState(() => (page && (h.kind === 'DRAW' || paths || !h.body?.trim()) ? cropPage(page, h) : null));
+  const [crop] = useState(() => (page && (h.kind === 'DRAW' || h.kind === 'READ' || paths || !h.body?.trim()) ? cropPage(page, h) : null));
   const [drawing] = useState(() => (h.kind === 'DRAW' ? (crop ?? blank(h.w, h.h)).toDataURL('image/png') : ''));
-  const mine = useQuery({ queryKey: ['my-work', h.id], queryFn: () => api.get<{ stars: number | null; comment: string; createdAt: string } | null>(`/reader/hotspots/${h.id}/my-work`), enabled: student });
+  const [readPic] = useState(() => (h.kind === 'READ' && crop ? crop.toDataURL('image/png') : ''));
+  const [clip, setClip] = useState<Clip | null>(null); const [sending, setSending] = useState(false);
+  const mine = useQuery({ queryKey: ['my-work', h.id], queryFn: () => api.get<{ stars: number | null; comment: string; verdict: 'OK' | 'REDO' | null; createdAt: string } | null>(`/reader/hotspots/${h.id}/my-work`), enabled: student });
   const send = async (image: string, stars: number | null) => {
+    if (!student) { toast('Students see “Send to teacher” here — their work goes to the teacher’s Book work page.'); return; }
     try { await api.post(`/reader/hotspots/${h.id}/work`, { image, ...(stars !== null ? { stars } : {}) }); toast('Sent to your teacher 📤'); qc.invalidateQueries({ queryKey: ['my-work', h.id] }); }
     catch (e: any) { toast(e.message, 'err'); throw e; }
   };
+  const sendReading = async () => {
+    if (!student) { toast('Students see “Send to teacher” here — their reading goes to the teacher’s Book work page.'); return; }
+    if (!clip) return; setSending(true);
+    try { await api.post(`/reader/hotspots/${h.id}/work`, { audioId: clip.id }); toast('Your reading was sent to your teacher 📤'); setClip(null); qc.invalidateQueries({ queryKey: ['my-work', h.id] }); }
+    catch (e: any) { toast(e.message, 'err'); } finally { setSending(false); }
+  };
   const last = mine.data;
+  const title = h.title || (h.kind === 'DRAW' ? 'Draw and colour' : h.kind === 'READ' ? 'Read aloud' : 'Trace the letters');
   return (
-    <Dialog open onOpenChange={onClose} wide title={`${KINDS[h.kind].icon} ${h.title || (h.kind === 'DRAW' ? 'Draw and colour' : 'Trace the letters')}`}>
-      {h.kind === 'DRAW' && h.body?.trim() && <p className="mb-3 whitespace-pre-wrap text-lg text-slate-800">{h.body}</p>}
-      {last && <p className="mb-3 rounded-xl bg-violet-50 p-3 text-sm text-violet-900">📤 You sent this on {new Date(last.createdAt).toLocaleDateString()}.
-        {last.comment ? <> <b>Your teacher says:</b> {last.comment}</> : ' Your teacher has not answered yet.'}</p>}
-      {h.kind === 'DRAW' ? <ColoringBoard image={drawing} say={(t) => void speakText(t)} doneLabel="📤 Send to teacher"
-          onDone={student ? (img) => void send(img, null).catch(() => undefined) : undefined} />
-        : crop || h.body?.trim() || paths ? <TracingPad backdrop={crop} paths={paths} text={crop ? undefined : h.body.trim()} lines={!crop} say={(t) => void speakText(t)} onSend={student ? send : undefined} />
+    <Dialog open onOpenChange={onClose} wide title={`${KINDS[h.kind].icon} ${title}`}>
+      {(h.kind === 'DRAW') && h.body?.trim() && <p className="mb-3 whitespace-pre-wrap text-lg text-slate-800">{h.body}</p>}
+      {last && <div className={cn('mb-3 rounded-xl p-3 text-sm', last.verdict === 'OK' ? 'bg-emerald-50 text-emerald-900' : last.verdict === 'REDO' ? 'bg-amber-50 text-amber-900' : 'bg-violet-50 text-violet-900')}>
+        📤 You sent this on {new Date(last.createdAt).toLocaleDateString()}.
+        {last.verdict === 'OK' && <b> ✅ Your teacher says: well done!</b>}{last.verdict === 'REDO' && <b> 🔁 Your teacher asks you to do it again.</b>}
+        {last.stars !== null && last.verdict && <span> {'⭐'.repeat(last.stars)}</span>}
+        {last.comment ? <> <b>{last.verdict ? '' : 'Your teacher says:'}</b> “{last.comment}”</> : !last.verdict && ' Your teacher has not answered yet.'}</div>}
+      {!student && <p className="mb-3 rounded-lg bg-sky-50 p-2 text-xs text-sky-900">👁 You see this as staff. Students also get <b>📤 Send to teacher</b>; what they send appears in <b>Teacher → Book work</b>, where the teacher listens or looks, gives stars and answers “well done” or “do it again”.</p>}
+      {h.kind === 'READ' ? (
+        <div className="space-y-4">
+          {readPic ? <img src={readPic} alt="What to read" className="mx-auto max-h-[45vh] rounded-xl bg-white object-contain shadow ring-1 ring-slate-200" />
+            : h.body?.trim() ? null : <p className="text-slate-600">This page is still loading — close and try again.</p>}
+          {h.body?.trim() && <div className="flex items-start gap-3 rounded-2xl bg-amber-50 p-4"><p className="flex-1 whitespace-pre-wrap text-2xl font-bold leading-relaxed text-slate-800">{h.body}</p>
+            <button type="button" onClick={() => void speakText(h.body)} aria-label="Listen first" className="rounded-xl bg-amber-100 p-2 text-2xl">🔊</button></div>}
+          <ReadAloud playful value={clip} onChange={setClip} />
+          <div className="flex justify-center"><button type="button" disabled={(student && !clip) || sending} onClick={sendReading}
+            className="rounded-2xl bg-violet-600 px-6 py-3 text-lg font-black text-white shadow disabled:opacity-50">{sending ? '⏳ Sending…' : '📤 Send to teacher'}</button></div>
+        </div>
+      ) : h.kind === 'DRAW' ? <ColoringBoard image={drawing} say={(t) => void speakText(t)} doneLabel="📤 Send to teacher" onDone={(img) => void send(img, null).catch(() => undefined)} />
+        : crop || h.body?.trim() || paths ? <TracingPad backdrop={crop} paths={paths} text={crop ? undefined : h.body.trim()} lines={!crop} say={(t) => void speakText(t)} onSend={send} />
         : <p className="text-slate-600">This page is still loading — close and try again.</p>}
     </Dialog>
   );
@@ -203,8 +227,9 @@ function HotspotForm({ componentId, value, games, page, onClose }: { componentId
               <b className="block">{l}</b><span className="text-xs text-slate-600">{hint}</span></button>))}</div>
           {trace === 'PATH' && <PathDrawer page={page} box={{ x: f.x, y: f.y, w: f.w, h: f.h }} value={paths} onChange={setPaths} />}
           <p className="rounded-lg bg-sky-50 p-2 text-xs text-sky-900">Children trace with their finger or mouse and get stars; they can send their work to their teacher (Teacher → Book work).</p></>}
+        {f.kind === 'READ' && <p className="rounded-lg bg-sky-50 p-2 text-xs text-sky-900">Draw the box around the words to read on the page (or type them below). Children tap 🎤, read aloud, and send the recording to their teacher (Teacher → Book work), who listens, gives stars and answers “well done” or “do it again”.</p>}
         {f.kind === 'DRAW' && <p className="rounded-lg bg-sky-50 p-2 text-xs text-sky-900">Children draw and colour in this part of the page (what is printed here stays as lines), then send it to their teacher (Teacher → Book work).</p>}
-        {!(f.kind === 'TRACE' && trace !== 'TEXT') && <Field label={f.kind === 'TRACE' ? 'Letters to trace' : f.kind === 'DRAW' ? 'What to draw (optional), e.g. Draw your family' : f.kind === 'AUDIO' ? (f.assetId ? 'Words (optional)' : 'Words read aloud') : f.kind === 'NOTE' ? 'Note' : f.kind === 'IMAGE' ? 'Caption (optional)' : 'Text (optional)'}><Textarea rows={3} maxLength={4000} required={(f.kind === 'AUDIO' && !f.assetId) || f.kind === 'NOTE' || f.kind === 'TRACE'} value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} /></Field>}
+        {!(f.kind === 'TRACE' && trace !== 'TEXT') && <Field label={f.kind === 'TRACE' ? 'Letters to trace' : f.kind === 'DRAW' ? 'What to draw (optional), e.g. Draw your family' : f.kind === 'READ' ? 'Words to read (optional — leave empty to read what is printed in the box)' : f.kind === 'AUDIO' ? (f.assetId ? 'Words (optional)' : 'Words read aloud') : f.kind === 'NOTE' ? 'Note' : f.kind === 'IMAGE' ? 'Caption (optional)' : 'Text (optional)'}><Textarea rows={3} maxLength={4000} required={(f.kind === 'AUDIO' && !f.assetId) || f.kind === 'NOTE' || f.kind === 'TRACE'} value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} /></Field>}
         {err ? <ErrorBox error={err} /> : null}
         <div className="flex gap-2">
           {f.id && <Button type="button" variant="ghost" onClick={async () => { try { await api.del(`/reader/hotspots/${f.id}`); done('Hotspot deleted'); } catch (e) { setErr(e); } }}><Trash2 className="size-4" />Delete</Button>}

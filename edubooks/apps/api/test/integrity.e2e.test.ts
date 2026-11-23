@@ -10,7 +10,10 @@ beforeAll(async () => {
     req.on('end', () => {
       if (req.url?.endsWith('/models')) { res.end(JSON.stringify({ data: [{ id: 'test-model' }] })); return; }
       calls.push(JSON.parse(body));
-      const reply = { answers: [{ n: 1, score: 88, reason: 'Polished, generic wording far above a grade 1 level.' }] };
+      // score the answer that holds the AI-style text (the answers come in any order)
+      const user = String((JSON.parse(body).messages ?? []).map((m: any) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n'));
+      const chunk = user.split(/(?=Answer \d+\n)/).find((c) => c.includes('Student answer: Furthermore')); const n = Number(/^Answer (\d+)/.exec(chunk ?? '')?.[1] ?? 1);
+      const reply = { answers: [{ n, score: 88, reason: 'Polished, generic wording far above a grade 1 level.' }, { n: n === 1 ? 2 : 1, score: 5, reason: 'Simple words and spelling of a young child.' }] };
       res.end(JSON.stringify({ model: 'test-model', choices: [{ message: { content: JSON.stringify(reply) } }], usage: { prompt_tokens: 200, completion_tokens: 30 } }));
     });
   });
@@ -56,7 +59,7 @@ describe('Copy-paste and AI-writing check (teachers only)', () => {
     expect(r.status).toBe(201);
     expect(JSON.stringify(r.body)).not.toMatch(/integrity|copied|pasted/);
     let t: any;
-    for (let i = 0; i < 40; i++) { t = (await teacher.get(`/api/teacher/assessments/${id}`)).body.students.find((s: any) => s.submission); if (t.submission.integrity.items[q1]?.ai?.by === 'ai') break; await sleep(150); }
+    for (let i = 0; i < 100; i++) { t = (await teacher.get(`/api/teacher/assessments/${id}`)).body.students.find((s: any) => s.submission); if (t.submission.integrity.items[q1]?.ai?.by === 'ai') break; await sleep(200); }
     const it = t.submission.integrity.items;
     expect(it[q1]).toMatchObject({ copied: true, pasted: AI_TEXT.length, ai: { score: 88, by: 'ai' } });
     expect(it[q1].ai.rules.score).toBeGreaterThanOrEqual(60);

@@ -140,18 +140,27 @@ export class ReaderService {
     return { ok: true };
   }
   // ---------- work students send from book pages (tracing, drawing) ----------
-  async sendWork(hotspotId: string, d: { image: string; stars?: number }) {
+  async sendWork(hotspotId: string, d: { image?: string; audioId?: string; stars?: number }) {
     const { rows: [h] } = await this.q.execute(sql`SELECT id, component_id AS "componentId", page, kind FROM page_hotspots WHERE id = ${hotspotId}`) as any;
-    if (!h || !['TRACE', 'DRAW'].includes(h.kind)) throw new NotFoundException('Not found');
+    if (!h || !['TRACE', 'DRAW', 'READ'].includes(h.kind)) throw new NotFoundException('Not found');
     await this.component(h.componentId);
-    if (!/^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(d.image) || d.image.length > 1_500_000) throw new BadRequestException('The picture could not be sent — please try again');
-    const { rows: [w] } = await this.q.execute(sql`INSERT INTO page_work (publisher_id, school_id, student_id, hotspot_id, component_id, page, kind, image, stars)
-      VALUES (${this.db.ctx.publisherId}, ${this.db.ctx.schoolId}, ${this.db.ctx.userId}, ${h.id}, ${h.componentId}, ${h.page}, ${h.kind}, ${d.image}, ${d.stars ?? null}) RETURNING id, created_at AS "createdAt"`) as any;
+    let image: string | null = null; let audio: string | null = null;
+    if (h.kind === 'READ') {
+      // the reading must be this student's own recording
+      const { rows: [c] } = await this.q.execute(sql`SELECT id FROM audio_clips WHERE id = ${d.audioId ?? '00000000-0000-0000-0000-000000000000'} AND owner_id = ${this.db.ctx.userId} AND kind = 'READING'`) as any;
+      if (!c) throw new BadRequestException('Record your reading first');
+      audio = c.id;
+    } else {
+      if (!d.image || !/^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(d.image) || d.image.length > 1_500_000) throw new BadRequestException('The picture could not be sent — please try again');
+      image = d.image;
+    }
+    const { rows: [w] } = await this.q.execute(sql`INSERT INTO page_work (publisher_id, school_id, student_id, hotspot_id, component_id, page, kind, image, audio_id, stars)
+      VALUES (${this.db.ctx.publisherId}, ${this.db.ctx.schoolId}, ${this.db.ctx.userId}, ${h.id}, ${h.componentId}, ${h.page}, ${h.kind}, ${image}, ${audio}, ${d.stars ?? null}) RETURNING id, created_at AS "createdAt"`) as any;
     return w;
   }
   /** The student's own last work on this element, with the teacher's comment. */
   async myWork(hotspotId: string) {
-    const { rows } = await this.q.execute(sql`SELECT id, stars, comment, created_at AS "createdAt" FROM page_work WHERE hotspot_id = ${hotspotId} AND student_id = ${this.db.ctx.userId} ORDER BY created_at DESC LIMIT 1`);
+    const { rows } = await this.q.execute(sql`SELECT id, stars, comment, verdict, audio_id AS "audioId", created_at AS "createdAt" FROM page_work WHERE hotspot_id = ${hotspotId} AND student_id = ${this.db.ctx.userId} ORDER BY created_at DESC LIMIT 1`);
     return rows[0] ?? null;
   }
   private async workScope(classId?: string) {
@@ -162,7 +171,7 @@ export class ReaderService {
   }
   /** Book work sent by students of the teacher's classes (newest first). */
   async workList(classId?: string) {
-    const { rows } = await this.q.execute(sql`SELECT w.id, w.kind, w.page, w.stars, w.comment, w.seen_at AS "seenAt", w.created_at AS "createdAt", u.display_name AS student,
+    const { rows } = await this.q.execute(sql`SELECT w.id, w.kind, w.page, w.stars, w.comment, w.verdict, w.audio_id AS "audioId", w.image IS NOT NULL AS "hasImage", w.seen_at AS "seenAt", w.created_at AS "createdAt", u.display_name AS student,
         c.title AS part, b.title AS book, h.title AS element
       FROM page_work w JOIN users u ON u.id = w.student_id LEFT JOIN book_components c ON c.id = w.component_id LEFT JOIN book_editions e ON e.id = c.edition_id
       LEFT JOIN book_packages b ON b.id = e.package_id LEFT JOIN page_hotspots h ON h.id = w.hotspot_id
@@ -177,12 +186,13 @@ export class ReaderService {
   async workImage(id: string) {
     const w = await this.workFor(id);
     if (!w.seen_at) await this.q.execute(sql`UPDATE page_work SET seen_at = now() WHERE id = ${id}`);
+    if (!w.image) throw new NotFoundException('This work has no picture');
     const m = /^data:(image\/(?:jpeg|png));base64,(.*)$/.exec(w.image)!;
     return { mime: m[1], bytes: Buffer.from(m[2], 'base64') };
   }
-  async commentWork(id: string, d: { comment?: string; stars?: number }) {
+  async commentWork(id: string, d: { comment?: string; stars?: number; verdict?: 'OK' | 'REDO' }) {
     await this.workFor(id);
-    await this.q.execute(sql`UPDATE page_work SET comment = coalesce(${d.comment?.trim().slice(0, 500) ?? null}, comment), stars = coalesce(${d.stars ?? null}, stars), commented_by = ${this.db.ctx.userId}, seen_at = coalesce(seen_at, now()) WHERE id = ${id}`);
+    await this.q.execute(sql`UPDATE page_work SET comment = coalesce(${d.comment?.trim().slice(0, 500) ?? null}, comment), stars = coalesce(${d.stars ?? null}, stars), verdict = coalesce(${d.verdict ?? null}, verdict), commented_by = ${this.db.ctx.userId}, seen_at = coalesce(seen_at, now()) WHERE id = ${id}`);
     return { ok: true };
   }
 

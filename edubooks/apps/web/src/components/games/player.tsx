@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import { Maximize, Minimize, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/components/ui';
 import { ENGINE_INFO, ENGINES, Engine, maxScore } from './engines';
 import { Mascot } from './mascot';
@@ -13,12 +13,20 @@ export function GamePlayer({ game, onDone, preview }: { game: { engine: Engine; 
   const [phase, setPhase] = useState<'start' | 'play' | 'done'>('start');
   const [run, setRun] = useState(0); const [progress, setProgress] = useState([0, 1]); const [result, setResult] = useState<(PlayResult & { score: number; max: number }) | null>(null);
   const [sound, setSound] = useState(true); const started = useRef(0); const { t } = useT();
+  // full screen: the real browser full screen where it works, and always a page-filling view (iPhone has no real full screen)
+  const root = useRef<HTMLDivElement>(null); const [full, setFull] = useState(false);
+  const camera = game.engine === 'BUBBLE_POP' || game.engine === 'FINGERS' || game.engine === 'AIR_WRITING';
+  const goFull = (on: boolean) => {
+    setFull(on);
+    try { if (on && root.current?.requestFullscreen && !document.fullscreenElement) void root.current.requestFullscreen().catch(() => undefined); else if (!on && document.fullscreenElement) void document.exitFullscreen(); } catch { /* the page-filling view is enough */ }
+  };
+  useEffect(() => { const f = () => { if (!document.fullscreenElement) setFull(false); }; document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f); }, []);
   const say = useCallback((t: string) => {
     if (!sound || typeof window === 'undefined' || !window.speechSynthesis) return;
     try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.rate = 0.85; u.pitch = 1.1; window.speechSynthesis.speak(u); } catch { /* no voice: the game still works */ }
   }, [sound]);
   const Engine = ENGINES[game.engine]; const info = ENGINE_INFO[game.engine]; const max = maxScore(game.engine, game.content);
-  const start = () => { setPhase('play'); setRun(run + 1); setResult(null); started.current = Date.now(); say(game.instructions || game.title); };
+  const start = () => { if (camera) goFull(true); setPhase('play'); setRun(run + 1); setResult(null); started.current = Date.now(); say(game.instructions || game.title); };
   const finish = async (score: number) => {
     const local = { stars: score / max >= 0.9 ? 3 : score / max >= 0.6 ? 2 : score > 0 ? 1 : 0 };
     setPhase('done'); setResult({ ...local, score, max });
@@ -28,12 +36,14 @@ export function GamePlayer({ game, onDone, preview }: { game: { engine: Engine; 
   };
   useEffect(() => () => window.speechSynthesis?.cancel(), []);
   return (
-    <div className="relative">
-      <div className="mb-6 flex items-center gap-3">
+    <div ref={root} className={cn('relative', full && 'fixed inset-0 z-50 flex flex-col overflow-y-auto bg-gradient-to-b from-sky-50 to-amber-50 p-2 sm:p-4')}
+      style={{ ['--game-chrome' as any]: full ? '275px' : '380px' }}>
+      <div className={cn('flex items-center gap-3', full ? 'mb-2' : 'mb-6')}>
         <span className="grid size-12 shrink-0 place-items-center rounded-2xl text-2xl" style={{ background: info.color }}>{info.icon}</span>
         <div className="min-w-0 flex-1"><h1 className="truncate text-2xl font-extrabold text-slate-800">{game.title}</h1>
           {phase === 'play' && <div className="mt-1 h-3 overflow-hidden rounded-full bg-white" role="progressbar" aria-valuenow={progress[0]} aria-valuemax={progress[1]}>
             <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-pink-500 transition-all" style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} /></div>}</div>
+        <button onClick={() => goFull(!full)} aria-label={full ? t('Exit full screen') : t('Full screen')} title={full ? t('Exit full screen') : t('Full screen')} className="focus-ring rounded-2xl bg-white p-3 shadow">{full ? <Minimize className="size-6" /> : <Maximize className="size-6" />}</button>
         <button onClick={() => { setSound(!sound); window.speechSynthesis?.cancel(); }} aria-label={sound ? t('Sound off') : t('Sound on')} className="focus-ring rounded-2xl bg-white p-3 shadow">{sound ? <Volume2 className="size-6" /> : <VolumeX className="size-6" />}</button>
       </div>
       {phase === 'start' && (
@@ -43,7 +53,7 @@ export function GamePlayer({ game, onDone, preview }: { game: { engine: Engine; 
           {preview && <p className="text-sm text-slate-500">{t('Preview — scores are not saved.')}</p>}
         </div>
       )}
-      {phase === 'play' && <div key={run} className="rounded-[2rem] bg-white/60 p-4 sm:p-8"><Engine content={game.content} onFinish={finish} say={say} onProgress={(d, t) => setProgress([d, t])} /></div>}
+      {phase === 'play' && <div key={run} className={cn('rounded-[2rem] bg-white/60', full || camera ? 'p-2 sm:p-4' : 'p-4 sm:p-8')}><Engine content={game.content} onFinish={finish} say={say} onProgress={(d, t) => setProgress([d, t])} /></div>}
       {phase === 'done' && result && (
         <div className="relative overflow-hidden rounded-[2rem] bg-white p-8 text-center shadow-sm">
           {result.stars > 0 && <Confetti />}

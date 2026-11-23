@@ -211,7 +211,10 @@ export function Reader({ editionId, backHref, initial }: { editionId: string; ba
     <div ref={shell} className={cn('flex h-screen flex-col', kid ? 'bg-amber-50' : 'bg-slate-100')}>
       {preview && <div className="flex items-center gap-2 bg-violet-600 px-3 py-1.5 text-sm font-medium text-white">👁 Student preview — this is how students see this book.<span className="flex-1" /><button onClick={() => window.close()} className="rounded bg-white/20 px-2 py-0.5 hover:bg-white/30">Close preview</button></div>}
       <header className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white/90 px-3 py-2 backdrop-blur">
-        <Link href={backHref} className={btn} aria-label="Back"><ArrowLeft className="size-5" /></Link>
+        <Link href={backHref} className={btn} aria-label="Back" onClick={(e) => {
+          // back to the page the reader was opened from (e.g. the book builder), when it was a page of this site
+          try { if (window.history.length > 1 && document.referrer.startsWith(window.location.origin) && !document.referrer.includes('/login')) { e.preventDefault(); router.back(); } } catch { /* use the link */ }
+        }}><ArrowLeft className="size-5" /></Link>
         <button className={btn} onClick={() => setToc(!toc)} aria-label="Contents" aria-pressed={toc}><PanelLeft className="size-5" /></button>
         <div className="min-w-0 flex-1"><div className={cn('truncate font-semibold', kid && 'text-lg')}>{b.title}</div><div className="truncate text-xs text-slate-600">{comp?.title}{lessonHere && ` · Unit ${lessonHere.unit.number} · Lesson ${lessonHere.number}: ${lessonHere.title}`}</div></div>
         {comp?.flipbook && (

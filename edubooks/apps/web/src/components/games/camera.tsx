@@ -20,7 +20,10 @@ function loadLandmarker() {
     const { FilesetResolver, HandLandmarker } = await import('@mediapipe/tasks-vision');
     const files = await FilesetResolver.forVisionTasks('/mediapipe/wasm');
     const opts = (delegate: 'GPU' | 'CPU') => ({ baseOptions: { modelAssetPath: '/mediapipe/hand_landmarker.task', delegate }, runningMode: 'VIDEO' as const, numHands: 2 });
-    try { return await HandLandmarker.createFromOptions(files, opts('GPU')); } catch { return HandLandmarker.createFromOptions(files, opts('CPU')); }
+    // the fast (graphics card) engine first; if it fails or takes too long on this device, the safe one
+    const gpu = HandLandmarker.createFromOptions(files, opts('GPU'));
+    const r = await Promise.race([gpu.catch(() => null), new Promise<null>((res) => setTimeout(() => res(null), 10_000))]);
+    return r ?? HandLandmarker.createFromOptions(files, opts('CPU'));
   })().catch((e) => { landmarker = null; throw e; });
   return landmarker;
 }
@@ -98,6 +101,7 @@ export function useHands(enabled = true) {
       const tick = () => {
         if (stop) return;
         const t0 = performance.now();
+        if (document.hidden) { raf = requestAnimationFrame(tick); return; }
         // at most ~20 times a second, and less on a slow device, so the game itself always stays smooth
         if (t0 >= next && v.readyState >= 2 && v.currentTime !== last) {
           last = v.currentTime;
@@ -210,7 +214,7 @@ const floatText = (fx: Fx[], x: number, y: number, text: string, color: string, 
 
 const useCanvas = () => {
   const ref = useRef<HTMLCanvasElement>(null);
-  const fit = useCallback(() => { const c = ref.current; if (!c) return null; const r = c.getBoundingClientRect(); const k = window.devicePixelRatio || 1;
+  const fit = useCallback(() => { const c = ref.current; if (!c) return null; const r = c.getBoundingClientRect(); const k = Math.min(1.5, window.devicePixelRatio || 1);
     if (c.width !== Math.round(r.width * k) || c.height !== Math.round(r.height * k)) { c.width = Math.round(r.width * k); c.height = Math.round(r.height * k); }
     return { c, g: c.getContext('2d')!, w: c.width, h: c.height, k }; }, []);
   return { ref, fit };
@@ -241,7 +245,8 @@ function Stage({ cam, ready, setReady, children }: { cam: Cam; ready: boolean; s
     return () => clearInterval(k);
   }, [ready, cam.status, cam.hands, cam.light, setReady]);
   return (
-    <div className="relative mx-auto w-full max-w-3xl touch-none select-none overflow-hidden rounded-3xl shadow-lg ring-4 ring-white" style={{ aspectRatio: `${cam.ratio}` }}>
+    <div className="relative mx-auto w-full max-w-4xl touch-none select-none overflow-hidden rounded-3xl shadow-lg ring-4 ring-white"
+      style={{ aspectRatio: `${cam.ratio}`, maxWidth: `min(56rem, calc((100dvh - var(--game-chrome, 360px)) * ${cam.ratio}))`, minWidth: 'min(100%, 260px)' }}>
       {/* the camera picture is only read for tracking — it is never shown */}
       <video ref={cam.video} muted playsInline aria-hidden className="pointer-events-none absolute left-0 top-0 size-px opacity-0" />
       {children}
@@ -250,6 +255,7 @@ function Stage({ cam, ready, setReady, children }: { cam: Cam; ready: boolean; s
           <div className="space-y-3">
             <div className={cn('text-7xl', cam.status === 'ready' && seen === 0 && 'motion-safe:animate-bounce')}>{seen > 0 ? '👍' : '🖐️'}</div>
             <p className="text-2xl font-black">{cam.status === 'ready' ? t('Camera check') : `📷 ${t('Starting the camera…')}`}</p>
+            {cam.status === 'starting' && <p className="text-sm text-white/90">{t('The first time, hand tracking takes a few seconds to load.')}</p>}
             {cam.status === 'ready' && <p className="text-lg font-bold">{t(tip || 'Show your hand to the camera.')}</p>}
             {cam.status === 'ready' && <div className="mx-auto h-3 w-56 overflow-hidden rounded-full bg-white/30"><div className="h-full bg-emerald-400 transition-[width]" style={{ width: `${seen * 100}%` }} /></div>}
             <p className="text-xs text-white/80">🔒 {t('Only your hand is used. Your face and your room are never shown, recorded or sent anywhere.')}</p>
@@ -263,7 +269,7 @@ function Stage({ cam, ready, setReady, children }: { cam: Cam; ready: boolean; s
 }
 function CameraNote() {
   const { t } = useT();
-  return <p className="text-center text-xs text-slate-500">🔒 {t('The camera only looks at your hand. Your face and your room are never shown, recorded or sent anywhere.')}</p>;
+  return <p className="hidden text-center text-xs text-slate-500 sm:block">🔒 {t('The camera only looks at your hand. Your face and your room are never shown, recorded or sent anywhere.')}</p>;
 }
 
 // ---------- Bubble pop ----------
@@ -332,8 +338,8 @@ export function BubblePop({ content, onFinish, say, onProgress }: EngineProps) {
     return () => cancelAnimationFrame(raf);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className="space-y-3">
-      <p className="text-center text-2xl font-extrabold text-slate-800">🫧 {content.task || t('Pop the right bubbles!')}</p>
+    <div className="space-y-2">
+      <p className="text-center text-xl font-extrabold text-slate-800 sm:text-2xl">🫧 {content.task || t('Pop the right bubbles!')}</p>
       <div className="flex items-center justify-center gap-3 text-lg font-bold"><span className="rounded-full bg-emerald-100 px-4 py-1 text-emerald-800">⭐ {score} / {goal}</span>
         {streak >= 3 && <span className="rounded-full bg-orange-100 px-3 py-1 text-orange-700">🔥 {t('{n} in a row!', { n: streak })}</span>}
         <span className={cn('rounded-full px-4 py-1 tabular-nums', left <= 10 ? 'bg-red-100 text-red-700' : 'bg-white text-slate-700')}>⏱ {left}s</span></div>
@@ -393,8 +399,8 @@ export function ShowFingers({ content, onFinish, say, onProgress }: EngineProps)
   }, [r, done, next, ready]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!r) return <p className="text-center">{t('Nothing to play')}</p>;
   return (
-    <div className="space-y-3">
-      <p className="text-center text-3xl font-extrabold text-slate-800">✋ {/^\d+$/.test(r.show) ? t('Show me {n}!', { n: r.show }) : r.show}</p>
+    <div className="space-y-2">
+      <p className="text-center text-2xl font-extrabold text-slate-800 sm:text-3xl">✋ {/^\d+$/.test(r.show) ? t('Show me {n}!', { n: r.show }) : r.show}</p>
       <Stage cam={cam} ready={ready} setReady={setReady}><canvas ref={ref} className="absolute inset-0 size-full" />
         {ready && cam.status === 'ready' && <div className="absolute bottom-3 start-3 flex items-center gap-2 rounded-2xl bg-white/90 px-4 py-2 shadow">
           <span className="text-3xl font-black tabular-nums text-slate-800">{seen}</span><span className="text-xl">{'☝️'.repeat(Math.min(seen, 5))}{seen > 5 ? '…' : ''}</span></div>}
@@ -481,8 +487,8 @@ export function AirWriting({ content, onFinish, say, onProgress }: EngineProps) 
   const pos = (e: React.PointerEvent) => { const r = ink.current!.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
   if (!item) return <p className="text-center">{t('Nothing to write')}</p>;
   return (
-    <div className="space-y-3">
-      <p className="text-center text-2xl font-extrabold text-slate-800">☝️ {t('Write')} <span className="text-rose-600">{item}</span> {t('in the air!')}</p>
+    <div className="space-y-2">
+      <p className="text-center text-xl font-extrabold text-slate-800 sm:text-2xl">☝️ {t('Write')} <span className="text-rose-600">{item}</span> {t('in the air!')}</p>
       <Stage cam={cam} ready={ready} setReady={setReady}>
         <div ref={wrap} className="absolute inset-0">
           <canvas ref={board} className="absolute inset-0 size-full" />

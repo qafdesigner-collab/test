@@ -76,4 +76,24 @@ describe('Book page work: drawing areas, tracing paths and sending work to the t
     const note = await editor.post(`/api/reader/components/${part1}/hotspots`).send({ ...box, page: 4, kind: 'NOTE', body: 'hi' }); made.push(note.body.id);
     expect((await student.post(`/api/reader/hotspots/${note.body.id}/work`).send({ image: IMG })).status).toBe(404);
   });
+
+  it('read aloud on a book page: the student sends a recording; the teacher listens and answers well done or do it again', async () => {
+    const WEBM = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.alloc(400, 7)]);
+    const r = await editor.post(`/api/reader/components/${part1}/hotspots`).send({ ...box, page: 5, kind: 'READ', title: 'Read the sentence' });
+    expect(r.status).toBe(201); made.push(r.body.id);
+    expect((await student.post(`/api/reader/hotspots/${r.body.id}/work`).send({})).status).toBe(400); // nothing recorded
+    const teacherClip = (await teacher.post('/api/messages/audio').field('kind', 'READING').field('durationMs', '2000').attach('file', WEBM, 'r.webm')).body;
+    expect((await student.post(`/api/reader/hotspots/${r.body.id}/work`).send({ audioId: teacherClip.id })).status).toBe(400); // not their own reading
+    const clip = (await student.post('/api/messages/audio').field('kind', 'READING').field('durationMs', '2000').attach('file', WEBM, 'r.webm')).body;
+    expect((await student.post(`/api/reader/hotspots/${r.body.id}/work`).send({ audioId: clip.id })).status).toBe(201);
+    const w = (await teacher.get('/api/reader/work')).body.find((x: any) => x.kind === 'READ' && x.element === 'Read the sentence');
+    expect(w).toMatchObject({ audioId: clip.id, hasImage: false, verdict: null });
+    expect((await teacher.get(`/api/messages/audio/${clip.id}`)).status).toBe(200); // the teacher can listen
+    expect((await teacher.patch(`/api/reader/work/${w.id}`).send({ verdict: 'MAYBE' })).status).toBe(400);
+    expect((await teacher.patch(`/api/reader/work/${w.id}`).send({ verdict: 'REDO', stars: 1, comment: 'Read a bit slower, please.' })).status).toBe(200);
+    expect((await student.get(`/api/reader/hotspots/${r.body.id}/my-work`)).body).toMatchObject({ verdict: 'REDO', stars: 1, comment: 'Read a bit slower, please.' });
+    // drawings get a verdict too
+    const d = (await teacher.get('/api/reader/work')).body.find((x: any) => x.kind === 'DRAW');
+    expect((await teacher.patch(`/api/reader/work/${d.id}`).send({ verdict: 'OK' })).status).toBe(200);
+  });
 });
