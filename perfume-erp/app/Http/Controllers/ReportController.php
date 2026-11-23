@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\Dossiers;
 use App\Services\Profitability;
 use App\Services\ProfitLoss;
+use App\Services\Receivables;
 use App\Services\Stock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -69,5 +70,28 @@ class ReportController extends ErpBaseController
         }
 
         return ProfitLoss::year($year);
+    }
+
+    /**
+     * Amounts customers owe, by age.
+     */
+    public function receivables()
+    {
+        $this->allow(['manager', 'accountant']);
+
+        return Receivables::ageing();
+    }
+
+    /**
+     * Customer statement for a date range (defaults to the last 90 days).
+     */
+    public function statement(Request $r, int $id)
+    {
+        $this->allow(['manager', 'accountant']);
+        $v = $r->validate(['from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d|after_or_equal:from']);
+        $contact = DB::table('contacts')->find($id);
+        abort_unless($contact && $contact->kind === 'customer', 404);
+
+        return Receivables::statement($id, $v['from'] ?? now()->subDays(89)->toDateString(), $v['to'] ?? now()->toDateString());
     }
 }

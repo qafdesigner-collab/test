@@ -2611,3 +2611,16 @@ tr.total-row td { border-top: 2px solid var(--line) !important; }
   .sidebar-bottom { padding-top: 8px; }
   .sidebar .connection, .sidebar .build-badge, .theme-toggle { margin-bottom: 2px; padding-top: 2px; padding-bottom: 2px; }
 }
+.ageing-strip { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; background: var(--line); border-bottom: 1px solid var(--line); }
+.ageing-strip > div { background: var(--white); padding: 14px 18px; display: flex; flex-direction: column; gap: 4px; }
+.ageing-strip small { color: var(--muted); font-size: 12px; }
+.ageing-strip b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.ageing-strip .late b { color: var(--status-critical); }
+.ageing-strip .total { background: var(--accent-soft); }
+.overdue { color: var(--status-critical); font-weight: 600; }
+.statement-range { display: flex; gap: 12px; align-items: end; margin-bottom: 14px; flex-wrap: wrap; }
+.statement .ti-lines td:nth-child(n+5), .statement .ti-lines th:nth-child(n+5) { text-align: right; }
+.statement .ti-lines td:nth-child(3), .statement .ti-lines td:nth-child(4) { text-align: left; }
+.ageing-print { width: 100%; margin-top: 10px; }
+@media (max-width: 900px) { .ageing-strip { grid-template-columns: repeat(2, 1fr); } }
+@media print { .ageing-strip .late b, .overdue { color: #000; } }
