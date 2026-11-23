@@ -64,7 +64,7 @@ class ErpController extends Controller
         abort_unless(Auth::user()->active, 403);
         $user = Auth::user();
 
-        return ['user' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'role' => $user->role], 'settings' => DB::table('settings')->pluck('value', 'key'), 'locations' => DB::table('locations')->get(), 'csrf' => csrf_token(), 'build' => '0.1.0-development', 'capabilities' => ['hybrid_sync' => false, 'uae_einvoice' => false, 'full_accounting' => false, 'arabic' => false, 'terminal_integration' => false]];
+        return ['user' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'role' => $user->role], 'settings' => DB::table('settings')->pluck('value', 'key'), 'locations' => DB::table('locations')->get(), 'csrf' => csrf_token(), 'build' => '0.5.0-development', 'capabilities' => ['hybrid_sync' => false, 'uae_einvoice' => false, 'full_accounting' => false, 'arabic' => false, 'terminal_integration' => false]];
     }
 
     public function dashboard()
@@ -155,13 +155,13 @@ class ErpController extends Controller
         $this->allow(['manager', 'warehouse', 'cashier', 'production']);
         if ($r->isMethod('post')) {
             $this->allow(['manager', 'warehouse']);
-            $v = $r->validate(['brand' => 'required|string|max:100', 'name' => 'required|string|max:150', 'notes' => 'nullable|string|max:2000']);
+            $v = $r->validate(['brand' => 'required|string|max:100', 'name' => ['required', 'string', 'max:150', Rule::unique('references')->where('brand', $r->input('brand'))], 'notes' => 'nullable|string|max:2000', 'gender' => ['nullable', Rule::in(['Men', 'Women', 'Unisex'])], 'family' => 'nullable|string|max:80']);
             $id = DB::table('references')->insertGetId($v + ['created_at' => now(), 'updated_at' => now()]);
 
             return ['id' => $id];
         }
 
-        return ['references' => DB::table('references')->orderBy('brand')->get()];
+        return ['references' => DB::table('references')->orderBy('brand')->orderBy('name')->get()];
     }
 
     public function uploadImage(Request $r, int $id)

@@ -25,6 +25,7 @@ Artisan::command('erp:install {--demo : Add fictional sample catalogue}', functi
             DB::table('settings')->updateOrInsert(['key' => $k], ['value' => $v]);
         }DB::table('locations')->insert(['name' => 'Main warehouse', 'kind' => 'warehouse', 'created_at' => now(), 'updated_at' => now()]);
     });
+    $this->call('db:seed', ['--class' => 'Database\\Seeders\\InspirationLibrarySeeder', '--force' => true]);
     if ($this->option('demo')) {
         $this->call('db:seed', ['--class' => 'Database\\Seeders\\PerfumeSeeder', '--force' => true]);
     }
@@ -65,3 +66,7 @@ Artisan::command('erp:backup {destination : Absolute destination ZIP path outsid
     chmod($path, 0600);
     $this->info('Consistent database and private assets backup created. Store securely; archive is not encrypted.');
 })->purpose('Back up SQLite and private assets without exporting credentials');
+
+Artisan::command('erp:library', function () {
+    $this->call('db:seed', ['--class' => 'Database\\Seeders\\InspirationLibrarySeeder', '--force' => true]);
+})->purpose('Add missing internal inspiration references from the bundled library');
