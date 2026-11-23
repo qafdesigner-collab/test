@@ -17,7 +17,7 @@ class WorkspaceController extends ErpBaseController
         abort_unless(Auth::user()->active, 403);
         $user = Auth::user();
 
-        return ['user' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'role' => $user->role], 'settings' => DB::table('settings')->pluck('value', 'key'), 'locations' => DB::table('locations')->get(), 'csrf' => csrf_token(), 'build' => config('erp.version'), 'capabilities' => ['hybrid_sync' => false, 'uae_einvoice' => false, 'full_accounting' => false, 'arabic' => false, 'terminal_integration' => false]];
+        return ['user' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'role' => $user->role], 'settings' => DB::table('settings')->pluck('value', 'key'), 'locations' => DB::table('locations')->get(), 'csrf' => csrf_token(), 'build' => config('erp.version'), 'capabilities' => ['hybrid_sync' => false, 'uae_einvoice' => false, 'full_accounting' => false, 'arabic' => true, 'terminal_integration' => false]];
     }
 
     public function dashboard()

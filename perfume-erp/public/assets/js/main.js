@@ -2,4 +2,6 @@
 'use strict';
 
 watchTables();
+watchLanguage();
+if ($('#language-name')) $('#language-name').textContent = LANGUAGES[state.lang].label;
 start();

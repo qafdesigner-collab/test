@@ -2506,3 +2506,38 @@ tr[hidden] { display: none; }
 .library-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
 .steps { margin: 0 0 14px; padding-left: 20px; line-height: 1.7; font-size: 14px; }
 .check-row { flex-direction: row !important; align-items: center; gap: 10px !important; }
+
+/* ── 0.5 right-to-left layout for Arabic and Urdu ─────────────────── */
+:root[lang="ar"] body, :root[lang="ar"] input, :root[lang="ar"] select, :root[lang="ar"] textarea, :root[lang="ar"] button {
+  font-family: "Segoe UI", "Noto Sans Arabic", "Noto Naskh Arabic", Tahoma, "Geeza Pro", sans-serif;
+}
+:root[lang="ur"] body, :root[lang="ur"] input, :root[lang="ur"] select, :root[lang="ur"] textarea, :root[lang="ur"] button {
+  font-family: "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Naskh Arabic", "Segoe UI", Tahoma, sans-serif;
+}
+:root[lang="ur"] body { line-height: 1.9; }
+:root[lang="ar"] .eyebrow, :root[lang="ur"] .eyebrow, :root[lang="ar"] th, :root[lang="ur"] th, :root[lang="ar"] .section-label, :root[lang="ur"] .section-label { letter-spacing: 0; }
+[dir="rtl"] .sidebar { inset: 0 0 0 auto; border-right: 0 !important; border-left: 1px solid var(--line); }
+[dir="rtl"] .app-main { margin-left: 0; margin-right: 244px; }
+@media (max-width: 1200px) { [dir="rtl"] .app-main { margin-right: 214px; } }
+@media (max-width: 1180px) {
+  [dir="rtl"] .sidebar { transform: translateX(100%); }
+  [dir="rtl"] .nav-open .sidebar { transform: translateX(0); }
+  [dir="rtl"] .app-main { margin-right: 0; }
+}
+[dir="rtl"] .nav-item.active:after { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .user-card, [dir="rtl"] .theme-toggle, [dir="rtl"] th { text-align: right; }
+[dir="rtl"] .right, [dir="rtl"] .document-total { text-align: left; }
+[dir="rtl"] .footer-right, [dir="rtl"] .stat-icon { float: left; }
+[dir="rtl"] .search-box input { padding-left: 12px; padding-right: 37px; }
+[dir="rtl"] .search-box:before { left: auto; right: 13px; }
+[dir="rtl"] .product-art .category-badge { left: auto; right: 12px; }
+[dir="rtl"] .timeline, [dir="rtl"] .record-timeline { border-left: 0; padding-left: 0; border-right: 2px solid var(--line); padding-right: 22px; }
+[dir="rtl"] .record-event > span { left: auto; right: -29px; }
+[dir="rtl"] .sidebar .brand { margin-right: 0; margin-left: 30px; }
+[dir="rtl"] .navigation-close { right: auto; left: 14px; }
+[dir="rtl"] .hbar-track i { border-radius: 4px 0 0 4px; }
+[dir="rtl"] .table-count { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .steps { padding-left: 0; padding-right: 20px; }
+[dir="rtl"] .brand-logo-wide { object-position: right center; }
+[dir="rtl"] .chart-svg, [dir="rtl"] .chart-tip { direction: ltr; }
+[dir="rtl"] .payment-row input, [dir="rtl"] .count-qty, [dir="rtl"] .return-qty, [dir="rtl"] .receive-qty { direction: ltr; text-align: right; }

@@ -297,6 +297,11 @@ async function printReceipt(id) {
   w.document.open();
   w.document.write(html);
   w.document.close();
+  if (state.lang !== 'en') {
+    w.document.documentElement.dir = 'rtl';
+    w.document.documentElement.lang = state.lang;
+    translateTree(w.document.body);
+  }
 }
 
 
