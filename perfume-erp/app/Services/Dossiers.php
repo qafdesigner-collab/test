@@ -21,7 +21,7 @@ final class Dossiers
             }$out[] = $p;
         }
 
-return $out;
+        return $out;
     }
 
     public static function product(int $id): array
@@ -63,6 +63,6 @@ return $out;
             $products[] = self::product($p)['product'];
         }
 
-return ['customer' => $c, 'products' => $products, 'projects' => $projects, 'documents' => $docs];
+        return ['customer' => $c, 'products' => $products, 'projects' => $projects, 'documents' => $docs];
     }
 }

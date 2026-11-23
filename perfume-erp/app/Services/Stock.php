@@ -2,11 +2,20 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final class Stock
 {
+    /**
+     * Current lot balances per location, with product and location names.
+     */
+    public static function balances(): Collection
+    {
+        return DB::table('balances as b')->join('products as p', 'p.id', '=', 'b.product_id')->join('locations as l', 'l.id', '=', 'b.location_id')->select('b.*', 'p.name', 'p.sku', 'p.unit', 'l.name as location')->orderBy('p.name')->get();
+    }
+
     public static function move(int $product, int $location, string $lot, int $q, string $reason, string $source, ?int $user, ?int $value = null, string $basis = 'Configured estimate'): int
     {
         if ($q === 0) {
