@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Amounts;
 use App\Services\Documents;
+use App\Services\ReferenceLibrary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -161,5 +162,29 @@ class CatalogueController extends ErpBaseController
         }
 
         return ['ok' => true];
+    }
+
+    /**
+     * Import inspiration references from a CSV file.
+     */
+    public function importReferences(Request $r)
+    {
+        $this->allow(['manager', 'warehouse']);
+        $r->validate(['file' => 'required|file|max:2048|mimes:csv,txt', 'update' => 'sometimes|boolean']);
+        $result = ReferenceLibrary::import($r->file('file')->getRealPath(), $r->boolean('update'));
+        $this->audit('references.import', 'library', ['added' => $result['added'], 'updated' => $result['updated'], 'skipped' => $result['skipped'], 'errors' => count($result['errors'])]);
+
+        return $result;
+    }
+
+    /**
+     * Download the library (or an empty template) as CSV.
+     */
+    public function exportReferences(Request $r)
+    {
+        $this->allow(['manager', 'warehouse', 'production']);
+        $template = $r->boolean('template');
+
+        return response(ReferenceLibrary::csv($template), 200, ['Content-Type' => 'text/csv; charset=UTF-8', 'Content-Disposition' => 'attachment; filename="'.($template ? 'inspiration-template' : 'inspiration-library-'.date('Y-m-d')).'.csv"']);
     }
 }

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Database\Seeders\InspirationLibrarySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -43,5 +44,45 @@ class InspirationLibraryTest extends TestCase
     {
         $this->actingAs(User::factory()->create(['role' => 'cashier']));
         $this->postJson('/api/references', ['brand' => 'A', 'name' => 'B'])->assertForbidden();
+    }
+
+    public function test_csv_import_detects_separator_skips_duplicates_and_reports_bad_rows(): void
+    {
+        $this->seed(InspirationLibrarySeeder::class);
+        $this->actingAs(User::factory()->create(['role' => 'manager']));
+        $csv = "\xEF\xBB\xBFHouse;Perfume;For;Scent family;Key notes\n"
+            ."Noor House;Desert Rose;women;Floral;Rose, oud\n"
+            ."Creed;Aventus;Men;Fruity Chypre;Updated notes\n"
+            .";Missing brand;;;\n"
+            ."\n"
+            ."Noor House;Desert Rose;;;Duplicate in file\n";
+        $file = UploadedFile::fake()->createWithContent('library.csv', $csv);
+
+        $result = $this->post('/api/references/import', ['file' => $file], ['Accept' => 'application/json'])->assertOk()->json();
+        $this->assertSame([1, 0, 2], [$result['added'], $result['updated'], $result['skipped']]);
+        $this->assertSame(4, $result['errors'][0]['row']);
+        $added = DB::table('references')->where('name', 'Desert Rose')->first();
+        $this->assertSame(['Women', 'Floral', 0], [$added->gender, $added->family, (int) $added->library]);
+        $this->assertNotSame('Updated notes', DB::table('references')->where(['brand' => 'Creed', 'name' => 'Aventus'])->value('notes'));
+
+        $again = UploadedFile::fake()->createWithContent('library.csv', "brand,name,notes\nCreed,Aventus,Updated notes\n");
+        $this->post('/api/references/import', ['file' => $again, 'update' => '1'], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('updated', 1);
+        $this->assertSame('Updated notes', DB::table('references')->where(['brand' => 'Creed', 'name' => 'Aventus'])->value('notes'));
+
+        $noHeader = UploadedFile::fake()->createWithContent('bad.csv', "Creed,Aventus\n");
+        $this->post('/api/references/import', ['file' => $noHeader], ['Accept' => 'application/json'])->assertUnprocessable();
+    }
+
+    public function test_export_and_template_are_excel_safe_and_restricted(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'manager']));
+        DB::table('references')->insert(['brand' => '=HYPERLINK("x")', 'name' => 'Formula test', 'created_at' => now(), 'updated_at' => now()]);
+        $csv = $this->get('/api/references/export')->assertOk()->getContent();
+        $this->assertStringContainsString('brand,name,gender,family,notes', $csv);
+        $this->assertStringContainsString("\"'=HYPERLINK(\"\"x\"\")\"", $csv);
+        $this->assertStringContainsString('Example House', $this->get('/api/references/export?template=1')->getContent());
+
+        $this->actingAs(User::factory()->create(['role' => 'cashier']));
+        $this->post('/api/references/import', ['file' => UploadedFile::fake()->createWithContent('a.csv', "brand,name\nA,B\n")], ['Accept' => 'application/json'])->assertForbidden();
     }
 }

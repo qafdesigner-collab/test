@@ -150,7 +150,7 @@ function catalogueRender() {
       'The perfume catalogue',
       'Find the right fragrance by scent, style or inspiration.',
       can('manager', 'warehouse')
-        ? '<button class="secondary" onclick="referenceDialog()">+ Inspiration reference</button><button class="primary" onclick="productDialog()">+ Add product</button>'
+        ? '<button class="secondary" onclick="libraryDialog()">Inspiration library</button><button class="primary" onclick="productDialog()">+ Add product</button>'
         : '',
     ) +
     catalogueToolbar() +
@@ -358,4 +358,40 @@ function fragranceProfileView(p) {
   ]
     .map(([label, k]) => `<div><small>${label}</small><b>${esc(f[k] || 'Not recorded')}</b></div>`)
     .join('')}</div></section>`;
+}
+
+
+/** Browse, import and export the internal inspiration library. */
+function libraryDialog() {
+  const refs = state.references;
+  const own = refs.filter(r => !r.library).length;
+  modal(
+    `Inspiration library · ${refs.length} references`,
+    `<div class="notice">Internal staff reference only: brand and perfume names are never shown to customers as an affiliation. ${refs.length - own} come with the system, ${own} were added by your team.</div>
+    <div class="library-actions">${can('manager', 'warehouse') ? '<button class="primary" onclick="referenceDialog()">+ Add one</button><button class="secondary" onclick="importLibraryDialog()">Import from Excel / CSV</button>' : ''}<a class="secondary" href="/api/references/export">Export all (CSV)</a></div>
+    ${table(
+      ['Brand', 'Perfume', 'For', 'Family', 'Key notes'],
+      refs.map(r => `<tr><td><b>${esc(r.brand)}</b></td><td>${esc(r.name)}${r.library ? '' : '<small>Added by your team</small>'}</td><td>${esc(r.gender || '—')}</td><td>${esc(r.family || '—')}</td><td><small>${esc(r.notes || '')}</small></td></tr>`),
+    )}`,
+    true,
+  );
+}
+
+function importLibraryDialog() {
+  modal(
+    'Import inspiration references',
+    `<form><ol class="steps"><li>Download the <a href="/api/references/export?template=1">template</a> and open it in Excel or Google Sheets.</li><li>Fill one perfume per row: <b>brand</b> and <b>name</b> are required; gender (Men / Women / Unisex), family and notes are optional.</li><li>Save as <b>CSV</b> (File → Save as → CSV UTF-8) and choose the file below.</li></ol>
+    <label>CSV file<input type="file" name="file" accept=".csv,text/csv" required></label>
+    <label class="check-row"><input type="checkbox" name="update" value="1" style="width:auto"> Update gender, family and notes of references that already exist</label>
+    <div id="import-result"></div>${formActions('Import')}</form>`,
+  );
+  bindForm(async fd => {
+    const body = new FormData();
+    body.append('file', fd.get('file'));
+    body.append('update', fd.get('update') ? '1' : '0');
+    const r = await api('references/import', 'POST', body);
+    state.references = (await api('references')).references;
+    $('#import-result').innerHTML = `<div class="notice"><b>${r.added} added · ${r.updated} updated · ${r.skipped} already in the library</b>${r.errors.length ? `<br>${r.errors.length} row${r.errors.length === 1 ? '' : 's'} skipped:<br>${r.errors.map(e => `Row ${e.row}: ${esc(e.message)}`).join('<br>')}` : ''}</div>`;
+    toast(`${r.added} references added`);
+  });
 }
