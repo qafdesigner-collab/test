@@ -121,6 +121,33 @@ async function render() {
   }
 }
 
+const THEMES = { light: 'Light', dark: 'Dark', auto: 'Auto' };
+
+/** Light → Dark → Auto (follows the device setting). Saved per browser. */
+function cycleTheme() {
+  const order = Object.keys(THEMES);
+  const next = order[(order.indexOf(document.documentElement.dataset.theme || 'light') + 1) % order.length];
+  document.documentElement.dataset.theme = next;
+  try {
+    localStorage.setItem('atelier-theme', next);
+  } catch {}
+  showThemeName();
+}
+
+function showThemeName() {
+  const label = $('#theme-name');
+  if (label) label.textContent = THEMES[document.documentElement.dataset.theme] || 'Light';
+}
+
+/* Printed documents always use the light theme. */
+window.addEventListener('beforeprint', () => {
+  document.documentElement.dataset.printTheme = document.documentElement.dataset.theme;
+  document.documentElement.dataset.theme = 'light';
+});
+window.addEventListener('afterprint', () => {
+  document.documentElement.dataset.theme = document.documentElement.dataset.printTheme || 'light';
+});
+
 /** Apply the company's brand colour and logo to the interface. */
 function applyBranding() {
   const s = state.boot.settings;
@@ -145,6 +172,7 @@ function logoUrl() {
 
 function companyHeader() {
   applyBranding();
+  showThemeName();
   $('#company-name').textContent = state.boot.settings.company_name;
   $('#footer-company').textContent = state.boot.settings.company_name;
   $('#user-name').textContent = state.boot.user.name;

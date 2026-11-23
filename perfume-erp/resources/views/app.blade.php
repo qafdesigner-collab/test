@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Atelier · Perfume ERP</title>
+    <script>try{document.documentElement.dataset.theme=localStorage.getItem('atelier-theme')||'light'}catch(e){document.documentElement.dataset.theme='light'}</script>
     <link rel="stylesheet" href="/assets/app.css?v={{ config('erp.version') }}">
     {{-- Modules share one global scope and load in this order; main.js starts the app. --}}
     @foreach (['core', 'shell', 'dashboard', 'catalogue', 'inventory', 'sales', 'pos', 'manufacturing', 'projects', 'customers', 'reports', 'settings', 'tables', 'main'] as $module)
@@ -21,6 +22,7 @@
         <nav id="navigation"></nav>
         <div class="sidebar-bottom">
             <div class="connection"><i></i><span>Connected to this server</span></div>
+            <button type="button" class="theme-toggle" onclick="cycleTheme()" aria-label="Change colour theme"><span aria-hidden="true">◐</span> Theme: <b id="theme-name">Light</b></button>
             <div class="build-badge">Development release · {{ \Illuminate\Support\Str::before(config('erp.version'), '-') }}</div>
             <button class="user-card" onclick="passwordDialog()">
                 <span class="avatar" id="avatar">A</span>

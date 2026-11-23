@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · Atelier ERP</title><link rel="stylesheet" href="/assets/app.css"></head><body class="login-body">@php
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · Atelier ERP</title><script>try{document.documentElement.dataset.theme=localStorage.getItem('atelier-theme')||'light'}catch(e){document.documentElement.dataset.theme='light'}</script><link rel="stylesheet" href="/assets/app.css"></head><body class="login-body">@php
     try {
         $brand = \Illuminate\Support\Facades\DB::table('settings')->whereIn('key', ['logo_path', 'company_name', 'brand_color'])->pluck('value', 'key');
     } catch (\Throwable) {
