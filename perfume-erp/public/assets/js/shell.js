@@ -13,6 +13,7 @@ const navItems = [
   ['formulas', '⚗', 'Secret formulas', ['manager', 'production']],
   ['projects', '✧', 'Design & packaging', ['manager', 'designer']],
   ['reports', '▥', 'Reports', ['manager', 'accountant']],
+  ['expenses', '◈', 'Expenses', ['manager', 'accountant']],
   ['settings', '⚙', 'Company & access', ['manager']],
 ];
 
@@ -113,6 +114,7 @@ async function render() {
       formulas: formulaPage,
       projects: projectsPage,
       reports: reportsPage,
+      expenses: () => expensesPage(),
       settings: settingsPage,
     }[page]();
   } catch (e) {

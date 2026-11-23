@@ -51,6 +51,8 @@ class ShiftController extends ErpBaseController
         $refunds = DB::table('documents')->where('user_id', $s->user_id)->where('kind', 'Return')->whereBetween('created_at', [$s->opened_at, $end])
             ->selectRaw("COALESCE(SUM(CASE WHEN cash_refund_cents IS NOT NULL THEN cash_refund_cents WHEN method = 'Cash' THEN paid_cents ELSE 0 END),0) as cash")->value('cash');
 
-        return (int) $received - (int) $refunds;
+        $expenses = DB::table('expenses')->where('user_id', $s->user_id)->where('from_drawer', true)->whereNull('voided_at')->whereBetween('created_at', [$s->opened_at, $end])->sum('amount_cents');
+
+        return (int) $received - (int) $refunds - (int) $expenses;
     }
 }

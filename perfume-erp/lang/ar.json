@@ -160,5 +160,8 @@
   "Enable pdo_mysql in Select PHP Version → Extensions.": "فعّل pdo_mysql من Select PHP Version ← Extensions.",
   "File Manager → right click → Change Permissions → 755 for folders, 644/600 for files.": "File Manager ← نقر يمين ← Change Permissions ← 755 للمجلدات و644/600 للملفات.",
   "Fix the server requirement first: ": "أصلح متطلبات الخادم أولًا: ",
-  "Installation stopped: ": "توقف التثبيت: "
+  "Installation stopped: ": "توقف التثبيت: ",
+  "Enter a positive amount; VAT cannot exceed the amount.": "أدخل مبلغًا موجبًا؛ لا يمكن أن تتجاوز الضريبة المبلغ.",
+  "Only cash expenses can be paid from the cashier drawer.": "يمكن دفع المصروفات النقدية فقط من درج الكاشير.",
+  "This expense is already voided.": "هذا المصروف ملغى بالفعل."
 }

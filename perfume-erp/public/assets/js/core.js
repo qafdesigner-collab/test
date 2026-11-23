@@ -49,7 +49,7 @@ const date = s =>
 const can = (...roles) => state.boot?.user.role === 'owner' || roles.includes(state.boot?.user.role);
 
 const badge = s =>
-  `<span class="badge ${['Posted', 'Completed', 'Approved', 'Accepted', 'Released', 'Delivered', 'Received', 'Invoiced'].includes(s) ? 'green' : ['QC Hold', 'Declined', 'Returned', 'Revision', 'Cancelled'].includes(s) ? 'red' : ['Draft', 'Review', 'Planned', 'Maturing', 'Ordered', 'Partially received'].includes(s) ? 'amber' : 'blue'}">${esc(s)}</span>`;
+  `<span class="badge ${['Posted', 'Completed', 'Approved', 'Accepted', 'Released', 'Delivered', 'Received', 'Invoiced'].includes(s) ? 'green' : ['QC Hold', 'Declined', 'Returned', 'Revision', 'Cancelled', 'Voided'].includes(s) ? 'red' : ['Draft', 'Review', 'Planned', 'Maturing', 'Ordered', 'Partially received'].includes(s) ? 'amber' : 'blue'}">${esc(s)}</span>`;
 
 const options = (rows, label = 'name', selected = '', blank = 'Choose…') =>
   `<option value="">${esc(blank)}</option>` +

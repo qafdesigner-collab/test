@@ -2588,3 +2588,7 @@ tr[hidden] { display: none; }
   .ti-lines tr, .ti-bottom { break-inside: avoid; }
 }
 @media print { .modal, .modal-body, .document-preview, .modal-overlay { background: #fff !important; box-shadow: none !important; } }
+.month-picker { display: flex; align-items: center; gap: 14px; margin: 0 0 18px; }
+.month-picker b { font-size: 17px; min-width: 150px; text-align: center; }
+tr.voided td { opacity: .55; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent); }
+tr.voided td:last-child, tr.voided td small.returned-note { text-decoration: none; opacity: 1; }

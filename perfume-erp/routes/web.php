@@ -7,6 +7,7 @@ use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DesignProjectController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ManufacturingController;
@@ -81,6 +82,9 @@ Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
         Route::post('projects/{id}/links', [DesignProjectController::class, 'projectLinks'])->whereNumber('id');
         Route::post('projects/{id}/workflow', [DesignProjectController::class, 'projectWorkflow'])->whereNumber('id');
         Route::get('profitability', [ReportController::class, 'profitability']);
+        Route::get('expenses', [ExpenseController::class, 'index']);
+        Route::post('expenses', [ExpenseController::class, 'store']);
+        Route::post('expenses/{id}/void', [ExpenseController::class, 'void'])->whereNumber('id');
         Route::get('export', [ReportController::class, 'export']);
         Route::get('system', [SystemController::class, 'status']);
         Route::post('system/update', [SystemController::class, 'update'])->middleware('throttle:system');
