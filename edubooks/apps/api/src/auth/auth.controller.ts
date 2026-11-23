@@ -5,6 +5,8 @@ import { Request, Response } from 'express';
 import { Public, Ctx } from '../common/decorators';
 import { config } from '../config';
 import { AuthService } from './auth.service';
+import { DbService } from '../db/db.service';
+import { sql } from 'drizzle-orm';
 import { ChangePasswordDto, LoginDto } from './auth.dto';
 import { SESSION_COOKIE } from './auth.guard';
 import { RETURN_COOKIE } from './login-as.controller';
@@ -12,7 +14,7 @@ import { RETURN_COOKIE } from './login-as.controller';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(private readonly auth: AuthService, private readonly db: DbService) {}
 
   @Public()
   @Throttle({ default: { limit: Number(process.env.LOGIN_RATE_LIMIT || 60), ttl: 60_000 } })
@@ -31,11 +33,14 @@ export class AuthController {
   }
 
   @Get('me')
-  me(@Req() req: any) {
+  async me(@Req() req: any) {
     const m = req.me;
+    const { rows: [p] } = await this.db.q.execute(sql`SELECT photo_at FROM users WHERE id = ${m.user_id}`) as any;
+    m.photo_at = p?.photo_at ?? null;
     return {
       id: m.user_id, username: m.username, displayName: m.display_name, roles: m.roles, mustChangePassword: m.impersonator_id ? false : m.must_change_password,
       impersonatedBy: m.impersonator_id ? { id: m.impersonator_id, name: m.impersonator_name } : null,
+      photoUrl: m.photo_at ? `/api/users/${m.user_id}/photo?v=${new Date(m.photo_at).getTime()}` : null,
       publisherId: m.publisher_id, school: m.school_id ? { id: m.school_id, name: m.school_name, code: m.school_code } : null,
     };
   }

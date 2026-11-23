@@ -135,15 +135,19 @@ export class SchoolsService {
    * Sales demo: a ready-to-use trial school. Trial seats come from a TRIAL adjustment (traceable licence source),
    * logins are generated and returned once, and the school stops working at the demo expiry date.
    */
-  async createDemo(d: { name: string; city?: string; contact?: string; productVersionIds: string[]; days: number }) {
-    const vs = await this.q.select({ id: productVersions.id, status: productVersions.status, name: products.name }).from(productVersions)
-      .innerJoin(products, eq(products.id, productVersions.productId)).where(inArray(productVersions.id, d.productVersionIds));
-    if (!vs.length || vs.length !== new Set(d.productVersionIds).size || vs.some((v) => v.status !== 'ACTIVE')) throw new BadRequestException('Choose active products to demo');
+  async createDemo(d: { name: string; city?: string; contact?: string; productVersionIds: string[]; days: number }, personal?: { ownerId: string }) {
+    const vs = personal
+      ? await this.q.select({ id: productVersions.id, status: productVersions.status, name: products.name }).from(productVersions)
+        .innerJoin(products, eq(products.id, productVersions.productId)).where(eq(productVersions.status, 'ACTIVE')).limit(20)
+      : await this.q.select({ id: productVersions.id, status: productVersions.status, name: products.name }).from(productVersions)
+        .innerJoin(products, eq(products.id, productVersions.productId)).where(inArray(productVersions.id, d.productVersionIds));
+    if (!personal && (!vs.length || vs.length !== new Set(d.productVersionIds).size || vs.some((v) => v.status !== 'ACTIVE'))) throw new BadRequestException('Choose active products to demo');
     let code: string;
     do { code = `DEMO${randomInt(10000, 99999)}`; } while ((await this.q.execute(sql`SELECT 1 FROM schools WHERE code = ${code}`)).rows.length);
     const expires = new Date(Date.now() + d.days * 864e5);
     const [s] = await this.q.insert(schools).values({
       publisherId: this.db.ctx.publisherId, name: d.name.trim(), code, city: d.city, phone: d.contact, isDemo: true, demoExpiresAt: expires, createdBy: this.db.ctx.userId,
+      demoOwnerId: personal?.ownerId ?? null,
     }).returning();
     const [ay] = await this.q.insert(academicYears).values({ publisherId: s.publisherId, schoolId: s.id, name: `Trial ${new Date().toISOString().slice(0, 10)}`, startsOn: new Date(), endsOn: expires }).returning();
     const logins = [
@@ -152,6 +156,12 @@ export class SchoolsService {
       ...(await this.users.create(s.id, 'STUDENT', [{ displayName: 'Demo Student 1', username: 'student1' }, { displayName: 'Demo Student 2', username: 'student2' }])).map((x) => ({ ...x, role: 'Student' })),
     ];
     const teacher = logins.find((l) => l.role === 'Teacher')!; const students = logins.filter((l) => l.role === 'Student');
+    if (personal) {
+      // a ready class (teacher + students) and a parent, so every part of the platform can be shown; no "change your password" step
+      logins.push(...(await this.users.create(s.id, 'PARENT', [{ displayName: 'Demo Parent', username: 'parent1' }])).map((x) => ({ ...x, role: 'Parent' })));
+      const parent = logins.find((l) => l.role === 'Parent')!;
+      await this.q.execute(sql`SELECT setup_personal_demo(${s.id}, ${ay.id}, ${teacher.id}, ${`{${students.map((x) => x.id).join(',')}}`}::uuid[], ${parent.id})`);
+    }
     for (const v of vs) {
       for (const [seatType, quantity, holders] of [['STUDENT', 5, students], ['TEACHER', 1, [teacher]]] as const) {
         const { poolId } = await this.licensing.createAdjustment({ schoolId: s.id, academicYearId: ay.id, productVersionId: v.id, seatType, quantity, kind: 'TRIAL',

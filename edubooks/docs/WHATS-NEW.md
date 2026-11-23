@@ -1,3 +1,25 @@
+# What's new in Knowledge Gate 1.4.20
+
+## 📷 Profile photos for everyone
+- Every user — super admin, sales, school admin, teacher, student and parent — can add their own photo: click your picture (or initials) at the top of the page → **Add a photo / Change photo / Remove**. The picture is made square and small automatically.
+- Click a photo to **open it large**.
+- A photo is seen only by people in the same school and by the publisher's team. Only the person themselves can change it (not someone signed in as them).
+
+## 👥 Team: logins for the sales team (and editors)
+- New page **Super admin → Team**: add a team member with a **username and password**, choose the role (**Sales**, Editor or Super admin), make a new password, suspend or reactivate. The first password is shown until the person picks their own.
+- Sales people sign in on the **Publisher staff** tab.
+
+## 🎁 My demo accounts (for every sales person)
+- New page **My demo accounts**: one click makes the sales person's **own demo school** — a school admin, a teacher, two students and a parent, in a ready **Demo Class**, with trial licences for the books, valid for a year.
+- **Open as teacher / student / parent / school admin** with one click to give a demo (a bar at the top takes you back), or **Copy sign-in** to give the details to a customer.
+- **New passwords** after a customer has tried the accounts; **Renew for a year**.
+- A sales person can open only the accounts of their own demo schools — never real schools.
+
+## 🌅 Welcome window with the important things
+- After signing in, everyone sees a greeting for the time of day **where they are** (from their own device's clock): **Good morning ☀️, Good noon 🌞, Good afternoon 🌤️, Good evening 🌆 or Good night 🌙** — also in Arabic — with their photo, today's date, time and time zone.
+- Below it, **Important today**: what is waiting (homework to do and due soon for students, answers to mark for teachers, licences ending for school admins, demo schools ending for sales) and the most important unread notifications. A click opens it.
+- It shows once for each part of the day.
+
 # What's new in Knowledge Gate 1.4.19
 
 ## 🗓️ Children's data is kept for 30 days, then deleted automatically

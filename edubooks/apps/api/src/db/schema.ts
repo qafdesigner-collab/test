@@ -53,6 +53,8 @@ export const schools = pgTable('schools', {
   curriculumId: uuid('curriculum_id'), // FK to curricula (declared in SQL; curricula is defined further down)
   demoExpiresAt: timestamp('demo_expires_at', { withTimezone: true }),
   createdBy: uuid('created_by'),
+  /** A sales person's own demo school (one each), for giving demos. */
+  demoOwnerId: uuid('demo_owner_id'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [index('schools_publisher_idx').on(t.publisherId)]);
@@ -70,6 +72,9 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   /** Password given out by an admin, encrypted (secret-box); null once the user picks their own. */
   issuedPassword: text('issued_password'),
+  photoKey: text('photo_key'),
+  photoMime: text('photo_mime'),
+  photoAt: timestamp('photo_at', { withTimezone: true }),
   status: accountStatusEnum('status').notNull().default('ACTIVE'),
   mustChangePassword: boolean('must_change_password').notNull().default(false),
   failedLogins: integer('failed_logins').notNull().default(0),

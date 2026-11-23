@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { hasRole, useMe } from '@/lib/session';
 import { PageLoader } from '@/components/ui';
 import { NotificationBell } from '@/components/notifications';
+import { MyPhoto, WelcomePopup } from '@/components/welcome';
 import { InstallAppButton } from '@/components/install-app';
 import { BackButton } from '@/components/back-button';
 import { BrandMark } from '@/lib/branding';
@@ -32,10 +33,12 @@ function ParentShell({ children }: { children: React.ReactNode }) {
           <LangSwitch className="border border-slate-300 text-slate-700 hover:bg-slate-50" />
           <InstallAppButton className="ring-1 ring-slate-200" />
           <NotificationBell />
+          <MyPhoto size={36} />
           <button onClick={async () => { await api.post('/auth/logout'); qc.clear(); router.replace('/login'); }} className="focus-ring rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100">{t('Sign out')}</button>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <WelcomePopup />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 'use client';
-import { LayoutDashboard, Library, Tags, ScrollText, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle, Palette, TrendingUp, GraduationCap, LineChart, FlaskConical, Building, Users, Mail, AtSign } from 'lucide-react';
+import { LayoutDashboard, Library, Tags, ScrollText, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle, Palette, TrendingUp, GraduationCap, LineChart, FlaskConical, Building, Users, Mail, AtSign, UserCog, Presentation } from 'lucide-react';
 import { Shell } from '@/components/shell';
 
 const A = 'PUBLISHER_ADMIN', E = 'PUBLISHER_EDITOR', S = 'PUBLISHER_SALES';
@@ -8,7 +8,9 @@ const NAV = [
   { href: '/admin/books', label: 'Book Packages', icon: Library, roles: [A, E] },
   { href: '/admin/products', label: 'Products & Bundles', icon: Package, roles: [A, E, S] },
   { href: '/admin/schools', label: 'Schools', icon: Building2, roles: [A, E, S] },
+  { href: '/admin/my-demo', label: 'My demo accounts', icon: Presentation, roles: [A, S] },
   { href: '/admin/users', label: 'Users', icon: Users, roles: [A] },
+  { href: '/admin/team', label: 'Team', icon: UserCog, roles: [A] },
   { href: '/admin/orders', label: 'Orders', icon: Receipt, roles: [A, S] },
   { href: '/admin/sales', label: 'Sales', icon: TrendingUp, roles: [A, S] },
   { href: '/admin/insights', label: 'Usage Insights', icon: LineChart, roles: [A, E, S] },

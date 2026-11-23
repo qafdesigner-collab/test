@@ -7,6 +7,15 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
  */
 export type Lang = 'en' | 'ar';
 const AR: Record<string, string> = {
+  // photo and welcome window
+  'My photo': 'صورتي', 'Please choose a picture.': 'يرجى اختيار صورة.', 'Change photo': 'تغيير الصورة', 'Add a photo': 'إضافة صورة', Remove: 'إزالة',
+  'Only this person can change their photo.': 'يمكن لصاحب الحساب فقط تغيير صورته.', 'Your photo is seen only by people in your school (and the publisher’s team).': 'لا يرى صورتك إلا من في مدرستك (وفريق دار النشر).',
+  'Good noon': 'طاب ظهرك', 'Good night': 'طابت ليلتك', 'Important today': 'المهم اليوم', 'Loading…': 'جارٍ التحميل…',
+  'Nothing important is waiting — have a great day!': 'لا يوجد شيء مهم بانتظارك — نتمنى لك يومًا رائعًا!', "Let's go": 'هيا بنا',
+  'Add your photo: click your picture at the top of the page.': 'أضف صورتك: اضغط على صورتك في أعلى الصفحة.',
+  '{n} unread notifications in total — see the bell 🔔.': '{n} إشعارات غير مقروءة — انظر إلى الجرس 🔔.',
+  'You have {n} homework to do': 'لديك {n} من الواجبات', '{n} homework due in the next 2 days': '{n} واجبات يجب تسليمها خلال يومين',
+  '{n} answers are waiting for your marking': '{n} إجابات تنتظر التصحيح', '{n} book licences end within 30 days': '{n} تراخيص كتب تنتهي خلال 30 يومًا', '{n} demo schools end within 7 days': '{n} مدارس تجريبية تنتهي خلال 7 أيام',
   // sign-in
   'Sign in': 'تسجيل الدخول', 'New school?': 'مدرسة جديدة؟', 'Register your school': 'سجّل مدرستك', 'Use the login your school or publisher gave you.': 'استخدم بيانات الدخول التي أعطتك إياها مدرستك أو دار النشر.',
   School: 'المدرسة', 'Publisher staff': 'فريق دار النشر', 'School code': 'رمز المدرسة', Username: 'اسم المستخدم', 'Login ID or email': 'رقم الدخول أو البريد الإلكتروني', Password: 'كلمة المرور', 'e.g. SUN01': 'مثال: SUN01',

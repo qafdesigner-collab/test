@@ -58,7 +58,8 @@ export class LoginAsController {
   }
 
   /** Opens a short session as the chosen school user; the super admin's own session is kept to come back to. */
-  @Roles('PUBLISHER_ADMIN') @Post('admin/users/:id/login-as') @HttpCode(200)
+  /** The super admin for any school account; a sales person only for their own demo schools (checked in the database). */
+  @Roles('PUBLISHER_ADMIN', 'PUBLISHER_SALES') @Post('admin/users/:id/login-as') @HttpCode(200)
   async loginAs(@Param('id', ParseUUIDPipe) id: string, @Ctx() ctx: any, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     if (ctx.impersonatorId) throw new BadRequestException('Go back to your own account first.');
     const own = req.cookies?.[SESSION_COOKIE];
@@ -71,7 +72,13 @@ export class LoginAsController {
     if (u.schoolStatus !== 'ACTIVE') throw new BadRequestException(`${u.school} is suspended, so nobody there can sign in.`);
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + LOGIN_AS_HOURS * 3600_000);
-    await this.db.q.execute(sql`SELECT start_impersonation(${id}, ${hashToken(token)}, ${expiresAt}, ${req.ip ?? null}, ${req.headers['user-agent'] ?? ''})`);
+    try {
+      await this.db.q.execute(sql`SELECT start_impersonation(${id}, ${hashToken(token)}, ${expiresAt}, ${req.ip ?? null}, ${req.headers['user-agent'] ?? ''})`);
+    } catch (e: any) {
+      const msg = String(e.cause?.message ?? e.message);
+      if (/own demo schools|super admin|Account not found/.test(msg)) throw new ForbiddenException(msg.replace(/^.*?(You can|Only|Account)/, '$1'));
+      throw e;
+    }
     const role = ['SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT'].find((r) => u.roles?.includes(r)) ?? 'STUDENT';
     await this.audit.log('auth.login_as', 'user', id, `Signed in as ${u.name} (${role.toLowerCase().replace('_', ' ')}, ${u.school})`, undefined, undefined, null);
     const opts = { httpOnly: true, sameSite: 'lax' as const, secure: config.cookieSecure, path: '/' };
@@ -90,6 +97,8 @@ export class LoginAsController {
     res.clearCookie(RETURN_COOKIE, { path: '/' });
     if (!back) { res.clearCookie(SESSION_COOKIE, { path: '/' }); return { ok: true, home: '/login' }; }
     res.cookie(SESSION_COOKIE, back, { ...opts, expires: new Date(Date.now() + config.sessionTtlHours * 3600_000) });
-    return { ok: true, home: '/admin/users' };
+    const { rows } = await this.db.root.execute(sql`SELECT roles FROM auth_session(${hashToken(back)}, ${config.sessionIdleMinutes})`);
+    const roles: string[] = (rows[0] as any)?.roles ?? [];
+    return { ok: true, home: roles.includes('PUBLISHER_ADMIN') || !roles.includes('PUBLISHER_SALES') ? '/admin/users' : '/admin/my-demo' };
   }
 }

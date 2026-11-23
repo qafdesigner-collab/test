@@ -10,6 +10,7 @@ import { cn, PageLoader } from '@/components/ui';
 import { NotificationBell } from '@/components/notifications';
 import { InstallAppButton } from '@/components/install-app';
 import { BackButton } from '@/components/back-button';
+import { MyPhoto, WelcomePopup } from '@/components/welcome';
 import { useBranding } from '@/lib/branding';
 
 export interface NavItem { href: string; label: string; icon: React.ComponentType<{ className?: string }>; exact?: boolean; color?: string; roles?: string[] }
@@ -24,8 +25,6 @@ export const THEMES = {
   teacher: { side: 'linear-gradient(180deg,#2c2766 0%,#3a2d78 55%,#4f3480 100%)', hero: 'linear-gradient(115deg,#6857cf 0%,#9a5cc3 50%,#d9847a 100%)', page: '#f6f4fb', sub: '#d9d0f5' },
 } as const;
 export type ThemeName = keyof typeof THEMES;
-
-const initials = (n?: string) => (n ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '🙂';
 
 /** Colourful sidebar layout shared by the school-admin and teacher portals. */
 export function Shell({ role, roleLabel, nav, children, deny, theme = 'teacher', subtitle }: { role: string | string[]; roleLabel: string | ((me: Me) => string); nav: NavItem[]; children: React.ReactNode; deny?: string; accent?: string; theme?: ThemeName; subtitle?: string }) {
@@ -70,10 +69,11 @@ export function Shell({ role, roleLabel, nav, children, deny, theme = 'teacher',
           <InstallAppButton canSaveBooks={me.roles.includes('TEACHER') || me.roles.includes('SCHOOL_ADMIN')} />
           <span className="rounded-2xl bg-white shadow-sm"><NotificationBell /></span>
           <div className="hidden text-right text-sm leading-tight sm:block"><div className="font-semibold text-slate-800">{me.displayName}</div><div className="text-xs text-slate-500">{typeof roleLabel === 'function' ? roleLabel(me) : roleLabel}</div></div>
-          <span className="grid size-10 place-items-center rounded-full text-sm font-extrabold text-white shadow" style={{ background: T.hero }} aria-hidden>{initials(me.displayName)}</span>
+          <MyPhoto size={40} style={{ background: T.hero }} />
           <button onClick={logout} className="focus-ring rounded-xl bg-white p-2 text-slate-500 shadow-sm hover:text-slate-800" aria-label="Sign out"><LogOut className="size-5" /></button>
         </header>
         <main className="mx-auto max-w-7xl p-4 lg:p-8 lg:pt-4">{children}</main>
+        <WelcomePopup />
       </div>
     </div>
   );

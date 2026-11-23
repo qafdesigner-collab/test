@@ -4,5 +4,5 @@ import { LicensingModule } from '../licensing/licensing.module';
 import { SchoolsController } from './schools.controller';
 import { SchoolsService } from './schools.service';
 import { SchoolUsersService } from './school-users.service';
-@Module({ imports: [LicensingModule], controllers: [RegistrationController, SchoolsController], providers: [SchoolsService, SchoolUsersService], exports: [SchoolUsersService] })
+@Module({ imports: [LicensingModule], controllers: [RegistrationController, SchoolsController], providers: [SchoolsService, SchoolUsersService], exports: [SchoolUsersService, SchoolsService] })
 export class SchoolsModule {}
