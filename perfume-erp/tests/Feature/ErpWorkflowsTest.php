@@ -326,4 +326,15 @@ class ErpWorkflowsTest extends TestCase
         $designer = User::factory()->create(['role' => 'designer']);
         $this->actingAs($designer)->getJson('/api/customers/1/360')->assertForbidden();
     }
+
+    public function test_every_read_endpoint_loads_after_a_sale(): void
+    {
+        $this->postOnce('/api/documents', $this->sale())->assertOk();
+        foreach (['dashboard', 'products', 'references', 'contacts', 'inventory', 'documents', 'documents/1', 'formulas', 'batches', 'projects', 'shifts', 'settings', 'users', 'staff', 'audit', 'customers/1/360', 'products/1/360', 'profitability', 'bootstrap'] as $endpoint) {
+            $this->getJson('/api/'.$endpoint)->assertOk();
+        }
+        $dashboard = $this->getJson('/api/dashboard')->json();
+        $this->assertIsInt($dashboard['revenue_cents']);
+        $this->assertIsInt($dashboard['outstanding_cents']);
+    }
 }

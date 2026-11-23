@@ -1,9 +1,9 @@
 <?php
 
 use App\Models\User;
+use App\Services\Installation;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 Artisan::command('erp:install {--demo : Add fictional sample catalogue}', function () {
     if (User::exists()) {
@@ -19,16 +19,12 @@ Artisan::command('erp:install {--demo : Add fictional sample catalogue}', functi
 
         return 1;
     }
-    DB::transaction(function () use ($name, $email, $password) {
-        DB::table('users')->insert(['name' => $name, 'email' => $email, 'password' => Hash::make($password), 'role' => 'owner', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        foreach (['company_name' => 'Your Perfume Company', 'currency' => 'AED', 'address' => '', 'phone' => '', 'email' => $email, 'tax_id' => ''] as $k => $v) {
-            DB::table('settings')->updateOrInsert(['key' => $k], ['value' => $v]);
-        }DB::table('locations')->insert(['name' => 'Main warehouse', 'kind' => 'warehouse', 'created_at' => now(), 'updated_at' => now()]);
-    });
+    Installation::createOwner($name, $email, $password);
     $this->call('db:seed', ['--class' => 'Database\\Seeders\\InspirationLibrarySeeder', '--force' => true]);
     if ($this->option('demo')) {
         $this->call('db:seed', ['--class' => 'Database\\Seeders\\PerfumeSeeder', '--force' => true]);
     }
+    Installation::markInstalled();
     $this->info('Owner created. Sign in at /login. No default shared password is used.');
 })->purpose('Initialize the private company installation');
 Artisan::command('erp:backup {destination : Absolute destination ZIP path outside public/}', function () {

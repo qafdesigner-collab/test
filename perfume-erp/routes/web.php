@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ArtworkPortalController as A;
 use App\Http\Controllers\ErpController as E;
+use App\Http\Controllers\InstallController;
 use App\Http\Middleware\EnsureActiveUser;
 use Illuminate\Support\Facades\Route;
 
@@ -12,6 +13,9 @@ Route::prefix('artwork-review/{token}')->where(['token' => '[a-f0-9]{64}'])->mid
     Route::post('upload', [A::class, 'upload'])->middleware('throttle:10,1');
     Route::post('decision', [A::class, 'decide'])->middleware('throttle:10,1');
 });
+
+Route::get('/install', [InstallController::class, 'show']);
+Route::post('/install', [InstallController::class, 'install'])->middleware('throttle:10,1');
 
 Route::middleware('guest')->group(function () {
     Route::view('/login', 'login')->name('login');
