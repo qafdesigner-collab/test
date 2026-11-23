@@ -1,3 +1,13 @@
+# What's new in Knowledge Gate 1.4.14
+
+## 🛡️ Watched tests: live view for the teacher, better camera preview
+- **Camera preview fixed and bigger.** As soon as the camera is on, the student sees a large live picture (like a mirror). It **stays on during the room scan**, with the instruction on top (“Turn to your right…”) and progress dots. After sharing, the student also sees a small preview of the **shared screen**.
+- **🔴 Live view for the teacher.** On a published watched test, the new **Live view** button shows a tile for every student: their **shared screen with the camera picture in the corner**, updated every few seconds, which **question they are on** and how many they answered, and warnings (left the page, stopped sharing). Click a student to see the screen and camera big, or open the saved photos and timeline. Students who have not started or have handed in are shown too.
+  - Only the newest picture of each student is kept for the live view, and it is deleted when the student hands in. The random photos are still saved as the record of the test (deleted after 90 days).
+  - Before starting, students are told that the teacher sees their camera and screen live.
+- **Read-aloud questions in watched tests.** Add a question of type **Read aloud 🎤**: the student taps “Tap to start reading”, reads, and stops; the recording is handed in with the test. When marking, the teacher presses ▶ to listen and gives the points.
+- More reliable copy-paste/AI check: it now waits until the hand-in is fully saved.
+
 # What's new in Knowledge Gate 1.4.13
 
 ## ✋ “Show me fingers” — counts correctly, and shows the child's real hand

@@ -48,10 +48,24 @@ describe('Online exam safety: room scan, camera and screen pictures, leaving the
     expect(pic.status).toBe(200); expect(pic.headers['content-type']).toBe('image/jpeg'); expect(pic.body[0]).toBe(0xff);
     expect((await student.get(`/api/teacher/watch/${log[3].id}/image`)).status).toBe(403);
 
+    // the live view: the newest camera and screen picture, which question, for the teacher only
+    expect((await student.post(`/api/student/homework/${id}/live`).send({ cam: JPEG, screen: JPEG, q: 1, answered: 0 })).status).toBe(201);
+    expect((await student.post(`/api/student/homework/${id}/live`).send({ cam: 'data:image/png;base64,AAAA' })).status).toBe(400);
+    expect((await student.post(`/api/student/homework/${plain}/live`).send({ cam: JPEG })).status).toBe(400);
+    const live = (await teacher.get(`/api/teacher/assessments/${id}/live`)).body.students.find((x: any) => x.id === me);
+    expect(live).toMatchObject({ state: 'LIVE', cam: true, screen: true, q: 1, answered: 0, away: 1, awaySeconds: 42, warnings: 1 });
+    const li = await teacher.get(`/api/teacher/assessments/${id}/live/${me}/screen`);
+    expect(li.status).toBe(200); expect(li.headers['cache-control']).toBe('no-store');
+    expect((await student.get(`/api/teacher/assessments/${id}/live`)).status).toBe(403);
+    expect((await teacher.get(`/api/teacher/assessments/${id}/live/${me}/../../x`)).status).toBe(404);
+
     // after handing in, nothing more is recorded
     const v = (await student.get(`/api/student/homework/${id}`)).body;
     await student.post(`/api/student/homework/${id}/submit`).send({ answers: [{ itemId: v.items[0].id, response: true }] });
     expect((await watch(id, { kind: 'CAMERA', image: JPEG })).status).toBe(409);
+    // the live pictures are gone after handing in
+    expect((await teacher.get(`/api/teacher/assessments/${id}/live`)).body.students.find((x: any) => x.id === me)).toMatchObject({ state: 'HANDED_IN', cam: false, screen: false });
+    expect((await teacher.get(`/api/teacher/assessments/${id}/live/${me}/cam`)).status).toBe(404);
   });
 
   it('lets the teacher delete all photos; old ones are removed automatically', async () => {

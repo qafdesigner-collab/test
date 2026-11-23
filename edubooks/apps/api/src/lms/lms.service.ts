@@ -14,7 +14,7 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { config } from '../config';
 import { checkItem, gradeNumber } from './integrity';
-import { AssessmentDto, ProctorEventDto, EvaluationDto, GradeDto, ItemDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
+import { AssessmentDto, LiveFrameDto, ProctorEventDto, EvaluationDto, GradeDto, ItemDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
 
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.!?]+$/, '');
 
@@ -423,11 +423,67 @@ export class LmsService {
     await this.assessment(e.assessmentId);
     try { return await fsp.readFile(path.join(config.storageDir, e.file)); } catch { throw new NotFoundException('This picture was removed'); }
   }
+  // ---------- live view: the newest camera and screen picture of each student, every few seconds ----------
+  // Kept only as the latest picture on disk (overwritten each time, removed when the student hands in) — the record of the test is the random photos above.
+  private liveDir(id: string) { return path.join(config.storageDir, 'live', id); }
+  async liveFrame(id: string, d: LiveFrameDto) {
+    const [a] = await this.q.select().from(assessments).where(eq(assessments.id, id));
+    if (!a || !(await this.visibleToStudent(a))) throw new NotFoundException('Homework not found');
+    const p = (a.proctor ?? {}) as { camera?: boolean; screen?: boolean };
+    if (!p.camera && !p.screen) throw new BadRequestException('This work is not watched');
+    const open = await this.openAttempt(id);
+    if (!open) throw new ConflictException('Press Start first');
+    const dir = this.liveDir(id); await fsp.mkdir(dir, { recursive: true });
+    const me = this.ctx.userId;
+    const save = async (kind: 'cam' | 'screen', img?: string) => {
+      if (!img) return false;
+      const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(img); if (!m) throw new BadRequestException('The picture could not be sent');
+      const b = Buffer.from(m[1], 'base64'); if (b[0] !== 0xff || b[1] !== 0xd8 || b.length > 500_000) throw new BadRequestException('The picture could not be sent');
+      const tmp = path.join(dir, `${me}-${kind}.${randomUUID()}.tmp`); await fsp.writeFile(tmp, b); await fsp.rename(tmp, path.join(dir, `${me}-${kind}.jpg`)); return true;
+    };
+    const cam = p.camera ? await save('cam', d.cam) : false; const screen = p.screen ? await save('screen', d.screen) : false;
+    let meta: any = {}; try { meta = JSON.parse(await fsp.readFile(path.join(dir, `${me}.json`), 'utf8')); } catch { /* first one */ }
+    meta = { ...meta, at: new Date().toISOString(), attempt: open.attempt, q: d.q ?? meta.q ?? null, answered: d.answered ?? meta.answered ?? null, ...(cam ? { camAt: new Date().toISOString() } : {}), ...(screen ? { screenAt: new Date().toISOString() } : {}) };
+    await fsp.writeFile(path.join(dir, `${me}.json`), JSON.stringify(meta));
+    return { ok: true };
+  }
+  /** Every student of a watched assessment: live or not, which question, answered, warnings so far. */
+  async liveList(id: string) {
+    const a = await this.assessment(id);
+    const targeted = (await this.q.select({ id: assessmentStudents.studentId }).from(assessmentStudents).where(eq(assessmentStudents.assessmentId, id))).map((r) => r.id);
+    const roster = (await this.q.execute(sql`SELECT u.id, u.display_name AS "displayName" FROM enrolments e JOIN users u ON u.id = e.student_id WHERE e.class_id = ${a.classId} ORDER BY u.display_name`)).rows as any[];
+    const tries = (await this.q.execute(sql`SELECT DISTINCT ON (student_id) student_id AS "studentId", attempt, started_at AS "startedAt", submitted_at AS "submittedAt" FROM assessment_attempts WHERE assessment_id = ${id} ORDER BY student_id, attempt DESC`)).rows as any[];
+    const ev = (await this.q.execute(sql`SELECT student_id AS "studentId", count(*) FILTER (WHERE kind = 'AWAY')::int AS away, coalesce(sum((detail->>'seconds')::int) FILTER (WHERE kind = 'AWAY'), 0)::int AS "awaySeconds",
+        count(*) FILTER (WHERE kind IN ('SCREEN_OFF','CAMERA_OFF','SCREEN_PART','NO_SCREEN','NO_CAMERA','FULLSCREEN_OFF'))::int AS warnings, max(created_at) FILTER (WHERE kind <> 'CAMERA' AND kind <> 'SCREEN' AND kind <> 'ROOM') AS "lastEvent"
+      FROM proctor_events WHERE assessment_id = ${id} GROUP BY student_id`)).rows as any[];
+    const dir = this.liveDir(id);
+    const out = [];
+    for (const s of roster.filter((x) => !targeted.length || targeted.includes(x.id))) {
+      let meta: any = null; try { meta = JSON.parse(await fsp.readFile(path.join(dir, `${s.id}.json`), 'utf8')); } catch { /* not live */ }
+      const t = tries.find((x) => x.studentId === s.id); const e = ev.find((x) => x.studentId === s.id);
+      const fresh = meta && Date.now() - new Date(meta.at).getTime() < 30_000 && t && !t.submittedAt;
+      out.push({ id: s.id, name: s.displayName, state: !t ? 'NOT_STARTED' : t.submittedAt ? 'HANDED_IN' : fresh ? 'LIVE' : 'STARTED', startedAt: t?.startedAt ?? null, submittedAt: t?.submittedAt ?? null,
+        attempt: t?.attempt ?? null, at: meta?.at ?? null, q: meta?.q ?? null, answered: meta?.answered ?? null, cam: !!(fresh && meta.camAt), screen: !!(fresh && meta.screenAt),
+        away: e?.away ?? 0, awaySeconds: e?.awaySeconds ?? 0, warnings: e?.warnings ?? 0 });
+    }
+    return { proctor: a.proctor, total: a.timeLimitMin, students: out };
+  }
+  async liveImage(id: string, studentId: string, kind: string) {
+    await this.assessment(id);
+    if (kind !== 'cam' && kind !== 'screen') throw new NotFoundException('Not found');
+    try { return await fsp.readFile(path.join(this.liveDir(id), `${studentId}-${kind}.jpg`)); } catch { throw new NotFoundException('No picture yet'); }
+  }
+  private async liveEnd(id: string, studentId: string) {
+    const dir = this.liveDir(id);
+    await Promise.all([`${studentId}-cam.jpg`, `${studentId}-screen.jpg`, `${studentId}.json`].map((f) => fsp.rm(path.join(dir, f), { force: true })));
+  }
+
   /** Removes all photos and records of an assessment (e.g. after the results are final). */
   async proctorClear(id: string) {
     const a = await this.assessment(id);
     const { rows } = await this.q.execute(sql`DELETE FROM proctor_events WHERE assessment_id = ${id} RETURNING file`);
     await fsp.rm(path.join(config.storageDir, 'proctor', a.id), { recursive: true, force: true });
+    await fsp.rm(this.liveDir(a.id), { recursive: true, force: true });
     await this.audit.log('lms.proctor.clear', 'assessment', id, `Deleted the exam photos of “${a.title}”`);
     return { removed: rows.length };
   }
@@ -511,6 +567,7 @@ export class LmsService {
       WHERE assessment_id = ${id} AND student_id = ${this.ctx.userId} AND attempt = ${attempt} AND submitted_at IS NULL RETURNING attempt`);
     if (!done.length) await this.q.execute(sql`INSERT INTO assessment_attempts (publisher_id, school_id, assessment_id, student_id, attempt, submitted_at)
       VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${id}, ${this.ctx.userId}, ${attempt}, now()) ON CONFLICT DO NOTHING`);
+    await this.liveEnd(id, this.ctx.userId).catch(() => undefined);
     if (Object.keys(checks).length) {
       const [row] = await this.q.select({ id: submissions.id }).from(submissions).where(and(eq(submissions.assessmentId, id), eq(submissions.studentId, this.ctx.userId)));
       for (const h of this.afterSubmit) h(row.id).catch(() => undefined);

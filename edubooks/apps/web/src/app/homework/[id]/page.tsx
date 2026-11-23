@@ -75,7 +75,8 @@ function Doing({ h, id, onDone }: { h: any; id: string; onDone: () => void }) {
   const focusOn = (k: string) => { sigOf(k).since = Date.now(); };
   const focusOff = (k: string) => { const r = sigOf(k); if (r.since) { r.ms += Date.now() - r.since; r.since = null; } };
   const guard = watched(h.proctor); const [streams, setStreams] = useState<Streams | null>(null);
-  const pr = useProctor(id, h.proctor, streams, !!run && !!streams);
+  const iRef = useRef(0); iRef.current = i;
+  const pr = useProctor(id, h.proctor, streams, !!run && !!streams, () => ({ q: iRef.current + 1, answered: Object.values(answersRef.current).filter((v) => v !== undefined && v !== '').length }));
   const start = async () => {
     try {
       const r = await api.post<any>(`/student/homework/${id}/start`);

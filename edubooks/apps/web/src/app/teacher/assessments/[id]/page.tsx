@@ -18,6 +18,7 @@ import { PageHeader, Status, Table, Td } from '@/components/common';
 import { BookScope } from '@/components/book-scope';
 import { Item, ItemEditor, newItem } from '@/components/item-editor';
 import { PageQuestionsPanel } from '@/components/page-questions';
+import { LiveView } from '@/components/live-view';
 
 function Builder({ initial, id }: { initial: any; id: string | null }) {
   const router = useRouter(); const classes = useMyClasses();
@@ -210,7 +211,7 @@ function Results({ a }: { a: any }) {
   const brand = usePrintBrand(); const me = useMe().data; const classes = useMyClasses();
   const [pass, setPass] = useState(40);
   const watchedOn = !!(a.proctor?.camera || a.proctor?.screen || a.proctor?.roomScan) || a.students.some((s: any) => s.watch);
-  const [watchOf, setWatchOf] = useState<any>(null);
+  const [watchOf, setWatchOf] = useState<any>(null); const [live, setLive] = useState(false);
   const checkOn = a.students.some((s: any) => Object.keys(s.submission?.integrity?.items ?? {}).length);
   const res = (s: any) => {
     const sc = s.submission?.score; const pct = sc === null || sc === undefined || !a.maxScore ? null : Math.round((sc / a.maxScore) * 1000) / 10;
@@ -235,6 +236,7 @@ function Results({ a }: { a: any }) {
       <Link href="/teacher/assessments" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"><ArrowLeft className="size-4" />Assessments</Link>
       <PageHeader title={a.title} sub={`${KIND_LABEL[a.kind]} · ${a.items.length} questions · ${a.maxScore} points${a.dueAt ? ` · due ${fmtDate(a.dueAt)}` : ''}${a.timeLimitMin ? ` · ⏱ ${a.timeLimitMin} min` : ''}${a.maxAttempts > 1 ? ` · ${a.maxAttempts} tries` : ''}`}>
         <Status s={a.status} />
+        {watchedOn && a.status === 'PUBLISHED' && <Button variant="danger" onClick={() => setLive(true)}>🔴 Live view</Button>}
         {waiting.length > 0 && <Button onClick={() => setMark(waiting[0])}><PenLine className="size-4" />Mark next ({waiting.length})</Button>}
         <Button variant="secondary" onClick={printResults}><Printer className="size-4" />Print results</Button>
         <Button variant="secondary" onClick={exportCsv}><Download className="size-4" />Save (Excel / CSV)</Button>
@@ -273,6 +275,7 @@ function Results({ a }: { a: any }) {
             {st?.correctRate !== null && st?.correctRate !== undefined && <span className={`font-semibold ${st.correctRate < 0.5 ? 'text-red-600' : 'text-emerald-600'}`}>{Math.round(st.correctRate * 100)}% correct</span>}</Card>;
         })}</div>
       )}
+      {live && <LiveView a={a} onClose={() => setLive(false)} onOpenRecord={(st) => { setLive(false); setWatchOf(st); }} />}
       {watchOf && <WatchDialog a={a} student={watchOf} onClose={() => setWatchOf(null)} />}
       {mark && <MarkDialog key={mark.id} a={a} student={mark} onClose={() => setMark(null)} onNext={mark.submission?.status === 'SUBMITTED' ? () => nextAfter(mark) : undefined} left={waiting.filter((s: any) => s.id !== mark.id).length} />}
       <Confirm open={closeAsk} onOpenChange={setCloseAsk} title="Close this work?" confirmLabel="Close" loading={close.isPending} onConfirm={() => close.mutate()} body="Students can no longer hand it in. Marks stay visible." />

@@ -4,7 +4,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsUUID } from 'class-validator';
 import { Roles } from '../common/decorators';
 import { LmsService } from './lms.service';
-import { AssessmentDto, ProctorEventDto, EvaluationDto, GradeDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
+import { AssessmentDto, LiveFrameDto, ProctorEventDto, EvaluationDto, GradeDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
 import { LicensingService } from '../licensing/licensing.service';
 
 class FromBankDto { @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100) @IsUUID('all', { each: true }) questionIds: string[]; }
@@ -40,6 +40,10 @@ export class TeacherController {
   @Roles(...STAFF) @Get('watch/:eventId/image') async watchImage(@Param('eventId', Id()) eid: string, @Res() res: Response) {
     const b = await this.svc.proctorImage(eid); res.setHeader('Content-Type', 'image/jpeg'); res.setHeader('Cache-Control', 'private, max-age=3600'); res.end(b);
   }
+  @Roles(...STAFF) @Get('assessments/:id/live') live(@Param('id', Id()) id: string) { return this.svc.liveList(id); }
+  @Roles(...STAFF) @Get('assessments/:id/live/:studentId/:kind') async liveImage(@Param('id', Id()) id: string, @Param('studentId', Id()) sid: string, @Param('kind') kind: string, @Res() res: Response) {
+    const b = await this.svc.liveImage(id, sid, kind); res.setHeader('Content-Type', 'image/jpeg'); res.setHeader('Cache-Control', 'no-store'); res.end(b);
+  }
   @Roles('TEACHER', 'SCHOOL_ADMIN') @Delete('assessments/:id/watch') clearWatch(@Param('id', Id()) id: string) { return this.svc.proctorClear(id); }
   @Roles('TEACHER') @Patch('submissions/:id') grade(@Param('id', Id()) id: string, @Body() d: GradeDto) { return this.svc.grade(id, d); }
 
@@ -57,6 +61,7 @@ export class StudentController {
   @Get('homework') list() { return this.svc.studentList(); }
   @Get('homework/:id') get(@Param('id', Id()) id: string) { return this.svc.studentGet(id); }
   @Post('homework/:id/start') start(@Param('id', Id()) id: string) { return this.svc.startAttempt(id); }
+  @Post('homework/:id/live') live(@Param('id', Id()) id: string, @Body() d: LiveFrameDto) { return this.svc.liveFrame(id, d); }
   @Post('homework/:id/watch') watch(@Param('id', Id()) id: string, @Body() d: ProctorEventDto) { return this.svc.proctorEvent(id, d); }
   @Post('homework/:id/submit') submit(@Param('id', Id()) id: string, @Body() d: SubmitDto) { return this.svc.submit(id, d); }
   @Get('report') report() { return this.svc.studentReport(this.svc.db.ctx.userId); }

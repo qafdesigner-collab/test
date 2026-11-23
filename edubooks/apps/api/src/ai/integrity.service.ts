@@ -20,14 +20,20 @@ export class IntegrityService implements OnModuleInit {
     this.lms.afterSubmit.push(async (id) => {
       const ctx = { ...this.db.ctx };
       // wait until the hand-in is saved, then check in the background
-      setTimeout(() => { this.db.detached(ctx, () => this.check(id)).catch((e) => this.log.warn(`check failed: ${e.message}`)); }, Number(process.env.INTEGRITY_DELAY_MS ?? 1500)).unref?.();
+      // the hand-in may still be saving: try again a few times until it is there
+      const run = (tries: number) => setTimeout(() => {
+        this.db.detached(ctx, () => this.check(id)).then((r) => { if (r === 'not-saved' && tries > 0) run(tries - 1); })
+          .catch((e) => this.log.warn(`check failed: ${e.message}`));
+      }, Number(process.env.INTEGRITY_DELAY_MS ?? 1500) + (5 - tries) * 300).unref?.();
+      run(5);
     });
   }
 
   async check(submissionId: string) {
     const q = this.db.q;
     const { rows: [s] } = await q.execute(sql`SELECT s.id, s.answers, s.integrity, s.assessment_id AS "assessmentId" FROM submissions s WHERE s.id = ${submissionId}`) as any;
-    const items = s?.integrity?.items ?? {};
+    if (!s || !s.integrity?.items) return 'not-saved';
+    const items = s.integrity.items;
     const ids = Object.keys(items).filter((k) => items[k].length >= 60).slice(0, 10);
     if (!ids.length) return 'nothing';
     const provider = await this.providers.current();

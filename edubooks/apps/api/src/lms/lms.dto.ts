@@ -47,6 +47,13 @@ export class ProctorEventDto {
   @IsOptional() @IsString() @MaxLength(800_000) image?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(86400) seconds?: number;
 }
+export class LiveFrameDto {
+  @IsOptional() @IsString() @MaxLength(400_000) cam?: string;
+  @IsOptional() @IsString() @MaxLength(700_000) screen?: string;
+  /** which question the student is on (1-based) and how many are answered */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(500) q?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(500) answered?: number;
+}
 export class AssessmentDto {
   @IsUUID() classId: string;
   @IsEnum(['HOMEWORK', 'QUIZ', 'TEST']) kind: 'HOMEWORK' | 'QUIZ' | 'TEST';

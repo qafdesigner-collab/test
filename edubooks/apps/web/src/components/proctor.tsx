@@ -10,6 +10,18 @@ export type Streams = { cam: MediaStream | null; scr: MediaStream | null; room: 
 
 const canShare = () => typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getDisplayMedia;
 /** A picture of a video stream as a small JPEG data URL. */
+const players = new WeakMap<MediaStream, HTMLVideoElement>();
+/** A picture of a stream, from a video kept playing for that stream (quick, no waiting for a new video to start). */
+async function snap(stream: MediaStream, maxW: number, quality: number): Promise<string | null> {
+  let v = players.get(stream);
+  if (!v) { v = document.createElement('video'); v.muted = true; v.playsInline = true; v.srcObject = stream; players.set(stream, v); await v.play().catch(() => undefined); }
+  if (v.readyState < 2) return grab(stream, maxW, quality);
+  try {
+    const k = Math.min(1, maxW / (v.videoWidth || maxW)); const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round((v.videoWidth || maxW) * k)); c.height = Math.max(1, Math.round((v.videoHeight || maxW * 0.75) * k));
+    c.getContext('2d')!.drawImage(v, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', quality);
+  } catch { return null; }
+}
 function grab(stream: MediaStream, maxW: number, quality: number): Promise<string | null> {
   return new Promise((resolve) => {
     const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.srcObject = stream;
@@ -37,8 +49,7 @@ export function ProctorGate({ p, resume, onReady }: { p: Proctor; resume: boolea
   const [cam, setCam] = useState<MediaStream | null>(null); const [scr, setScr] = useState<MediaStream | null>(null);
   const [room, setRoom] = useState<string[]>([]); const [scan, setScan] = useState<number | null>(null); const [err, setErr] = useState('');
   const [part, setPart] = useState(false); const [noScreen, setNoScreen] = useState(false);
-  const preview = useRef<HTMLVideoElement>(null);
-  useEffect(() => { if (preview.current && cam) { preview.current.srcObject = cam; preview.current.play().catch(() => undefined); } }, [cam]);
+  const attach = (stream: MediaStream | null) => (el: HTMLVideoElement | null) => { if (el && stream && el.srcObject !== stream) { el.srcObject = stream; el.play().catch(() => undefined); } };
   const askCam = async () => {
     setErr('');
     try { setCam(await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, facingMode: 'user' }, audio: false })); }
@@ -76,17 +87,32 @@ export function ProctorGate({ p, resume, onReady }: { p: Proctor; resume: boolea
           {p.roomScan && !resume && <li>{t('a short look around your room')}</li>}
           {p.camera && <li>{t('photos from your camera at random times')}</li>}
           {p.screen && <li>{t('pictures of your whole screen at random times')}</li>}
+          {(p.camera || p.screen) && <li>{t('your camera and screen live, during the test')}</li>}
           <li>{t('when you leave this page or open another app')}</li>
         </ul>
         <p className="mt-2 text-sm text-slate-500">{t('Nothing is recorded before you press Start, and recording stops when you hand in.')}</p></div>
+      {/* the live camera picture (like a mirror) — it stays on during the room scan, with what to do next */}
+      {(cam || scr) && <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+        {cam ? <div className="relative overflow-hidden rounded-2xl bg-black shadow-inner">
+          <video ref={attach(cam)} autoPlay muted playsInline className="aspect-video w-full -scale-x-100 object-cover" aria-label={t('Your camera')} />
+          <span className="absolute start-2 top-2 rounded bg-red-600 px-1.5 py-0.5 text-xs font-bold text-white">● {t('Camera')}</span>
+          {scan !== null && <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 text-center">
+            <p className="text-xl font-black text-white drop-shadow">🔄 {t(STEPS[scan])}</p>
+            <div className="mt-2 flex justify-center gap-1.5">{STEPS.map((_, i) => <span key={i} className={cn('size-2.5 rounded-full', i < scan ? 'bg-emerald-400' : i === scan ? 'bg-white' : 'bg-white/40')} />)}</div></div>}
+        </div> : <div />}
+        {scr && <div className="relative overflow-hidden rounded-2xl bg-slate-900">
+          <video ref={attach(scr)} autoPlay muted playsInline className="aspect-video w-full object-contain" aria-label={t('Your shared screen')} />
+          <span className="absolute start-2 top-2 rounded bg-sky-600 px-1.5 py-0.5 text-xs font-bold text-white">🖥️ {t('Your screen')}</span></div>}
+      </div>}
       <ol className="space-y-3">
-        {needCam && step(!!cam, ++n, t('Allow the camera'), cam ? <video ref={preview} muted playsInline className="h-32 rounded-xl bg-black" />
+        {needCam && step(!!cam, ++n, t('Allow the camera'), cam ? <p className="text-emerald-800">{t('Your camera is on — you can see yourself above.')}</p>
           : <button type="button" onClick={askCam} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white">📷 {t('Turn on the camera')}</button>)}
         {p.roomScan && !resume && step(room.length > 0, ++n, t('Show your room'), scan !== null
           ? <p className="text-lg font-bold text-sky-800">🔄 {t(STEPS[scan])} <span className="text-sm text-slate-500">({scan + 1}/{STEPS.length})</span></p>
-          : room.length ? <div className="flex gap-1">{room.map((r, i) => <img key={i} src={r} alt="" className="h-12 rounded" />)}</div>
+          : room.length ? <div className="flex flex-wrap items-center gap-1">{room.map((r, i) => <img key={i} src={r} alt="" className="h-12 -scale-x-100 rounded" />)}
+              <button type="button" onClick={doScan} className="ms-2 text-xs text-sky-700 underline">{t('Scan again')}</button></div>
           : <button type="button" disabled={!cam} onClick={doScan} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white disabled:opacity-40">🔄 {t('Start the room scan')}</button>)}
-        {p.screen && step(!!scr || noScreen, ++n, t('Share your whole screen'), scr ? <p className="text-emerald-800">{t('Your screen is shared.')}</p>
+        {p.screen && step(!!scr || noScreen, ++n, t('Share your whole screen'), scr ? <p className="text-emerald-800">{t('Your screen is shared — you can see it above.')}</p>
           : noScreen ? <p className="text-amber-800">{t('This device cannot share its screen. Your teacher will see this. Use a computer next time if you can.')}</p>
           : <button type="button" onClick={askScreen} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white">🖥️ {t('Share the screen')}</button>)}
       </ol>
@@ -99,7 +125,7 @@ export function ProctorGate({ p, resume, onReady }: { p: Proctor; resume: boolea
 }
 
 /** During a watched test: photos and screen pictures at random times, leaving the page, sharing stopped. */
-export function useProctor(id: string, p: Proctor | null, s: Streams | null, active: boolean) {
+export function useProctor(id: string, p: Proctor | null, s: Streams | null, active: boolean, where?: () => { q: number; answered: number }) {
   const [lost, setLost] = useState<'' | 'screen' | 'camera'>('');
   const scr = useRef<MediaStream | null>(s?.scr ?? null); const cam = useRef<MediaStream | null>(s?.cam ?? null);
   useEffect(() => { if (s) { scr.current = s.scr; cam.current = s.cam; } }, [s]);
@@ -117,11 +143,20 @@ export function useProctor(id: string, p: Proctor | null, s: Streams | null, act
     const loop = (kind: 'CAMERA' | 'SCREEN', ref: React.MutableRefObject<MediaStream | null>, a: number, b: number, w: number, q: number) => {
       const tick = async () => {
         if (stop) return;
-        const st = ref.current; if (st && st.getVideoTracks()[0]?.readyState === 'live') { const img = await grab(st, w, q); if (img && !stop) void send(kind, { image: img }); }
+        const st = ref.current; if (st && st.getVideoTracks()[0]?.readyState === 'live') { const img = await snap(st, w, q); if (img && !stop) void send(kind, { image: img }); }
         timers.push(setTimeout(tick, rand(a, b)));
       };
       timers.push(setTimeout(tick, rand(5, Math.min(a, 30))));
     };
+    // the live view for the teacher: the newest camera and screen picture every few seconds (only the latest is kept)
+    const live = async () => {
+      if (stop) return;
+      const c = p.camera && cam.current?.getVideoTracks()[0]?.readyState === 'live' ? await snap(cam.current, 320, 0.5) : null;
+      const sc = p.screen && scr.current?.getVideoTracks()[0]?.readyState === 'live' ? await snap(scr.current, 960, 0.5) : null;
+      if (!stop && (c || sc || where)) await api.post(`/student/homework/${id}/live`, { ...(c ? { cam: c } : {}), ...(sc ? { screen: sc } : {}), ...(where ? where() : {}) }).catch(() => undefined);
+      timers.push(setTimeout(live, 4000));
+    };
+    if (p.camera || p.screen) timers.push(setTimeout(live, 1500));
     if (p.camera && cam.current) loop('CAMERA', cam, 35, 100, 480, 0.6);
     if (p.screen && scr.current) loop('SCREEN', scr, 45, 120, 1280, 0.55);
     // sharing stopped by the student
