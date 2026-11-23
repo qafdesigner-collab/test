@@ -19,7 +19,12 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('projects', fn (Blueprint $t) => $t->dropColumn(['product_id', 'batch_id', 'supplier_id', 'workflow_events']));
+        Schema::table('projects', function (Blueprint $t) {
+            $t->dropConstrainedForeignId('product_id');
+            $t->dropConstrainedForeignId('batch_id');
+            $t->dropConstrainedForeignId('supplier_id');
+            $t->dropColumn('workflow_events');
+        });
         Schema::table('batches', fn (Blueprint $t) => $t->dropColumn('workflow_events'));
     }
 };

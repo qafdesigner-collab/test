@@ -70,7 +70,8 @@ final class Documents
             if (in_array($kind, ['Sale', 'Invoice']) && $total > $paid) {
                 if (! $contact) {
                     self::fail('A customer is required for credit sales.');
-                }$outstanding = DB::table('documents')->where('contact_id', $contact)->whereIn('kind', ['Sale', 'Invoice'])->where('status', 'Posted')->selectRaw('COALESCE(SUM(total_cents-paid_cents),0) AS balance')->value('balance');
+                }$outstanding = DB::table('documents')->where('contact_id', $contact)->whereIn('kind', ['Sale', 'Invoice'])->where('status', 'Posted')->selectRaw('COALESCE(SUM(total_cents-paid_cents),0) AS balance')->value('balance') ?? 0;
+                $outstanding = (int) $outstanding;
                 if ($outstanding + $total - $paid > $c->credit_cents) {
                     self::fail('Customer credit limit would be exceeded.');
                 }

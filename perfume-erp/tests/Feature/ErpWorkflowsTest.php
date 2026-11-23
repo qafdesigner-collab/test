@@ -63,13 +63,13 @@ class ErpWorkflowsTest extends TestCase
     public function test_sale_retry_posts_stock_and_payment_once(): void
     {
         $key = (string) Str::uuid();
-        $before = DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli');
+        $before = (int) DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli');
         $a = $this->postOnce('/api/documents', $this->sale(), $key)->assertOk()->json();
         $b = $this->postOnce('/api/documents', $this->sale(), $key)->assertOk()->json();
         $this->assertSame($a, $b);
         $this->assertDatabaseCount('documents', 1);
         $this->assertDatabaseCount('payments', 1);
-        $this->assertSame($before - 1000, DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli'));
+        $this->assertSame($before - 1000, (int) DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli'));
     }
 
     public function test_reused_identifier_for_changed_request_is_rejected(): void
@@ -83,10 +83,10 @@ class ErpWorkflowsTest extends TestCase
     {
         $v = $this->sale(['paid' => '0.00', 'method' => 'Credit']);
         $v['lines'] = [['product_id' => 2, 'quantity' => '1'], ['product_id' => 1, 'quantity' => '9999']];
-        $before = DB::table('balances')->where(['product_id' => 2, 'location_id' => 1])->sum('quantity_milli');
+        $before = (int) DB::table('balances')->where(['product_id' => 2, 'location_id' => 1])->sum('quantity_milli');
         $this->postOnce('/api/documents', $v)->assertUnprocessable();
         $this->assertDatabaseCount('documents', 0);
-        $this->assertSame($before, DB::table('balances')->where(['product_id' => 2, 'location_id' => 1])->sum('quantity_milli'));
+        $this->assertSame($before, (int) DB::table('balances')->where(['product_id' => 2, 'location_id' => 1])->sum('quantity_milli'));
     }
 
     public function test_credit_limit_and_whole_bottle_rules(): void
@@ -100,28 +100,28 @@ class ErpWorkflowsTest extends TestCase
 
     public function test_quotation_does_not_consume_stock(): void
     {
-        $before = DB::table('balances')->where('product_id', 1)->sum('quantity_milli');
+        $before = (int) DB::table('balances')->where('product_id', 1)->sum('quantity_milli');
         $this->postOnce('/api/documents', $this->sale(['kind' => 'Quotation', 'paid' => '0.00', 'method' => 'Credit']))->assertOk();
-        $this->assertSame($before, DB::table('balances')->where('product_id', 1)->sum('quantity_milli'));
+        $this->assertSame($before, (int) DB::table('balances')->where('product_id', 1)->sum('quantity_milli'));
     }
 
     public function test_purchase_receipt_and_transfer_are_atomic(): void
     {
         $this->postOnce('/api/documents', ['kind' => 'Purchase', 'contact_id' => 2, 'location_id' => 1, 'paid' => '0.00', 'method' => 'Credit', 'lines' => [['product_id' => 7, 'quantity' => '100']]])->assertOk();
-        $a = DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli');
-        $b = DB::table('balances')->where(['product_id' => 1, 'location_id' => 2])->sum('quantity_milli');
+        $a = (int) DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli');
+        $b = (int) DB::table('balances')->where(['product_id' => 1, 'location_id' => 2])->sum('quantity_milli');
         $this->postOnce('/api/stock', ['product_id' => 1, 'location_id' => 1, 'target_id' => 2, 'lot' => 'DEMO-OPENING', 'quantity' => '2', 'reason' => 'Transfer test'])->assertOk();
-        $this->assertSame($a - 2000, DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli'));
-        $this->assertSame($b + 2000, DB::table('balances')->where(['product_id' => 1, 'location_id' => 2])->sum('quantity_milli'));
+        $this->assertSame($a - 2000, (int) DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli'));
+        $this->assertSame($b + 2000, (int) DB::table('balances')->where(['product_id' => 1, 'location_id' => 2])->sum('quantity_milli'));
     }
 
     public function test_full_return_is_once_and_restores_stock(): void
     {
-        $before = DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli');
+        $before = (int) DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli');
         $id = $this->postOnce('/api/documents', $this->sale())->assertOk()->json('id');
         $this->postOnce('/api/documents/'.$id, ['action' => 'return', 'condition' => 'Restock'])->assertOk();
         $this->postOnce('/api/documents/'.$id, ['action' => 'return', 'condition' => 'Restock'])->assertUnprocessable();
-        $this->assertSame($before, DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli'));
+        $this->assertSame($before, (int) DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli'));
     }
 
     public function test_pos_requires_shift_and_cashier_cannot_override_price(): void
@@ -153,9 +153,9 @@ class ErpWorkflowsTest extends TestCase
         $this->postOnce('/api/batches/'.$id, ['action' => 'issue'])->assertOk();
         $this->postOnce('/api/batches/'.$id, ['action' => 'mature'])->assertOk();
         $this->postOnce('/api/batches/'.$id, ['action' => 'qc', 'passed' => true, 'qc_notes' => 'Fill and scent checks passed'])->assertOk();
-        $before = DB::table('balances')->where('product_id', 1)->sum('quantity_milli');
+        $before = (int) DB::table('balances')->where('product_id', 1)->sum('quantity_milli');
         $this->postOnce('/api/batches/'.$id, ['action' => 'complete', 'accepted' => 9, 'rejected' => 1, 'loss_reason' => 'One leaking bottle', 'extra_cost' => '15.00'])->assertOk();
-        $this->assertSame($before + 9000, DB::table('balances')->where('product_id', 1)->sum('quantity_milli'));
+        $this->assertSame($before + 9000, (int) DB::table('balances')->where('product_id', 1)->sum('quantity_milli'));
         $this->postOnce('/api/batches/'.$id, ['action' => 'complete', 'accepted' => 9, 'rejected' => 1, 'loss_reason' => 'Again'])->assertUnprocessable();
     }
 
@@ -202,9 +202,9 @@ class ErpWorkflowsTest extends TestCase
 
     public function test_failed_transfer_leaves_both_locations_unchanged(): void
     {
-        $before = DB::table('balances')->sum('quantity_milli');
+        $before = (int) DB::table('balances')->sum('quantity_milli');
         $this->postOnce('/api/stock', ['product_id' => 1, 'location_id' => 1, 'target_id' => 2, 'lot' => 'DEMO-OPENING', 'quantity' => '9999', 'reason' => 'Insufficient'])->assertUnprocessable();
-        $this->assertSame($before, DB::table('balances')->sum('quantity_milli'));
+        $this->assertSame($before, (int) DB::table('balances')->sum('quantity_milli'));
     }
 
     public function test_maturing_batch_cannot_be_released_early(): void
@@ -229,13 +229,13 @@ class ErpWorkflowsTest extends TestCase
     public function test_ingredient_sales_opt_in_and_fractional_shared_stock(): void
     {
         $raw = DB::table('products')->where('kind', 'raw')->first();
-        $opening = DB::table('balances')->where('product_id', $raw->id)->where('location_id', 1)->sum('quantity_milli');
+        $opening = (int) DB::table('balances')->where('product_id', $raw->id)->where('location_id', 1)->sum('quantity_milli');
         $this->postOnce('/api/shifts', ['action' => 'open', 'amount' => '0'])->assertOk();
         $data = ['kind' => 'Sale', 'location_id' => 1, 'lines' => [['product_id' => $raw->id, 'quantity' => '0.5']], 'paid' => '1', 'method' => 'Cash'];
         $this->postOnce('/api/documents', $data)->assertStatus(422);
         DB::table('products')->where('id', $raw->id)->update(['sales_allowed' => true, 'price_cents' => 200, 'tax_bp' => 0]);
         $this->postOnce('/api/documents', $data)->assertOk();
-        $this->assertEquals($opening - 500, DB::table('balances')->where('product_id', $raw->id)->where('location_id', 1)->sum('quantity_milli'));
+        $this->assertEquals($opening - 500, (int) DB::table('balances')->where('product_id', $raw->id)->where('location_id', 1)->sum('quantity_milli'));
     }
 
     public function test_completed_cost_sheet_recalculates_accepted_output_and_extras(): void
