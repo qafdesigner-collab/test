@@ -62,9 +62,9 @@ class DocumentController extends ErpBaseController
             foreach ($v['lines'] as $l) {
                 $p = DB::table('products')->find($l['product_id']);
                 if (isset($l['price']) && Amounts::parse($l['price']) !== $p->price_cents) {
-                    abort(403, 'Cashiers cannot override prices.');
+                    abort(403, __('Cashiers cannot override prices.'));
                 }if (Amounts::parse($l['discount'] ?? '0') > 0) {
-                    abort(403, 'Discount approval is required.');
+                    abort(403, __('Discount approval is required.'));
                 }
             }
         }
@@ -105,12 +105,12 @@ class DocumentController extends ErpBaseController
             return DB::transaction(function () use ($id, $action) {
                 $doc = DB::table('documents')->where('id', $id)->lockForUpdate()->first();
                 if (! $doc || $doc->kind !== 'Quotation' || $doc->status !== 'Draft') {
-                    Documents::fail('Only a draft quotation can be approved or declined.');
+                    Documents::fail(__('Only a draft quotation can be approved or declined.'));
                 }DB::table('documents')->where('id', $id)->update(['status' => $action === 'accept' ? 'Accepted' : 'Declined', 'updated_at' => now()]);
                 $this->audit('quotation.'.$action, $doc->number);
 
                 return ['ok' => true];
             });
-        }Documents::fail('Unknown document action.');
+        }Documents::fail(__('Unknown document action.'));
     }
 }

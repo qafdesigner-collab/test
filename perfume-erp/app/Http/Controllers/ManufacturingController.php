@@ -36,20 +36,20 @@ class ManufacturingController extends ErpBaseController
         $v = $r->validate(['code' => 'required|string|max:40', 'name' => 'required|string|max:150', 'product_id' => 'required|exists:products,id', 'ingredients' => 'required|array|min:1|max:100', 'ingredients.*.product_id' => 'required|exists:products,id', 'ingredients.*.quantity' => 'required', 'packaging' => 'present|array|max:50', 'packaging.*.product_id' => 'required|exists:products,id', 'packaging.*.quantity' => 'required', 'instructions' => 'nullable|string|max:5000', 'maturation_days' => 'required|integer|min:0|max:365']);
         $p = DB::table('products')->find($v['product_id']);
         if ($p->kind !== 'finished' || ! in_array($p->unit, ['bottle', 'piece'])) {
-            Documents::fail('Formula output must be a finished bottle/piece product.');
+            Documents::fail(__('Formula output must be a finished bottle/piece product.'));
         }foreach (['ingredients', 'packaging'] as $key) {
             $rows = [];
             foreach ($v[$key] as $i) {
                 $material = DB::table('products')->find($i['product_id']);
                 if ($key === 'ingredients' && ! in_array($material->kind, ['raw', 'intermediate'])) {
-                    Documents::fail('Ingredients must be raw or intermediate products.');
+                    Documents::fail(__('Ingredients must be raw or intermediate products.'));
                 }if ($key === 'packaging' && $material->kind !== 'packaging') {
-                    Documents::fail('Packaging rows must use packaging products.');
+                    Documents::fail(__('Packaging rows must use packaging products.'));
                 }$q = Amounts::parse($i['quantity'], 3);
                 if ($q <= 0 || $q > 100000) {
-                    Documents::fail('Per-bottle material quantity must be positive and no more than 100 base units.');
+                    Documents::fail(__('Per-bottle material quantity must be positive and no more than 100 base units.'));
                 }if (in_array($material->unit, ['piece', 'bottle', 'box', 'carton']) && $q % 1000) {
-                    Documents::fail('Packaging/count units must be whole numbers.');
+                    Documents::fail(__('Packaging/count units must be whole numbers.'));
                 }$rows[] = ['product_id' => $i['product_id'], 'quantity_milli' => $q, 'unit' => $material->unit, 'name' => $material->name];
             }$v[$key] = json_encode($rows);
         }
@@ -80,7 +80,7 @@ class ManufacturingController extends ErpBaseController
             $this->allow(['manager', 'production']);
             $v = $r->validate(['formula_id' => 'required|exists:formulas,id', 'location_id' => 'required|exists:locations,id', 'planned' => 'required|integer|min:1|max:100000', 'estimated_labour_cost' => 'nullable', 'estimated_overhead_cost' => 'nullable', 'estimated_freight_cost' => 'nullable', 'estimated_other_cost' => 'nullable']);
             if (DB::table('formulas')->where('id', $v['formula_id'])->value('status') !== 'Approved') {
-                Documents::fail('Approve the formula first.');
+                Documents::fail(__('Approve the formula first.'));
             }
 
             return $this->once($r, 'batch.create', function () use ($v) {

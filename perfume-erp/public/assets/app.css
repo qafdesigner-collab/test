@@ -2511,11 +2511,7 @@ tr[hidden] { display: none; }
 :root[lang="ar"] body, :root[lang="ar"] input, :root[lang="ar"] select, :root[lang="ar"] textarea, :root[lang="ar"] button {
   font-family: "Segoe UI", "Noto Sans Arabic", "Noto Naskh Arabic", Tahoma, "Geeza Pro", sans-serif;
 }
-:root[lang="ur"] body, :root[lang="ur"] input, :root[lang="ur"] select, :root[lang="ur"] textarea, :root[lang="ur"] button {
-  font-family: "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Naskh Arabic", "Segoe UI", Tahoma, sans-serif;
-}
-:root[lang="ur"] body { line-height: 1.9; }
-:root[lang="ar"] .eyebrow, :root[lang="ur"] .eyebrow, :root[lang="ar"] th, :root[lang="ur"] th, :root[lang="ar"] .section-label, :root[lang="ur"] .section-label { letter-spacing: 0; }
+:root[lang="ar"] .eyebrow, :root[lang="ar"] th, :root[lang="ar"] .section-label { letter-spacing: 0; }
 [dir="rtl"] .sidebar { inset: 0 0 0 auto; border-right: 0 !important; border-left: 1px solid var(--line); }
 [dir="rtl"] .app-main { margin-left: 0; margin-right: 244px; }
 @media (max-width: 1200px) { [dir="rtl"] .app-main { margin-right: 214px; } }
@@ -2541,3 +2537,5 @@ tr[hidden] { display: none; }
 [dir="rtl"] .brand-logo-wide { object-position: right center; }
 [dir="rtl"] .chart-svg, [dir="rtl"] .chart-tip { direction: ltr; }
 [dir="rtl"] .payment-row input, [dir="rtl"] .count-qty, [dir="rtl"] .return-qty, [dir="rtl"] .receive-qty { direction: ltr; text-align: right; }
+.language-link { float: right; font-size: 13px; color: var(--accent); text-decoration: none; font-weight: 600; }
+[dir="rtl"] .language-link { float: left; }

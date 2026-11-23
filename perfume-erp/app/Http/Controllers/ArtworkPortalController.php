@@ -51,7 +51,7 @@ class ArtworkPortalController extends Controller
             $phone = substr($phone, 2);
         }
         if (! preg_match('/^[1-9][0-9]{7,14}$/', $phone)) {
-            throw ValidationException::withMessages(['phone' => 'Enter a phone number with its country code, for example +971501234567.']);
+            throw ValidationException::withMessages(['phone' => __('Enter a phone number with its country code, for example +971501234567.')]);
         }
 
         return $phone;
@@ -67,9 +67,9 @@ class ArtworkPortalController extends Controller
                 $v = $r->validate(['action' => 'required|in:create,revoke', 'allow_upload' => 'sometimes|boolean']);
                 DB::table('artwork_links')->where('project_id', $id)->whereNull('revoked_at')->update(['revoked_at' => now(), 'updated_at' => now()]);
                 if ($v['action'] === 'create') {
-                    abort_if($p->status === 'Delivered', 422, 'Delivered projects are locked.');
+                    abort_if($p->status === 'Delivered', 422, __('Delivered projects are locked.'));
                     $c = DB::table('contacts')->find($p->contact_id);
-                    abort_unless($c && $c->kind === 'customer', 422, 'Link a customer before creating an artwork link.');
+                    abort_unless($c && $c->kind === 'customer', 422, __('Link a customer before creating an artwork link.'));
                     self::phone($c->phone ?? '');
                     $token = bin2hex(random_bytes(32));
                     DB::table('artwork_links')->insert(['project_id' => $id, 'contact_id' => $c->id, 'created_by' => Auth::id(), 'token_hash' => hash('sha256', $token), 'encrypted_token' => Crypt::encryptString($token), 'allow_upload' => $v['allow_upload'] ?? true, 'expires_at' => now()->addDays(30), 'created_at' => now(), 'updated_at' => now()]);
@@ -92,7 +92,7 @@ class ArtworkPortalController extends Controller
     {
         abort_unless(preg_match('/^[a-f0-9]{64}$/', $token), 404);
         $link = DB::table('artwork_links')->where('token_hash', hash('sha256', $token))->whereNull('revoked_at')->where('expires_at', '>', now())->first();
-        abort_unless($link, 404, 'This artwork link has expired or been closed.');
+        abort_unless($link, 404, __('This artwork link has expired or been closed.'));
         $p = DB::table('projects')->find($link->project_id);
         abort_unless($p && $p->contact_id === $link->contact_id, 404);
 
@@ -105,7 +105,7 @@ class ArtworkPortalController extends Controller
         $phone = self::phone($v['phone']);
         $expected = self::phone(DB::table('contacts')->where('id', $link->contact_id)->value('phone') ?? '');
         if (! hash_equals($expected, $phone)) {
-            throw ValidationException::withMessages(['phone' => 'Use the phone number registered for this customer. Contact the studio if it needs updating.']);
+            throw ValidationException::withMessages(['phone' => __('Use the phone number registered for this customer. Contact the studio if it needs updating.')]);
         }
 
         return ['customer_name' => trim($v['name']), 'customer_phone' => $phone, 'source' => 'customer', 'artwork_link_id' => $link->id, 'user_id' => null];
@@ -140,7 +140,7 @@ class ArtworkPortalController extends Controller
     public function upload(Request $r, string $token): array
     {
         $link = $this->link($token);
-        abort_unless($link->allow_upload, 403, 'Uploads are closed for this link.');
+        abort_unless($link->allow_upload, 403, __('Uploads are closed for this link.'));
         $identity = $this->identity($r, $link);
         $r->validate(['file' => 'required|file|mimes:pdf,png,jpg,jpeg,webp|max:16384', 'comment' => 'nullable|string|max:2000']);
         $f = $r->file('file');
@@ -149,8 +149,8 @@ class ArtworkPortalController extends Controller
             return DB::transaction(function () use ($link, $identity, $r, $f, $path, $token) {
                 $p = DB::table('projects')->where('id', $link->project_id)->lockForUpdate()->first();
                 $this->link($token);
-                abort_if($p->status === 'Delivered', 422, 'Delivered projects are locked.');
-                abort_if(DB::table('artworks')->where('project_id', $p->id)->count() >= 100, 422, 'Please contact the studio to add more revisions.');
+                abort_if($p->status === 'Delivered', 422, __('Delivered projects are locked.'));
+                abort_if(DB::table('artworks')->where('project_id', $p->id)->count() >= 100, 422, __('Please contact the studio to add more revisions.'));
                 $id = DB::table('artworks')->insertGetId($identity + ['project_id' => $p->id, 'version' => 1 + (int) DB::table('artworks')->where('project_id', $p->id)->max('version'), 'path' => $path, 'filename' => Str::limit(basename($f->getClientOriginalName()), 150, ''), 'mime' => $f->getMimeType(), 'comment' => $r->input('comment'), 'created_at' => now(), 'updated_at' => now()]);
                 $events = array_map(fn ($e) => $e['stage'] === 'packaging_ready' ? array_merge($e, ['stage' => 'packaging_superseded']) : $e, json_decode($p->workflow_events ?? '[]', true));
                 DB::table('projects')->where('id', $p->id)->update(['status' => 'Review', 'approved_artwork_id' => null, 'workflow_events' => json_encode($events), 'updated_at' => now()]);
@@ -173,9 +173,9 @@ class ArtworkPortalController extends Controller
         return DB::transaction(function () use ($link, $identity, $v, $token) {
             $p = DB::table('projects')->where('id', $link->project_id)->lockForUpdate()->first();
             $this->link($token);
-            abort_if($p->status === 'Delivered', 422, 'Delivered projects are locked.');
+            abort_if($p->status === 'Delivered', 422, __('Delivered projects are locked.'));
             $a = DB::table('artworks')->where('project_id', $p->id)->latest('version')->first();
-            abort_unless($a && $a->id === $v['artwork_id'], 409, 'The artwork has changed. Reload and review the latest version.');
+            abort_unless($a && $a->id === $v['artwork_id'], 409, __('The artwork has changed. Reload and review the latest version.'));
             if ($v['decision'] === 'approve' && $p->approved_artwork_id === $a->id) {
                 return ['ok' => true];
             }

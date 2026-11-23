@@ -527,4 +527,21 @@ class ErpWorkflowsTest extends TestCase
         $this->postOnce('/api/documents/'.$invoice['id'], ['action' => 'payment', 'amount' => '125.01', 'method' => 'Cash'])->assertUnprocessable();
         $this->postOnce('/api/documents/'.$invoice['id'], ['action' => 'payment', 'amount' => '125.00', 'method' => 'Cash'])->assertOk();
     }
+
+    public function test_server_messages_follow_the_chosen_language(): void
+    {
+        $this->withHeader('X-Locale', 'ar');
+        $this->postOnce('/api/documents', $this->sale(['paid' => '0', 'method' => 'Credit', 'contact_id' => null]))
+            ->assertUnprocessable()->assertJsonPath('errors.document.0', 'يجب اختيار عميل للبيع الآجل.');
+        $this->postJson('/api/settings', ['currency' => 'AED'])->assertUnprocessable()->assertJsonPath('errors.company_name.0', 'حقل اسم الشركة مطلوب.');
+
+        $this->withHeader('X-Locale', 'en');
+        $this->postOnce('/api/documents', $this->sale(['paid' => '0', 'method' => 'Credit', 'contact_id' => null]))
+            ->assertJsonPath('errors.document.0', 'A customer is required for credit sales.');
+
+        $this->post('/logout');
+        $this->flushHeaders();
+        $this->withUnencryptedCookie('atelier_lang', 'ar')->get('/login')->assertOk()->assertSee('dir="rtl"', false)->assertSee('الدخول إلى مساحة العمل');
+        $this->withUnencryptedCookie('atelier_lang', 'en')->get('/login')->assertSee('Sign in to your workspace');
+    }
 }

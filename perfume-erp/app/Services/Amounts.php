@@ -16,7 +16,7 @@ final class Amounts
         $neg = str_starts_with($s, '-');
         $parts = explode('.', ltrim($s, '-'));
         if (strlen(ltrim($parts[0], '0')) > 9) {
-            throw ValidationException::withMessages(['amount' => 'Amount is too large.']);
+            throw ValidationException::withMessages(['amount' => __('Amount is too large.')]);
         }
         $n = (int) $parts[0] * (10 ** $places) + (int) str_pad($parts[1] ?? '', $places, '0');
 

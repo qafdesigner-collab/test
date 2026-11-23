@@ -18,10 +18,10 @@ class AuthController extends ErpBaseController
         $v = $r->validate(['email' => 'required|email', 'password' => 'required|string']);
         $key = 'login:'.$r->ip().':'.strtolower($v['email']);
         if (RateLimiter::tooManyAttempts($key, 6)) {
-            throw ValidationException::withMessages(['email' => 'Too many attempts. Try again in a minute.']);
+            throw ValidationException::withMessages(['email' => __('Too many attempts. Try again in a minute.')]);
         }if (! Auth::attempt($v + ['active' => true])) {
             RateLimiter::hit($key, 60);
-            throw ValidationException::withMessages(['email' => 'Email or password is incorrect.']);
+            throw ValidationException::withMessages(['email' => __('Email or password is incorrect.')]);
         }RateLimiter::clear($key);
         $r->session()->regenerate();
         $this->audit('auth.login', 'user:'.Auth::id());

@@ -1,5 +1,7 @@
 # Roadmap to completion (English + Arabic)
 
+Language order: English first (default), Arabic second.
+
 Working rule: one step at a time; each step ends with tests (SQLite, plus MySQL where data
 changes), browser screenshots, a rebuilt cPanel ZIP, a commit and a push to
 `claude/hopeful-ptolemy-xrt7sw`. Tick the box in the same commit.
@@ -14,7 +16,7 @@ changes), browser screenshots, a rebuilt cPanel ZIP, a commit and a push to
 - [x] Arabic interface with right-to-left layout
 
 ## Remaining
-- [ ] 1. Remove Urdu (English + Arabic only); Arabic for server messages, sign-in page and installer
+- [x] 1. Remove Urdu (English + Arabic only); Arabic for server messages, sign-in page and installer
 - [ ] 2. UAE tax invoice: bilingual English/Arabic A4 invoice and receipt, TRN, "Tax Invoice" title, VAT summary
 - [ ] 3. Expenses: record rent, salaries, utilities etc. by category, date, method and note
 - [ ] 4. Profit & loss: monthly revenue − cost of goods − expenses = net profit, with chart and export

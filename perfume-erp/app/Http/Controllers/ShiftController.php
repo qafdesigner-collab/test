@@ -25,12 +25,12 @@ class ShiftController extends ErpBaseController
                 $shift = DB::table('shifts')->where('user_id', Auth::id())->whereNull('closed_at')->lockForUpdate()->first();
                 if ($v['action'] === 'open') {
                     if ($shift) {
-                        Documents::fail('You already have an open shift.');
+                        Documents::fail(__('You already have an open shift.'));
                     }$id = DB::table('shifts')->insertGetId(['user_id' => Auth::id(), 'opening_cents' => $amount, 'opened_at' => now()]);
 
                     return ['id' => $id];
                 }if (! $shift) {
-                    Documents::fail('No open shift.');
+                    Documents::fail(__('No open shift.'));
                 }$cash = $this->shiftCash($shift);
                 DB::table('shifts')->where('id', $shift->id)->update(['counted_cents' => $amount, 'variance_cents' => $amount - ($shift->opening_cents + $cash), 'closed_at' => now()]);
 

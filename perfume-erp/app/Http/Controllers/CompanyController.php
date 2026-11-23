@@ -67,7 +67,7 @@ class CompanyController extends ErpBaseController
         $this->allow([]);
         $v = $r->validate(['active' => 'required|boolean', 'sales_allowed' => 'sometimes|boolean']);
         if ($id === Auth::id()) {
-            Documents::fail('You cannot disable your own account.');
+            Documents::fail(__('You cannot disable your own account.'));
         }abort_unless(DB::table('users')->where('id', $id)->exists(), 404);
         DB::table('users')->where('id', $id)->update(['active' => $v['active'], 'updated_at' => now()]);
         $this->audit('user.status', 'user:'.$id);

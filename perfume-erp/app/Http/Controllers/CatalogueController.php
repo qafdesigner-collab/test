@@ -67,9 +67,9 @@ class CatalogueController extends ErpBaseController
         $v['tax_bp'] = Amounts::parse($v['tax']);
         $v['reorder_milli'] = Amounts::parse($v['reorder'], 3);
         if ($v['price_cents'] > 10000000 || $v['cost_cents'] > 10000000) {
-            Documents::fail('Price or cost cannot exceed 100,000 per base unit.');
+            Documents::fail(__('Price or cost cannot exceed 100,000 per base unit.'));
         }if ($v['tax_bp'] > 10000) {
-            Documents::fail('Tax percentage cannot exceed 100.');
+            Documents::fail(__('Tax percentage cannot exceed 100.'));
         }unset($v['price'],$v['cost'],$v['tax'],$v['reorder']);
         foreach (['families', 'notes', 'tags'] as $k) {
             $v[$k] = json_encode(array_values(array_unique($v[$k])));
@@ -79,7 +79,7 @@ class CatalogueController extends ErpBaseController
             abort_unless(DB::table('products')->where('id', $id)->exists(), 404);
             $old = DB::table('products')->find($id);
             if (($old->unit !== $v['unit'] || $old->kind !== $v['kind']) && (DB::table('movements')->where('product_id', $id)->exists() || DB::table('document_lines')->where('product_id', $id)->exists() || DB::table('formulas')->exists())) {
-                Documents::fail('Unit/type cannot change after operational use. Create a new SKU.');
+                Documents::fail(__('Unit/type cannot change after operational use. Create a new SKU.'));
             }DB::table('products')->where('id', $id)->update($v);
         } else {
             $v['created_at'] = now();
@@ -109,12 +109,12 @@ class CatalogueController extends ErpBaseController
         abort_unless(DB::table('products')->where('id', $id)->exists(), 404);
         $r->validate(['image' => 'required|image|mimes:jpg,jpeg,png,webp|max:8192|dimensions:max_width=4096,max_height=4096', 'alt' => 'nullable|string|max:180']);
         if (DB::table('images')->where('product_id', $id)->count() >= 12) {
-            Documents::fail('Maximum 12 images per product.');
+            Documents::fail(__('Maximum 12 images per product.'));
         }$file = $r->file('image');
         $raw = file_get_contents($file->getRealPath());
         $image = @imagecreatefromstring($raw);
         if (! $image) {
-            Documents::fail('Image cannot be decoded.');
+            Documents::fail(__('Image cannot be decoded.'));
         }$key = (string) Str::uuid();
         $path = $file->storeAs('products', $key.'.'.$file->guessExtension(), 'local');
         $w = imagesx($image);
@@ -158,7 +158,7 @@ class CatalogueController extends ErpBaseController
             Storage::disk('local')->delete([$i->path, $i->thumb]);
             DB::table('images')->where('id', $id)->delete();
         } else {
-            Documents::fail('Unknown image action.');
+            Documents::fail(__('Unknown image action.'));
         }
 
         return ['ok' => true];

@@ -16,7 +16,7 @@ final class Production
             }$f = DB::table('formulas')->find($b->formula_id);
             if ($action === 'issue') {
                 if ($b->status !== 'Planned' || $f->status !== 'Approved') {
-                    self::fail('Only a planned batch with an approved formula can be issued.');
+                    self::fail(__('Only a planned batch with an approved formula can be issued.'));
                 }
                 $sheet = $b->cost_sheet ? json_decode($b->cost_sheet, true) : ['estimate' => null, 'issued' => null, 'actual' => null];
                 $sheet['issued'] = Costing::recipe($f, $b->planned);
@@ -28,7 +28,7 @@ final class Production
                     $q = $i['quantity_milli'] * $b->planned;
                     $p = DB::table('products')->find($i['product_id']);
                     if (! $p || ! $p->active) {
-                        self::fail('A material is unavailable.');
+                        self::fail(__('A material is unavailable.'));
                     }foreach (Stock::consume($p->id, $b->location_id, $q, 'Production issue', $b->number, $user) as $lot) {
                         $issued[] = $lot;
                     }
@@ -55,29 +55,29 @@ final class Production
                 DB::table('batches')->where('id', $id)->update(['cost_sheet' => json_encode($sheet), 'issued' => json_encode($issued), 'material_cost_cents' => $cost, 'status' => 'Mixing', 'updated_at' => now()]);
             } elseif ($action === 'mature') {
                 if ($b->status !== 'Mixing') {
-                    self::fail('Start maturation only after mixing.');
+                    self::fail(__('Start maturation only after mixing.'));
                 }DB::table('batches')->where('id', $id)->update(['status' => 'Maturing', 'matures_at' => now()->addDays($f->maturation_days), 'updated_at' => now()]);
             } elseif ($action === 'qc') {
                 if ($b->status !== 'Maturing') {
-                    self::fail('Quality release requires maturation.');
+                    self::fail(__('Quality release requires maturation.'));
                 }if ($b->matures_at && now()->lt($b->matures_at)) {
-                    self::fail('The configured maturation period has not finished.');
+                    self::fail(__('The configured maturation period has not finished.'));
                 }if (trim($data['qc_notes'] ?? '') === '') {
-                    self::fail('Record the quality observations.');
+                    self::fail(__('Record the quality observations.'));
                 }DB::table('batches')->where('id', $id)->update(['status' => ($data['passed'] ?? false) ? 'Released' : 'QC Hold', 'qc_notes' => $data['qc_notes'], 'updated_at' => now()]);
             } elseif ($action === 'recheck') {
                 if ($b->status !== 'QC Hold') {
-                    self::fail('Only a held batch can be rechecked.');
+                    self::fail(__('Only a held batch can be rechecked.'));
                 }DB::table('batches')->where('id', $id)->update(['status' => 'Maturing', 'updated_at' => now()]);
             } elseif ($action === 'complete') {
                 if ($b->status !== 'Released') {
-                    self::fail('Batch must pass quality checks first.');
+                    self::fail(__('Batch must pass quality checks first.'));
                 }$accepted = (int) ($data['accepted'] ?? -1);
                 $rejected = (int) ($data['rejected'] ?? -1);
                 if ($accepted < 1 || $rejected < 0 || $accepted + $rejected !== $b->planned) {
-                    self::fail('Accepted plus rejected units must equal planned units.');
+                    self::fail(__('Accepted plus rejected units must equal planned units.'));
                 }if ($rejected && ! trim($data['loss_reason'] ?? '')) {
-                    self::fail('Explain rejected units or losses.');
+                    self::fail(__('Explain rejected units or losses.'));
                 }$extras = Costing::extras($data);
                 $extras['legacy_cents'] = Amounts::parse($data['extra_cost'] ?? '0');
                 $extra = array_sum($extras);
@@ -86,7 +86,7 @@ final class Production
                 Stock::move($f->product_id, $b->location_id, $b->number, $accepted * 1000, 'Production output', $b->number, $user, $sheet['actual']['total_cents'], collect(json_decode($b->issued, true))->contains(fn ($lot) => str_contains(strtolower($lot['cost_basis'] ?? ''), 'estimate') || ($lot['cost_basis'] ?? '') === 'Mixed cost basis') ? 'Production cost with estimates' : 'Production batch cost');
                 DB::table('batches')->where('id', $id)->update(['cost_sheet' => json_encode($sheet), 'status' => 'Completed', 'accepted' => $accepted, 'rejected' => $rejected, 'loss_reason' => $data['loss_reason'] ?? null, 'extra_cost_cents' => $extra, 'updated_at' => now()]);
             } else {
-                self::fail('Unknown batch action.');
+                self::fail(__('Unknown batch action.'));
             }
             $events = json_decode($b->workflow_events ?? '[]', true);
             $events[] = ['stage' => $action, 'at' => now()->toIso8601String(), 'notes' => $data['qc_notes'] ?? $data['loss_reason'] ?? ''];

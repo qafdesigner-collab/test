@@ -61,6 +61,6 @@ class CompanyBrandingTest extends TestCase
         $this->assertSame('#8a2c3b', $settings['brand_color']);
         $this->assertSame('Bank: Example Bank', $settings['invoice_footer']);
         $this->post('/logout');
-        $this->get('/login')->assertOk()->assertSee('--accent:#8a2c3b', false)->assertSee('NOOR PERFUMES');
+        $this->get('/login')->assertOk()->assertSee('--accent:#8a2c3b', false)->assertSee('Noor Perfumes');
     }
 }

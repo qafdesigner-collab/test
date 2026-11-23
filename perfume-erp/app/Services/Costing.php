@@ -32,7 +32,7 @@ final class Costing
             foreach (json_decode($f->$k, true) as $i) {
                 $p = DB::table('products')->find($i['product_id']);
                 if (! $p || ! $p->active) {
-                    Production::fail('A formula material is unavailable.');
+                    Production::fail(__('A formula material is unavailable.'));
                 }
                 $q = $i['quantity_milli'] * $output;
                 $cost = Amounts::roundDivide($q * $p->cost_cents, 1000);

@@ -45,11 +45,11 @@ class InstallController extends Controller
             'demo' => 'sometimes|boolean',
         ]);
         if (! hash_equals(Installation::code(), strtoupper(trim($v['install_code'])))) {
-            throw ValidationException::withMessages(['install_code' => 'The install code does not match storage/app/private/install-code.txt.']);
+            throw ValidationException::withMessages(['install_code' => __('The install code does not match storage/app/private/install-code.txt.')]);
         }
         foreach (Installation::requirements() as $check) {
             if (! $check['ok']) {
-                throw ValidationException::withMessages(['install_code' => 'Fix the server requirement first: '.$check['label']]);
+                throw ValidationException::withMessages(['install_code' => __('Fix the server requirement first: ').$check['label']]);
             }
         }
 
@@ -70,7 +70,7 @@ class InstallController extends Controller
         try {
             DB::connection()->getPdo();
         } catch (Throwable $e) {
-            throw ValidationException::withMessages(['db_host' => 'Could not connect to the database. Check the database name, user and password, and that the user is added to the database in cPanel → MySQL Databases.']);
+            throw ValidationException::withMessages(['db_host' => __('Could not connect to the database. Check the database name, user and password, and that the user is added to the database in cPanel → MySQL Databases.')]);
         }
         try {
             Installation::writeEnvironment($environment);
@@ -93,11 +93,11 @@ class InstallController extends Controller
             }
         } catch (Throwable $e) {
             Log::error('Web installation failed', ['exception' => $e]);
-            throw ValidationException::withMessages(['install_code' => 'Installation stopped: '.$e->getMessage()]);
+            throw ValidationException::withMessages(['install_code' => __('Installation stopped: ').$e->getMessage()]);
         }
         Installation::markInstalled();
         Artisan::call('config:clear');
 
-        return redirect('/login')->with('status', 'Installation complete. Sign in with your owner account.');
+        return redirect('/login')->with('status', __('Installation complete. Sign in with your owner account.'));
     }
 }

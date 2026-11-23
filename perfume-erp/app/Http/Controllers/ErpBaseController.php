@@ -17,7 +17,7 @@ abstract class ErpBaseController extends Controller
 
     protected function allow(array $roles): void
     {
-        abort_unless(Auth::check() && Auth::user()->active && in_array(Auth::user()->role, array_merge(['owner'], $roles)), 403, 'You do not have permission for this action.');
+        abort_unless(Auth::check() && Auth::user()->active && in_array(Auth::user()->role, array_merge(['owner'], $roles)), 403, __('You do not have permission for this action.'));
     }
 
     protected function audit(string $action, string $subject, array $details = []): void
@@ -29,13 +29,13 @@ abstract class ErpBaseController extends Controller
     {
         $key = $r->header('Idempotency-Key');
         if (! $key || ! Str::isUuid($key)) {
-            Documents::fail('A unique request identifier is required.');
+            Documents::fail(__('A unique request identifier is required.'));
         }$fingerprint = hash('sha256', json_encode($r->except('_token')));
 
         return DB::transaction(function () use ($key, $action, $fingerprint, $fn) {
             $prior = DB::table('idempotency')->where('key', $key)->first();
             if ($prior) {
-                abort_unless($prior->user_id === Auth::id() && $prior->action === $action && $prior->fingerprint === $fingerprint, 409, 'Request identifier was already used.');
+                abort_unless($prior->user_id === Auth::id() && $prior->action === $action && $prior->fingerprint === $fingerprint, 409, __('Request identifier was already used.'));
 
                 return json_decode($prior->result, true);
             }$result = $fn();

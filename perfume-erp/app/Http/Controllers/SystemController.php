@@ -80,14 +80,14 @@ class SystemController extends Controller
 
     private function ownerOnly(): void
     {
-        abort_unless(Auth::user()?->active && Auth::user()->role === 'owner', 403, 'Only the owner can manage system updates and backups.');
+        abort_unless(Auth::user()?->active && Auth::user()->role === 'owner', 403, __('Only the owner can manage system updates and backups.'));
     }
 
     private function confirmPassword(Request $r): void
     {
         $r->validate(['password' => 'required|string']);
         if (! Hash::check($r->input('password'), Auth::user()->password)) {
-            throw ValidationException::withMessages(['password' => 'Your password is incorrect.']);
+            throw ValidationException::withMessages(['password' => __('Your password is incorrect.')]);
         }
     }
 

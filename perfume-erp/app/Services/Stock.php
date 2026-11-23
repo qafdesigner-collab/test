@@ -96,7 +96,7 @@ final class Stock
         $currentValue = $row->value_cents ?? Amounts::roundDivide($row->quantity_milli * DB::table('products')->where('id', $product)->value('cost_cents'), 1000);
         $amount = $q < 0 ? ($row->quantity_milli > 0 ? Amounts::roundDivide($currentValue * (-$q), $row->quantity_milli) : 0) : ($value ?? Amounts::roundDivide($q * DB::table('products')->where('id', $product)->value('cost_cents'), 1000));
         if ($q < 0 && -$q > $row->quantity_milli) {
-            throw ValidationException::withMessages(['stock' => 'Insufficient stock.']);
+            throw ValidationException::withMessages(['stock' => __('Insufficient stock.')]);
         }
 
         // Conditional update remains safe even where row locking differs (SQLite).

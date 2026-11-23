@@ -70,7 +70,7 @@ function toast(s) {
 }
 
 async function api(path, method = 'GET', data = null, key = null) {
-  const headers = { Accept: 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').content };
+  const headers = { Accept: 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').content, 'X-Locale': state.lang || 'en' };
   let body;
   if (data instanceof FormData) body = data;
   else if (data) {

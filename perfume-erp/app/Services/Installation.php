@@ -63,13 +63,13 @@ class Installation
      */
     public static function requirements(): array
     {
-        $checks = [['label' => 'PHP 8.3 or newer (you have '.PHP_VERSION.')', 'ok' => version_compare(PHP_VERSION, '8.3.0', '>='), 'hint' => 'cPanel → MultiPHP Manager → choose PHP 8.3 for this domain.']];
+        $checks = [['label' => __('PHP 8.3 or newer (you have :version)', ['version' => PHP_VERSION]), 'ok' => version_compare(PHP_VERSION, '8.3.0', '>='), 'hint' => __('cPanel → MultiPHP Manager → choose PHP 8.3 for this domain.')]];
         foreach (self::EXTENSIONS as $extension) {
-            $checks[] = ['label' => "PHP extension: {$extension}", 'ok' => extension_loaded($extension), 'hint' => 'cPanel → Select PHP Version → Extensions → tick '.$extension.'.'];
+            $checks[] = ['label' => __('PHP extension: :name', ['name' => $extension]), 'ok' => extension_loaded($extension), 'hint' => __('cPanel → Select PHP Version → Extensions → tick :name.', ['name' => $extension])];
         }
-        $checks[] = ['label' => 'Database driver: MySQL (pdo_mysql) or SQLite (pdo_sqlite)', 'ok' => extension_loaded('pdo_mysql') || extension_loaded('pdo_sqlite'), 'hint' => 'Enable pdo_mysql in Select PHP Version → Extensions.'];
+        $checks[] = ['label' => __('Database driver: MySQL (pdo_mysql) or SQLite (pdo_sqlite)'), 'ok' => extension_loaded('pdo_mysql') || extension_loaded('pdo_sqlite'), 'hint' => __('Enable pdo_mysql in Select PHP Version → Extensions.')];
         foreach (['storage' => storage_path(), 'bootstrap/cache' => base_path('bootstrap/cache'), '.env file' => base_path('.env')] as $name => $path) {
-            $checks[] = ['label' => "Writable: {$name}", 'ok' => is_writable($path), 'hint' => 'File Manager → right click → Change Permissions → 755 for folders, 644/600 for files.'];
+            $checks[] = ['label' => __('Writable: :name', ['name' => $name]), 'ok' => is_writable($path), 'hint' => __('File Manager → right click → Change Permissions → 755 for folders, 644/600 for files.')];
         }
 
         return $checks;

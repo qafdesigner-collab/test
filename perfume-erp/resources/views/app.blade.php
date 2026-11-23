@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Atelier · Perfume ERP</title>
-    <script>try{document.documentElement.dataset.theme=localStorage.getItem('atelier-theme')||'light';var l=localStorage.getItem('atelier-lang');if(l==='ar'||l==='ur'){document.documentElement.lang=l;document.documentElement.dir='rtl'}}catch(e){document.documentElement.dataset.theme='light'}</script>
+    <script>try{document.documentElement.dataset.theme=localStorage.getItem('atelier-theme')||'light';var l=localStorage.getItem('atelier-lang');if(l==='ar'){document.documentElement.lang=l;document.documentElement.dir='rtl'}}catch(e){document.documentElement.dataset.theme='light'}</script>
     <link rel="stylesheet" href="/assets/app.css?v={{ config('erp.version') }}">
     {{-- Modules share one global scope and load in this order; main.js starts the app. --}}
     @foreach (['core', 'shell', 'dashboard', 'catalogue', 'inventory', 'sales', 'pos', 'manufacturing', 'projects', 'customers', 'reports', 'settings', 'tables', 'i18n-dict', 'i18n', 'main'] as $module)

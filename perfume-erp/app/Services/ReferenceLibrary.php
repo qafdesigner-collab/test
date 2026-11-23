@@ -43,7 +43,7 @@ final class ReferenceLibrary
         }
         if (! isset($map['brand'], $map['name'])) {
             fclose($handle);
-            throw ValidationException::withMessages(['file' => 'The first row must be a header with at least "brand" and "name" columns. Download the template to see the layout.']);
+            throw ValidationException::withMessages(['file' => __('The first row must be a header with at least "brand" and "name" columns. Download the template to see the layout.')]);
         }
 
         $existing = DB::table('references')->get(['id', 'brand', 'name'])->keyBy(fn ($r) => mb_strtolower(trim($r->brand)).'|'.mb_strtolower(trim($r->name)));
