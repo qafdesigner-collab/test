@@ -16,6 +16,7 @@ body { @apply bg-slate-50 text-slate-800 antialiased; }
 @keyframes shake { 0%,100% { transform: translateX(0) } 20%,60% { transform: translateX(-10px) } 40%,80% { transform: translateX(10px) } }
 @keyframes confetti-fall { 0% { transform: translateY(-10vh) rotate(0) } 100% { transform: translateY(110vh) rotate(720deg) } }
 @keyframes pop-in { 0% { transform: scale(.3); opacity: 0 } 70% { transform: scale(1.15) } 100% { transform: scale(1); opacity: 1 } }
+@keyframes cheer { 0% { transform: translateY(20px) scale(.4); opacity: 0 } 25% { transform: translateY(0) scale(1.2); opacity: 1 } 70% { transform: translateY(-30px) scale(1); opacity: 1 } 100% { transform: translateY(-70px) scale(.9); opacity: 0 } }
 @keyframes bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; } }
 @keyframes drift { 0% { transform: translateX(-20vw) } 100% { transform: translateX(120vw) } }

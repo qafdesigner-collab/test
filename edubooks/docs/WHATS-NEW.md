@@ -1,3 +1,18 @@
+# What's new in Knowledge Gate 1.4.16
+
+## 🎮 Games look and sound more real
+- **Natural voice in every game.** Instructions, words and praise (“Pop the letter B!”, “Well done!”) are spoken with the natural voice (when installed — Settings → Natural voice), otherwise with the device voice.
+- **Real sound effects** (free CC0 sounds, built into the LMS — nothing is loaded from outside):
+  - a happy chime for every correct step and a soft “oops” for a wrong one in **all games**;
+  - **applause** at the end (bigger with a fanfare for ⭐⭐⭐);
+  - a **real bubble “plop”** in Bubble Pop (bigger bubbles sound deeper), a coin sound for stars and a special sound for 3 right in a row;
+  - **chalk scratching** in Air Writing, a **pencil** sound in Tracing and a **crayon** sound in Colouring — they follow how fast the child moves;
+  - a soft room echo on all sounds; the 🔊 button turns everything off.
+- **More real looks:**
+  - Bubble Pop: real **soap bubbles** — clear, with a rainbow shimmer, shiny highlights and a wobble — that burst into **water droplets**;
+  - Air Writing: real **chalk** on the board — grainy, dusty lines and falling chalk dust;
+  - every game: a big **⭐ +1** pops up for each correct answer.
+
 # What's new in Knowledge Gate 1.4.15
 
 ## 🎤 Read aloud on book pages — and the teacher answers

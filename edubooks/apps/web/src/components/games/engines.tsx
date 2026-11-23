@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/components/ui';
 import { useT } from '@/lib/i18n';
+import { sfx } from '@/lib/sfx';
 import { Tracing } from './tracing';
 import { Coloring } from './coloring';
 import { AirWriting, BubblePop, ShowFingers } from './camera';
@@ -28,7 +29,7 @@ export const shuffle = <T,>(a: T[]): T[] => { const b = [...a]; for (let i = b.l
 const rand = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
 const isPic = (s: string) => /\p{Extended_Pictographic}/u.test(s) && s.length <= 4;
 const TILE = 'focus-ring select-none rounded-3xl font-extrabold shadow-[0_6px_0_rgba(0,0,0,0.12)] transition active:translate-y-1 active:shadow-none motion-reduce:transition-none';
-function useShake() { const [k, setK] = useState<string | null>(null); return { shaking: k, shake: (id: string) => { setK(id); setTimeout(() => setK(null), 450); } }; }
+function useShake() { const [k, setK] = useState<string | null>(null); return { shaking: k, shake: (id: string) => { sfx.wrong(); setK(id); setTimeout(() => setK(null), 450); } }; }
 function Big({ children }: { children: React.ReactNode }) { const { t } = useT(); return <p className="mb-6 text-center text-2xl font-extrabold text-slate-800 sm:text-3xl">{typeof children === 'string' ? t(children) : children}</p>; }
 
 // ---------- 1 & 2: matching (alphabet / picture-word) ----------

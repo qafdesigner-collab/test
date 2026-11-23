@@ -5,6 +5,8 @@ import { cn } from '@/components/ui';
 import { ENGINE_INFO, ENGINES, Engine, maxScore } from './engines';
 import { Mascot } from './mascot';
 import { useT } from '@/lib/i18n';
+import { preloadGameSounds, setGameSound, sfx } from '@/lib/sfx';
+import { speakText, stopVoice } from '@/lib/voice';
 
 export interface PlayResult { stars: number; best?: number; starsGained?: number; totalStars?: number; newBadges?: { key: string; label: string; emoji: string }[] }
 
@@ -21,20 +23,23 @@ export function GamePlayer({ game, onDone, preview }: { game: { engine: Engine; 
     try { if (on && root.current?.requestFullscreen && !document.fullscreenElement) void root.current.requestFullscreen().catch(() => undefined); else if (!on && document.fullscreenElement) void document.exitFullscreen(); } catch { /* the page-filling view is enough */ }
   };
   useEffect(() => { const f = () => { if (!document.fullscreenElement) setFull(false); }; document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f); }, []);
-  const say = useCallback((t: string) => {
-    if (!sound || typeof window === 'undefined' || !window.speechSynthesis) return;
-    try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.rate = 0.85; u.pitch = 1.1; window.speechSynthesis.speak(u); } catch { /* no voice: the game still works */ }
-  }, [sound]);
+  // the natural voice (or the device voice when it is not installed) for instructions, words and praise
+  const say = useCallback((t: string) => { if (!sound || typeof window === 'undefined' || !t?.trim()) return; void speakText(t).catch(() => undefined); }, [sound]);
+  useEffect(() => { setGameSound(sound); if (!sound) stopVoice(); }, [sound]);
+  // a happy sound for every step done right
+  const lastDone = useRef(0);
+  const [cheer, setCheer] = useState(0);
+  const onProgress = useCallback((d: number, total: number) => { if (d > lastDone.current) { sfx.correct(); setCheer((c) => c + 1); } lastDone.current = d; setProgress([d, total]); }, []);
   const Engine = ENGINES[game.engine]; const info = ENGINE_INFO[game.engine]; const max = maxScore(game.engine, game.content);
-  const start = () => { if (camera) goFull(true); setPhase('play'); setRun(run + 1); setResult(null); started.current = Date.now(); say(game.instructions || game.title); };
+  const start = () => { preloadGameSounds(); sfx.whoosh(); lastDone.current = 0; if (camera) goFull(true); setPhase('play'); setRun(run + 1); setResult(null); started.current = Date.now(); say(game.instructions || game.title); };
   const finish = async (score: number) => {
     const local = { stars: score / max >= 0.9 ? 3 : score / max >= 0.6 ? 2 : score > 0 ? 1 : 0 };
-    setPhase('done'); setResult({ ...local, score, max });
+    setPhase('done'); setResult({ ...local, score, max }); sfx.finish(local.stars);
     const r = await onDone?.(score, Date.now() - started.current).catch(() => undefined);
     if (r) setResult({ ...local, ...r, score, max });
     say(local.stars === 3 ? 'Amazing! Three stars!' : local.stars ? 'Well done!' : 'Good try! Play again?');
   };
-  useEffect(() => () => window.speechSynthesis?.cancel(), []);
+  useEffect(() => () => stopVoice(), []);
   return (
     <div ref={root} className={cn('relative', full && 'fixed inset-0 z-50 flex flex-col overflow-y-auto bg-gradient-to-b from-sky-50 to-amber-50 p-2 sm:p-4')}
       style={{ ['--game-chrome' as any]: full ? '275px' : '380px' }}>
@@ -44,7 +49,7 @@ export function GamePlayer({ game, onDone, preview }: { game: { engine: Engine; 
           {phase === 'play' && <div className="mt-1 h-3 overflow-hidden rounded-full bg-white" role="progressbar" aria-valuenow={progress[0]} aria-valuemax={progress[1]}>
             <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-pink-500 transition-all" style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} /></div>}</div>
         <button onClick={() => goFull(!full)} aria-label={full ? t('Exit full screen') : t('Full screen')} title={full ? t('Exit full screen') : t('Full screen')} className="focus-ring rounded-2xl bg-white p-3 shadow">{full ? <Minimize className="size-6" /> : <Maximize className="size-6" />}</button>
-        <button onClick={() => { setSound(!sound); window.speechSynthesis?.cancel(); }} aria-label={sound ? t('Sound off') : t('Sound on')} className="focus-ring rounded-2xl bg-white p-3 shadow">{sound ? <Volume2 className="size-6" /> : <VolumeX className="size-6" />}</button>
+        <button onClick={() => setSound(!sound)} aria-label={sound ? t('Sound off') : t('Sound on')} className="focus-ring rounded-2xl bg-white p-3 shadow">{sound ? <Volume2 className="size-6" /> : <VolumeX className="size-6" />}</button>
       </div>
       {phase === 'start' && (
         <div className="flex flex-col items-center gap-6 rounded-[2rem] bg-white/80 p-8 text-center shadow-sm">
@@ -53,7 +58,9 @@ export function GamePlayer({ game, onDone, preview }: { game: { engine: Engine; 
           {preview && <p className="text-sm text-slate-500">{t('Preview — scores are not saved.')}</p>}
         </div>
       )}
-      {phase === 'play' && <div key={run} className={cn('rounded-[2rem] bg-white/60', full || camera ? 'p-2 sm:p-4' : 'p-4 sm:p-8')}><Engine content={game.content} onFinish={finish} say={say} onProgress={(d, t) => setProgress([d, t])} /></div>}
+      {phase === 'play' && cheer > 0 && <div key={`cheer-${cheer}`} aria-hidden className="pointer-events-none fixed inset-x-0 top-1/3 z-[60] flex justify-center">
+        <span className="text-6xl font-black text-amber-400 drop-shadow-[0_3px_0_rgba(0,0,0,0.15)] motion-safe:animate-[cheer_0.9s_ease-out_both]">⭐ +1</span></div>}
+      {phase === 'play' && <div key={run} className={cn('rounded-[2rem] bg-white/60', full || camera ? 'p-2 sm:p-4' : 'p-4 sm:p-8')}><Engine content={game.content} onFinish={finish} say={say} onProgress={onProgress} /></div>}
       {phase === 'done' && result && (
         <div className="relative overflow-hidden rounded-[2rem] bg-white p-8 text-center shadow-sm">
           {result.stars > 0 && <Confetti />}

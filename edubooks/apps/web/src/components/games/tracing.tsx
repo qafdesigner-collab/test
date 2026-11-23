@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { cn } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import type { EngineProps } from './engines';
+import { pencil, sfx } from '@/lib/sfx';
 
 export type TraceGuide = 'DOTTED' | 'FADED' | 'OUTLINE';
 export type TraceFont = 'PRINT' | 'ROUND' | 'CURSIVE';
@@ -110,7 +111,8 @@ export function TracingPad({ text, guide = 'DOTTED', font = 'ROUND', lines = tru
   const clear = () => { const c = ink.current; if (c) c.getContext('2d')!.clearRect(0, 0, c.width, c.height); setResult(null); setSending(''); };
   const check = useCallback(() => {
     if (!tpl.current || !ink.current) return;
-    const r = scoreTrace(tpl.current, ink.current, !!backdrop && !paths?.length); setResult(r.stars); onChecked?.(r);
+    pencil.stop(); const r = scoreTrace(tpl.current, ink.current, !!backdrop && !paths?.length); setResult(r.stars); onChecked?.(r);
+    if (r.stars >= 3) sfx.levelUp(); else if (r.stars >= 1) sfx.star(); else sfx.wrong();
     say?.(r.stars >= 3 ? 'Excellent!' : r.stars === 2 ? 'Very good!' : r.stars === 1 ? 'Good try!' : 'Try again, follow the dots.');
   }, [backdrop, paths, onChecked, say]);
   const send = async () => {
@@ -127,8 +129,8 @@ export function TracingPad({ text, guide = 'DOTTED', font = 'ROUND', lines = tru
         <canvas ref={bg} className="absolute inset-0 size-full" />
         <canvas ref={ink} className="absolute inset-0 size-full cursor-crosshair" aria-label={t('Trace here')}
           onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); drawing.current = true; last.current = pos(e); line(last.current, last.current); }}
-          onPointerMove={(e) => { if (!drawing.current || !last.current) return; const p = pos(e); line(last.current, p); last.current = p; }}
-          onPointerUp={() => { drawing.current = false; last.current = null; }} onPointerCancel={() => { drawing.current = false; }} />
+          onPointerMove={(e) => { if (!drawing.current || !last.current) return; const p = pos(e); line(last.current, p); pencil.move(Math.hypot(p.x - last.current.x, p.y - last.current.y) / Math.max(1, w) * 20); last.current = p; }}
+          onPointerUp={() => { drawing.current = false; last.current = null; pencil.lift(); }} onPointerCancel={() => { drawing.current = false; pencil.lift(); }} />
         {result !== null && <div className="pointer-events-none absolute right-3 top-2 text-3xl drop-shadow">{result ? '⭐'.repeat(result) : '🔁'}</div>}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-2">

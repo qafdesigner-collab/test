@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import type { EngineProps } from './engines';
+import { crayon, sfx } from '@/lib/sfx';
 
 const PALETTE = ['#ef4444', '#f97316', '#facc15', '#84cc16', '#22c55e', '#06b6d4', '#3b82f6', '#6366f1', '#a855f7', '#ec4899', '#a16207', '#f5d0a9', '#94a3b8', '#111827', '#ffffff'];
 type Tool = 'fill' | 'brush' | 'eraser';
@@ -46,7 +47,7 @@ export function ColoringBoard({ image, onDone, say, doneLabel }: { image: string
     const start = y * W + x; if (walls[start]) return;
     const sr = d[start * 4], sg = d[start * 4 + 1], sb = d[start * 4 + 2]; if (sr === R && sg === G && sb === B) return;
     const same = (p: number) => !walls[p] && Math.abs(d[p * 4] - sr) < 40 && Math.abs(d[p * 4 + 1] - sg) < 40 && Math.abs(d[p * 4 + 2] - sb) < 40;
-    save(); const stack = [start]; const seen = new Uint8Array(W * H);
+    save(); sfx.pop(2.2); const stack = [start]; const seen = new Uint8Array(W * H);
     while (stack.length) {
       const p = stack.pop()!; if (seen[p] || !same(p)) continue; seen[p] = 1;
       d[p * 4] = R; d[p * 4 + 1] = G; d[p * 4 + 2] = B; d[p * 4 + 3] = 255;
@@ -60,7 +61,7 @@ export function ColoringBoard({ image, onDone, say, doneLabel }: { image: string
   };
   const finish = () => {
     const out = document.createElement('canvas'); out.width = W; out.height = H; const g = out.getContext('2d')!; g.drawImage(color.current!, 0, 0); g.drawImage(lines.current!, 0, 0);
-    say?.('Beautiful colours!'); onDone?.(out.toDataURL('image/jpeg', 0.8));
+    crayon.stop(); if (!onDone) sfx.win(); say?.('Beautiful colours!'); onDone?.(out.toDataURL('image/jpeg', 0.8));
   };
   const btn = (on: boolean) => cn('rounded-2xl px-3 py-2 text-base font-bold', on ? 'bg-violet-600 text-white shadow' : 'bg-slate-100 text-slate-700');
   return (
@@ -80,8 +81,8 @@ export function ColoringBoard({ image, onDone, say, doneLabel }: { image: string
         <div className="relative touch-none select-none rounded-xl bg-white shadow-lg ring-1 ring-slate-200" style={{ width: W, height: H }}>
           <canvas ref={color} className="absolute inset-0 size-full rounded-xl"
             onPointerDown={(e) => { const p = pos(e); if (tool === 'fill') { fill(p.x, p.y); return; } (e.target as HTMLElement).setPointerCapture(e.pointerId); save(); drawing.current = true; last.current = p; stroke(p, p); }}
-            onPointerMove={(e) => { if (!drawing.current || !last.current) return; const p = pos(e); stroke(last.current, p); last.current = p; }}
-            onPointerUp={() => { drawing.current = false; last.current = null; }} />
+            onPointerMove={(e) => { if (!drawing.current || !last.current) return; const p = pos(e); stroke(last.current, p); crayon.move(Math.hypot(p.x - last.current.x, p.y - last.current.y) / Math.max(1, W) * 20); last.current = p; }}
+            onPointerUp={() => { drawing.current = false; last.current = null; crayon.lift(); }} />
           <canvas ref={lines} className="pointer-events-none absolute inset-0 size-full rounded-xl" />
         </div>
       </div>

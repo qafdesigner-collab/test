@@ -11,6 +11,7 @@ import { cn } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import type { EngineProps } from './engines';
 import { scoreTrace } from './tracing';
+import { chalk, sfx } from '@/lib/sfx';
 
 type Pt = { x: number; y: number; z?: number };
 export type Hand = { pts: Pt[]; world?: Pt[]; side: string };
@@ -54,25 +55,6 @@ export const pointing = (p: Pt[]) => {
 };
 /** The pen for air writing: the index finger up and the other three down (thumb free), from the 3D points when known. */
 export const pointingHand = (hand: Hand) => { if (hand.world?.length !== 21) return pointing(hand.pts); const f = fingerStates(hand); return f[1] === 1 && f[2] + f[3] + f[4] === 0; };
-
-// ---------- sounds (made on the device, no files) ----------
-let audio: AudioContext | null = null;
-function tone(freq: number, ms: number, type: OscillatorType = 'sine', gain = 0.12, slide = 0) {
-  try {
-    audio ??= new (window.AudioContext || (window as any).webkitAudioContext)();
-    const o = audio.createOscillator(); const g = audio.createGain(); const t = audio.currentTime;
-    o.type = type; o.frequency.setValueAtTime(freq, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), t + ms / 1000);
-    g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
-    o.connect(g).connect(audio.destination); o.start(t); o.stop(t + ms / 1000 + 0.02);
-  } catch { /* no sound on this device */ }
-}
-export const sfx = {
-  pop: () => { tone(520, 90, 'sine', 0.16, 500); setTimeout(() => tone(900, 70, 'triangle', 0.08), 40); },
-  good: () => { tone(660, 120, 'triangle'); setTimeout(() => tone(880, 160, 'triangle'), 110); },
-  bad: () => tone(180, 220, 'sawtooth', 0.06, -60),
-  win: () => [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 180, 'triangle', 0.12), i * 120)),
-  tick: () => tone(1200, 30, 'square', 0.03),
-};
 
 /** The camera with hand tracking. Hands come back mirrored (like a mirror), with x and y from 0 to 1. The picture itself is never shown. */
 export function useHands(enabled = true) {
@@ -196,6 +178,30 @@ function drawScene(g: CanvasRenderingContext2D, w: number, h: number, scene: Sce
   }
 }
 
+/** A real-looking soap bubble: almost clear, a thin rainbow skin at the edge, two shiny window reflections, a gentle wobble. */
+function drawSoapBubble(g: CanvasRenderingContext2D, b: { x: number; y: number; r: number; hue: number; wob: number; label: string }, now: number, k: number) {
+  const t = now / 1000 + b.wob; const sx = 1 + Math.sin(t * 3.1) * 0.035, sy = 1 - Math.sin(t * 3.1) * 0.035;
+  g.save(); g.translate(b.x, b.y); g.scale(sx, sy);
+  // body: clear in the middle, coloured film towards the edge
+  const body = g.createRadialGradient(0, 0, b.r * 0.2, 0, 0, b.r);
+  body.addColorStop(0, 'rgba(255,255,255,0.05)'); body.addColorStop(0.7, `hsla(${(b.hue + 40) % 360},90%,85%,0.12)`); body.addColorStop(0.92, `hsla(${b.hue},95%,70%,0.35)`); body.addColorStop(1, 'rgba(255,255,255,0.55)');
+  g.beginPath(); g.arc(0, 0, b.r, 0, Math.PI * 2); g.fillStyle = body; g.fill();
+  // the rainbow skin, slowly turning
+  const ang = t * 0.6;
+  for (let i = 0; i < 3; i++) {
+    g.beginPath(); g.arc(0, 0, b.r * (0.93 - i * 0.025), ang + i * 2.1, ang + i * 2.1 + 1.6);
+    g.strokeStyle = `hsla(${(b.hue + i * 110 + now / 30) % 360},95%,65%,0.45)`; g.lineWidth = b.r * 0.07; g.lineCap = 'round'; g.stroke();
+  }
+  g.beginPath(); g.arc(0, 0, b.r, 0, Math.PI * 2); g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 1.6 * k; g.stroke();
+  // window reflections
+  g.fillStyle = 'rgba(255,255,255,0.85)';
+  g.beginPath(); g.ellipse(-b.r * 0.38, -b.r * 0.42, b.r * 0.2, b.r * 0.11, -0.7, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(255,255,255,0.45)'; g.beginPath(); g.ellipse(b.r * 0.42, b.r * 0.4, b.r * 0.09, b.r * 0.05, -0.7, 0, Math.PI * 2); g.fill();
+  // the letter, number or picture inside
+  g.font = `800 ${b.label.length > 2 ? b.r * 0.55 : b.r * 0.9}px "Andika", system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = b.r * 0.12; g.strokeStyle = 'rgba(255,255,255,0.9)'; g.strokeText(b.label, 0, b.r * 0.05); g.fillStyle = '#1e3a8a'; g.fillText(b.label, 0, b.r * 0.05);
+  g.restore();
+}
 type Fx = { x: number; y: number; vx: number; vy: number; life: number; color: string; text?: string; size: number };
 function stepFx(g: CanvasRenderingContext2D, fx: Fx[], dt: number, k: number) {
   for (const p of fx) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 600 * k * dt * (p.text ? 0 : 1); }
@@ -240,7 +246,7 @@ function Stage({ cam, ready, setReady, children }: { cam: Cam; ready: boolean; s
       if (size < 0.09) { since = null; setSeen(0); setTip('Come a little closer.'); return; }
       if (size > 0.38) { since = null; setSeen(0); setTip('Move back a little.'); return; }
       since ??= Date.now(); const p = Math.min(1, (Date.now() - since) / 900); setSeen(p); setTip('Great — keep your hand there!');
-      if (p >= 1) { sfx.good(); setReady(true); }
+      if (p >= 1) { sfx.correct(); setReady(true); }
     }, 120);
     return () => clearInterval(k);
   }, [ready, cam.status, cam.hands, cam.light, setReady]);
@@ -285,7 +291,7 @@ export function BubblePop({ content, onFinish, say, onProgress }: EngineProps) {
   const readyRef = useRef(false); readyRef.current = ready;
   useEffect(() => { if (content.task) say(content.task); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { onProgress?.(Math.min(score, goal), goal); }, [score, goal, onProgress]);
-  const finish = useCallback((won: boolean) => { if (st.current.over) return; st.current.over = true; setOver(true); if (won) sfx.win(); setTimeout(() => onFinish(Math.min(st.current.score, goal)), 1600); }, [goal, onFinish]);
+  const finish = useCallback((won: boolean) => { if (st.current.over) return; st.current.over = true; setOver(true); setTimeout(() => onFinish(Math.min(st.current.score, goal)), 1600); }, [goal, onFinish]);
   useEffect(() => {
     let raf = 0; let prev = performance.now();
     const loop = (now: number) => {
@@ -315,20 +321,15 @@ export function BubblePop({ content, onFinish, say, onProgress }: EngineProps) {
         if (!s.over && readyRef.current && tips.some((p) => Math.hypot(p.x - b.x, p.y - b.y) < b.r * 1.15)) {
           const by = b.y; b.y = -9999; // popped
           if (b.ok) {
-            s.score++; s.streak++; setScore(s.score); setStreak(s.streak); sfx.pop(); say(b.label);
-            burst(s.fx, b.x, by, k, [`hsl(${b.hue},90%,60%)`, '#fff', '#fde047']);
+            s.score++; s.streak++; setScore(s.score); setStreak(s.streak); sfx.pop(b.r / (Math.min(w, h) * 0.085)); if (s.streak >= 3 && s.streak % 3 === 0) sfx.streak(); else sfx.star(); say(b.label);
+            burst(s.fx, b.x, by, k, ['rgba(255,255,255,0.95)', `hsla(${b.hue},90%,75%,0.9)`, 'rgba(186,230,253,0.95)'], 22);
             floatText(s.fx, b.x, by, s.streak >= 3 ? `🔥 ${s.streak}` : '+1', '#16a34a', k);
             if (s.score >= goal) finish(true);
-          } else { s.streak = 0; setStreak(0); sfx.bad(); s.shake = 1; floatText(s.fx, b.x, by, '✗', '#dc2626', k); }
+          } else { s.streak = 0; setStreak(0); sfx.pop(1.4); sfx.wrong(); s.shake = 1; floatText(s.fx, b.x, by, '✗', '#dc2626', k); }
         }
       }
       s.bubbles = s.bubbles.filter((b) => b.y > -b.r * 2);
-      for (const b of s.bubbles) {
-        const grad = g.createRadialGradient(b.x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.1, b.x, b.y, b.r);
-        grad.addColorStop(0, 'rgba(255,255,255,0.95)'); grad.addColorStop(0.5, `hsla(${b.hue},90%,75%,0.6)`); grad.addColorStop(1, `hsla(${b.hue},90%,55%,0.85)`);
-        g.beginPath(); g.arc(b.x, b.y, b.r, 0, Math.PI * 2); g.fillStyle = grad; g.fill(); g.lineWidth = 3 * k; g.strokeStyle = 'rgba(255,255,255,0.95)'; g.stroke();
-        g.font = `800 ${b.label.length > 2 ? b.r * 0.55 : b.r * 0.9}px "Andika", system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#1e293b'; g.fillText(b.label, b.x, b.y + b.r * 0.05);
-      }
+      for (const b of s.bubbles) drawSoapBubble(g, b, now, k);
       g.restore();
       s.fx = stepFx(g, s.fx, dt, k);
       cam.hands.current.forEach((hd, i) => drawHand(g, hd.pts, w, h, i, 0.95));
@@ -366,9 +367,9 @@ export function ShowFingers({ content, onFinish, say, onProgress }: EngineProps)
   const r = rounds[k];
   useEffect(() => { if (!ready) return; onProgress?.(k, rounds.length); if (r) say(/^\d+$/.test(r.show) ? `Show me ${r.show}` : r.show); }, [k, ready]); // eslint-disable-line react-hooks/exhaustive-deps
   const next = useCallback((ok: boolean) => {
-    if (ok) { right.current++; sfx.good(); const f = fit(); if (f) for (let i = 0; i < 4; i++) burst(fx.current, f.w * (0.2 + i * 0.2), f.h * 0.3, f.k, ['#f472b6', '#60a5fa', '#34d399', '#fbbf24'], 18); }
+    if (ok) { right.current++; sfx.correct(); const f = fit(); if (f) for (let i = 0; i < 4; i++) burst(fx.current, f.w * (0.2 + i * 0.2), f.h * 0.3, f.k, ['#f472b6', '#60a5fa', '#34d399', '#fbbf24'], 18); }
     setDone(ok ? 'ok' : 'skip'); if (ok) say(['Great!', 'Well done!', 'Yes!'][Math.floor(Math.random() * 3)]);
-    setTimeout(() => { setDone(''); setHold(0); since.current = null; miss.current = null; hist.current = []; if (k + 1 < rounds.length) setK(k + 1); else { sfx.win(); onFinish(right.current); } }, 1400);
+    setTimeout(() => { setDone(''); setHold(0); since.current = null; miss.current = null; hist.current = []; if (k + 1 < rounds.length) setK(k + 1); else onFinish(right.current); }, 1400);
   }, [k, rounds.length, onFinish, say, fit]);
   useEffect(() => {
     let raf = 0; let prev = performance.now();
@@ -407,7 +408,7 @@ export function ShowFingers({ content, onFinish, say, onProgress }: EngineProps)
         {hold > 0 && !done && <div className="absolute inset-x-6 top-3 h-4 overflow-hidden rounded-full bg-white/70 ring-2 ring-white"><div className="h-full bg-emerald-500" style={{ width: `${hold * 100}%` }} /></div>}
         {done && <div className="absolute inset-0 grid place-items-center text-8xl drop-shadow">{done === 'ok' ? '🎉' : '➡️'}</div>}</Stage>
       <div className="flex flex-wrap justify-center gap-1.5" aria-label={t('Or tap the number')}>
-        {Array.from({ length: 11 }, (_, n) => <button key={n} type="button" disabled={!!done} onClick={() => (n === r.answer ? next(true) : (sfx.bad(), say('Try again')))}
+        {Array.from({ length: 11 }, (_, n) => <button key={n} type="button" disabled={!!done} onClick={() => (n === r.answer ? next(true) : (sfx.wrong(), say('Try again')))}
           className="size-11 rounded-2xl bg-white text-xl font-black text-slate-700 shadow ring-1 ring-slate-200 hover:bg-amber-50 disabled:opacity-50">{n}</button>)}
         <button type="button" disabled={!!done} onClick={() => next(false)} className="rounded-2xl bg-slate-100 px-4 text-sm font-bold text-slate-600">{t('Skip')} ⏭</button>
       </div>
@@ -448,25 +449,38 @@ export function AirWriting({ content, onFinish, say, onProgress }: EngineProps) 
     for (const x of [ink.current!, top.current!]) { x.width = size.w; x.height = size.h; }
     setStars(null);
   }, [size, item]);
+  // real chalk: a slightly see-through line with a dusty, grainy edge and little gaps where the chalk skips
+  const dust = useRef<{ x: number; y: number; vy: number; life: number }[]>([]);
   const line = (a: { x: number; y: number }, b: { x: number; y: number }) => {
-    const g = ink.current!.getContext('2d')!; g.strokeStyle = '#fde047'; g.shadowColor = 'rgba(253,224,71,0.6)'; g.shadowBlur = penW * 0.6;
-    g.lineWidth = penW; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+    const g = ink.current!.getContext('2d')!; const len = Math.hypot(b.x - a.x, b.y - a.y);
+    g.globalCompositeOperation = 'source-over'; g.strokeStyle = 'rgba(254,249,195,0.82)'; g.lineWidth = penW; g.lineCap = 'round'; g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.5)';
+    for (let i = 0; i < Math.max(2, len / 2); i++) { const f = Math.random(); const x = a.x + (b.x - a.x) * f + (Math.random() - 0.5) * penW * 1.2, y = a.y + (b.y - a.y) * f + (Math.random() - 0.5) * penW * 1.2; g.fillRect(x, y, 1.5, 1.5); }
+    g.globalCompositeOperation = 'destination-out'; g.fillStyle = 'rgba(0,0,0,0.55)';
+    for (let i = 0; i < Math.max(3, len); i++) { const f = Math.random(); const x = a.x + (b.x - a.x) * f + (Math.random() - 0.5) * penW, y = a.y + (b.y - a.y) * f + (Math.random() - 0.5) * penW; g.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2); }
+    g.globalCompositeOperation = 'source-over';
+    if (Math.random() < 0.5) dust.current.push({ x: b.x + (Math.random() - 0.5) * penW, y: b.y, vy: 20 + Math.random() * 40, life: 1 });
   };
   // writing with the finger in the air; the cartoon hand and the chalk tip are drawn on a top layer
   useEffect(() => {
     let raf = 0;
     const loop = () => {
       const tg = top.current?.getContext('2d'); const hd = cam.hands.current[0];
-      if (tg && size.w) tg.clearRect(0, 0, size.w, size.h);
+      if (tg && size.w) {
+        tg.clearRect(0, 0, size.w, size.h);
+        dust.current = dust.current.filter((d) => (d.life -= 0.02) > 0); tg.fillStyle = 'rgba(255,255,255,0.6)';
+        for (const d of dust.current) { d.y += d.vy / 60; tg.globalAlpha = d.life; tg.fillRect(d.x, d.y, 2, 2); } tg.globalAlpha = 1;
+      }
       if (hd && size.w && ready && stars === null) {
         const raw = { x: hd.pts[8].x * size.w, y: hd.pts[8].y * size.h };
         const s = smooth.current ? { x: smooth.current.x * 0.55 + raw.x * 0.45, y: smooth.current.y * 0.55 + raw.y * 0.45 } : raw; smooth.current = s;
         const down = pointingHand(hd); setPen((x) => (x === down ? x : down));
-        if (down) { if (last.current) line(last.current, s); last.current = s; } else last.current = null;
+        if (down) { if (last.current) { line(last.current, s); chalk.move(Math.hypot(s.x - last.current.x, s.y - last.current.y) / size.w * 20); } last.current = s; } else { last.current = null; chalk.lift(); }
         if (tg) {
           drawHand(tg, hd.pts, size.w, size.h, 0, 0.45);
-          tg.beginPath(); tg.arc(s.x, s.y, penW * 0.7, 0, Math.PI * 2); tg.fillStyle = down ? '#fde047' : 'rgba(255,255,255,0.5)'; tg.fill();
-          tg.lineWidth = 3; tg.strokeStyle = down ? '#ca8a04' : '#fff'; tg.stroke();
+          tg.beginPath(); tg.arc(s.x, s.y, penW * 0.7, 0, Math.PI * 2); tg.fillStyle = down ? '#fefce8' : 'rgba(255,255,255,0.35)'; tg.fill();
+          tg.lineWidth = 3; tg.strokeStyle = down ? '#eab308' : '#fff'; tg.stroke();
         }
       } else { last.current = null; smooth.current = null; }
       raf = requestAnimationFrame(loop);
@@ -474,15 +488,16 @@ export function AirWriting({ content, onFinish, say, onProgress }: EngineProps) 
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [size, stars, ready]); // eslint-disable-line react-hooks/exhaustive-deps
-  const clear = () => { const c = ink.current; if (c) c.getContext('2d')!.clearRect(0, 0, c.width, c.height); setStars(null); };
+  useEffect(() => () => chalk.stop(), []);
+  const clear = () => { const c = ink.current; if (c) c.getContext('2d')!.clearRect(0, 0, c.width, c.height); setStars(null); sfx.whoosh(); };
   const check = () => {
     if (!tpl.current || !ink.current) return;
-    const r = scoreTrace(tpl.current, ink.current); setStars(r.stars);
+    chalk.stop(); const r = scoreTrace(tpl.current, ink.current); setStars(r.stars);
     say(r.stars >= 3 ? 'Excellent!' : r.stars === 2 ? 'Very good!' : r.stars === 1 ? 'Good try!' : 'Try again!');
     if (r.stars >= 1) {
-      sfx.good(); best.current[k] = r.stars;
-      setTimeout(() => { if (k + 1 < items.length) setK(k + 1); else { sfx.win(); onFinish(best.current.filter((x) => x >= 1).length); } }, 1500);
-    } else sfx.bad();
+      (r.stars >= 3 ? sfx.levelUp : sfx.correct)(); best.current[k] = r.stars;
+      setTimeout(() => { if (k + 1 < items.length) setK(k + 1); else onFinish(best.current.filter((x) => x >= 1).length); }, 1500);
+    } else sfx.wrong();
   };
   const pos = (e: React.PointerEvent) => { const r = ink.current!.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
   if (!item) return <p className="text-center">{t('Nothing to write')}</p>;
@@ -496,8 +511,8 @@ export function AirWriting({ content, onFinish, say, onProgress }: EngineProps) 
           <canvas ref={ink} className="absolute inset-0 size-full" />
           <canvas ref={top} className="absolute inset-0 size-full"
             onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); mouse.current = true; last.current = pos(e); line(last.current, last.current); }}
-            onPointerMove={(e) => { if (!mouse.current || !last.current) return; const p = pos(e); line(last.current, p); last.current = p; }}
-            onPointerUp={() => { mouse.current = false; last.current = null; }} />
+            onPointerMove={(e) => { if (!mouse.current || !last.current) return; const p = pos(e); line(last.current, p); chalk.move(Math.hypot(p.x - last.current.x, p.y - last.current.y) / Math.max(1, size.w) * 20); last.current = p; }}
+            onPointerUp={() => { mouse.current = false; last.current = null; chalk.lift(); }} />
         </div>
         {ready && cam.status === 'ready' && <div className={cn('absolute start-3 top-3 rounded-full px-3 py-1 text-sm font-bold shadow', pen ? 'bg-yellow-300 text-yellow-900' : 'bg-white/90 text-slate-700')}>{pen ? `✏️ ${t('Writing')}` : `✋ ${t('Pen up')}`}</div>}
         {stars !== null && <div className="absolute end-3 top-3 text-4xl drop-shadow">{stars ? '⭐'.repeat(stars) : '🔁'}</div>}
