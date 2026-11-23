@@ -239,3 +239,44 @@ Scan trees:
 | LMS seed/`ADMIN_PASSWORD` defaults | Excluded known family |
 | LMS plaintext session tokens / no login rate limit | Excluded known family |
 | EduBooks Nest API SSRF/XSS/updater/login-as | Out of LMS tree scope; already stored #3/#9/#15/#16/#17 |
+
+---
+
+## LMS + packaging + workflows + pine + zen (2026-11-23 22:25 UTC) — NONE NEW
+
+Scan trees:
+- Node LMS `/tmp/sec-scan/edubooks/lms` (alongside EduBooks 1.4.20 @ `6604b15`)
+- Zen `/tmp/sec-scan/zen` @ `93f2588` (API 0.1.0; LMS byte-identical; no `packaging/`)
+- Workflows: `/tmp/sec-scan/edubooks/.github`, `/tmp/sec-scan/zen/.github` (no `/agent/repos/test/.github`)
+- Packaging: `/tmp/sec-scan/edubooks/edubooks/packaging` (skip known public_html updater RCE #16 + demo password)
+- Pine: `/agent/repos/test/*.pine`
+
+**Result: NONE NEW** — no new MEDIUM+ complete attack chain beyond known exclusions.
+
+### Surfaces reviewed (held)
+
+| Area | Evidence | Why held |
+|---|---|---|
+| LMS auth / IDOR | `lms/src/auth.js`, `lms/src/routes.js` | `requireRole`; `canSeeBook` / `ownUser` / `ownClass` / `myClass` / `myStudent` / `myDemo`; student assignments scoped by `class_id` |
+| LMS file serve | `routes.js:72-84` | `path.basename(m.filename)`; multer `randomBytes(16).hex` + allowlisted ext; CSP `sandbox` (no `allow-same-origin`) |
+| LMS AI | `lms/src/ai.js` | Gemini/Groq/Ollama from env only — no user-controlled URL |
+| LMS SQL / mass-assign | `routes.js` `pick`/`update` | Column names from hardcoded allowlists; values bound via `db.prepare` |
+| Zen | LMS identical; no packaging; API older 0.1.0 | Not a separate deployable product branch; prefer 1.4.20; no zen-unique MEDIUM+ chain |
+| GitHub Actions | `edubooks-ci.yml` | `permissions: contents: read`; `pull_request` only; no `secrets.*` exfil; CI dummy passwords |
+| cPanel updater unzip | `packaging/cpanel/updater.js:86-113` | Rejects `..`, absolute paths, symlinks; size/entry caps |
+| System update download | `system.controller.ts:125-142` | Known #3 (https SSRF) |
+| public_html emergency update | `public_html/index.php:167-192` | Known #16 — skipped per prompt |
+| Pine scripts | `*.pine` | Only `alert(...)`; no webhook URLs, tokens, or credentials |
+
+### Discarded this pass
+
+| Candidate | Why discarded |
+|---|---|
+| LMS seed / plaintext sessions / no login rate limit / sales all books / CSP-sandboxed HTML XSS | Explicit exclusions |
+| LMS client-reported game stars | Same family as excluded game client scores |
+| `GET /api/me` leaks AI provider name when logged out | Info only — below MEDIUM |
+| `embedded-db` restore `tar -xzf` weak path check | Needs filesystem write into `restore/` outside webroot — incomplete remote chain |
+| Update `upload` without password reauth | Staging only; `apply`/`rollback` require password; no remote swap of staging without FS write |
+| Flipbook `Access-Control-Allow-Origin: *` | Cookie-less capability URLs; known HMAC/#11 family |
+| Workflow cpanel zip artifact | Built package, not secrets |
+| TradingView `alert()` | Not a vuln per prompt |
