@@ -62,3 +62,4 @@ h1,h2,h3,.document-meta,.document-header{overflow-wrap:anywhere}
 /* 0.5: keep every menu item on one line and visible on short desktop screens */
 .nav-item{white-space:nowrap}
 @media (min-width:1181px) and (max-height:960px){.nav-item{min-height:38px;padding:8px 14px;margin-bottom:2px}.nav-separator{margin:8px 10px}.sidebar .brand{margin-bottom:14px}}
+.cron-line{white-space:pre-wrap;word-break:break-all;background:#f1f6f2;border:1px solid #d6e3dc;border-radius:10px;padding:10px 12px;font-size:12px;margin:6px 0}

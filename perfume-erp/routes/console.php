@@ -1,9 +1,10 @@
 <?php
 
 use App\Models\User;
+use App\Services\Backup;
 use App\Services\Installation;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('erp:install {--demo : Add fictional sample catalogue}', function () {
     if (User::exists()) {
@@ -34,34 +35,22 @@ Artisan::command('erp:backup {destination : Absolute destination ZIP path outsid
 
         return 1;
     }
-    if (config('database.default') !== 'sqlite') {
-        $this->error('This command supports SQLite only. Use your database-native consistent backup tools for other engines.');
+    try {
+        Backup::create($path);
+    } catch (RuntimeException $e) {
+        $this->error($e->getMessage());
 
         return 1;
     }
-    $db = storage_path('app/backup-'.bin2hex(random_bytes(6)).'.sqlite');
-    $pdo = DB::connection()->getPdo();
-    $pdo->exec('VACUUM INTO '.$pdo->quote($db));
-    $zip = new ZipArchive;
-    if ($zip->open($path, ZipArchive::CREATE | ZipArchive::EXCL) !== true) {
-        unlink($db);
-        $this->error('Cannot create backup.');
-
-        return 1;
-    }$zip->addFile($db, 'database.sqlite');
-    $dir = storage_path('app/private');
-    if (is_dir($dir)) {
-        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)) as $file) {
-            if ($file->isFile()) {
-                $zip->addFile($file->getPathname(), 'private/'.substr($file->getPathname(), strlen($dir) + 1));
-            }
-        }
-    }$zip->addFromString('RECOVERY.txt', 'Restore database.sqlite and private files only during maintenance. Keep your APP_KEY/environment separately and securely. This ZIP is unencrypted and contains confidential business data.');
-    $zip->close();
-    unlink($db);
-    chmod($path, 0600);
     $this->info('Consistent database and private assets backup created. Store securely; archive is not encrypted.');
-})->purpose('Back up SQLite and private assets without exporting credentials');
+})->purpose('Back up the database (SQLite or MySQL) and private assets without exporting credentials');
+
+Artisan::command('erp:backup-auto {--keep=14 : Number of daily backups to keep}', function () {
+    $path = Backup::rotate(max(1, (int) $this->option('keep')));
+    $this->info('Backup created: '.$path);
+})->purpose('Daily backup into storage/app/backups (use from a cPanel cron job)');
+
+Schedule::command('erp:backup-auto')->dailyAt('02:17');
 
 Artisan::command('erp:library', function () {
     $this->call('db:seed', ['--class' => 'Database\\Seeders\\InspirationLibrarySeeder', '--force' => true]);

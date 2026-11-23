@@ -3,6 +3,7 @@
 use App\Http\Controllers\ArtworkPortalController as A;
 use App\Http\Controllers\ErpController as E;
 use App\Http\Controllers\InstallController;
+use App\Http\Controllers\SystemController;
 use App\Http\Middleware\EnsureActiveUser;
 use Illuminate\Support\Facades\Route;
 
@@ -65,6 +66,9 @@ Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
         Route::post('projects/{id}/workflow', [E::class, 'projectWorkflow'])->whereNumber('id');
         Route::get('profitability', [E::class, 'profitability']);
         Route::get('export', [E::class, 'export']);
+        Route::get('system', [SystemController::class, 'status']);
+        Route::post('system/update', [SystemController::class, 'update'])->middleware('throttle:system');
+        Route::post('system/backup', [SystemController::class, 'backup'])->middleware('throttle:system');
     });
     Route::get('media/image/{id}', [E::class, 'image'])->whereNumber('id');
 });

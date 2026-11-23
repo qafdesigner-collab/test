@@ -49,17 +49,21 @@ Use this only when the main domain is used for nothing else.
 ## After installation
 
 - **Folder permissions**: folders 755, files 644. `perfume-erp/.env` should be 600 (it holds the database password).
-- **Backups**: enable cPanel → Backup (or JetBackup) for both the **home folder** and the **MySQL database**.
-  The uploaded product images and artwork are in `perfume-erp/storage/app/private`.
-  Keep `perfume-erp/.env` safe: without its `APP_KEY`, customer artwork links cannot be read.
+- **Backups**:
+  - Sign in as the owner → **Company & access → System → Download backup now** gives you a ZIP of the database and uploaded files.
+  - **Automatic daily backup**: cPanel → **Cron Jobs** → "Once Per Day" → paste the command shown in the System panel
+    (it looks like `php /home/youruser/perfume-erp/artisan erp:backup-auto`). The newest 14 backups are kept in `perfume-erp/storage/app/backups`.
+  - Also keep cPanel → Backup (or JetBackup) switched on for the home folder and the MySQL database.
+  - Keep `perfume-erp/.env` safe: it is not in the backup, and without its `APP_KEY` customer artwork links cannot be read.
+- **Restoring a backup**: cPanel → phpMyAdmin → choose the (empty) ERP database → Import → `database.sql` from the backup ZIP.
+  Copy the backup's `private` folder to `perfume-erp/storage/app/private`.
 - **Email** (optional): put your cPanel email account's SMTP details into `perfume-erp/.env` (`MAIL_MAILER=smtp`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`).
 
 ## Updating to a new version
 
-1. Back up first (files and database).
-2. Upload the new ZIP and extract it over the old files. Your `.env` and `storage` folder are not in the ZIP, so your data and settings stay.
-3. Sign in as the owner. Database updates are applied from **Company & access → System** (coming in the next release).
-   Until then, ask your host to run `php artisan migrate --force` in the `perfume-erp` folder, or use cPanel → Terminal if you have it.
+1. **Company & access → System → Download backup now.**
+2. Upload the new ZIP and extract it over the old files. Your `.env` and the data in `storage` are not in the ZIP, so your settings and files stay.
+3. Sign in as the owner → **Company & access → System**. If it shows "database update waiting", click **Apply update** and confirm with your password.
 
 ## Troubleshooting
 
