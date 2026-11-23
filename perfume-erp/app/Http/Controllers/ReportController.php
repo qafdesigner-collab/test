@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Dossiers;
 use App\Services\Profitability;
+use App\Services\ProfitLoss;
 use App\Services\Stock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -53,5 +54,20 @@ class ReportController extends ErpBaseController
                 }
             }fclose($out);
         }, 'perfume-'.$kind.'-'.date('Y-m-d').'.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    /**
+     * Monthly profit and loss for a year, or its CSV.
+     */
+    public function profitLoss(Request $r)
+    {
+        $this->allow(['manager', 'accountant']);
+        $r->validate(['year' => 'nullable|integer|between:2000,2100']);
+        $year = $r->integer('year') ?: (int) now()->format('Y');
+        if ($r->boolean('csv')) {
+            return response(ProfitLoss::csv($year), 200, ['Content-Type' => 'text/csv; charset=UTF-8', 'Content-Disposition' => 'attachment; filename="profit-and-loss-'.$year.'.csv"']);
+        }
+
+        return ProfitLoss::year($year);
     }
 }

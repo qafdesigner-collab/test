@@ -82,6 +82,7 @@ Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
         Route::post('projects/{id}/links', [DesignProjectController::class, 'projectLinks'])->whereNumber('id');
         Route::post('projects/{id}/workflow', [DesignProjectController::class, 'projectWorkflow'])->whereNumber('id');
         Route::get('profitability', [ReportController::class, 'profitability']);
+        Route::get('profit-loss', [ReportController::class, 'profitLoss']);
         Route::get('expenses', [ExpenseController::class, 'index']);
         Route::post('expenses', [ExpenseController::class, 'store']);
         Route::post('expenses/{id}/void', [ExpenseController::class, 'void'])->whereNumber('id');

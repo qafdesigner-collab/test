@@ -2592,3 +2592,22 @@ tr[hidden] { display: none; }
 .month-picker b { font-size: 17px; min-width: 150px; text-align: center; }
 tr.voided td { opacity: .55; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent); }
 tr.voided td:last-child, tr.voided td small.returned-note { text-decoration: none; opacity: 1; }
+.chart-bar-loss { fill: var(--status-critical); }
+.chart-legend { display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+.chart-legend .key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: -8px; }
+.chart-legend .key.profit { background: var(--chart-mark); }
+.chart-legend .key.loss { background: var(--status-critical); }
+td.negative { color: var(--status-critical); }
+tr.total-row td { border-top: 2px solid var(--line) !important; }
+#pl-year { width: auto; }
+.chart-bar-loss { fill: url(#loss-hatch); stroke: var(--status-critical); stroke-width: 1; }
+.loss-bg { fill: color-mix(in srgb, var(--status-critical) 25%, transparent); }
+.loss-line { stroke: var(--status-critical); stroke-width: 3; }
+.chart-legend .key.loss { background: repeating-linear-gradient(45deg, var(--status-critical) 0 2px, color-mix(in srgb, var(--status-critical) 25%, transparent) 2px 5px); }
+@media (min-width: 1181px) and (max-height: 960px) {
+  .nav-item { min-height: 34px; padding: 6px 14px; margin-bottom: 1px; }
+  .nav-separator { margin: 6px 10px; }
+  .sidebar .workspace-label { margin-bottom: 6px; }
+  .sidebar-bottom { padding-top: 8px; }
+  .sidebar .connection, .sidebar .build-badge, .theme-toggle { margin-bottom: 2px; padding-top: 2px; padding-bottom: 2px; }
+}

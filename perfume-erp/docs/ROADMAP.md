@@ -19,7 +19,7 @@ changes), browser screenshots, a rebuilt cPanel ZIP, a commit and a push to
 - [x] 1. Remove Urdu (English + Arabic only); Arabic for server messages, sign-in page and installer
 - [x] 2. UAE tax invoice: bilingual English/Arabic A4 invoice and receipt, TRN, "Tax Invoice" title, VAT summary
 - [x] 3. Expenses: record rent, salaries, utilities etc. by category, date, method and note
-- [ ] 4. Profit & loss: monthly revenue − cost of goods − expenses = net profit, with chart and export
+- [x] 4. Profit & loss: monthly revenue − cost of goods − expenses = net profit, with chart and export
 - [ ] 5. Receivables: customer statement (print/PDF) and ageing (current, 30, 60, 90+ days)
 - [ ] 6. FEFO option: sell the earliest-expiring lots first
 - [ ] 7. Final pass: full regression on SQLite and MySQL, every page in English and Arabic (desktop + mobile), cPanel install from the ZIP, updated guide and feature status

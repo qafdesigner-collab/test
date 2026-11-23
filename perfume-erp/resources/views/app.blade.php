@@ -8,7 +8,7 @@
     <script>try{document.documentElement.dataset.theme=localStorage.getItem('atelier-theme')||'light';var l=localStorage.getItem('atelier-lang');if(l==='ar'){document.documentElement.lang=l;document.documentElement.dir='rtl'}}catch(e){document.documentElement.dataset.theme='light'}</script>
     <link rel="stylesheet" href="/assets/app.css?v={{ config('erp.version') }}">
     {{-- Modules share one global scope and load in this order; main.js starts the app. --}}
-    @foreach (['core', 'shell', 'dashboard', 'catalogue', 'inventory', 'sales', 'pos', 'manufacturing', 'projects', 'customers', 'reports', 'expenses', 'settings', 'tables', 'i18n-dict', 'i18n', 'main'] as $module)
+    @foreach (['core', 'shell', 'dashboard', 'catalogue', 'inventory', 'sales', 'pos', 'manufacturing', 'projects', 'customers', 'reports', 'expenses', 'profit', 'settings', 'tables', 'i18n-dict', 'i18n', 'main'] as $module)
         <script src="/assets/js/{{ $module }}.js?v={{ config('erp.version') }}" defer></script>
     @endforeach
 </head>
