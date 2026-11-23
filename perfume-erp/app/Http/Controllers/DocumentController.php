@@ -80,6 +80,10 @@ class DocumentController extends ErpBaseController
             $r->validate(['amount' => 'required', 'method' => ['required', Rule::in(['Cash', 'Card', 'Bank'])]]);
 
             return $this->once($r, 'payment', fn () => Documents::payment($id, Amounts::parse($r->input('amount')), $r->input('method'), Auth::id()));
+        }if ($action === 'return' && $r->has('lines')) {
+            $v = $r->validate(['condition' => ['required', Rule::in(['Restock', 'Do not restock'])], 'refund_method' => ['nullable', Rule::in(['Cash', 'Card', 'Bank'])], 'lines' => 'required|array|min:1|max:100', 'lines.*.line_id' => 'required|integer', 'lines.*.quantity' => 'required']);
+
+            return $this->once($r, 'partial_return', fn () => Documents::returnLines($id, $v['lines'], $v['condition'], $v['refund_method'] ?? null, Auth::id()));
         }if ($action === 'return') {
             $r->validate(['condition' => ['required', Rule::in(['Restock', 'Do not restock'])]]);
 

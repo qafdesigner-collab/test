@@ -12,14 +12,16 @@ final class Profitability
             return null;
         }
         $cost = 0;
+        $returned = 0;
         $missing = false;
         $estimated = false;
         foreach ($lines as $line) {
+            $returned += (int) ($line->returned_subtotal_cents ?? 0);
             if ($line->cogs_cents === null) {
                 $missing = true;
 
                 continue;
-            }$cost += $line->cogs_cents;
+            }$cost += $line->cogs_cents - (int) ($line->returned_cogs_cents ?? 0);
             $allocations = is_array($line->cost_allocations) ? $line->cost_allocations : json_decode($line->cost_allocations ?? '[]', true);
             foreach ($allocations ?? [] as $allocation) {
                 if (str_contains(strtolower($allocation['cost_basis'] ?? ''), 'estimate') || ($allocation['cost_basis'] ?? '') === 'Mixed cost basis') {
@@ -28,7 +30,7 @@ final class Profitability
             }
         }
 
-        return ['revenue_cents' => $d->subtotal_cents, 'cogs_cents' => $missing ? null : $cost, 'gross_profit_cents' => $missing ? null : $d->subtotal_cents - $cost, 'estimated' => $estimated, 'active' => $d->status === 'Posted'];
+        return ['revenue_cents' => $d->subtotal_cents - $returned, 'returned_cents' => $returned, 'cogs_cents' => $missing ? null : $cost, 'gross_profit_cents' => $missing ? null : $d->subtotal_cents - $returned - $cost, 'estimated' => $estimated, 'active' => $d->status === 'Posted'];
     }
 
     public static function report(): array
@@ -57,13 +59,15 @@ final class Profitability
                     $row['purchased_milli'] += $line->quantity_milli;
                     $row['purchase_cents'] += $line->subtotal_cents;
                 } else {
-                    $row['sold_milli'] += $line->quantity_milli;
-                    $row['revenue_cents'] += $line->subtotal_cents;
+                    $netRevenue = $line->subtotal_cents - $line->returned_subtotal_cents;
+                    $row['sold_milli'] += $line->quantity_milli - $line->returned_milli;
+                    $row['revenue_cents'] += $netRevenue;
                     if ($line->cogs_cents === null) {
                         $row['missing_cost_lines']++;
                     } else {
-                        $row['cogs_cents'] += $line->cogs_cents;
-                        $row['gross_profit_cents'] += $line->subtotal_cents - $line->cogs_cents;
+                        $netCost = $line->cogs_cents - $line->returned_cogs_cents;
+                        $row['cogs_cents'] += $netCost;
+                        $row['gross_profit_cents'] += $netRevenue - $netCost;
                     }
                 }unset($row);
             }

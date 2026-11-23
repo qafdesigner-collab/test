@@ -2498,3 +2498,5 @@ tr[hidden] { display: none; }
 .checkout-summary .over { color: var(--status-critical); }
 .cart-actions { display: flex; gap: 4px; }
 @media (max-width: 520px) { .payment-row { grid-template-columns: 1fr 1fr 32px; } }
+.returned-note { display: block; color: var(--status-warning); font-size: 11px; }
+.document-total small { display: block; }

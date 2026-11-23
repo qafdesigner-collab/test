@@ -399,4 +399,50 @@ class ErpWorkflowsTest extends TestCase
 
         $this->postOnce('/api/documents/'.$quote['id'], ['action' => 'convert'])->assertUnprocessable();
     }
+
+    private function returnItems(int $documentId, array $lines, ?string $method = 'Cash')
+    {
+        return $this->postOnce('/api/documents/'.$documentId, ['action' => 'return', 'condition' => 'Restock', 'refund_method' => $method, 'lines' => $lines]);
+    }
+
+    public function test_partial_returns_on_a_paid_pos_sale_refund_and_restock(): void
+    {
+        $this->postOnce('/api/shifts', ['action' => 'open', 'amount' => '0'])->assertOk();
+        $sale = $this->postOnce('/api/documents', ['kind' => 'Sale', 'location_id' => 1, 'lines' => [['product_id' => 1, 'quantity' => '3']], 'payments' => [['method' => 'Cash', 'amount' => '375.00']]])->assertOk()->json();
+        $line = DB::table('document_lines')->where('document_id', $sale['id'])->first();
+        $stock = fn () => (int) DB::table('balances')->where(['product_id' => 1, 'location_id' => 1])->sum('quantity_milli');
+        $before = $stock();
+
+        $this->returnItems($sale['id'], [['line_id' => $line->id, 'quantity' => '4']])->assertUnprocessable();
+        $this->returnItems($sale['id'], [['line_id' => $line->id, 'quantity' => '1']], null)->assertUnprocessable();
+        $first = $this->returnItems($sale['id'], [['line_id' => $line->id, 'quantity' => '1']])->assertOk()->assertJsonPath('refund_cents', 12500)->json();
+        $this->assertSame($before + 1000, $stock());
+        $this->assertSame(12500, (int) DB::table('documents')->where('id', $first['id'])->value('cash_refund_cents'));
+        $this->getJson('/api/shifts')->assertJsonPath('shifts.0.expected_cents', 25000);
+        $this->assertSame(25000, $this->getJson('/api/dashboard')->json('sales.period.revenue_cents'));
+        $product = collect($this->getJson('/api/profitability')->json('products'))->firstWhere('product_id', 1);
+        $this->assertSame(2000, $product['sold_milli']);
+
+        $this->postOnce('/api/documents/'.$sale['id'], ['action' => 'return', 'condition' => 'Restock'])->assertUnprocessable();
+        $this->returnItems($sale['id'], [['line_id' => $line->id, 'quantity' => '2']])->assertOk()->assertJsonPath('refund_cents', 25000);
+        $this->returnItems($sale['id'], [['line_id' => $line->id, 'quantity' => '1']])->assertUnprocessable();
+        $this->assertSame(0, $this->getJson('/api/dashboard')->json('sales.period.revenue_cents'));
+        $this->getJson('/api/shifts')->assertJsonPath('shifts.0.expected_cents', 0);
+    }
+
+    public function test_partial_return_on_credit_invoices_reduces_balance_before_refunding(): void
+    {
+        $invoice = $this->postOnce('/api/documents', $this->sale(['paid' => '0', 'method' => 'Credit', 'lines' => [['product_id' => 1, 'quantity' => '2']]]))->assertOk()->json();
+        $line = DB::table('document_lines')->where('document_id', $invoice['id'])->first();
+        $this->returnItems($invoice['id'], [['line_id' => $line->id, 'quantity' => '1']], null)->assertOk()->assertJsonPath('refund_cents', 0);
+        $this->assertSame(12500, $this->getJson('/api/dashboard')->json('outstanding_cents'));
+
+        $partPaid = $this->postOnce('/api/documents', $this->sale(['paid' => '100.00', 'method' => 'Cash', 'lines' => [['product_id' => 1, 'quantity' => '2']]]))->assertOk()->json();
+        $line = DB::table('document_lines')->where('document_id', $partPaid['id'])->first();
+        $this->returnItems($partPaid['id'], [['line_id' => $line->id, 'quantity' => '1']], null)->assertOk()->assertJsonPath('refund_cents', 0);
+        $this->returnItems($partPaid['id'], [['line_id' => $line->id, 'quantity' => '1']], 'Bank')->assertOk()->assertJsonPath('refund_cents', 10000);
+        $document = DB::table('documents')->find($partPaid['id']);
+        $this->assertSame([25000, 10000], [(int) $document->returned_cents, (int) $document->refunded_cents]);
+        $this->assertSame(12500, $this->getJson('/api/dashboard')->json('outstanding_cents'));
+    }
 }

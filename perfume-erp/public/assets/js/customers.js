@@ -23,8 +23,8 @@ async function customer360(id) {
     state.customerDossier = d;
     state.currentCustomer = id;
     const posted = d.documents.filter(i => ['Sale', 'Invoice'].includes(i.kind) && i.status === 'Posted'),
-      rev = posted.reduce((n, i) => n + i.subtotal_cents, 0),
-      balance = posted.reduce((n, i) => n + i.total_cents - i.paid_cents, 0);
+      rev = posted.reduce((n, i) => n + i.subtotal_cents - (i.returned_subtotal_cents || 0), 0),
+      balance = posted.reduce((n, i) => n + i.total_cents - i.paid_cents - (i.returned_cents || 0) + (i.refunded_cents || 0), 0);
     const counts = ['Artwork approved', 'Production complete', 'Packaging ready', 'Delivered'].map((name, index) => ({
       name,
       value: d.projects.filter(p =>

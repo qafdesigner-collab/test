@@ -77,7 +77,7 @@ final class Documents
             if (in_array($kind, ['Sale', 'Invoice']) && $total > $paid) {
                 if (! $contact) {
                     self::fail('A customer is required for credit sales.');
-                }$outstanding = DB::table('documents')->where('contact_id', $contact)->whereIn('kind', ['Sale', 'Invoice'])->where('status', 'Posted')->selectRaw('COALESCE(SUM(total_cents-paid_cents),0) AS balance')->value('balance') ?? 0;
+                }$outstanding = DB::table('documents')->where('contact_id', $contact)->whereIn('kind', ['Sale', 'Invoice'])->where('status', 'Posted')->selectRaw('COALESCE(SUM(total_cents+refunded_cents-paid_cents-returned_cents),0) AS balance')->value('balance') ?? 0;
                 $outstanding = (int) $outstanding;
                 if ($outstanding + $total - $paid > $c->credit_cents) {
                     self::fail('Customer credit limit would be exceeded.');
@@ -174,6 +174,9 @@ final class Documents
             if (! $d || ! in_array($d->kind, ['Sale', 'Invoice']) || $d->status !== 'Posted') {
                 self::fail('Only a posted sale/invoice can be returned, once.');
             }
+            if ($d->returned_cents > 0) {
+                self::fail('Items from this sale were already returned. Return the remaining items line by line.');
+            }
             $cashRefund = (int) DB::table('payments')->where('document_id', $id)->where('method', 'Cash')->sum('amount_cents');
             $rid = DB::table('documents')->insertGetId(['cash_refund_cents' => $cashRefund, 'uuid' => (string) Str::uuid(), 'kind' => 'Return', 'status' => 'Posted', 'original_id' => $id, 'contact_id' => $d->contact_id, 'location_id' => $d->location_id, 'user_id' => $user, 'subtotal_cents' => $d->subtotal_cents, 'tax_cents' => $d->tax_cents, 'total_cents' => $d->total_cents, 'paid_cents' => $d->paid_cents, 'method' => $d->method, 'notes' => 'Full return: '.$condition, 'seller_snapshot' => $d->seller_snapshot, 'contact_snapshot' => $d->contact_snapshot, 'created_at' => now(), 'updated_at' => now()]);
             $num = 'RET-'.str_pad((string) $rid, 6, '0', STR_PAD_LEFT);
@@ -242,6 +245,86 @@ final class Documents
         }
 
         return [$tendered, $tendered - $cash];
+    }
+
+    /**
+     * Return some items from a posted sale or invoice.
+     *
+     * The original document keeps its figures; each line records what came back, and every
+     * sales, profit and balance total subtracts it. Money is refunded only where the customer
+     * has now paid more than the reduced total; otherwise the return lowers the amount owed.
+     *
+     * @param  list<array{line_id: int, quantity: string}>  $items
+     */
+    public static function returnLines(int $id, array $items, string $condition, ?string $refundMethod, int $user): array
+    {
+        return DB::transaction(function () use ($id, $items, $condition, $refundMethod, $user) {
+            $d = DB::table('documents')->where('id', $id)->lockForUpdate()->first();
+            if (! $d || ! in_array($d->kind, ['Sale', 'Invoice']) || $d->status !== 'Posted') {
+                self::fail('Only a posted sale or invoice can have items returned.');
+            }
+            $returnLines = [];
+            $updates = [];
+            $sub = 0;
+            $tax = 0;
+            foreach ($items as $item) {
+                $line = DB::table('document_lines')->where('document_id', $id)->where('id', $item['line_id'])->lockForUpdate()->first();
+                if (! $line) {
+                    self::fail('That item is not on this document.');
+                }
+                $q = Amounts::parse((string) $item['quantity'], 3);
+                if ($q === 0) {
+                    continue;
+                }
+                if ($q > $line->quantity_milli - $line->returned_milli) {
+                    self::fail("Only {$line->name} items that have not been returned yet can be returned.");
+                }
+                if (in_array($line->unit, ['piece', 'bottle', 'box', 'carton']) && $q % 1000) {
+                    self::fail('Counted products are returned in whole quantities.');
+                }
+                $isLast = $q === $line->quantity_milli - $line->returned_milli;
+                $lineSub = $isLast ? $line->subtotal_cents - $line->returned_subtotal_cents : Amounts::roundDivide($line->subtotal_cents * $q, $line->quantity_milli);
+                $lineTax = $isLast ? $line->tax_cents - $line->returned_tax_cents : Amounts::roundDivide($line->tax_cents * $q, $line->quantity_milli);
+                $lineCogs = $line->cogs_cents === null ? null : ($isLast ? $line->cogs_cents - $line->returned_cogs_cents : Amounts::roundDivide($line->cogs_cents * $q, $line->quantity_milli));
+                $sub += $lineSub;
+                $tax += $lineTax;
+                $updates[] = [$line, $q, $lineSub, $lineTax, $lineCogs];
+                $returnLines[] = ['product_id' => $line->product_id, 'name' => $line->name, 'unit' => $line->unit, 'quantity_milli' => $q, 'price_cents' => $line->price_cents, 'discount_cents' => $isLast ? $line->discount_cents - Amounts::roundDivide($line->discount_cents * $line->returned_milli, $line->quantity_milli) : Amounts::roundDivide($line->discount_cents * $q, $line->quantity_milli), 'tax_bp' => $line->tax_bp, 'subtotal_cents' => $lineSub, 'tax_cents' => $lineTax, 'total_cents' => $lineSub + $lineTax, 'cogs_cents' => $lineCogs, 'cost_allocations' => json_encode([['cost_basis' => 'Partial return of '.$d->number]])];
+            }
+            if (! $returnLines) {
+                self::fail('Choose at least one item to return.');
+            }
+            $total = $sub + $tax;
+            $netTotal = $d->total_cents - $d->returned_cents - $total;
+            $netPaid = $d->paid_cents - $d->refunded_cents;
+            $refund = max(0, $netPaid - $netTotal);
+            if ($refund > 0 && ! in_array($refundMethod, ['Cash', 'Card', 'Bank'], true)) {
+                self::fail('Choose how the refund is paid back: Cash, Card or Bank.');
+            }
+            $method = $refund > 0 ? $refundMethod : 'Credit';
+            $rid = DB::table('documents')->insertGetId(['uuid' => (string) Str::uuid(), 'kind' => 'Return', 'status' => 'Posted', 'original_id' => $id, 'contact_id' => $d->contact_id, 'location_id' => $d->location_id, 'user_id' => $user, 'subtotal_cents' => $sub, 'tax_cents' => $tax, 'total_cents' => $total, 'paid_cents' => $refund, 'method' => $method, 'cash_refund_cents' => $method === 'Cash' ? $refund : 0, 'notes' => 'Partial return: '.$condition, 'seller_snapshot' => $d->seller_snapshot, 'contact_snapshot' => $d->contact_snapshot, 'created_at' => now(), 'updated_at' => now()]);
+            $number = 'RET-'.str_pad((string) $rid, 6, '0', STR_PAD_LEFT);
+            DB::table('documents')->where('id', $rid)->update(['number' => $number]);
+            foreach ($returnLines as $returnLine) {
+                DB::table('document_lines')->insert($returnLine + ['document_id' => $rid]);
+            }
+            foreach ($updates as [$line, $q, $lineSub, $lineTax, $lineCogs]) {
+                DB::table('document_lines')->where('id', $line->id)->update([
+                    'returned_milli' => $line->returned_milli + $q,
+                    'returned_subtotal_cents' => $line->returned_subtotal_cents + $lineSub,
+                    'returned_tax_cents' => $line->returned_tax_cents + $lineTax,
+                    'returned_cogs_cents' => $line->returned_cogs_cents + ($lineCogs ?? 0),
+                ]);
+                $product = DB::table('products')->find($line->product_id);
+                if ($product->kind !== 'service' && $condition === 'Restock') {
+                    Stock::move($product->id, $d->location_id, $number, $q, 'Customer return', $number, $user, $lineCogs, $lineCogs === null ? 'Configured estimate' : 'Returned sale cost');
+                }
+            }
+            DB::table('documents')->where('id', $id)->update(['returned_cents' => $d->returned_cents + $total, 'refunded_cents' => $d->refunded_cents + $refund, 'updated_at' => now()]);
+            DB::table('audit')->insert(['user_id' => $user, 'action' => 'sale.partial_return', 'subject' => $number, 'details' => json_encode(['original' => $d->number, 'returned_cents' => $total, 'refund_cents' => $refund, 'refund_method' => $method, 'condition' => $condition]), 'created_at' => now()]);
+
+            return ['id' => $rid, 'number' => $number, 'returned_cents' => $total, 'refund_cents' => $refund, 'refund_method' => $method];
+        });
     }
 
     public static function fail(string $message): never

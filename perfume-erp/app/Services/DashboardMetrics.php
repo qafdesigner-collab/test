@@ -23,7 +23,7 @@ final class DashboardMetrics
 
         $trendStart = $now->copy()->subDays($trendDays - 1)->startOfDay();
         $daily = self::posted()->where('created_at', '>=', $trendStart)
-            ->selectRaw('DATE(created_at) as day, SUM(total_cents) as total, COUNT(*) as count')
+            ->selectRaw('DATE(created_at) as day, SUM(total_cents - returned_cents) as total, COUNT(*) as count')
             ->groupByRaw('DATE(created_at)')->get()->keyBy(fn ($row) => (string) $row->day);
         $trend = [];
         for ($date = $trendStart->copy(); $date <= $now; $date->addDay()) {
@@ -34,7 +34,7 @@ final class DashboardMetrics
         $top = DB::table('document_lines as l')->join('documents as d', 'd.id', '=', 'l.document_id')->join('products as p', 'p.id', '=', 'l.product_id')
             ->whereIn('d.kind', ['Sale', 'Invoice'])->where('d.status', 'Posted')->where('d.created_at', '>=', $start)
             ->groupBy('p.id', 'p.name', 'p.unit')
-            ->select('p.id', 'p.name', 'p.unit')->selectRaw('SUM(l.quantity_milli) as quantity_milli, SUM(l.subtotal_cents) as revenue_cents')
+            ->select('p.id', 'p.name', 'p.unit')->selectRaw('SUM(l.quantity_milli - l.returned_milli) as quantity_milli, SUM(l.subtotal_cents - l.returned_subtotal_cents) as revenue_cents')
             ->orderByDesc('revenue_cents')->limit(5)->get()
             ->map(fn ($row) => ['id' => (int) $row->id, 'name' => $row->name, 'unit' => $row->unit, 'quantity_milli' => (int) $row->quantity_milli, 'revenue_cents' => (int) $row->revenue_cents])->all();
 
@@ -64,11 +64,11 @@ final class DashboardMetrics
     private static function totals(Carbon $from, Carbon $to): array
     {
         $documents = self::posted()->where('created_at', '>=', $from)->where('created_at', '<', $to->copy()->addSecond())
-            ->selectRaw('COALESCE(SUM(total_cents),0) as revenue, COUNT(*) as count')->first();
+            ->selectRaw('COALESCE(SUM(total_cents - returned_cents),0) as revenue, COUNT(*) as count')->first();
         $lines = DB::table('document_lines as l')->join('documents as d', 'd.id', '=', 'l.document_id')
             ->whereIn('d.kind', ['Sale', 'Invoice'])->where('d.status', 'Posted')
             ->where('d.created_at', '>=', $from)->where('d.created_at', '<', $to->copy()->addSecond())->whereNotNull('l.cogs_cents')
-            ->selectRaw('COALESCE(SUM(l.subtotal_cents),0) as revenue, COALESCE(SUM(l.cogs_cents),0) as cogs')->first();
+            ->selectRaw('COALESCE(SUM(l.subtotal_cents - l.returned_subtotal_cents),0) as revenue, COALESCE(SUM(l.cogs_cents - l.returned_cogs_cents),0) as cogs')->first();
 
         return [
             'revenue' => (int) $documents->revenue,

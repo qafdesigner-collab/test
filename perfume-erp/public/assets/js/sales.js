@@ -20,7 +20,7 @@ async function documentsPage(purchase) {
         ['Number', 'Customer / supplier', 'Status', 'Total', 'Paid', 'Balance', 'Date'],
         docs.map(
           d =>
-            `<tr><td><button class="subtle" onclick="documentDetail(${d.id})">${esc(d.number)}</button><small>${esc(d.kind)}</small></td><td>${esc(d.contact || 'Walk-in')}</td><td>${badge(d.status)}</td><td>${money(d.total_cents)}</td><td>${money(d.paid_cents)}</td><td>${money(['Returned', 'Declined', 'Draft', 'Accepted'].includes(d.status) ? 0 : d.total_cents - d.paid_cents)}</td><td>${date(d.created_at)}</td></tr>`,
+            `<tr><td><button class="subtle" onclick="documentDetail(${d.id})">${esc(d.number)}</button><small>${esc(d.kind)}</small></td><td>${esc(d.contact || 'Walk-in')}</td><td>${badge(d.status)}</td><td>${money(d.total_cents)}</td><td>${money(d.paid_cents)}</td><td>${money(['Returned', 'Declined', 'Draft', 'Accepted'].includes(d.status) ? 0 : d.total_cents - d.paid_cents - (d.returned_cents || 0) + (d.refunded_cents || 0))}</td><td>${date(d.created_at)}</td></tr>`,
         ),
       ),
       '<a href="/api/export?type=sales" class="subtle">Export CSV ↓</a>',
@@ -138,9 +138,9 @@ async function documentDetail(id) {
         ['Item', 'Qty / unit', 'Unit price', 'Discount', 'Tax', 'Total'],
         d.lines.map(
           l =>
-            `<tr><td>${esc(l.name)}</td><td>${quantity(l.quantity_milli)} ${esc(l.unit)}</td><td>${money(l.price_cents)}</td><td>${money(l.discount_cents)}</td><td>${money(l.tax_cents)}</td><td>${money(l.total_cents)}</td></tr>`,
+            `<tr><td>${esc(l.name)}${Number(l.returned_milli) ? `<small class="returned-note">${quantity(l.returned_milli)} ${esc(l.unit)} returned</small>` : ''}</td><td>${quantity(l.quantity_milli)} ${esc(l.unit)}</td><td>${money(l.price_cents)}</td><td>${money(l.discount_cents)}</td><td>${money(l.tax_cents)}</td><td>${money(l.total_cents)}</td></tr>`,
         ),
-      )}<div class="document-total"><p>Subtotal ${money(p.subtotal_cents)} · Tax ${money(p.tax_cents)}</p><strong>${money(p.total_cents)}</strong><small>Paid ${money(p.paid_cents)} · ${p.status === 'Returned' ? 'Returned' : `Balance ${money(p.total_cents - p.paid_cents)}`}</small></div>${p.notes ? `<p class="tiny muted" style="margin-top:20px">${esc(p.notes)}</p>` : ''}<p class="doc-footer">${esc(state.boot.settings.invoice_footer || 'Thank you for your business.')}</p></article>${invoiceCostView(d)}<div class="form-actions"><button class="secondary" onclick="window.print()">Print A4 / save PDF</button>${['Sale', 'Invoice', 'Return'].includes(p.kind) ? `<button class="secondary" onclick="printReceipt(${id})">Print receipt · 80 mm</button>` : ''}${can('manager', 'accountant') && p.status === 'Draft' && p.kind === 'Quotation' ? `<button class="secondary" onclick="quotationAction(${id},'decline')">Decline</button><button class="secondary" onclick="quotationAction(${id},'accept')">Accept quotation</button>` : ''}${can('manager', 'accountant') && ['Draft', 'Accepted'].includes(p.status) && p.kind === 'Quotation' ? `<button class="primary" onclick="convertQuotation(${id})">Convert to invoice →</button>` : ''}${can('manager', 'accountant') && p.status === 'Posted' && p.kind !== 'Return' ? `${p.paid_cents < p.total_cents ? `<button class="primary" onclick="paymentDialog(${id},${p.total_cents - p.paid_cents})">Record payment</button>` : ''}${['Sale', 'Invoice'].includes(p.kind) ? `<button class="danger" onclick="returnDialog(${id})">Full return</button>` : ''}` : ''}</div>`,
+      )}<div class="document-total"><p>Subtotal ${money(p.subtotal_cents)} · Tax ${money(p.tax_cents)}</p><strong>${money(p.total_cents)}</strong>${Number(p.returned_cents) ? `<small>Items returned ${money(p.returned_cents)}${Number(p.refunded_cents) ? ' · refunded ' + money(p.refunded_cents) : ''}</small>` : ''}<small>Paid ${money(p.paid_cents)} · ${p.status === 'Returned' ? 'Returned' : `Balance ${money(p.total_cents - p.paid_cents - Number(p.returned_cents || 0) + Number(p.refunded_cents || 0))}`}</small></div>${p.notes ? `<p class="tiny muted" style="margin-top:20px">${esc(p.notes)}</p>` : ''}<p class="doc-footer">${esc(state.boot.settings.invoice_footer || 'Thank you for your business.')}</p></article>${invoiceCostView(d)}<div class="form-actions"><button class="secondary" onclick="window.print()">Print A4 / save PDF</button>${['Sale', 'Invoice', 'Return'].includes(p.kind) ? `<button class="secondary" onclick="printReceipt(${id})">Print receipt · 80 mm</button>` : ''}${can('manager', 'accountant') && p.status === 'Draft' && p.kind === 'Quotation' ? `<button class="secondary" onclick="quotationAction(${id},'decline')">Decline</button><button class="secondary" onclick="quotationAction(${id},'accept')">Accept quotation</button>` : ''}${can('manager', 'accountant') && ['Draft', 'Accepted'].includes(p.status) && p.kind === 'Quotation' ? `<button class="primary" onclick="convertQuotation(${id})">Convert to invoice →</button>` : ''}${can('manager', 'accountant') && p.status === 'Posted' && p.kind !== 'Return' ? `${p.paid_cents < p.total_cents ? `<button class="primary" onclick="paymentDialog(${id},${p.total_cents - p.paid_cents})">Record payment</button>` : ''}${['Sale', 'Invoice'].includes(p.kind) && d.lines.some(l => Number(l.quantity_milli) > Number(l.returned_milli || 0)) ? `<button class="secondary" onclick="partialReturnDialog(${id})">Return items</button>` : ''}${['Sale', 'Invoice'].includes(p.kind) && !Number(p.returned_cents) ? `<button class="danger" onclick="returnDialog(${id})">Full return</button>` : ''}` : ''}</div>`,
       true,
     );
   } catch (e) {
@@ -168,6 +168,51 @@ function paymentDialog(id, balance) {
     await api('documents/' + id, 'POST', { action: 'payment', ...Object.fromEntries(fd) }, key);
     closeModal();
     toast('Payment recorded');
+    await render();
+    await documentDetail(id);
+  });
+}
+
+/** Return some of the items on a sale or invoice. */
+async function partialReturnDialog(id) {
+  const d = await api('documents/' + id);
+  const p = d.document;
+  const open = d.lines.filter(l => Number(l.quantity_milli) > Number(l.returned_milli || 0));
+  const netTotal = p.total_cents - Number(p.returned_cents || 0);
+  const netPaid = p.paid_cents - Number(p.refunded_cents || 0);
+  modal(
+    'Return items · ' + p.number,
+    `<form><div class="notice">Enter how many of each item came back. The refund is only what the customer paid beyond the new total; on unpaid invoices the return lowers the balance instead.</div>
+    ${table(
+      ['Item', 'Sold', 'Already returned', 'Return now'],
+      open.map(
+        l =>
+          `<tr><td>${esc(l.name)}<small>${money(l.price_cents)} / ${esc(l.unit)}</small></td><td>${quantity(l.quantity_milli)}</td><td>${quantity(l.returned_milli || 0)}</td><td><input class="return-qty" data-line="${l.id}" data-max="${l.quantity_milli - (l.returned_milli || 0)}" data-sub="${l.subtotal_cents}" data-tax="${l.tax_cents}" data-qty="${l.quantity_milli}" inputmode="decimal" value="0" aria-label="Quantity of ${esc(l.name)} to return"></td></tr>`,
+      ),
+    )}
+    <div class="form-grid"><label>Returned stock condition<select name="condition">${selectOptions(['Restock', 'Do not restock'])}</select></label><label>Refund paid back by<select name="refund_method">${selectOptions(['Cash', 'Card', 'Bank'], p.method === 'Card' || p.method === 'Bank' ? p.method : 'Cash')}</select></label></div>
+    <div class="checkout-summary" id="return-summary"></div>${formActions('Record return')}</form>`,
+    true,
+  );
+  const summarise = () => {
+    let value = 0;
+    document.querySelectorAll('.return-qty').forEach(input => {
+      const q = Math.round(Number(input.value || 0) * 1000);
+      value += Math.round(((Number(input.dataset.sub) + Number(input.dataset.tax)) * q) / Number(input.dataset.qty));
+    });
+    const refund = Math.max(0, netPaid - (netTotal - value));
+    $('#return-summary').innerHTML = `<span>Returned value ${money(value)}</span><b class="${refund ? 'due' : 'ok'}">${refund ? 'Refund ' + money(refund) : 'No refund · balance reduced'}</b>`;
+  };
+  document.querySelectorAll('.return-qty').forEach(i => i.addEventListener('input', summarise));
+  summarise();
+  bindForm(async (fd, key) => {
+    const lines = [...document.querySelectorAll('.return-qty')]
+      .map(i => ({ line_id: Number(i.dataset.line), quantity: String(i.value || '0').trim() }))
+      .filter(l => Number(l.quantity) > 0);
+    if (!lines.length) throw new Error('Enter a quantity for at least one item.');
+    const r = await api('documents/' + id, 'POST', { action: 'return', condition: fd.get('condition'), refund_method: fd.get('refund_method'), lines }, key);
+    closeModal();
+    toast(`${r.number} recorded · ${r.refund_cents ? 'refund ' + money(r.refund_cents) + ' by ' + r.refund_method : 'balance reduced by ' + money(r.returned_cents)}`);
     await render();
     await documentDetail(id);
   });

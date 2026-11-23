@@ -57,6 +57,8 @@ final class Dossiers
         abort_unless($c && $c->kind === 'customer', 404);
         $projects = self::projects(DB::table('projects')->where('contact_id', $id)->orderByDesc('id')->get());
         $docs = DB::table('documents')->where('contact_id', $id)->orderByDesc('id')->get();
+        $returnedSubtotals = DB::table('document_lines')->whereIn('document_id', $docs->pluck('id'))->groupBy('document_id')->selectRaw('document_id, SUM(returned_subtotal_cents) as returned')->pluck('returned', 'document_id');
+        $docs->each(fn ($doc) => $doc->returned_subtotal_cents = (int) ($returnedSubtotals[$doc->id] ?? 0));
         $ids = DB::table('document_lines')->whereIn('document_id', $docs->pluck('id'))->pluck('product_id')->merge(collect($projects)->pluck('product_id'))->filter()->unique();
         $products = [];
         foreach ($ids as $p) {
