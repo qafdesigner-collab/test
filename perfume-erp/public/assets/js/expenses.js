@@ -6,7 +6,7 @@ async function expensesPage(month = state.expenseMonth) {
   state.expenseMonth = d.month;
   state.expenseCategories = d.categories;
   await loadLists();
-  const label = new Date(d.month + '-01T00:00:00').toLocaleDateString('en', { month: 'long', year: 'numeric' });
+  const label = new Date(d.month + '-01T00:00:00').toLocaleDateString(state.lang === 'ar' ? 'ar-AE-u-nu-latn' : 'en', { month: 'long', year: 'numeric' });
   const max = Math.max(...d.by_category.map(c => c.amount_cents), 1);
   $('#content').innerHTML =
     pageHead('Expenses', 'Rent, salaries, utilities and other running costs. Voided entries stay visible for the audit trail.', '<button class="primary" onclick="expenseDialog()">+ Record expense</button>') +

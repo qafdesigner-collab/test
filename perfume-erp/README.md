@@ -1,8 +1,10 @@
-# Atelier Perfume ERP — development release 0.4.0
+# Atelier Perfume ERP — release 0.6.0
 
-A working Laravel 13 / PHP 8.3 application for a perfume company, with a responsive browser interface and a separate database per installation. No shared demonstration password is shipped.
+A working Laravel 13 / PHP 8.3 application for a perfume company, with a responsive browser interface in English and Arabic, and a separate database per installation (MySQL/MariaDB or SQLite). No shared demonstration password is shipped.
 
-**Release status: development milestone, not the final commercial product.** See [docs/FEATURE_STATUS.md](docs/FEATURE_STATUS.md) for the exact implemented scope and remaining work. Do not substitute this build for an accepted accounting or regulatory submission system.
+**Installing on cPanel:** build the package with `bash build-cpanel.sh` (or use the provided ZIP) and follow [docs/CPANEL_INSTALL.md](docs/CPANEL_INSTALL.md). No SSH is needed.
+
+See [docs/FEATURE_STATUS.md](docs/FEATURE_STATUS.md) for the exact implemented scope and what is not included. Do not substitute this build for an accepted accounting or regulatory submission system.
 
 ## Start locally (Windows)
 

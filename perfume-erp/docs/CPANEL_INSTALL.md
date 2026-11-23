@@ -59,6 +59,20 @@ Use this only when the main domain is used for nothing else.
   Copy the backup's `private` folder to `perfume-erp/storage/app/private`.
 - **Email** (optional): put your cPanel email account's SMTP details into `perfume-erp/.env` (`MAIL_MAILER=smtp`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`).
 
+## First settings after installing
+
+Sign in as the owner and open **Company & access → Edit company**:
+
+- Company name, address, phone, email and currency (AED).
+- **TRN** and **VAT registered: Yes** if your company is registered for VAT. Invoices then print as
+  *TAX INVOICE / فاتورة ضريبية* with a VAT summary, and POS receipts as *Simplified Tax Invoice*.
+- **Company name and address in Arabic** for the bilingual invoices.
+- Logo, brand colour and the invoice footer (bank details, thanks).
+- **Stock leaves in this order:** FIFO, or FEFO if you track expiry dates (expired lots are then never sold).
+
+Each person can switch the interface between **English and العربية** from the menu (Language).
+Give products an **Arabic name** (Catalogue → Edit product) so it prints under the English name on invoices.
+
 ## Updating to a new version
 
 1. **Company & access → System → Download backup now.**

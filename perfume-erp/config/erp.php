@@ -16,6 +16,6 @@ return [
 
     'sqlite_path' => database_path('database.sqlite'),
 
-    'version' => '0.5.0-development',
+    'version' => '0.6.0',
 
 ];

@@ -35,7 +35,7 @@
             @if ($errors->any())<div class="error">{{ $errors->first() }}</div>@endif
             <button class="primary full" type="submit">{{ __('Sign in to your workspace') }} <span>{{ $arabic ? '←' : '→' }}</span></button>
         </form>
-        <p class="tiny muted">{{ __("Your company's private installation") }} · {{ __('Development build') }} {{ config('erp.version') }}</p>
+        <p class="tiny muted">{{ __("Your company's private installation") }} · {{ __('Version') }} {{ config('erp.version') }}</p>
     </main>
     <aside class="login-art">
         <div class="orb"></div>

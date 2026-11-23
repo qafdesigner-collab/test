@@ -24,7 +24,7 @@
             <div class="connection"><i></i><span>Connected to this server</span></div>
             <button type="button" class="theme-toggle" onclick="cycleTheme()" aria-label="Change colour theme"><span aria-hidden="true">◐</span> Theme: <b id="theme-name">Light</b></button>
             <button type="button" class="theme-toggle" onclick="cycleLanguage()" aria-label="Change language"><span aria-hidden="true">文</span> <span>Language:</span> <b data-no-translate id="language-name">English</b></button>
-            <div class="build-badge">Development release · {{ \Illuminate\Support\Str::before(config('erp.version'), '-') }}</div>
+            <div class="build-badge">Release · {{ config('erp.version') }}</div>
             <button class="user-card" onclick="passwordDialog()">
                 <span class="avatar" id="avatar">A</span>
                 <span><b id="user-name"></b><small id="user-role"></small></span>

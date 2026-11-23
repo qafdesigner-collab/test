@@ -15,7 +15,7 @@ async function settingsPage() {
     ) +
     panel(
       'Your installation',
-      `<div class="panel-body"><div class="detail-grid"><div><h2>${esc(s.company_name)}</h2><p class="muted">${esc(s.address)}<br>${esc(s.email)} · ${esc(s.phone)}</p><small>Currency ${esc(s.currency)} · Tax ID ${esc(s.tax_id || 'not configured')}</small></div><div class="notice">Private single-company installation.<br>Development release ${esc(state.boot.build)}.<br>Local LAN operation is supported by the server. Hybrid branch syncing, electronic invoicing and terminal drivers are not enabled.</div></div></div>`,
+      `<div class="panel-body"><div class="detail-grid"><div><h2>${esc(s.company_name)}</h2><p class="muted">${esc(s.address)}<br>${esc(s.email)} · ${esc(s.phone)}</p><small>Currency ${esc(s.currency)} · Tax ID ${esc(s.tax_id || 'not configured')}</small></div><div class="notice">Private single-company installation.<br>Release ${esc(state.boot.build)}.<br>Local LAN operation is supported by the server. Hybrid branch syncing, electronic invoicing and terminal drivers are not enabled.</div></div></div>`,
     ) +
     (system ? systemPanel(system) : '') +
     (can()

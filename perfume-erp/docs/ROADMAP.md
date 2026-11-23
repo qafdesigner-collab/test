@@ -22,4 +22,4 @@ changes), browser screenshots, a rebuilt cPanel ZIP, a commit and a push to
 - [x] 4. Profit & loss: monthly revenue − cost of goods − expenses = net profit, with chart and export
 - [x] 5. Receivables: customer statement (print/PDF) and ageing (current, 30, 60, 90+ days)
 - [x] 6. FEFO option: sell the earliest-expiring lots first
-- [ ] 7. Final pass: full regression on SQLite and MySQL, every page in English and Arabic (desktop + mobile), cPanel install from the ZIP, updated guide and feature status
+- [x] 7. Final pass: full regression on SQLite and MySQL, every page in English and Arabic (desktop + mobile), cPanel install from the ZIP, updated guide and feature status
