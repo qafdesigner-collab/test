@@ -47,7 +47,7 @@ class DocumentController extends ErpBaseController
             }
         }
 
-        return ['document' => $d, 'lines' => $lines, 'profit' => $finance ? Profitability::document($d, $lines) : null, 'payments' => DB::table('payments')->where('document_id', $id)->get(), 'quotation' => $d->quotation_id ? DB::table('documents')->select('id', 'number')->find($d->quotation_id) : null, 'purchase_order' => $d->purchase_order_id ? DB::table('documents')->select('id', 'number')->find($d->purchase_order_id) : null, 'receipts' => $d->kind === 'PurchaseOrder' ? DB::table('documents')->select('id', 'number', 'created_at', 'total_cents')->where('purchase_order_id', $d->id)->orderBy('id')->get() : [], 'invoice' => $d->kind === 'Quotation' ? DB::table('documents')->select('id', 'number')->where('quotation_id', $d->id)->first() : null, 'contact' => $d->contact_snapshot ? json_decode($d->contact_snapshot, true) : ($d->contact_id ? DB::table('contacts')->find($d->contact_id) : null)];
+        return ['document' => $d, 'lines' => $lines, 'profit' => $finance ? Profitability::document($d, $lines) : null, 'payments' => DB::table('payments')->where('document_id', $id)->get(), 'quotation' => $d->quotation_id ? DB::table('documents')->select('id', 'number')->find($d->quotation_id) : null, 'original' => $d->original_id ? DB::table('documents')->select('id', 'number', 'kind')->find($d->original_id) : null, 'purchase_order' => $d->purchase_order_id ? DB::table('documents')->select('id', 'number')->find($d->purchase_order_id) : null, 'receipts' => $d->kind === 'PurchaseOrder' ? DB::table('documents')->select('id', 'number', 'created_at', 'total_cents')->where('purchase_order_id', $d->id)->orderBy('id')->get() : [], 'invoice' => $d->kind === 'Quotation' ? DB::table('documents')->select('id', 'number')->where('quotation_id', $d->id)->first() : null, 'contact' => $d->contact_snapshot ? json_decode($d->contact_snapshot, true) : ($d->contact_id ? DB::table('contacts')->find($d->contact_id) : null)];
     }
 
     public function createDocument(Request $r)
@@ -75,7 +75,7 @@ class DocumentController extends ErpBaseController
     public function documentAction(Request $r, int $id)
     {
         $action = $r->input('action');
-        $this->allow($action === 'receive' ? ['manager', 'warehouse'] : ['manager', 'accountant']);
+        $this->allow(in_array($action, ['receive', 'supplier_return']) ? ['manager', 'warehouse'] : ['manager', 'accountant']);
         if ($action === 'payment') {
             $r->validate(['amount' => 'required', 'method' => ['required', Rule::in(['Cash', 'Card', 'Bank'])]]);
 
@@ -88,6 +88,10 @@ class DocumentController extends ErpBaseController
             $r->validate(['condition' => ['required', Rule::in(['Restock', 'Do not restock'])]]);
 
             return $this->once($r, 'return', fn () => Documents::returnSale($id, $r->input('condition'), Auth::id()));
+        }if ($action === 'supplier_return') {
+            $v = $r->validate(['refund_method' => ['nullable', Rule::in(['Cash', 'Card', 'Bank'])], 'reason' => 'nullable|string|max:300', 'lines' => 'required|array|min:1|max:100', 'lines.*.line_id' => 'required|integer', 'lines.*.quantity' => 'required']);
+
+            return $this->once($r, 'supplier_return', fn () => Documents::returnToSupplier($id, $v['lines'], $v['refund_method'] ?? null, $v['reason'] ?? null, Auth::id()));
         }if ($action === 'receive') {
             $this->allow(['manager', 'warehouse']);
             $v = $r->validate(['location_id' => 'required|exists:locations,id', 'bill_reference' => 'nullable|string|max:100', 'lines' => 'required|array|min:1|max:100', 'lines.*.line_id' => 'required|integer', 'lines.*.quantity' => 'required', 'lines.*.expires_on' => 'nullable|date_format:Y-m-d']);

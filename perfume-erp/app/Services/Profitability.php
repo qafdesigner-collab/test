@@ -56,8 +56,8 @@ final class Profitability
             foreach ($lines as $line) {
                 $row = &$rows[$line->product_id];
                 if ($d->kind === 'Purchase') {
-                    $row['purchased_milli'] += $line->quantity_milli;
-                    $row['purchase_cents'] += $line->subtotal_cents;
+                    $row['purchased_milli'] += $line->quantity_milli - $line->returned_milli;
+                    $row['purchase_cents'] += $line->subtotal_cents - $line->returned_subtotal_cents;
                 } else {
                     $netRevenue = $line->subtotal_cents - $line->returned_subtotal_cents;
                     $row['sold_milli'] += $line->quantity_milli - $line->returned_milli;

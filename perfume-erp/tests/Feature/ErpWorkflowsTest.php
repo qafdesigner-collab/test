@@ -492,4 +492,39 @@ class ErpWorkflowsTest extends TestCase
         $this->postOnce('/api/documents/'.$partial['id'], ['action' => 'close'])->assertOk()->assertJsonPath('status', 'Closed');
         $this->postOnce('/api/documents/'.$partial['id'], ['action' => 'receive', 'location_id' => 1, 'lines' => [['line_id' => $line->id, 'quantity' => '1']]])->assertUnprocessable();
     }
+
+    public function test_supplier_return_reduces_stock_payable_and_records_refund(): void
+    {
+        $receipt = $this->postOnce('/api/documents', ['kind' => 'Purchase', 'contact_id' => 2, 'location_id' => 1, 'paid' => '0', 'method' => 'Credit', 'lines' => [['product_id' => 7, 'quantity' => '10', 'price' => '3.00']]])->assertOk()->json();
+        $line = DB::table('document_lines')->where('document_id', $receipt['id'])->first();
+        $lot = fn () => (int) DB::table('balances')->where(['product_id' => 7, 'location_id' => 1, 'lot' => $receipt['number']])->value('quantity_milli');
+        $back = fn (string $qty, ?string $method = null) => $this->postOnce('/api/documents/'.$receipt['id'], ['action' => 'supplier_return', 'reason' => 'Damaged', 'refund_method' => $method, 'lines' => [['line_id' => $line->id, 'quantity' => $qty]]]);
+
+        $this->actingAs(User::factory()->create(['role' => 'cashier']));
+        $back('1')->assertForbidden();
+        $this->actingAs($this->owner);
+
+        $back('11')->assertUnprocessable();
+        $first = $back('4')->assertOk()->assertJsonPath('refund_cents', 0)->json();
+        $this->assertStringStartsWith('SRN-', $first['number']);
+        $this->assertSame(6000, $lot());
+        $this->postOnce('/api/documents/'.$receipt['id'], ['action' => 'payment', 'amount' => '18.01', 'method' => 'Bank'])->assertUnprocessable();
+        $this->postOnce('/api/documents/'.$receipt['id'], ['action' => 'payment', 'amount' => '18.00', 'method' => 'Bank'])->assertOk();
+
+        $back('2')->assertUnprocessable();
+        $back('2', 'Bank')->assertOk()->assertJsonPath('refund_cents', 600);
+        $this->assertSame(4000, $lot());
+        $product = collect($this->getJson('/api/profitability')->json('products'))->firstWhere('product_id', 7);
+        $this->assertSame(4000, $product['purchased_milli']);
+        $this->getJson('/api/documents/'.$first['id'])->assertJsonPath('original.number', $receipt['number']);
+    }
+
+    public function test_payment_after_partial_return_cannot_exceed_new_balance(): void
+    {
+        $invoice = $this->postOnce('/api/documents', $this->sale(['paid' => '0', 'method' => 'Credit', 'lines' => [['product_id' => 1, 'quantity' => '2']]]))->assertOk()->json();
+        $line = DB::table('document_lines')->where('document_id', $invoice['id'])->first();
+        $this->postOnce('/api/documents/'.$invoice['id'], ['action' => 'return', 'condition' => 'Restock', 'lines' => [['line_id' => $line->id, 'quantity' => '1']]])->assertOk();
+        $this->postOnce('/api/documents/'.$invoice['id'], ['action' => 'payment', 'amount' => '125.01', 'method' => 'Cash'])->assertUnprocessable();
+        $this->postOnce('/api/documents/'.$invoice['id'], ['action' => 'payment', 'amount' => '125.00', 'method' => 'Cash'])->assertOk();
+    }
 }

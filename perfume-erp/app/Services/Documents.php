@@ -131,7 +131,7 @@ final class Documents
             $doc = DB::table('documents')->where('id', $id)->lockForUpdate()->first();
             if (! $doc || ! in_array($doc->kind, ['Sale', 'Invoice', 'Purchase']) || $doc->status !== 'Posted') {
                 self::fail('This document cannot receive payments.');
-            }if ($amount <= 0 || $doc->paid_cents + $amount > $doc->total_cents) {
+            }if ($amount <= 0 || $doc->paid_cents - $doc->refunded_cents + $amount > $doc->total_cents - $doc->returned_cents) {
                 self::fail('Payment must be positive and not exceed the balance.');
             }DB::table('documents')->where('id', $id)->increment('paid_cents', $amount);
             DB::table('payments')->insert(['document_id' => $id, 'amount_cents' => $amount, 'method' => $method, 'user_id' => $user, 'created_at' => now(), 'updated_at' => now()]);
@@ -399,6 +399,70 @@ final class Documents
             DB::table('audit')->insert(['user_id' => $user, 'action' => 'purchase_order.'.strtolower($status), 'subject' => $order->number, 'details' => '{}', 'created_at' => now()]);
 
             return ['id' => $id, 'status' => $status];
+        });
+    }
+
+    /**
+     * Send items from a purchase receipt back to the supplier. Stock leaves the receipt's lot at
+     * its current value; what we owe the supplier drops, and if we had already paid more than the
+     * reduced total, the supplier's refund to us is recorded.
+     *
+     * @param  list<array{line_id: int, quantity: string}>  $items
+     */
+    public static function returnToSupplier(int $id, array $items, ?string $refundMethod, ?string $reason, int $user): array
+    {
+        return DB::transaction(function () use ($id, $items, $refundMethod, $reason, $user) {
+            $d = DB::table('documents')->where('id', $id)->lockForUpdate()->first();
+            if (! $d || $d->kind !== 'Purchase' || $d->status !== 'Posted') {
+                self::fail('Only a posted purchase receipt can be returned to the supplier.');
+            }
+            $plan = [];
+            $sub = 0;
+            $tax = 0;
+            foreach ($items as $item) {
+                $line = DB::table('document_lines')->where('document_id', $id)->where('id', $item['line_id'])->lockForUpdate()->first();
+                if (! $line) {
+                    self::fail('That item is not on this purchase receipt.');
+                }
+                $q = Amounts::parse((string) $item['quantity'], 3);
+                if ($q === 0) {
+                    continue;
+                }
+                if ($q > $line->quantity_milli - $line->returned_milli) {
+                    self::fail("You cannot return more {$line->name} than was received and not yet returned.");
+                }
+                if (in_array($line->unit, ['piece', 'bottle', 'box', 'carton']) && $q % 1000) {
+                    self::fail('Counted products are returned in whole quantities.');
+                }
+                $isLast = $q === $line->quantity_milli - $line->returned_milli;
+                $lineSub = $isLast ? $line->subtotal_cents - $line->returned_subtotal_cents : Amounts::roundDivide($line->subtotal_cents * $q, $line->quantity_milli);
+                $lineTax = $isLast ? $line->tax_cents - $line->returned_tax_cents : Amounts::roundDivide($line->tax_cents * $q, $line->quantity_milli);
+                $sub += $lineSub;
+                $tax += $lineTax;
+                $plan[] = [$line, $q, $lineSub, $lineTax];
+            }
+            if (! $plan) {
+                self::fail('Choose at least one item to send back.');
+            }
+            $total = $sub + $tax;
+            $refund = max(0, ($d->paid_cents - $d->refunded_cents) - ($d->total_cents - $d->returned_cents - $total));
+            if ($refund > 0 && ! in_array($refundMethod, ['Cash', 'Card', 'Bank'], true)) {
+                self::fail('Choose how the supplier pays the money back: Cash, Card or Bank.');
+            }
+            $method = $refund > 0 ? $refundMethod : 'Credit';
+            $rid = DB::table('documents')->insertGetId(['uuid' => (string) Str::uuid(), 'kind' => 'SupplierReturn', 'status' => 'Posted', 'original_id' => $id, 'contact_id' => $d->contact_id, 'location_id' => $d->location_id, 'user_id' => $user, 'subtotal_cents' => $sub, 'tax_cents' => $tax, 'total_cents' => $total, 'paid_cents' => $refund, 'method' => $method, 'notes' => trim('Returned to supplier from '.$d->number.($reason ? ': '.$reason : '')), 'seller_snapshot' => $d->seller_snapshot, 'contact_snapshot' => $d->contact_snapshot, 'created_at' => now(), 'updated_at' => now()]);
+            $number = 'SRN-'.str_pad((string) $rid, 6, '0', STR_PAD_LEFT);
+            DB::table('documents')->where('id', $rid)->update(['number' => $number]);
+            foreach ($plan as [$line, $q, $lineSub, $lineTax]) {
+                $product = DB::table('products')->find($line->product_id);
+                $value = $product->kind === 'service' ? 0 : Stock::move($product->id, $d->location_id, $d->number, -$q, 'Returned to supplier', $number, $user);
+                DB::table('document_lines')->insert(['document_id' => $rid, 'product_id' => $line->product_id, 'name' => $line->name, 'unit' => $line->unit, 'quantity_milli' => $q, 'price_cents' => $line->price_cents, 'discount_cents' => 0, 'tax_bp' => $line->tax_bp, 'subtotal_cents' => $lineSub, 'tax_cents' => $lineTax, 'total_cents' => $lineSub + $lineTax, 'cogs_cents' => $value, 'cost_allocations' => json_encode([['cost_basis' => 'Stock value removed', 'lot' => $d->number]])]);
+                DB::table('document_lines')->where('id', $line->id)->update(['returned_milli' => $line->returned_milli + $q, 'returned_subtotal_cents' => $line->returned_subtotal_cents + $lineSub, 'returned_tax_cents' => $line->returned_tax_cents + $lineTax]);
+            }
+            DB::table('documents')->where('id', $id)->update(['returned_cents' => $d->returned_cents + $total, 'refunded_cents' => $d->refunded_cents + $refund, 'updated_at' => now()]);
+            DB::table('audit')->insert(['user_id' => $user, 'action' => 'purchase.supplier_return', 'subject' => $number, 'details' => json_encode(['receipt' => $d->number, 'returned_cents' => $total, 'refund_cents' => $refund]), 'created_at' => now()]);
+
+            return ['id' => $rid, 'number' => $number, 'returned_cents' => $total, 'refund_cents' => $refund, 'refund_method' => $method];
         });
     }
 
