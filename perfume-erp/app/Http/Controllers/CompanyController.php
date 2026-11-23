@@ -20,7 +20,7 @@ class CompanyController extends ErpBaseController
     {
         $this->allow(['manager']);
         if ($r->isMethod('post')) {
-            $v = $r->validate(['company_name' => 'required|string|max:150', 'address' => 'nullable|string|max:2000', 'phone' => 'nullable|string|max:50', 'email' => 'nullable|email|max:150', 'tax_id' => 'nullable|string|max:50', 'currency' => 'required|string|size:3', 'brand_color' => ['sometimes', 'nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'company_name_ar' => 'sometimes|nullable|string|max:150', 'address_ar' => 'sometimes|nullable|string|max:2000', 'vat_registered' => 'sometimes|in:0,1', 'invoice_footer' => 'sometimes|nullable|string|max:500']);
+            $v = $r->validate(['company_name' => 'required|string|max:150', 'address' => 'nullable|string|max:2000', 'phone' => 'nullable|string|max:50', 'email' => 'nullable|email|max:150', 'tax_id' => 'nullable|string|max:50', 'currency' => 'required|string|size:3', 'brand_color' => ['sometimes', 'nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'company_name_ar' => 'sometimes|nullable|string|max:150', 'address_ar' => 'sometimes|nullable|string|max:2000', 'vat_registered' => 'sometimes|in:0,1', 'stock_issue_order' => 'sometimes|in:fifo,fefo', 'invoice_footer' => 'sometimes|nullable|string|max:500']);
             foreach ($v as $k => $val) {
                 DB::table('settings')->updateOrInsert(['key' => $k], ['value' => $val ?? '']);
             }$this->audit('settings.update', 'company');

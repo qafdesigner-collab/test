@@ -88,4 +88,24 @@ class StockControlTest extends TestCase
         $lines = [['product_id' => 1, 'lot' => 'DEMO-OPENING', 'expected' => number_format($a / 1000, 3, '.', ''), 'counted' => '1.5']];
         $this->postOnce('/api/stock-counts', ['location_id' => 1, 'lines' => $lines])->assertUnprocessable();
     }
+
+    public function test_fefo_sells_earliest_expiry_first_and_never_expired_stock(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'owner']));
+        DB::table('balances')->where('product_id', 1)->where('location_id', 1)->delete();
+        foreach (['LOT-OLD-EXPIRED' => now()->subDay(), 'LOT-LATE' => now()->addYear(), 'LOT-SOON' => now()->addDays(20)] as $lot => $expiry) {
+            DB::table('balances')->insert(['product_id' => 1, 'location_id' => 1, 'lot' => $lot, 'quantity_milli' => 2000]);
+            DB::table('lot_details')->insert(['product_id' => 1, 'lot' => $lot, 'expires_on' => $expiry->toDateString(), 'created_at' => now(), 'updated_at' => now()]);
+        }
+        $sell = fn (string $qty) => $this->postOnce('/api/documents', ['kind' => 'Invoice', 'contact_id' => 1, 'location_id' => 1, 'method' => 'Cash', 'paid' => '0', 'lines' => [['product_id' => 1, 'quantity' => $qty]]]);
+
+        $sell('1')->assertOk();
+        $this->assertSame(1000, $this->quantity(1, 'LOT-OLD-EXPIRED'), 'FIFO (default) takes the oldest lot, expired or not');
+
+        DB::table('settings')->updateOrInsert(['key' => 'stock_issue_order'], ['value' => 'fefo']);
+        $sell('3')->assertOk();
+        $this->assertSame([0, 1000, 1000], [$this->quantity(1, 'LOT-SOON'), $this->quantity(1, 'LOT-LATE'), $this->quantity(1, 'LOT-OLD-EXPIRED')]);
+        $sell('2')->assertUnprocessable()->assertJsonFragment(['Not enough unexpired stock for Ocean Breeze. Expired lots cannot be sold or used.']);
+        $this->assertSame(1000, $this->quantity(1, 'LOT-LATE'));
+    }
 }

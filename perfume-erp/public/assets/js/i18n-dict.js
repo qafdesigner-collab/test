@@ -624,4 +624,7 @@ const I18N_DICT = {
   "To": "إلى",
   "Show": "عرض",
   "Print / save PDF": "طباعة / حفظ PDF",
+  "Stock leaves in this order": "ترتيب صرف المخزون",
+  "FIFO · oldest stock first": "FIFO · الأقدم أولًا",
+  "FEFO · earliest expiry first, never expired stock": "FEFO · الأقرب انتهاءً أولًا، دون صرف المنتهي",
 };

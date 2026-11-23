@@ -105,7 +105,7 @@ final class Stock
             $query->where('quantity_milli', '>=', -$q);
         }
         if (! $query->increment('quantity_milli', $q)) {
-            throw ValidationException::withMessages(['stock' => 'Insufficient stock for '.DB::table('products')->where('id', $product)->value('name').'.']);
+            throw ValidationException::withMessages(['stock' => __('Insufficient stock for :product.', ['product' => DB::table('products')->where('id', $product)->value('name')])]);
         }
         DB::table('balances')->where('id', $row->id)->update(['value_cents' => $currentValue + ($q < 0 ? -$amount : $amount), 'cost_basis' => $q < 0 ? $row->cost_basis : ($row->quantity_milli > 0 && $row->cost_basis !== $basis ? 'Mixed cost basis' : $basis)]);
         DB::table('movements')->insert($key + ['quantity_milli' => $q, 'reason' => $reason, 'source' => $source, 'user_id' => $user, 'created_at' => now()]);
@@ -115,7 +115,16 @@ final class Stock
 
     public static function consume(int $product, int $location, int $q, string $reason, string $source, ?int $user): array
     {
-        $lots = DB::table('balances')->where(['product_id' => $product, 'location_id' => $location])->where('quantity_milli', '>', 0)->orderBy('id')->lockForUpdate()->get();
+        $fefo = DB::table('settings')->where('key', 'stock_issue_order')->value('value') === 'fefo';
+        $query = DB::table('balances as b')->where(['b.product_id' => $product, 'b.location_id' => $location])->where('b.quantity_milli', '>', 0)->select('b.*');
+        if ($fefo) {
+            // First expired, first out: earliest expiry first, undated lots last, expired lots never.
+            $today = now()->toDateString();
+            $query->leftJoin('lot_details as x', fn ($j) => $j->on('x.product_id', '=', 'b.product_id')->on('x.lot', '=', 'b.lot'))
+                ->where(fn ($w) => $w->whereNull('x.expires_on')->orWhere('x.expires_on', '>=', $today))
+                ->orderByRaw('CASE WHEN x.expires_on IS NULL THEN 1 ELSE 0 END')->orderBy('x.expires_on');
+        }
+        $lots = $query->orderBy('b.id')->lockForUpdate()->get();
         $used = [];
         foreach ($lots as $lot) {
             $take = min($q, (int) $lot->quantity_milli);
@@ -128,7 +137,8 @@ final class Stock
             }
         }
         if ($q > 0) {
-            throw ValidationException::withMessages(['stock' => 'Insufficient stock for '.DB::table('products')->where('id', $product)->value('name').'.']);
+            $name = DB::table('products')->where('id', $product)->value('name');
+            throw ValidationException::withMessages(['stock' => $fefo ? __('Not enough unexpired stock for :product. Expired lots cannot be sold or used.', ['product' => $name]) : __('Insufficient stock for :product.', ['product' => $name])]);
         }
 
         return $used;
