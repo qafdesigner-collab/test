@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Put, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsUUID } from 'class-validator';
-import { Roles } from '../common/decorators';
+import { ManualTx, Public, Roles } from '../common/decorators';
+import { Throttle } from '@nestjs/throttler';
 import { LmsService } from './lms.service';
-import { AssessmentDto, LiveFrameDto, ProctorEventDto, EvaluationDto, GradeDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
+import { AssessmentDto, LiveFrameDto, PhoneScanDto, ProctorEventDto, EvaluationDto, GradeDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
 import { LicensingService } from '../licensing/licensing.service';
 
 class FromBankDto { @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100) @IsUUID('all', { each: true }) questionIds: string[]; }
@@ -61,8 +62,24 @@ export class StudentController {
   @Get('homework') list() { return this.svc.studentList(); }
   @Get('homework/:id') get(@Param('id', Id()) id: string) { return this.svc.studentGet(id); }
   @Post('homework/:id/start') start(@Param('id', Id()) id: string) { return this.svc.startAttempt(id); }
+  @Post('homework/:id/scan-link') scanLink(@Param('id', Id()) id: string) { return this.svc.createScanLink(id); }
+  @Get('homework/:id/scan-link/:linkId') scanStatus(@Param('id', Id()) id: string, @Param('linkId', Id()) l: string) { return this.svc.scanLinkStatus(id, l); }
+  @Get('homework/:id/scan-link/:linkId/panorama') async scanPano(@Param('id', Id()) id: string, @Param('linkId', Id()) l: string, @Res() res: Response) {
+    const b = await this.svc.scanLinkPanorama(id, l); res.setHeader('Content-Type', 'image/jpeg'); res.setHeader('Cache-Control', 'no-store'); res.end(b);
+  }
   @Post('homework/:id/live') live(@Param('id', Id()) id: string, @Body() d: LiveFrameDto) { return this.svc.liveFrame(id, d); }
   @Post('homework/:id/watch') watch(@Param('id', Id()) id: string, @Body() d: ProctorEventDto) { return this.svc.proctorEvent(id, d); }
   @Post('homework/:id/submit') submit(@Param('id', Id()) id: string, @Body() d: SubmitDto) { return this.svc.submit(id, d); }
   @Get('report') report() { return this.svc.studentReport(this.svc.db.ctx.userId); }
+}
+
+/** Room scan on a phone: no login — the phone only has the secret one-time link from the student's QR code. */
+@ApiTags('student')
+@Controller('room-scan')
+export class RoomScanController {
+  constructor(private readonly svc: LmsService) {}
+  @Public() @ManualTx() @Throttle({ default: { limit: 30, ttl: 60_000 } }) @Get(':token')
+  async info(@Param('token') token: string) { if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) throw new NotFoundException('This link is not valid.'); const r = await this.svc.phoneScanInfo(token); return { title: r.title, expiresAt: r.expiresAt }; }
+  @Public() @ManualTx() @Throttle({ default: { limit: 10, ttl: 60_000 } }) @Post(':token')
+  save(@Param('token') token: string, @Body() d: PhoneScanDto) { if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) throw new NotFoundException('This link is not valid.'); return this.svc.phoneScanSave(token, d); }
 }

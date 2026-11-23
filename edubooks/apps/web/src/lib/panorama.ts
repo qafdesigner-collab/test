@@ -19,6 +19,9 @@ export class PanoramaBuilder {
   covered = 1;
   /** true when the last frame moved too much to be matched (turning too fast) */
   tooFast = false;
+  /** true when the camera came all the way round and sees the first picture again (the whole room is scanned) */
+  closed = false;
+  private first: Float32Array | null = null;
 
   constructor(video: HTMLVideoElement, frameWidth = 320) {
     this.v = video; this.fw = frameWidth; this.fh = Math.round(frameWidth * ((video.videoHeight || 480) / (video.videoWidth || 640)));
@@ -70,7 +73,9 @@ export class PanoramaBuilder {
       px = this.x - s.dx * (this.fw / SW); py = this.y - s.dy * (this.fh / SH);
       if (Math.abs(px - this.x) < this.fw * 0.04 && Math.abs(py - this.y) < 3) return true; // hardly moved: nothing new to add
     }
-    this.prev = g; this.x = px; this.y = py;
+    this.prev = g; this.x = px; this.y = py; this.first ??= g;
+    // back at the start after going round: the first picture is seen again (only after covering most of the room)
+    if (!this.closed && this.first && this.covered >= 4) { const m = this.shift(g, this.first); if (m.cost < 12 && Math.abs(m.dx) < 20) this.closed = true; }
     this.minX = Math.min(this.minX, px); this.maxX = Math.max(this.maxX, px); this.minY = Math.min(this.minY, py); this.maxY = Math.max(this.maxY, py);
     this.covered = (this.maxX - this.minX + this.fw) / this.fw;
     // the frame, faded at its edges, painted onto the wide picture

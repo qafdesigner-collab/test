@@ -333,7 +333,9 @@ function WatchDialog({ a, student, onClose }: { a: any; student: any; onClose: (
   return (
     <Dialog open onOpenChange={onClose} wide title={`🛡️ ${student.displayName} — what was recorded`} description="Look at the pictures and the timeline together: leaving the page for a long time, other apps on the screen or another person in the photos can show the student had help.">
       {(panos.length > 0 || vids.length > 0) && <div className="mb-4 space-y-2">
-        {panos.map((e) => <figure key={e.id}><figcaption className="mb-1 text-xs font-medium text-slate-600">🌄 Room panorama · {new Date(e.createdAt).toLocaleTimeString()}{e.attempt > 1 ? ` · try ${e.attempt}` : ''} — scroll sideways, click to enlarge</figcaption>
+        {panos.map((e) => <figure key={e.id}><figcaption className="mb-1 flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-600">🌄 Room panorama · {new Date(e.createdAt).toLocaleTimeString()}{e.attempt > 1 ? ` · try ${e.attempt}` : ''}
+            {e.detail?.complete === true ? <Badge tone="PUBLISHED">✅ whole room</Badge> : e.detail?.complete === false ? <Badge tone="danger">⚠ unfinished — {e.detail?.coverage ?? 0}% of the room</Badge> : null}
+            {e.detail?.phone && <Badge>📱 made with a phone</Badge>}<span className="text-slate-400">— scroll sideways, click to enlarge</span></figcaption>
           <div className="overflow-x-auto rounded-lg bg-slate-900"><button type="button" onClick={() => setBig(e.id)}><img src={`/api/teacher/watch/${e.id}/image`} alt="Room panorama" className="h-40 max-w-none" /></button></div></figure>)}
         {vids.map((e) => <figure key={e.id}><figcaption className="mb-1 text-xs font-medium text-slate-600">🎥 Room scan video · {new Date(e.createdAt).toLocaleTimeString()}</figcaption>
           <video src={`/api/teacher/watch/${e.id}/image`} controls playsInline className="max-h-56 rounded-lg bg-black" /></figure>)}

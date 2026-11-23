@@ -1,3 +1,17 @@
+# What's new in Knowledge Gate 1.4.18
+
+## 🌄 Room panorama: the whole room, also with a PC camera
+- **It does not stop by itself until the whole room is scanned.** The scan finishes only when the camera is back where it started (the app recognises the first picture again) or a full turn is covered; a percentage shows how far the student is. There is no time limit and no early “Done”.
+- If a scan really cannot be finished (e.g. plain walls), after 90 seconds the student may send it **unfinished** — the teacher then sees **⚠ unfinished — 45% of the room**, also as a warning in the Watch column and the Live view. A full scan shows **✅ whole room**.
+- **Computers whose camera cannot turn** (desktop PCs, all-in-ones): the student presses **📱 My camera cannot turn — scan with my phone**. A **QR code** appears; the student scans it with a phone, does the room scan there (with the phone's back camera, no login needed), and the computer continues by itself. The teacher sees **📱 made with a phone**. The link works only once, only for that student and test, for 20 minutes.
+- On a laptop: hold the laptop and turn on the spot; with a USB camera: unclip it and turn it around.
+
+## 🖋️ Tracing: pen size, colours and the Arabic qalam
+- Tracing (book pages and the Tracing game) now has a pen toolbar: **8 colours**, a **size** slider, **↶ Undo**, and two pens:
+  - **✏️ Pen** — a round pen with an even line;
+  - **🖋️ Arabic qalam** — the broad, slanted calligraphy nib (about 70°): lines are thick or thin depending on the direction, like real Naskh writing. It is chosen automatically for Arabic letters.
+- With a stylus (e.g. Apple Pencil), pressing harder makes the line thicker. Each child's colour and size are remembered on their device.
+
 # What's new in Knowledge Gate 1.4.17
 
 ## 🌄 Watched tests: the room scan is now a panorama

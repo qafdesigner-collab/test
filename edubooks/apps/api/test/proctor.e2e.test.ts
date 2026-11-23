@@ -85,4 +85,36 @@ describe('Online exam safety: room scan, camera and screen pictures, leaving the
     expect(await app.get(ProctorCleanup).purge(90)).toBeGreaterThanOrEqual(1);
     expect((await teacher.get(`/api/teacher/assessments/${id}/watch/${me}`)).body).toEqual([]);
   });
+
+  it('room scan with a phone: a one-time QR link without login; the panorama joins the test', async () => {
+    const r = await teacher.post('/api/teacher/assessments').send({ classId, kind: 'TEST', title: `Phone scan ${Date.now()}`, proctor: { roomScan: true, camera: true }, items: [{ type: 'TRUE_FALSE', prompt: 'x', answer: [true], points: 1 }] });
+    const pid = r.body.id; await teacher.post(`/api/teacher/assessments/${pid}/publish`);
+    const link = (await student.post(`/api/student/homework/${pid}/scan-link`)).body;
+    expect(link.token).toMatch(/^[A-Za-z0-9_-]{30,}$/);
+    // the phone has no login
+    const phone = require('supertest')(app.getHttpServer());
+    expect((await phone.get('/api/room-scan/not-a-real-token-1234567890')).status).toBe(404);
+    expect((await phone.get(`/api/room-scan/${link.token}`)).body.title).toContain('Phone scan');
+    expect((await phone.post(`/api/room-scan/${link.token}`).send({ panorama: 'data:image/png;base64,AAAA', coverage: 50, complete: false })).status).toBe(400);
+    expect((await student.get(`/api/student/homework/${pid}/scan-link/${link.id}`)).body).toMatchObject({ done: false });
+    expect((await phone.post(`/api/room-scan/${link.token}`).send({ panorama: JPEG, coverage: 100, complete: true })).status).toBe(201);
+    expect((await phone.post(`/api/room-scan/${link.token}`).send({ panorama: JPEG, coverage: 100, complete: true })).status).toBe(409); // only once
+    expect((await student.get(`/api/student/homework/${pid}/scan-link/${link.id}`)).body).toMatchObject({ done: true, coverage: 100, complete: true });
+    expect((await student.get(`/api/student/homework/${pid}/scan-link/${link.id}/panorama`)).status).toBe(200);
+    // at Start the phone's panorama is added to the test record
+    await student.post(`/api/student/homework/${pid}/start`);
+    expect((await watch(pid, { kind: 'PANORAMA', linkId: link.id })).status).toBe(201);
+    // an unfinished panorama made on the computer is a warning for the teacher
+    expect((await watch(pid, { kind: 'PANORAMA', image: JPEG, coverage: 40, complete: false })).status).toBe(201);
+    const log = (await teacher.get(`/api/teacher/assessments/${pid}/watch/${me}`)).body;
+    expect(log.map((e: any) => [e.kind, e.detail])).toEqual([['PANORAMA', { coverage: 100, complete: true, phone: true }], ['PANORAMA', { coverage: 40, complete: false }]]);
+    expect((await teacher.get(`/api/teacher/assessments/${pid}`)).body.students.find((s: any) => s.id === me).watch.warnings).toBe(1);
+    // an expired link does not work
+    const old = (await student.post(`/api/student/homework/${pid}/scan-link`)).body;
+    const o = ownerPool(); await o.query(`UPDATE room_scan_links SET expires_at = now() - interval '1 minute' WHERE id = $1`, [old.id]); await o.end();
+    expect((await phone.get(`/api/room-scan/${old.token}`)).status).toBe(409);
+    const v = (await student.get(`/api/student/homework/${pid}`)).body;
+    await student.post(`/api/student/homework/${pid}/submit`).send({ answers: [{ itemId: v.items[0].id, response: true }] });
+    const o2 = ownerPool(); await o2.query('DELETE FROM assessments WHERE id = $1', [pid]); await o2.end();
+  });
 });

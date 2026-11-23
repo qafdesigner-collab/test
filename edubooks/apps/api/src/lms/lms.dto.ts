@@ -47,7 +47,18 @@ export class ProctorEventDto {
   @IsOptional() @IsString() @MaxLength(1_900_000) image?: string;
   /** the room-scan video (WebM or MP4) */
   @IsOptional() @IsString() @MaxLength(1_900_000) video?: string;
+  /** room panorama: how much of the room was covered (0–100) and whether the scan came all the way round */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100) coverage?: number;
+  @IsOptional() @IsBoolean() complete?: boolean;
+  /** a room scan made on a phone (its link) */
+  @IsOptional() @IsUUID() linkId?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(86400) seconds?: number;
+}
+export class PhoneScanDto {
+  @IsString() @MaxLength(1_900_000) panorama: string;
+  @IsOptional() @IsString() @MaxLength(1_900_000) video?: string;
+  @Type(() => Number) @IsInt() @Min(0) @Max(100) coverage: number;
+  @IsBoolean() complete: boolean;
 }
 export class LiveFrameDto {
   @IsOptional() @IsString() @MaxLength(400_000) cam?: string;

@@ -14,7 +14,8 @@ async function parse(res: Response) {
   }
   if (!res.ok) {
     const msg = Array.isArray(body?.message) ? body.message.join('; ') : body?.message || `Request failed (${res.status})`;
-    if (res.status === 401 && typeof window !== 'undefined' && !location.pathname.startsWith('/login')) {
+    // pages that work without logging in never jump to the sign-in page
+    if (res.status === 401 && typeof window !== 'undefined' && !['/login', '/register', '/room-scan'].some((p) => location.pathname.startsWith(p))) {
       location.href = `/login?next=${encodeURIComponent(location.pathname)}`;
     }
     throw new ApiError(res.status, msg);

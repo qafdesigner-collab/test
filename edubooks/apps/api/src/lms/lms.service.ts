@@ -11,10 +11,10 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { AccessService } from './access.service';
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { config } from '../config';
 import { checkItem, gradeNumber } from './integrity';
-import { AssessmentDto, LiveFrameDto, ProctorEventDto, EvaluationDto, GradeDto, ItemDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
+import { AssessmentDto, LiveFrameDto, PhoneScanDto, ProctorEventDto, EvaluationDto, GradeDto, ItemDto, LessonPlanDto, QuestionDto, SubmitDto, UpdateAssessmentDto } from './lms.dto';
 
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.!?]+$/, '');
 
@@ -298,7 +298,7 @@ export class LmsService {
       FROM assessment_attempts WHERE assessment_id = ${id} ORDER BY attempt`)).rows as any[];
     const watch = (await this.q.execute(sql`SELECT student_id AS "studentId", count(*) FILTER (WHERE kind IN ('ROOM','PANORAMA','CAMERA'))::int AS photos, count(*) FILTER (WHERE kind = 'SCREEN')::int AS screens,
         count(*) FILTER (WHERE kind = 'AWAY')::int AS away, coalesce(sum((detail->>'seconds')::int) FILTER (WHERE kind = 'AWAY'), 0)::int AS "awaySeconds",
-        count(*) FILTER (WHERE kind IN ('SCREEN_OFF','CAMERA_OFF','SCREEN_PART','NO_SCREEN','NO_CAMERA','FULLSCREEN_OFF'))::int AS warnings
+        count(*) FILTER (WHERE kind IN ('SCREEN_OFF','CAMERA_OFF','SCREEN_PART','NO_SCREEN','NO_CAMERA','FULLSCREEN_OFF') OR (kind = 'PANORAMA' AND detail->>'complete' = 'false'))::int AS warnings
       FROM proctor_events WHERE assessment_id = ${id} GROUP BY student_id`)).rows as any[];
     const students = (roster.rows as any[]).filter((s) => !targeted.length || targeted.includes(s.id))
       .map((s) => ({ ...s, submission: subs.find((x) => x.studentId === s.id) ?? null, attempts: tries.filter((t) => t.studentId === s.id), watch: watch.find((w) => w.studentId === s.id) ?? null }));
@@ -392,6 +392,7 @@ export class LmsService {
     if (!p.camera && !p.roomScan && !p.screen) throw new BadRequestException('This work is not watched');
     const open = await this.openAttempt(id);
     if (!open) throw new ConflictException('Press Start first');
+    if (d.kind === 'PANORAMA' && d.linkId) return this.attachPhoneScan(a.id, open.attempt, d.linkId);
     const LIMIT: Record<string, number> = { ROOM: 12, PANORAMA: 3, ROOM_VIDEO: 3, CAMERA: 150, SCREEN: 150 };
     const { rows: [n] } = await this.q.execute(sql`SELECT count(*)::int AS all, count(*) FILTER (WHERE kind = ${d.kind})::int AS same FROM proctor_events
       WHERE assessment_id = ${id} AND student_id = ${this.ctx.userId} AND attempt = ${open.attempt}`) as any;
@@ -417,9 +418,65 @@ export class LmsService {
       await put(bytes, m[1]);
     }
     await this.q.execute(sql`INSERT INTO proctor_events (publisher_id, school_id, assessment_id, student_id, attempt, kind, file, detail)
-      VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${id}, ${this.ctx.userId}, ${open.attempt}, ${d.kind}, ${file}, ${JSON.stringify(d.seconds !== undefined ? { seconds: d.seconds } : {})}::jsonb)`);
+      VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${id}, ${this.ctx.userId}, ${open.attempt}, ${d.kind}, ${file},
+        ${JSON.stringify({ ...(d.seconds !== undefined ? { seconds: d.seconds } : {}), ...(d.kind === 'PANORAMA' ? { coverage: d.coverage ?? null, complete: d.complete ?? null } : {}) })}::jsonb)`);
     return { ok: true };
   }
+  // ---------- room scan on a phone (for computers whose camera cannot turn) ----------
+  /** A one-time link (shown as a QR code) to scan the room with a phone; valid for 20 minutes. */
+  async createScanLink(id: string) {
+    const [a] = await this.q.select().from(assessments).where(eq(assessments.id, id));
+    if (!a || !(await this.visibleToStudent(a))) throw new NotFoundException('Homework not found');
+    if (!(a.proctor as any)?.roomScan) throw new BadRequestException('This test has no room scan');
+    const token = randomBytes(24).toString('base64url');
+    const { rows: [l] } = await this.q.execute(sql`INSERT INTO room_scan_links (publisher_id, school_id, assessment_id, student_id, token_hash, expires_at)
+      VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${id}, ${this.ctx.userId}, ${createHash('sha256').update(token).digest()}, now() + interval '20 minutes') RETURNING id, expires_at AS "expiresAt"`) as any;
+    return { id: l.id, token, expiresAt: l.expiresAt };
+  }
+  async scanLinkStatus(id: string, linkId: string) {
+    const { rows: [l] } = await this.q.execute(sql`SELECT done_at AS "doneAt", coverage, complete, expires_at AS "expiresAt" FROM room_scan_links WHERE id = ${linkId} AND assessment_id = ${id} AND student_id = ${this.ctx.userId}`) as any;
+    if (!l) throw new NotFoundException('Not found');
+    return { done: !!l.doneAt, coverage: l.coverage, complete: l.complete, expired: !l.doneAt && new Date(l.expiresAt) < new Date() };
+  }
+  async scanLinkPanorama(id: string, linkId: string) {
+    const { rows: [l] } = await this.q.execute(sql`SELECT panorama_file AS f FROM room_scan_links WHERE id = ${linkId} AND assessment_id = ${id} AND student_id = ${this.ctx.userId}`) as any;
+    if (!l?.f) throw new NotFoundException('Not found');
+    return fsp.readFile(path.join(config.storageDir, l.f));
+  }
+  private async attachPhoneScan(id: string, attempt: number, linkId: string) {
+    const { rows: [l] } = await this.q.execute(sql`SELECT * FROM room_scan_links WHERE id = ${linkId} AND assessment_id = ${id} AND student_id = ${this.ctx.userId} AND done_at IS NOT NULL`) as any;
+    if (!l) throw new BadRequestException('The phone scan was not found');
+    const detail = JSON.stringify({ coverage: l.coverage, complete: l.complete, phone: true });
+    await this.q.execute(sql`INSERT INTO proctor_events (publisher_id, school_id, assessment_id, student_id, attempt, kind, file, detail)
+      VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${id}, ${this.ctx.userId}, ${attempt}, 'PANORAMA', ${l.panorama_file}, ${detail}::jsonb)`);
+    if (l.video_file) await this.q.execute(sql`INSERT INTO proctor_events (publisher_id, school_id, assessment_id, student_id, attempt, kind, file, detail)
+      VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${id}, ${this.ctx.userId}, ${attempt}, 'ROOM_VIDEO', ${l.video_file}, '{"phone":true}'::jsonb)`);
+    return { ok: true };
+  }
+  /** The phone (no login, only the secret link) — what the link is for. */
+  async phoneScanInfo(token: string) {
+    const { rows: [l] } = await this.db.root.execute(sql`SELECT * FROM room_scan_link(${createHash('sha256').update(token).digest()})`) as any;
+    if (!l) throw new NotFoundException('This link is not valid.');
+    if (l.done) throw new ConflictException('This room scan was already sent.');
+    if (new Date(l.expires_at) < new Date()) throw new ConflictException('This link has expired. Make a new QR code on the computer.');
+    return { title: l.title, expiresAt: l.expires_at, link: l };
+  }
+  /** The phone sends its panorama (and video); it is saved for the student's test. */
+  async phoneScanSave(token: string, d: PhoneScanDto) {
+    const { link: l } = await this.phoneScanInfo(token);
+    const pm = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(d.panorama); if (!pm) throw new BadRequestException('The picture could not be sent');
+    const pano = Buffer.from(pm[1], 'base64'); if (pano.length > 1_400_000 || pano[0] !== 0xff || pano[1] !== 0xd8) throw new BadRequestException('The picture could not be sent');
+    let video: Buffer | null = null; let vext = 'webm';
+    if (d.video) { const vm = /^data:video\/(webm|mp4)(?:;[^,]*)?;base64,([A-Za-z0-9+/=]+)$/.exec(d.video); if (vm) { const b = Buffer.from(vm[2], 'base64'); const ok = vm[1] === 'webm' ? b.readUInt32BE(0) === 0x1a45dfa3 : b.toString('latin1', 4, 8) === 'ftyp'; if (ok && b.length <= 1_400_000) { video = b; vext = vm[1]; } } }
+    const dir = path.join('proctor', l.assessment_id); await fsp.mkdir(path.join(config.storageDir, dir), { recursive: true });
+    const pf = path.join(dir, `${randomUUID()}.jpg`); await fsp.writeFile(path.join(config.storageDir, pf), pano);
+    const vf = video ? path.join(dir, `${randomUUID()}.${vext}`) : null; if (video && vf) await fsp.writeFile(path.join(config.storageDir, vf), video);
+    const ctx = { userId: l.student_id, publisherId: l.publisher_id, schoolId: l.school_id, roles: ['STUDENT'], staff: false };
+    await this.db.withContext(ctx, () => this.db.q.execute(sql`UPDATE room_scan_links SET done_at = now(), panorama_file = ${pf}, video_file = ${vf}, coverage = ${d.coverage}, complete = ${d.complete}
+      WHERE id = ${l.id} AND done_at IS NULL`));
+    return { ok: true };
+  }
+
   /** Everything recorded for one student (teacher). */
   async proctorLog(id: string, studentId: string) {
     await this.assessment(id);
@@ -466,7 +523,7 @@ export class LmsService {
     const roster = (await this.q.execute(sql`SELECT u.id, u.display_name AS "displayName" FROM enrolments e JOIN users u ON u.id = e.student_id WHERE e.class_id = ${a.classId} ORDER BY u.display_name`)).rows as any[];
     const tries = (await this.q.execute(sql`SELECT DISTINCT ON (student_id) student_id AS "studentId", attempt, started_at AS "startedAt", submitted_at AS "submittedAt" FROM assessment_attempts WHERE assessment_id = ${id} ORDER BY student_id, attempt DESC`)).rows as any[];
     const ev = (await this.q.execute(sql`SELECT student_id AS "studentId", count(*) FILTER (WHERE kind = 'AWAY')::int AS away, coalesce(sum((detail->>'seconds')::int) FILTER (WHERE kind = 'AWAY'), 0)::int AS "awaySeconds",
-        count(*) FILTER (WHERE kind IN ('SCREEN_OFF','CAMERA_OFF','SCREEN_PART','NO_SCREEN','NO_CAMERA','FULLSCREEN_OFF'))::int AS warnings, max(created_at) FILTER (WHERE kind <> 'CAMERA' AND kind <> 'SCREEN' AND kind <> 'ROOM') AS "lastEvent"
+        count(*) FILTER (WHERE kind IN ('SCREEN_OFF','CAMERA_OFF','SCREEN_PART','NO_SCREEN','NO_CAMERA','FULLSCREEN_OFF') OR (kind = 'PANORAMA' AND detail->>'complete' = 'false'))::int AS warnings, max(created_at) FILTER (WHERE kind <> 'CAMERA' AND kind <> 'SCREEN' AND kind <> 'ROOM') AS "lastEvent"
       FROM proctor_events WHERE assessment_id = ${id} GROUP BY student_id`)).rows as any[];
     const dir = this.liveDir(id);
     const out = [];

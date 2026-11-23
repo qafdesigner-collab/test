@@ -12,6 +12,8 @@ const FONTS: Record<TraceFont, string> = {
   ROUND: '"Comic Sans MS", "Chalkboard SE", "Andika", "Arial Rounded MT Bold", "Noto Sans Arabic", sans-serif',
   CURSIVE: '"Segoe Script", "Lucida Handwriting", "Brush Script MT", "Noto Nastaliq Urdu", cursive',
 };
+type PenType = 'ROUND' | 'QALAM';
+const PEN_COLORS = ['#2563eb', '#111827', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#db2777', '#0891b2'];
 const isRtl = (t: string) => /[֐-ࣿ]/.test(t);
 const CELL = 4; // the drawing is compared on a grid of 4-pixel cells
 
@@ -104,11 +106,29 @@ export function TracingPad({ text, guide = 'DOTTED', font = 'ROUND', lines = tru
   useEffect(() => { const c = ink.current; if (!c || w < 20) return; c.width = w; c.height = h; setResult(null); setSending(''); }, [w, h, text, backdrop, paths, fade]);
 
   const pos = (e: React.PointerEvent) => { const r = ink.current!.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * ink.current!.width, y: ((e.clientY - r.top) / r.height) * ink.current!.height }; };
+  // the pen: colour, size and type (a round pen, or the Arabic calligraphy qalam with its broad, slanted nib)
+  const [tool, setToolState] = useState<{ color: string; size: number; type: PenType }>(() => {
+    const d = { color: PEN_COLORS[0], size: 3, type: (text && isRtl(text) ? 'QALAM' : 'ROUND') as PenType };
+    try { const s = JSON.parse(localStorage.getItem('kg-pen') || 'null'); if (s && PEN_COLORS.includes(s.color) && s.size >= 1 && s.size <= 6) return { ...d, color: s.color, size: s.size }; } catch { /* default */ }
+    return d;
+  });
+  const setTool = (x: Partial<typeof tool>) => { const n = { ...tool, ...x }; setToolState(n); try { localStorage.setItem('kg-pen', JSON.stringify({ color: n.color, size: n.size })); } catch { /* not kept */ } };
+  const basePen = backdrop ? Math.max(6, w * 0.014) : pen;
+  const undo = useRef<ImageData[]>([]); const pressure = useRef(1);
   const line = (a: { x: number; y: number }, b: { x: number; y: number }) => {
-    const g = ink.current!.getContext('2d')!; g.strokeStyle = '#2563eb'; g.lineWidth = backdrop ? Math.max(6, w * 0.014) : pen; g.lineCap = 'round'; g.lineJoin = 'round';
-    g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+    const g = ink.current!.getContext('2d')!; const width = basePen * (0.35 + tool.size * 0.22) * pressure.current;
+    g.fillStyle = tool.color; g.strokeStyle = tool.color;
+    if (tool.type === 'QALAM') {
+      // the qalam: a flat nib held at about 70° — thick across, thin along the nib, like Naskh calligraphy
+      const ang = (70 * Math.PI) / 180, nx = Math.cos(ang) * width * 0.75, ny = -Math.sin(ang) * width * 0.75;
+      g.beginPath(); g.moveTo(a.x + nx, a.y + ny); g.lineTo(b.x + nx, b.y + ny); g.lineTo(b.x - nx, b.y - ny); g.lineTo(a.x - nx, a.y - ny); g.closePath(); g.fill();
+      g.lineWidth = Math.max(1, width * 0.12); g.lineCap = 'round'; g.beginPath(); g.moveTo(a.x + nx, a.y + ny); g.lineTo(a.x - nx, a.y - ny); g.moveTo(b.x + nx, b.y + ny); g.lineTo(b.x - nx, b.y - ny); g.stroke();
+    } else {
+      g.lineWidth = width; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+    }
   };
-  const clear = () => { const c = ink.current; if (c) c.getContext('2d')!.clearRect(0, 0, c.width, c.height); setResult(null); setSending(''); };
+  const remember = () => { const c = ink.current; if (!c) return; undo.current.push(c.getContext('2d')!.getImageData(0, 0, c.width, c.height)); if (undo.current.length > 25) undo.current.shift(); };
+  const clear = () => { const c = ink.current; if (c) { remember(); c.getContext('2d')!.clearRect(0, 0, c.width, c.height); } setResult(null); setSending(''); };
   const check = useCallback(() => {
     if (!tpl.current || !ink.current) return;
     pencil.stop(); const r = scoreTrace(tpl.current, ink.current, !!backdrop && !paths?.length); setResult(r.stars); onChecked?.(r);
@@ -125,11 +145,26 @@ export function TracingPad({ text, guide = 'DOTTED', font = 'ROUND', lines = tru
 
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-center gap-2 rounded-2xl bg-white/80 px-3 py-2 shadow-sm ring-1 ring-slate-200" role="toolbar" aria-label={t('Pen')}>
+        <div className="flex rounded-xl bg-slate-100 p-0.5" role="radiogroup" aria-label={t('Pen type')}>
+          {([['ROUND', `✏️ ${t('Pen')}`], ['QALAM', `🖋️ ${t('Arabic qalam')}`]] as const).map(([k, l]) => (
+            <button key={k} type="button" role="radio" aria-checked={tool.type === k} onClick={() => setTool({ type: k })}
+              className={cn('rounded-lg px-3 py-1.5 text-sm font-bold', tool.type === k ? 'bg-white text-slate-900 shadow' : 'text-slate-600')}>{l}</button>))}
+        </div>
+        <div className="flex items-center gap-1" role="radiogroup" aria-label={t('Colour')}>
+          {PEN_COLORS.map((c) => <button key={c} type="button" role="radio" aria-checked={tool.color === c} aria-label={c} onClick={() => setTool({ color: c })}
+            className={cn('size-7 rounded-full ring-2 ring-offset-1 transition', tool.color === c ? 'scale-110 ring-slate-800' : 'ring-transparent')} style={{ background: c }} />)}
+        </div>
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-600">{t('Size')}
+          <input type="range" min={1} max={6} value={tool.size} onChange={(e) => setTool({ size: Number(e.target.value) })} className="w-24 accent-sky-600" />
+          <span className="grid size-8 place-items-center"><span className={cn(tool.type === 'QALAM' ? '-rotate-[20deg]' : 'rounded-full')} style={{ background: tool.color, width: tool.type === 'QALAM' ? Math.max(3, (0.35 + tool.size * 0.22) * 4) : (0.35 + tool.size * 0.22) * 12, height: (0.35 + tool.size * 0.22) * 12 }} /></span></label>
+        <button type="button" onClick={() => { const u = undo.current.pop(); if (u) ink.current!.getContext('2d')!.putImageData(u, 0, 0); setResult(null); }} className="rounded-xl bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-700">↶ {t('Undo')}</button>
+      </div>
       <div ref={wrap} className="relative mx-auto w-full touch-none select-none overflow-hidden rounded-2xl bg-white shadow-inner ring-2 ring-sky-200" style={{ height: h, maxWidth: backdrop ? `calc(62vh * ${backdrop.width / backdrop.height})` : undefined }}>
         <canvas ref={bg} className="absolute inset-0 size-full" />
         <canvas ref={ink} className="absolute inset-0 size-full cursor-crosshair" aria-label={t('Trace here')}
-          onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); drawing.current = true; last.current = pos(e); line(last.current, last.current); }}
-          onPointerMove={(e) => { if (!drawing.current || !last.current) return; const p = pos(e); line(last.current, p); pencil.move(Math.hypot(p.x - last.current.x, p.y - last.current.y) / Math.max(1, w) * 20); last.current = p; }}
+          onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); remember(); setResult(null); drawing.current = true; pressure.current = e.pointerType === 'pen' && e.pressure > 0 ? 0.5 + e.pressure : 1; last.current = pos(e); line(last.current, last.current); }}
+          onPointerMove={(e) => { if (!drawing.current || !last.current) return; if (e.pointerType === 'pen' && e.pressure > 0) pressure.current = 0.5 + e.pressure; const p = pos(e); line(last.current, p); pencil.move(Math.hypot(p.x - last.current.x, p.y - last.current.y) / Math.max(1, w) * 20); last.current = p; }}
           onPointerUp={() => { drawing.current = false; last.current = null; pencil.lift(); }} onPointerCancel={() => { drawing.current = false; pencil.lift(); }} />
         {result !== null && <div className="pointer-events-none absolute right-3 top-2 text-3xl drop-shadow">{result ? '⭐'.repeat(result) : '🔁'}</div>}
       </div>

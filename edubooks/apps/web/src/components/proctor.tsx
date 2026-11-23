@@ -3,11 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { cn } from '@/components/ui';
-import { PanoramaBuilder, recordClip } from '@/lib/panorama';
+import { RoomScan } from '@/components/room-scan';
 
 export type Proctor = { camera?: boolean; roomScan?: boolean; screen?: boolean };
 export const watched = (p?: Proctor | null) => !!(p?.camera || p?.roomScan || p?.screen);
-export type Streams = { cam: MediaStream | null; scr: MediaStream | null; room: string[]; panorama?: string | null; roomVideo?: string | null; screenPart: boolean; noScreen: boolean };
+export type Streams = { cam: MediaStream | null; scr: MediaStream | null; room: string[]; panorama?: string | null; roomVideo?: string | null;
+  panoLink?: string | null; panoCoverage?: number; panoComplete?: boolean; screenPart: boolean; noScreen: boolean };
 
 const canShare = () => typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getDisplayMedia;
 /** A picture of a video stream as a small JPEG data URL. */
@@ -44,7 +45,7 @@ const isWhole = (s: MediaStream) => { const ds = (s.getVideoTracks()[0]?.getSett
  * Before a watched test: the student allows the camera, turns it slowly around the room, and shares the whole screen.
  * Everything that will be recorded is said plainly first.
  */
-export function ProctorGate({ p, resume, onReady }: { p: Proctor; resume: boolean; onReady: (s: Streams) => void }) {
+export function ProctorGate({ id, p, resume, onReady }: { id: string; p: Proctor; resume: boolean; onReady: (s: Streams) => void }) {
   const { t } = useT();
   const needCam = !!(p.camera || (p.roomScan && !resume));
   const [cam, setCam] = useState<MediaStream | null>(null); const [scr, setScr] = useState<MediaStream | null>(null);
@@ -56,32 +57,32 @@ export function ProctorGate({ p, resume, onReady }: { p: Proctor; resume: boolea
     try { setCam(await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, facingMode: 'user' }, audio: false })); }
     catch { setErr(t('The camera is blocked. Allow the camera for this website (the camera icon in the address bar), then try again. If you have no camera, tell your teacher.')); }
   };
-  // the room scan: a panorama while the student turns slowly all around, and a short video of it
-  const [pano, setPano] = useState<string | null>(null); const [roomVideo, setRoomVideo] = useState<string | null>(null);
-  const [scanInfo, setScanInfo] = useState({ covered: 0, fast: false, secs: 0 });
-  const strip = useRef<HTMLCanvasElement>(null); const scanVideo = useRef<HTMLVideoElement | null>(null); const stopScan = useRef<(() => void) | null>(null);
-  const TARGET = 6; // camera-widths: about all the way around
-  const doScan = async () => {
-    if (!cam) return;
-    setPano(null); setRoomVideo(null); setRoom([]); setScan(0);
-    const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.srcObject = cam; await v.play().catch(() => undefined); scanVideo.current = v;
-    for (let i = 0; i < 20 && v.readyState < 2; i++) await new Promise((r) => setTimeout(r, 100));
-    const b = new PanoramaBuilder(v); const clip = recordClip(cam); const t0 = Date.now();
-    let done = false; const finish = async () => {
-      if (done) return; done = true; clearInterval(timer);
-      const img = b.result(); const vid = clip ? await clip.stop() : null;
-      setPano(img); setRoomVideo(vid); setScan(null); v.srcObject = null; stopScan.current = null;
-    };
-    stopScan.current = () => void finish();
-    const timer = setInterval(() => {
-      b.add(); const secs = Math.round((Date.now() - t0) / 1000);
-      setScanInfo({ covered: b.covered, fast: b.tooFast, secs }); if (strip.current) b.preview(strip.current);
-      if ((b.covered >= TARGET && secs >= 8) || secs >= 40) void finish();
-    }, 220);
+  // the room panorama (made on this computer, or on a phone when this camera cannot turn)
+  type Pano = { img: string; video: string | null; coverage: number; complete: boolean; linkId?: string };
+  const [pano, setPanoState] = useState<Pano | null>(null); const [scanning, setScanning] = useState(false);
+  const [phone, setPhone] = useState<{ linkId: string; url: string; qr: string; expiresAt: string } | null>(null);
+  const doScan = () => { setPanoState(null); setPhone(null); setScanning(true); };
+  const usePhone = async () => {
+    setErr(''); setScanning(false);
+    try {
+      const l = await api.post<{ id: string; token: string; expiresAt: string }>(`/student/homework/${id}/scan-link`);
+      const url = `${window.location.origin}/room-scan/${l.token}`;
+      const QR = (await import('qrcode')).default; const qr = await QR.toDataURL(url, { margin: 1, width: 300, errorCorrectionLevel: 'M' });
+      setPhone({ linkId: l.id, url, qr, expiresAt: l.expiresAt });
+    } catch (e: any) { setErr(e.message); }
   };
-  useEffect(() => () => stopScan.current?.(), []);
-  const scanning = scan !== null;
-  const scanTip = scanInfo.fast ? 'Slower please — turn very slowly.' : scanInfo.covered < 1.6 ? 'Hold the camera (or the laptop) and turn slowly to your left…' : scanInfo.covered < 4 ? 'Keep turning slowly — show the walls…' : 'Almost there — keep turning until you are back at the start.';
+  // wait for the phone to send its panorama
+  useEffect(() => {
+    if (!phone) return;
+    const k = setInterval(async () => {
+      try {
+        const st = await api.get<{ done: boolean; coverage: number; complete: boolean; expired: boolean }>(`/student/homework/${id}/scan-link/${phone.linkId}`);
+        if (st.expired) { setPhone(null); setErr(t('The phone link expired. Make a new QR code.')); }
+        if (st.done) { setPanoState({ img: `/api/student/homework/${id}/scan-link/${phone.linkId}/panorama?t=${Date.now()}`, video: null, coverage: st.coverage, complete: st.complete, linkId: phone.linkId }); setPhone(null); }
+      } catch { /* try again */ }
+    }, 2500);
+    return () => clearInterval(k);
+  }, [phone]); // eslint-disable-line react-hooks/exhaustive-deps
   const askScreen = async () => {
     setErr('');
     if (!canShare()) { setNoScreen(true); return; }
@@ -110,14 +111,10 @@ export function ProctorGate({ p, resume, onReady }: { p: Proctor; resume: boolea
         </ul>
         <p className="mt-2 text-sm text-slate-500">{t('Nothing is recorded before you press Start, and recording stops when you hand in.')}</p></div>
       {/* the live camera picture (like a mirror) — it stays on during the room scan, with what to do next */}
-      {(cam || scr) && <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+      {(cam || scr) && !scanning && <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
         {cam ? <div className="relative overflow-hidden rounded-2xl bg-black shadow-inner">
           <video ref={attach(cam)} autoPlay muted playsInline className="aspect-video w-full -scale-x-100 object-cover" aria-label={t('Your camera')} />
           <span className="absolute start-2 top-2 rounded bg-red-600 px-1.5 py-0.5 text-xs font-bold text-white">● {t('Camera')}</span>
-          {scanning && <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-3 text-center">
-            <p className={cn('text-lg font-black drop-shadow sm:text-xl', scanInfo.fast ? 'text-amber-300' : 'text-white')}>{scanInfo.fast ? '🐢' : '⟵'} {t(scanTip)}</p>
-            <div className="mx-auto mt-2 h-2.5 w-3/4 overflow-hidden rounded-full bg-white/30"><div className="h-full bg-emerald-400 transition-[width]" style={{ width: `${Math.min(100, (scanInfo.covered / TARGET) * 100)}%` }} /></div></div>}
-          {scanning && <span className="absolute end-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-xs font-bold text-white">● REC {scanInfo.secs}s</span>}
         </div> : <div />}
         {scr && <div className="relative overflow-hidden rounded-2xl bg-slate-900">
           <video ref={attach(scr)} autoPlay muted playsInline className="aspect-video w-full object-contain" aria-label={t('Your shared screen')} />
@@ -126,21 +123,29 @@ export function ProctorGate({ p, resume, onReady }: { p: Proctor; resume: boolea
       <ol className="space-y-3">
         {needCam && step(!!cam, ++n, t('Allow the camera'), cam ? <p className="text-emerald-800">{t('Your camera is on — you can see yourself above.')}</p>
           : <button type="button" onClick={askCam} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white">📷 {t('Turn on the camera')}</button>)}
-        {p.roomScan && !resume && step(!!pano, ++n, t('Show your room (panorama)'), scanning
-          ? <div className="space-y-2"><canvas ref={strip} width={900} height={150} className="h-24 w-full rounded-lg bg-slate-900" aria-label={t('Your room panorama, growing')} />
-              <div className="flex items-center gap-2 text-sm text-slate-600"><span className="flex-1">{t('Turn slowly all the way around. The picture of your room grows here.')}</span>
-                <button type="button" disabled={scanInfo.covered < 2} onClick={() => stopScan.current?.()} className="rounded-lg bg-emerald-600 px-3 py-1.5 font-bold text-white disabled:opacity-40">✓ {t('Done')}</button></div></div>
-          : pano ? <div className="space-y-1"><div className="overflow-x-auto rounded-lg bg-slate-900"><img src={pano} alt={t('Your room panorama')} className="h-28 max-w-none" /></div>
+        {p.roomScan && !resume && step(!!pano, ++n, t('Show your room (panorama)'), scanning && cam
+          ? <RoomScan stream={cam} onCancel={() => setScanning(false)} onDone={(r) => { setScanning(false); setPanoState({ img: r.panorama, video: r.video, coverage: r.coverage, complete: r.complete }); }} />
+          : phone ? <div className="flex flex-wrap items-center gap-4">
+              <img src={phone.qr} alt={t('QR code for your phone')} className="size-40 rounded-lg ring-1 ring-slate-200" />
+              <div className="min-w-0 flex-1 space-y-2 text-sm text-slate-700">
+                <p className="font-bold">📱 {t('Scan this QR code with your phone camera.')}</p>
+                <p>{t('Your phone opens the room scan. Turn slowly all the way around with the phone. When it is done, this page continues by itself.')}</p>
+                <p className="break-all text-xs text-slate-500">{phone.url}</p>
+                <p className="flex items-center gap-2 text-sky-700"><span className="size-2 animate-pulse rounded-full bg-sky-600" />{t('Waiting for your phone…')}</p>
+                <button type="button" onClick={() => setPhone(null)} className="text-xs text-slate-500 underline">{t('Cancel')}</button></div></div>
+          : pano ? <div className="space-y-1"><div className="overflow-x-auto rounded-lg bg-slate-900"><img src={pano.img} alt={t('Your room panorama')} className="h-28 max-w-none" /></div>
+              <p className={cn('text-xs font-medium', pano.complete ? 'text-emerald-700' : 'text-amber-700')}>{pano.complete ? `✅ ${t('The whole room is scanned.')}` : `⚠ ${t('Unfinished scan ({n}%) — your teacher will see this.', { n: pano.coverage })}`}{pano.linkId ? ` · 📱 ${t('made with your phone')}` : ''}</p>
               <button type="button" onClick={doScan} className="text-xs text-sky-700 underline">{t('Scan again')}</button></div>
-          : <div className="space-y-2"><p className="text-sm text-slate-600">{t('Hold your camera (or turn your laptop) and turn slowly all the way around your room. We make one wide picture of it.')}</p>
-              <button type="button" disabled={!cam} onClick={doScan} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white disabled:opacity-40">🔄 {t('Start the room panorama')}</button></div>)}
+          : <div className="space-y-2"><p className="text-sm text-slate-600">{t('Turn the camera slowly all the way around your room: hold the laptop and turn on the spot, or unclip a USB camera and turn it. We make one wide picture of your room.')}</p>
+              <div className="flex flex-wrap gap-2"><button type="button" disabled={!cam} onClick={doScan} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white disabled:opacity-40">🔄 {t('Start the room panorama')}</button>
+                <button type="button" onClick={usePhone} className="rounded-xl bg-white px-4 py-2 font-bold text-sky-800 ring-2 ring-sky-200">📱 {t('My camera cannot turn — scan with my phone')}</button></div></div>)}
         {p.screen && step(!!scr || noScreen, ++n, t('Share your whole screen'), scr ? <p className="text-emerald-800">{t('Your screen is shared — you can see it above.')}</p>
           : noScreen ? <p className="text-amber-800">{t('This device cannot share its screen. Your teacher will see this. Use a computer next time if you can.')}</p>
           : <button type="button" onClick={askScreen} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white">🖥️ {t('Share the screen')}</button>)}
       </ol>
       {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{err}</p>}
-      <div className="text-center"><button type="button" disabled={!(camOk && roomOk && scrOk) || scanning}
-        onClick={() => onReady({ cam, scr, room, panorama: pano, roomVideo, screenPart: part, noScreen })}
+      <div className="text-center"><button type="button" disabled={!(camOk && roomOk && scrOk) || scanning || !!phone}
+        onClick={() => onReady({ cam, scr, room, panorama: pano?.linkId ? null : pano?.img ?? null, roomVideo: pano?.video ?? null, panoLink: pano?.linkId ?? null, panoCoverage: pano?.coverage, panoComplete: pano?.complete, screenPart: part, noScreen })}
         className="rounded-2xl bg-emerald-700 px-8 py-3 text-xl font-bold text-white shadow disabled:opacity-40">▶ {t(resume ? 'Go on' : 'Start')}</button></div>
     </div>
   );
@@ -159,7 +164,8 @@ export function useProctor(id: string, p: Proctor | null, s: Streams | null, act
     let stop = false; const timers: ReturnType<typeof setTimeout>[] = [];
     // what happened at the start
     s.room.forEach((img) => void send('ROOM', { image: img }));
-    if (s.panorama) void send('PANORAMA', { image: s.panorama });
+    if (s.panorama) void send('PANORAMA', { image: s.panorama, coverage: s.panoCoverage ?? 0, complete: !!s.panoComplete });
+    if (s.panoLink) void send('PANORAMA', { linkId: s.panoLink });
     if (s.roomVideo) void send('ROOM_VIDEO', { video: s.roomVideo });
     if (p.screen && s.noScreen) void send('NO_SCREEN');
     if (p.screen && s.screenPart) void send('SCREEN_PART');

@@ -107,7 +107,7 @@ function Doing({ h, id, onDone }: { h: any; id: string; onDone: () => void }) {
 
   if (!run && guard) return <>
     {h.timeLimitMin && !h.current && <p className="mt-4 rounded-2xl bg-white p-3 text-center font-bold text-slate-700 shadow-sm">⏱️ {t('You have {n} minutes.', { n: h.timeLimitMin })} {t('The clock starts when you press Start.')}</p>}
-    <ProctorGate p={h.proctor} resume={!!h.current} onReady={(s) => { setStreams(s); void start(); }} />
+    <ProctorGate id={id} p={h.proctor} resume={!!h.current} onReady={(s) => { setStreams(s); void start(); }} />
   </>;
   if (!run) return h.timeLimitMin && !h.current ? (
     <div className="mt-6 rounded-3xl bg-white p-6 text-center shadow-sm">
