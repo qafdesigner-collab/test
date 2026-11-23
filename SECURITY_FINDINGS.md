@@ -186,3 +186,56 @@ Scan trees: `/tmp/edubooks-scan/edubooks` (packaging/cpanel, packaging/public_ht
 - health/ready `e.message` (known #13)
 - System update `POST .../download` https SSRF (known #3)
 - No `createCipher`/`md5`-as-MAC/`Math.random` for auth tokens; Piper MD5 is vendor checksum only
+
+---
+
+## Perfume ERP + LMS hunt (2026-11-23) — NONE
+
+Scan trees:
+- Perfume ERP `/tmp/sec-scan/perfume/perfume-erp` @ `5d67d9c` (dark theme / branding / System panel / cPanel installer)
+- LMS `/tmp/sec-scan/edubooks/lms` @ `6604b15` (package alongside EduBooks 1.4.20)
+
+**Result: NONE** — no new validated MEDIUM+ with a complete attack chain beyond known exclusions (LMS seed passwords / plaintext sessions / login rate limit; HMAC/secret-box; EduBooks cPanel updater RCE).
+
+### Prior “held” claims — re-verified
+
+| Claim | Evidence |
+|---|---|
+| Perfume `allow()` on mutating APIs | Controllers call `ErpBaseController::allow()` / role checks on POST paths; cashier Invoice/Purchase blocked by second `allow()` in `DocumentController::createDocument` |
+| Cashier cannot override price/discount | `DocumentController.php` ~61–69; tested in `ErpWorkflowsTest::test_pos_requires_shift_and_cashier_cannot_override_price` |
+| Formulas manager+production | `ManufacturingController::formulas/saveFormula` `allow(['manager','production'])`; approve manager-only |
+| Artwork tokens SHA-256 + 32-byte hex | `ArtworkPortalController` `random_bytes(32)` + `hash('sha256', $token)`; route regex `[a-f0-9]{64}` |
+| Installer `abort_if(isInstalled)` + install-code file | `InstallController` + `Installation::isInstalled/code`; lock deletes code file |
+| System update/backup owner+password reauth | `SystemController::ownerOnly` + `confirmPassword`; throttle `system` |
+| Query builder not string-concat SQL | Bindings / query builder throughout; Backup mysqlDump quotes identifiers from `SHOW TABLES` only |
+| LMS parameterized SQL | `db.prepare(sql).all/get/run(...p)`; dynamic columns only from fixed `pick()` allowlists |
+| LMS `allowedBookIds` / `ownUser` / `myDemo` | `auth.js` + `routes.js` ownership helpers |
+| LMS HTML CSP sandbox | `routes.js` materials file: `Content-Security-Policy: sandbox …` + `nosniff`; viewer iframe sandbox |
+
+### Recent Perfume feature attack surfaces (dark theme, branding, System, installer)
+
+| Surface | Files | Why not MEDIUM+ |
+|---|---|---|
+| Dark theme | `shell.js`, `app.blade.php`, `login.blade.php` | Theme from `localStorage` / fixed enum; print forces light; no server trust of theme |
+| Brand colour / invoice footer | `CompanyController::settings`, `shell.js` `applyBranding`, print paths in `sales.js` | Hex regex `^#[0-9a-fA-F]{6}$`; footer/name `esc()` / Blade `{{ }}` |
+| Logo upload / public `/media/logo` | `CompanyController::logo/logoImage` | `mimes`+`mimetypes` reject SVG; store under `branding/`; serve requires `str_starts_with(..., 'branding/')`; manager+owner only |
+| Owner System migrate/backup | `SystemController`, `Backup` | Owner role + password reauth + rate limit; migrate/library only (no arbitrary artisan); backup path random under `storage/app` |
+| cPanel web installer | `InstallController`, `Installation`, `first-run.php`, `build-cpanel.sh` | Closed after owner exists; install-code file `0o600`; `.env` quoting rejects `'`/newlines; package adds deny-all `.htaccess` on app root |
+| Dashboard / table sort-filter | `WorkspaceController`, `tables.js` | Client-side filter only; finance fields gated by role |
+
+### Discarded candidates
+
+| Candidate | Why discarded |
+|---|---|
+| Install code only `random_bytes(4)` (32-bit) | Online brute impractical under `throttle:10,1` per IP during short pre-install window; needs exposed unfinished install |
+| Installer MySQL `db_host` as SSRF | Requires valid install code (filesystem read of code file ≈ already privileged); MySQL wire protocol ≠ useful HTTP SSRF |
+| `logo_path` `branding/../` traversal | `logo_path` only written by `store('branding')`; settings POST cannot set it; no write primitive |
+| Warehouse can create Invoice | Intentional nav (`wholesale` includes warehouse); not cashier escalation |
+| `GET /api/products` without `allow()` | Any active authenticated role needs catalogue/POS; disabled users blocked by `EnsureActiveUser` |
+| Artwork path column in staff project JSON | Same-tenant staff; downloads still go through `projectAccess` |
+| LMS SVG/HTML upload XSS | Response CSP `sandbox` (no `allow-same-origin`) + viewer iframe sandbox; HttpOnly session not readable from opaque origin |
+| LMS `update(table, …)` string SQL | Table/column names from hardcoded callers / `pick()` allowlists only; values bound |
+| LMS sales sees all books/materials | Role design for demos; not cross-tenant |
+| LMS seed/`ADMIN_PASSWORD` defaults | Excluded known family |
+| LMS plaintext session tokens / no login rate limit | Excluded known family |
+| EduBooks Nest API SSRF/XSS/updater/login-as | Out of LMS tree scope; already stored #3/#9/#15/#16/#17 |
