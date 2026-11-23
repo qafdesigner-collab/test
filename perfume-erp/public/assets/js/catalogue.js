@@ -1,6 +1,30 @@
 /* Atelier Perfume ERP · Perfume catalogue: product cards, filters, product form, images, inspiration references and fragrance profiles. */
 'use strict';
 
+/** Bottle colours by the first recognised scent family: [glass tint, liquid]. */
+const FAMILY_COLORS = [
+  [/citrus/i, ['#f1e6bf', '#c9a227']],
+  [/aqua|marine|ocean/i, ['#d6e6ee', '#4f8fb0']],
+  [/fresh/i, ['#d7ebe6', '#4f9e8f']],
+  [/floral|rose|jasmine/i, ['#f1dbe0', '#c0627c']],
+  [/oud/i, ['#e2d3cc', '#6b3f2e']],
+  [/wood|cedar|sandal/i, ['#e6dbcd', '#8b6744']],
+  [/amber|oriental/i, ['#f1dcc2', '#c77a2c']],
+  [/gourmand|vanilla|sweet/i, ['#f0e1cf', '#b07a4f']],
+  [/aromatic|green|herbal|fougere/i, ['#dde8d4', '#5e8a4f']],
+  [/spic/i, ['#efd8cf', '#a4492f']],
+  [/leather|tobacco/i, ['#e4d6c8', '#7a5232']],
+  [/musk|powder/i, ['#e6e0ec', '#8a7aa3']],
+];
+
+function familyColors(families) {
+  for (const f of families || []) {
+    const hit = FAMILY_COLORS.find(([re]) => re.test(f));
+    if (hit) return hit[1];
+  }
+  return null;
+}
+
 function bottle(p) {
   const palettes = [
     ['#d8dace', '#8c9d84'],
@@ -9,15 +33,17 @@ function bottle(p) {
     ['#e0d8c1', '#ab9564'],
     ['#e0d6db', '#a48595'],
   ];
-  const [bg, liquid] = palettes[p.id % palettes.length];
+  const [bg, liquid] = familyColors(p.families) || palettes[p.id % palettes.length];
   const name = p.name.split(' ').slice(0, 2).join(' ').toUpperCase();
+  const house = (state.boot?.settings.company_name || 'Atelier').split(' ')[0].toUpperCase().slice(0, 14);
+  const strength = { Parfum: 'PARFUM', EDP: 'EAU DE PARFUM', EDT: 'EAU DE TOILETTE', Cologne: 'EAU DE COLOGNE', Attar: 'ATTAR', 'Perfume Oil': 'PERFUME OIL' }[p.concentration] || 'EAU DE PARFUM';
   if (p.kind === 'service')
     return `<svg viewBox="0 0 150 170" aria-hidden="true"><rect x="25" y="30" width="100" height="125" rx="7" fill="#f9f7ed" stroke="#a5b5a3"/><path d="M45 65h60M45 80h60M45 95h35" stroke="#a5b5a3" stroke-width="3"/><path d="M65 130l12-25 26-26 10 10-26 26z" fill="#718b7b"/><text x="75" y="146" text-anchor="middle" fill="#718b7b" font-size="6">CREATIVE SERVICE</text></svg>`;
   if (p.kind === 'raw')
     return `<svg viewBox="0 0 150 170" aria-hidden="true"><rect x="47" y="12" width="56" height="22" rx="4" fill="#b9b5a9"/><path d="M48 34h54l12 17v99a9 9 0 0 1-9 9H45a9 9 0 0 1-9-9V51z" fill="${liquid}" opacity=".75"/><rect x="43" y="70" width="65" height="55" fill="#f7f5e9" rx="2"/><text x="75" y="96" text-anchor="middle" fill="#6b6c56" font-size="8">MATERIAL</text><text x="75" y="110" text-anchor="middle" fill="#6b6c56" font-size="6">${esc(p.unit.toUpperCase())}</text></svg>`;
   if (p.kind === 'packaging')
     return `<svg viewBox="0 0 150 170" aria-hidden="true"><path d="M28 48l46-22 48 22-48 22z" fill="#d8cdb9"/><path d="M28 48v88l46 24V70z" fill="#bba98e"/><path d="M74 70v90l48-24V48z" fill="#cbbda5"/><text x="71" y="112" text-anchor="middle" fill="#8b755b" font-size="7" transform="rotate(27 71 112)">PACKAGING</text></svg>`;
-  return `<svg viewBox="0 0 150 170" aria-hidden="true"><rect x="56" y="7" width="38" height="29" rx="3" fill="#26362f"/><rect x="61" y="34" width="28" height="12" fill="#c5ae83"/><rect x="30" y="44" width="90" height="114" rx="12" fill="${bg}" stroke="${liquid}" stroke-width="1.5"/><rect x="36" y="53" width="78" height="96" rx="8" fill="${liquid}" opacity=".34"/><path d="M40 59v76" stroke="#fff" stroke-width="4" opacity=".3"/><rect x="38" y="81" width="74" height="47" fill="#fff" opacity=".78"/><text x="75" y="97" text-anchor="middle" fill="#596854" font-family="Georgia" font-size="6">ATELIER</text><text x="75" y="111" text-anchor="middle" fill="#52624f" font-size="6">${esc(name)}</text><text x="75" y="121" text-anchor="middle" fill="#87917a" font-size="4">EAU DE PARFUM</text></svg>`;
+  return `<svg viewBox="0 0 150 170" aria-hidden="true"><rect x="56" y="7" width="38" height="29" rx="3" fill="#26362f"/><rect x="61" y="34" width="28" height="12" fill="#c5ae83"/><rect x="30" y="44" width="90" height="114" rx="12" fill="${bg}" stroke="${liquid}" stroke-width="1.5"/><rect x="36" y="53" width="78" height="96" rx="8" fill="${liquid}" opacity=".34"/><path d="M40 59v76" stroke="#fff" stroke-width="4" opacity=".3"/><rect x="38" y="81" width="74" height="47" fill="#fff" opacity=".78"/><text x="75" y="97" text-anchor="middle" fill="#596854" font-family="Georgia" font-size="6">${esc(house)}</text><text x="75" y="111" text-anchor="middle" fill="#52624f" font-size="6">${esc(name)}</text><text x="75" y="121" text-anchor="middle" fill="#87917a" font-size="4">${strength}</text></svg>`;
 }
 
 function productArt(p, extra = '') {

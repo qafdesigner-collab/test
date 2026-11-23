@@ -134,13 +134,13 @@ async function documentDetail(id) {
       : state.boot.settings;
     modal(
       p.number,
-      `<article class="document-preview"><div class="document-header"><div><p class="eyebrow">${esc(s.company_name)}</p><h1>${esc(p.kind === 'Sale' ? 'SALES RECEIPT' : p.kind.toUpperCase())}</h1><p class="muted tiny">${esc(s.address || '')}<br>${esc(s.phone || '')} · ${esc(s.email || '')}<br>${s.tax_id ? 'Tax ID: ' + esc(s.tax_id) : ''}</p></div><div class="right"><h2>${esc(p.number)}</h2>${badge(p.status)}<p class="tiny muted" style="margin-top:10px">${date(p.created_at)}${p.due_date ? '<br>Due ' + date(p.due_date) : ''}${p.bill_reference ? '<br>Reference: ' + esc(p.bill_reference) : ''}</p></div></div><div class="document-meta"><div><small class="muted">${p.kind === 'Purchase' ? 'Supplier' : 'Customer'}</small><br><b>${esc(d.contact?.name || 'Walk-in customer')}</b><br><small>${esc(d.contact?.address || '')}<br>${esc(d.contact?.phone || '')} ${esc(d.contact?.email || '')}${d.contact?.tax_id ? '<br>Tax ID: ' + esc(d.contact.tax_id) : ''}</small></div><div class="right"><small class="muted">Payment method</small><br>${esc(p.method)}</div></div>${table(
+      `<article class="document-preview"><div class="document-header"><div>${state.boot.settings.logo_path ? `<img class="doc-logo" src="${logoUrl()}" alt="">` : ''}<p class="eyebrow">${esc(s.company_name)}</p><h1>${esc(p.kind === 'Sale' ? 'SALES RECEIPT' : p.kind.toUpperCase())}</h1><p class="muted tiny">${esc(s.address || '')}<br>${esc(s.phone || '')} · ${esc(s.email || '')}<br>${s.tax_id ? 'Tax ID: ' + esc(s.tax_id) : ''}</p></div><div class="right"><h2>${esc(p.number)}</h2>${badge(p.status)}<p class="tiny muted" style="margin-top:10px">${date(p.created_at)}${p.due_date ? '<br>Due ' + date(p.due_date) : ''}${p.bill_reference ? '<br>Reference: ' + esc(p.bill_reference) : ''}</p></div></div><div class="document-meta"><div><small class="muted">${p.kind === 'Purchase' ? 'Supplier' : 'Customer'}</small><br><b>${esc(d.contact?.name || 'Walk-in customer')}</b><br><small>${esc(d.contact?.address || '')}<br>${esc(d.contact?.phone || '')} ${esc(d.contact?.email || '')}${d.contact?.tax_id ? '<br>Tax ID: ' + esc(d.contact.tax_id) : ''}</small></div><div class="right"><small class="muted">Payment method</small><br>${esc(p.method)}</div></div>${table(
         ['Item', 'Qty / unit', 'Unit price', 'Discount', 'Tax', 'Total'],
         d.lines.map(
           l =>
             `<tr><td>${esc(l.name)}</td><td>${quantity(l.quantity_milli)} ${esc(l.unit)}</td><td>${money(l.price_cents)}</td><td>${money(l.discount_cents)}</td><td>${money(l.tax_cents)}</td><td>${money(l.total_cents)}</td></tr>`,
         ),
-      )}<div class="document-total"><p>Subtotal ${money(p.subtotal_cents)} · Tax ${money(p.tax_cents)}</p><strong>${money(p.total_cents)}</strong><small>Paid ${money(p.paid_cents)} · ${p.status === 'Returned' ? 'Returned' : `Balance ${money(p.total_cents - p.paid_cents)}`}</small></div><p class="tiny muted" style="margin-top:20px">${esc(p.notes || 'Thank you for your business.')}</p></article>${invoiceCostView(d)}<div class="form-actions"><button class="secondary" onclick="window.print()">Print / save PDF</button>${can('manager', 'accountant') && p.status === 'Draft' && p.kind === 'Quotation' ? `<button class="secondary" onclick="quotationAction(${id},'decline')">Decline</button><button class="primary" onclick="quotationAction(${id},'accept')">Accept quotation</button>` : ''}${can('manager', 'accountant') && p.status === 'Posted' && p.kind !== 'Return' ? `${p.paid_cents < p.total_cents ? `<button class="primary" onclick="paymentDialog(${id},${p.total_cents - p.paid_cents})">Record payment</button>` : ''}${['Sale', 'Invoice'].includes(p.kind) ? `<button class="danger" onclick="returnDialog(${id})">Full return</button>` : ''}` : ''}</div>`,
+      )}<div class="document-total"><p>Subtotal ${money(p.subtotal_cents)} · Tax ${money(p.tax_cents)}</p><strong>${money(p.total_cents)}</strong><small>Paid ${money(p.paid_cents)} · ${p.status === 'Returned' ? 'Returned' : `Balance ${money(p.total_cents - p.paid_cents)}`}</small></div>${p.notes ? `<p class="tiny muted" style="margin-top:20px">${esc(p.notes)}</p>` : ''}<p class="doc-footer">${esc(state.boot.settings.invoice_footer || 'Thank you for your business.')}</p></article>${invoiceCostView(d)}<div class="form-actions"><button class="secondary" onclick="window.print()">Print A4 / save PDF</button>${['Sale', 'Invoice', 'Return'].includes(p.kind) ? `<button class="secondary" onclick="printReceipt(${id})">Print receipt · 80 mm</button>` : ''}${can('manager', 'accountant') && p.status === 'Draft' && p.kind === 'Quotation' ? `<button class="secondary" onclick="quotationAction(${id},'decline')">Decline</button><button class="primary" onclick="quotationAction(${id},'accept')">Accept quotation</button>` : ''}${can('manager', 'accountant') && p.status === 'Posted' && p.kind !== 'Return' ? `${p.paid_cents < p.total_cents ? `<button class="primary" onclick="paymentDialog(${id},${p.total_cents - p.paid_cents})">Record payment</button>` : ''}${['Sale', 'Invoice'].includes(p.kind) ? `<button class="danger" onclick="returnDialog(${id})">Full return</button>` : ''}` : ''}</div>`,
       true,
     );
   } catch (e) {
@@ -197,4 +197,43 @@ function invoiceCostView(d) {
         `<tr><td>${esc(l.name)}</td><td>${quantity(l.quantity_milli)} ${esc(l.unit)}</td><td>${money(l.subtotal_cents)}</td><td>${l.cogs_cents === null || l.cogs_cents === undefined ? 'Not recorded' : money(l.cogs_cents)}</td><td>${l.cogs_cents === null || l.cogs_cents === undefined ? 'Not recorded' : money(l.subtotal_cents - l.cogs_cents)}</td><td>${(l.cost_allocations || []).map(a => esc(a.lot || a.cost_basis)).join(', ') || '—'}</td></tr>`,
     ),
   )}<div class="metric-grid"><div><small>Sales excluding tax</small><b>${money(p.revenue_cents)}</b></div><div><small>Cost of goods sold</small><b>${p.cogs_cents === null ? 'Not recorded' : money(p.cogs_cents)}</b></div><div><small>Gross profit</small><b>${p.gross_profit_cents === null ? 'Not recorded' : money(p.gross_profit_cents)}</b></div></div><p class="form-hint">${p.estimated ? 'Includes costs estimated from opening/configured values.' : 'Costs are captured from the stock lots consumed by this sale.'} General business expenses are excluded.</p></section>`;
+}
+
+
+/** Narrow receipt for 80 mm thermal printers, opened in its own window. */
+async function printReceipt(id) {
+  const d = await api('documents/' + id);
+  const p = d.document;
+  const snapshot = p.seller_snapshot ? (typeof p.seller_snapshot === 'string' ? JSON.parse(p.seller_snapshot) : p.seller_snapshot) : state.boot.settings;
+  const logo = state.boot.settings.logo_path ? `<img src="${location.origin}${logoUrl()}" alt="" class="logo">` : '';
+  const lines = d.lines
+    .map(l => `<tr><td colspan="2">${esc(l.name)}</td></tr><tr class="sub"><td>${quantity(l.quantity_milli)} ${esc(l.unit)} × ${money(l.price_cents)}${l.discount_cents ? ' − ' + money(l.discount_cents) : ''}</td><td class="r">${money(l.total_cents)}</td></tr>`)
+    .join('');
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(p.number)}</title><style>
+    @page { size: 80mm auto; margin: 4mm; }
+    * { box-sizing: border-box; }
+    body { font: 12px/1.35 ui-monospace, Menlo, Consolas, monospace; color: #000; margin: 0; width: 72mm; }
+    .c { text-align: center; } .r { text-align: right; white-space: nowrap; }
+    .logo { max-width: 40mm; max-height: 18mm; display: block; margin: 0 auto 4px; }
+    h1 { font-size: 15px; margin: 2px 0; } p { margin: 2px 0; }
+    hr { border: 0; border-top: 1px dashed #000; margin: 6px 0; }
+    table { width: 100%; border-collapse: collapse; } td { padding: 1px 0; vertical-align: top; }
+    tr.sub td { padding-bottom: 4px; }
+    .total td { font-size: 15px; font-weight: 700; padding-top: 4px; }
+  </style></head><body>
+    <div class="c">${logo}<h1>${esc(snapshot.company_name)}</h1><p>${esc(snapshot.address || '')}</p><p>${esc(snapshot.phone || '')}</p>${snapshot.tax_id ? `<p>Tax ID ${esc(snapshot.tax_id)}</p>` : ''}</div>
+    <hr><p>${esc(p.kind === 'Return' ? 'RETURN' : 'RECEIPT')} ${esc(p.number)}</p><p>${new Date(p.created_at).toLocaleString('en')}</p>${d.contact ? `<p>Customer: ${esc(d.contact.name)}</p>` : ''}<hr>
+    <table>${lines}</table><hr>
+    <table><tr><td>Subtotal</td><td class="r">${money(p.subtotal_cents)}</td></tr><tr><td>Tax</td><td class="r">${money(p.tax_cents)}</td></tr><tr class="total"><td>TOTAL</td><td class="r">${money(p.total_cents)}</td></tr><tr><td>Paid · ${esc(p.method)}</td><td class="r">${money(p.paid_cents)}</td></tr>${p.total_cents > p.paid_cents ? `<tr><td>Balance due</td><td class="r">${money(p.total_cents - p.paid_cents)}</td></tr>` : ''}</table>
+    <hr><p class="c">${esc(state.boot.settings.invoice_footer || 'Thank you for your visit.')}</p>
+    <script>window.addEventListener('load', () => { window.print(); });<\/script>
+  </body></html>`;
+  const w = window.open('', '_blank', 'width=420,height=720');
+  if (!w) {
+    toast('Allow pop-ups for this site to print receipts.');
+    return;
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
 }

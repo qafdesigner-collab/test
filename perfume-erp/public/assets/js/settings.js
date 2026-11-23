@@ -43,14 +43,65 @@ async function settingsPage() {
     );
 }
 
+const BRAND_COLORS = [
+  ['Emerald', '#087b61'], ['Navy', '#1f3a5f'], ['Burgundy', '#8a2c3b'], ['Plum', '#5b3a78'],
+  ['Teal', '#0f6c7a'], ['Charcoal', '#2f3a40'], ['Bronze', '#7d5310'], ['Rose', '#9c3563'],
+];
+
+/** WCAG contrast of white text on a hex colour. */
+function contrastWithWhite(hex) {
+  const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  const lum = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  return 1.05 / (lum + 0.05);
+}
+
 function companyDialog() {
   const s = state.boot.settings;
+  const current = s.brand_color || '#087b61';
   modal(
     'Company details',
-    `<form><div class="form-grid">${field('Company name', 'company_name', s.company_name)}${field('Email', 'email', s.email, 'email')}${field('Phone', 'phone', s.phone)}${field('Tax identifier', 'tax_id', s.tax_id)}${field('Currency · three-letter code', 'currency', s.currency)}<label class="span2">Address<textarea name="address">${esc(s.address)}</textarea></label></div>${formActions('Save company')}</form>`,
+    `<form><div class="form-grid">${field('Company name', 'company_name', s.company_name)}${field('Email', 'email', s.email, 'email')}${field('Phone', 'phone', s.phone)}${field('Tax identifier', 'tax_id', s.tax_id)}${field('Currency · three-letter code', 'currency', s.currency)}<label class="span2">Address<textarea name="address">${esc(s.address)}</textarea></label>
+    <div class="span2"><div class="section-label">Logo</div><div class="logo-preview">${s.logo_path ? `<img src="${logoUrl()}" alt="Current logo">` : '<span class="muted">No logo yet. The letter mark is used.</span>'}<label class="secondary file-button">Upload PNG, JPG or WebP (max 2 MB)<input type="file" id="logo-file" accept="image/png,image/jpeg,image/webp" hidden></label>${s.logo_path ? '<button type="button" class="subtle" id="logo-remove">Remove</button>' : ''}</div></div>
+    <div class="span2"><div class="section-label">Brand colour</div><div class="color-row">${BRAND_COLORS.map(([name, hex]) => `<button type="button" class="color-swatch ${hex === current ? 'is-selected' : ''}" style="background:${hex}" title="${name}" aria-label="${name}" data-color="${hex}"></button>`).join('')}<label class="tiny">Custom <input type="color" id="brand-custom" value="${current}" style="width:44px;height:32px;padding:0;border:0"></label><input type="hidden" name="brand_color" value="${current}"></div><p class="form-hint">Used for buttons, the menu and charts. Dark colours keep white text readable.</p></div>
+    <label class="span2">Printed invoice footer · thank-you note, bank details or terms<textarea name="invoice_footer" maxlength="500">${esc(s.invoice_footer || '')}</textarea></label></div>${formActions('Save company')}</form>`,
   );
+  const colorInput = $('.modal input[name=brand_color]');
+  const pick = hex => {
+    colorInput.value = hex;
+    document.querySelectorAll('.color-swatch').forEach(b => b.classList.toggle('is-selected', b.dataset.color === hex));
+    document.documentElement.style.setProperty('--accent', hex);
+  };
+  document.querySelectorAll('.color-swatch').forEach(b => b.addEventListener('click', () => pick(b.dataset.color)));
+  $('#brand-custom').addEventListener('input', e => pick(e.target.value));
+  $('#logo-file').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('logo', file);
+    try {
+      await api('settings/logo', 'POST', fd);
+      state.boot = await api('bootstrap');
+      companyHeader();
+      toast('Logo updated');
+      companyDialog();
+    } catch (err) {
+      $('#form-error').textContent = err.message;
+      $('#form-error').hidden = false;
+    }
+  });
+  $('#logo-remove')?.addEventListener('click', async () => {
+    await api('settings/logo', 'POST', { remove: true });
+    state.boot = await api('bootstrap');
+    companyHeader();
+    toast('Logo removed');
+    companyDialog();
+  });
   bindForm(async fd => {
-    await api('settings', 'POST', Object.fromEntries(fd));
+    const values = Object.fromEntries(fd);
+    if (contrastWithWhite(values.brand_color) < 4.5) {
+      throw new Error('That brand colour is too light for white button text. Choose a darker shade.');
+    }
+    await api('settings', 'POST', values);
     state.boot = await api('bootstrap');
     companyHeader();
     closeModal();

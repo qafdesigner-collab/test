@@ -121,7 +121,30 @@ async function render() {
   }
 }
 
+/** Apply the company's brand colour and logo to the interface. */
+function applyBranding() {
+  const s = state.boot.settings;
+  const root = document.documentElement.style;
+  if (/^#[0-9a-f]{6}$/i.test(s.brand_color || '')) {
+    root.setProperty('--accent', s.brand_color);
+    root.setProperty('--accent-soft', `color-mix(in srgb, ${s.brand_color} 12%, #fff)`);
+  } else {
+    root.removeProperty('--accent');
+    root.removeProperty('--accent-soft');
+  }
+  const brand = document.querySelector('.sidebar .brand');
+  brand.classList.toggle('has-logo', Boolean(s.logo_path));
+  brand.innerHTML = s.logo_path
+    ? `<img class="brand-logo-wide" src="${logoUrl()}" alt="${esc(s.company_name)}">`
+    : '<span class="brand-mark">A</span><span>atelier<small>PERFUME BUSINESS ERP</small></span>';
+}
+
+function logoUrl() {
+  return state.boot.settings.logo_path ? '/media/logo?v=' + encodeURIComponent(state.boot.settings.logo_path.slice(-12)) : '';
+}
+
 function companyHeader() {
+  applyBranding();
   $('#company-name').textContent = state.boot.settings.company_name;
   $('#footer-company').textContent = state.boot.settings.company_name;
   $('#user-name').textContent = state.boot.user.name;

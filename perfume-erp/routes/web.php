@@ -25,6 +25,7 @@ Route::prefix('artwork-review/{token}')->where(['token' => '[a-f0-9]{64}'])->mid
     Route::post('decision', [A::class, 'decide'])->middleware('throttle:10,1');
 });
 
+Route::get('/media/logo', [CompanyController::class, 'logoImage'])->middleware('throttle:120,1');
 Route::get('/install', [InstallController::class, 'show']);
 Route::post('/install', [InstallController::class, 'install'])->middleware('throttle:10,1');
 
@@ -67,6 +68,7 @@ Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
         Route::get('artwork/{id}', [DesignProjectController::class, 'artwork'])->whereNumber('id');
         Route::match(['get', 'post'], 'shifts', [ShiftController::class, 'shifts']);
         Route::match(['get', 'post'], 'settings', [CompanyController::class, 'settings']);
+        Route::post('settings/logo', [CompanyController::class, 'logo']);
         Route::match(['get', 'post'], 'users', [CompanyController::class, 'users']);
         Route::post('password', [AuthController::class, 'password']);
         Route::get('audit', [CompanyController::class, 'auditLog']);

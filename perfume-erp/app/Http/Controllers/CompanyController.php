@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 /**
@@ -19,7 +20,7 @@ class CompanyController extends ErpBaseController
     {
         $this->allow(['manager']);
         if ($r->isMethod('post')) {
-            $v = $r->validate(['company_name' => 'required|string|max:150', 'address' => 'nullable|string|max:2000', 'phone' => 'nullable|string|max:50', 'email' => 'nullable|email|max:150', 'tax_id' => 'nullable|string|max:50', 'currency' => 'required|string|size:3']);
+            $v = $r->validate(['company_name' => 'required|string|max:150', 'address' => 'nullable|string|max:2000', 'phone' => 'nullable|string|max:50', 'email' => 'nullable|email|max:150', 'tax_id' => 'nullable|string|max:50', 'currency' => 'required|string|size:3', 'brand_color' => ['sometimes', 'nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'invoice_footer' => 'sometimes|nullable|string|max:500']);
             foreach ($v as $k => $val) {
                 DB::table('settings')->updateOrInsert(['key' => $k], ['value' => $val ?? '']);
             }$this->audit('settings.update', 'company');
@@ -72,5 +73,43 @@ class CompanyController extends ErpBaseController
         $this->audit('user.status', 'user:'.$id);
 
         return ['ok' => true];
+    }
+
+    /**
+     * Upload or remove the company logo shown in the menu, on sign-in and on printed documents.
+     */
+    public function logo(Request $r)
+    {
+        $this->allow(['manager']);
+        $current = DB::table('settings')->where('key', 'logo_path')->value('value');
+        if ($r->boolean('remove')) {
+            if ($current) {
+                Storage::disk('local')->delete($current);
+            }
+            DB::table('settings')->where('key', 'logo_path')->delete();
+            $this->audit('settings.logo_removed', 'company');
+
+            return ['logo' => null];
+        }
+        $r->validate(['logo' => 'required|file|mimes:png,jpg,jpeg,webp|mimetypes:image/png,image/jpeg,image/webp|max:2048|dimensions:max_width=4000,max_height=4000']);
+        $path = $r->file('logo')->store('branding', 'local');
+        if ($current && $current !== $path) {
+            Storage::disk('local')->delete($current);
+        }
+        DB::table('settings')->updateOrInsert(['key' => 'logo_path'], ['value' => $path]);
+        $this->audit('settings.logo_uploaded', 'company');
+
+        return ['logo' => '/media/logo?v='.substr(sha1($path), 0, 8)];
+    }
+
+    /**
+     * The logo is public branding (shown on the sign-in page), never other private files.
+     */
+    public function logoImage()
+    {
+        $path = DB::table('settings')->where('key', 'logo_path')->value('value');
+        abort_unless($path && str_starts_with($path, 'branding/') && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path, null, ['Cache-Control' => 'public, max-age=86400', 'X-Content-Type-Options' => 'nosniff']);
     }
 }

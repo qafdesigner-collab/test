@@ -117,6 +117,7 @@ function modal(title, html, wide = false) {
 
 function closeModal() {
   $('#modal-root').innerHTML = '';
+  if (state.boot && typeof applyBranding === 'function') applyBranding();
 }
 
 function formActions(text = 'Save') {
