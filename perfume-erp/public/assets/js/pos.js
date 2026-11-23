@@ -18,7 +18,7 @@ async function posPage() {
       .map(p => productCard(p, true))
       .join(
         '',
-      )}</div></div></section><section class="panel cart-panel"><div class="panel-head"><h2>Current basket</h2><button class="subtle" onclick="state.cart=[];cartRender()">Clear</button></div><div class="panel-body" id="cart"></div></section></div>`;
+      )}</div></div></section><section class="panel cart-panel"><div class="panel-head"><h2>Current basket</h2><span class="cart-actions" id="cart-actions"></span></div><div class="panel-body" id="cart"></div></section></div>`;
   bindFilters(true);
   cartRender();
 }
@@ -54,6 +54,8 @@ function cartRender() {
     tax += Math.round((net * l.p.tax_bp) / 10000);
   });
   state.cartTotal = subtotal + tax;
+  const held = heldBaskets().length;
+  $('#cart-actions').innerHTML = `${held ? `<button class="subtle" onclick="heldDialog()">Held (${held})</button>` : ''}${lines.length ? '<button class="subtle" onclick="holdBasket()">Hold</button><button class="subtle" onclick="state.cart=[];cartRender()">Clear</button>' : ''}`;
   el.innerHTML = lines.length
     ? lines
         .map(
@@ -65,33 +67,187 @@ function cartRender() {
     : '<div class="empty">Your basket is empty.<br>Select a product to begin.</div>';
 }
 
+/** Cents from a typed amount such as "12.5". */
+function toCents(value) {
+  const n = Number(String(value).replace(/,/g, ''));
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+
+/** Rounded cash amounts a customer is likely to hand over. */
+function cashSuggestions(cents) {
+  const steps = [1000, 5000, 10000, 50000, 100000];
+  const values = new Set([cents]);
+  steps.forEach(step => values.add((Math.floor(cents / step) + 1) * step));
+  return [...values].sort((a, b) => a - b).slice(0, 5);
+}
+
 function checkoutDialog() {
   if (!state.openShift) {
     shiftDialog();
     return;
   }
+  const total = state.cartTotal;
   modal(
-    'Complete sale',
-    `<form><div class="document-total"><span>Total to pay</span><strong>${money(state.cartTotal)}</strong></div><div class="form-grid" style="margin-top:20px"><label class="span2">Customer<select name="contact_id">${options(
-      state.contacts.filter(c => c.kind === 'customer'),
-      'name',
-      '',
-      'Walk-in customer',
-    )}</select></label>${field('Amount received', 'paid', decimal(state.cartTotal))}<label>Payment method<select name="method">${selectOptions(['Cash', 'Card', 'Bank', 'Credit'])}</select></label></div><p class="form-hint">Enter the exact applied payment. Tender/change and split payments are not yet supported. Card records do not charge a terminal.</p>${formActions('Post sale')}</form>`,
+    'Take payment',
+    `<form class="checkout"><div class="checkout-total"><span>Total to pay</span><strong>${money(total)}</strong></div>
+    <label>Customer<select name="contact_id">${options(state.contacts.filter(c => c.kind === 'customer'), 'name', '', 'Walk-in customer')}</select></label>
+    <div class="section-label">Payment</div>
+    <div class="quick-methods"><button type="button" class="secondary" data-all="Cash">All cash</button><button type="button" class="secondary" data-all="Card">All card</button><button type="button" class="secondary" data-all="Bank">All bank transfer</button><button type="button" class="subtle" id="add-payment">+ Split payment</button></div>
+    <div id="payment-rows"></div>
+    <div id="cash-box" class="cash-box" hidden><label>Cash received from customer<input id="tendered" inputmode="decimal" autocomplete="off"></label><div class="cash-chips" id="cash-chips"></div><div class="change-due"><span>Change to give</span><strong id="change-due">${money(0)}</strong></div></div>
+    <div class="checkout-summary" id="checkout-summary"></div>
+    <p class="form-hint">Card records do not charge a terminal. Any amount left unpaid goes on the customer's account (credit) and needs a customer.</p>${formActions('Complete sale')}</form>`,
   );
+  const rows = $('#payment-rows');
+  const addRow = (method, cents) => {
+    if (rows.children.length >= 4) return;
+    const row = document.createElement('div');
+    row.className = 'payment-row';
+    row.innerHTML = `<select aria-label="Payment method">${selectOptions(['Cash', 'Card', 'Bank'], method)}</select><input aria-label="Amount" inputmode="decimal" value="${decimal(cents)}"><button type="button" class="subtle" aria-label="Remove payment">×</button>`;
+    row.querySelector('button').addEventListener('click', () => {
+      row.remove();
+      refresh();
+    });
+    row.querySelectorAll('select, input').forEach(el => el.addEventListener('input', refresh));
+    rows.append(row);
+  };
+  const payments = () => [...rows.children].map(r => ({ method: r.querySelector('select').value, cents: toCents(r.querySelector('input').value) }));
+  const refresh = () => {
+    const list = payments();
+    const paid = list.reduce((a, p) => a + p.cents, 0);
+    const cash = list.filter(p => p.method === 'Cash').reduce((a, p) => a + p.cents, 0);
+    const remaining = total - paid;
+    $('#cash-box').hidden = cash === 0;
+    if (cash) {
+      $('#cash-chips').innerHTML = cashSuggestions(cash).map(v => `<button type="button" class="chip" data-cash="${v}">${money(v)}</button>`).join('');
+      const tendered = $('#tendered').value === '' ? cash : toCents($('#tendered').value);
+      const change = tendered - cash;
+      $('#change-due').textContent = money(Math.max(0, change));
+      $('#change-due').classList.toggle('negative', change < 0);
+    }
+    rows.querySelectorAll('.payment-row button').forEach(b => (b.hidden = rows.children.length === 1));
+    $('#checkout-summary').innerHTML =
+      remaining > 0
+        ? `<span>Paid ${money(paid)}</span><b class="due">${money(remaining)} on customer account</b>`
+        : remaining < 0
+          ? `<span>Paid ${money(paid)}</span><b class="over">${money(-remaining)} more than the total</b>`
+          : `<span>Paid ${money(paid)}</span><b class="ok">Fully paid ✓</b>`;
+  };
+  addRow('Cash', total);
+  document.querySelectorAll('[data-all]').forEach(b =>
+    b.addEventListener('click', () => {
+      rows.innerHTML = '';
+      addRow(b.dataset.all, total);
+      $('#tendered').value = '';
+      refresh();
+    }),
+  );
+  $('#add-payment').addEventListener('click', () => {
+    const paid = payments().reduce((a, p) => a + p.cents, 0);
+    addRow('Card', Math.max(0, total - paid));
+    refresh();
+  });
+  $('#cash-chips').addEventListener('click', e => {
+    const chip = e.target.closest('[data-cash]');
+    if (!chip) return;
+    $('#tendered').value = decimal(Number(chip.dataset.cash));
+    refresh();
+  });
+  $('#tendered').addEventListener('input', refresh);
+  refresh();
   bindForm(async (fd, key) => {
-    const v = Object.fromEntries(fd);
-    v.contact_id = v.contact_id ? Number(v.contact_id) : null;
-    v.kind = 'Sale';
-    v.location_id = state.location;
-    v.lines = state.cart.map(l => ({ product_id: l.id, quantity: String(l.qty) }));
-    const r = await api('documents', 'POST', v, key);
+    const list = payments().filter(p => p.cents > 0);
+    const cash = list.filter(p => p.method === 'Cash').reduce((a, p) => a + p.cents, 0);
+    const body = {
+      kind: 'Sale',
+      location_id: state.location,
+      contact_id: fd.get('contact_id') ? Number(fd.get('contact_id')) : null,
+      lines: state.cart.map(l => ({ product_id: l.id, quantity: String(l.qty) })),
+    };
+    if (list.length) {
+      body.payments = list.map(p => ({ method: p.method, amount: decimal(p.cents) }));
+      if (cash && $('#tendered').value !== '') body.tendered = $('#tendered').value;
+    } else {
+      body.method = 'Credit';
+      body.paid = '0';
+    }
+    const r = await api('documents', 'POST', body, key);
     state.cart = [];
     closeModal();
-    toast(r.number + ' completed');
+    toast(r.change_cents ? `${r.number} completed · give change ${money(r.change_cents)}` : `${r.number} completed`);
     await posPage();
     await documentDetail(r.id);
   });
+}
+
+/* ── Held baskets: park a customer's basket and serve the next one. Saved in this browser. ── */
+function heldKey() {
+  return 'atelier-held-' + state.boot.user.id;
+}
+
+function heldBaskets() {
+  try {
+    return JSON.parse(localStorage.getItem(heldKey()) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function saveHeld(list) {
+  try {
+    localStorage.setItem(heldKey(), JSON.stringify(list));
+  } catch {
+    toast('This browser cannot save held baskets.');
+  }
+}
+
+function holdBasket() {
+  if (!state.cart.length) return;
+  modal(
+    'Hold this basket',
+    `<form><label>Name or note · for example the customer's name<input name="label" maxlength="60" placeholder="Basket ${heldBaskets().length + 1}"></label>${formActions('Hold basket')}</form>`,
+  );
+  bindForm(async fd => {
+    const list = heldBaskets();
+    list.push({ id: Date.now(), label: fd.get('label') || `Basket ${list.length + 1}`, at: new Date().toISOString(), cart: state.cart, total: state.cartTotal });
+    saveHeld(list.slice(-10));
+    state.cart = [];
+    closeModal();
+    toast('Basket held');
+    cartRender();
+  });
+}
+
+function heldDialog() {
+  const list = heldBaskets();
+  modal(
+    'Held baskets',
+    list.length
+      ? `<div class="held-list">${list
+          .map(
+            h =>
+              `<div class="list-row"><span class="grow"><b>${esc(h.label)}</b><small>${h.cart.length} item${h.cart.length === 1 ? '' : 's'} · ${money(h.total)} · ${new Date(h.at).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })}</small></span><button class="subtle" onclick="discardHeld(${h.id})">Discard</button><button class="primary" onclick="resumeHeld(${h.id})">Resume</button></div>`,
+          )
+          .join('')}</div>`
+      : '<div class="empty">No held baskets.</div>',
+  );
+}
+
+function resumeHeld(id) {
+  const list = heldBaskets();
+  const held = list.find(h => h.id === id);
+  if (!held) return;
+  if (state.cart.length && !confirm('Replace the current basket with this held basket?')) return;
+  state.cart = held.cart.filter(l => state.products.some(p => p.id === l.id));
+  saveHeld(list.filter(h => h.id !== id));
+  closeModal();
+  cartRender();
+}
+
+function discardHeld(id) {
+  saveHeld(heldBaskets().filter(h => h.id !== id));
+  heldDialog();
+  cartRender();
 }
 
 function shiftDialog() {

@@ -48,7 +48,8 @@ class ShiftController extends ErpBaseController
     {
         $end = $s->closed_at ?? now();
         $received = DB::table('payments')->where('user_id', $s->user_id)->where('method', 'Cash')->whereBetween('created_at', [$s->opened_at, $end])->whereIn('document_id', DB::table('documents')->whereIn('kind', ['Sale', 'Invoice'])->select('id'))->sum('amount_cents');
-        $refunds = DB::table('documents')->where('user_id', $s->user_id)->where('kind', 'Return')->where('method', 'Cash')->whereBetween('created_at', [$s->opened_at, $end])->sum('paid_cents');
+        $refunds = DB::table('documents')->where('user_id', $s->user_id)->where('kind', 'Return')->whereBetween('created_at', [$s->opened_at, $end])
+            ->selectRaw("COALESCE(SUM(CASE WHEN cash_refund_cents IS NOT NULL THEN cash_refund_cents WHEN method = 'Cash' THEN paid_cents ELSE 0 END),0) as cash")->value('cash');
 
         return (int) $received - (int) $refunds;
     }

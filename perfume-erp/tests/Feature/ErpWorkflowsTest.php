@@ -355,4 +355,26 @@ class ErpWorkflowsTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => 'cashier']));
         $this->assertNull($this->getJson('/api/dashboard')->assertOk()->json('sales'));
     }
+
+    public function test_pos_split_payment_with_cash_change_and_refund(): void
+    {
+        $this->postOnce('/api/shifts', ['action' => 'open', 'amount' => '50.00'])->assertOk();
+        $sale = ['kind' => 'Sale', 'location_id' => 1, 'contact_id' => null, 'lines' => [['product_id' => 1, 'quantity' => '1']], 'payments' => [['method' => 'Cash', 'amount' => '40.00'], ['method' => 'Card', 'amount' => '85.00']], 'tendered' => '50.00'];
+
+        $this->postOnce('/api/documents', ['tendered' => '30.00'] + $sale)->assertUnprocessable();
+        $this->postOnce('/api/documents', ['payments' => [['method' => 'Card', 'amount' => '125.00']], 'tendered' => '200'] + $sale)->assertUnprocessable();
+        $this->postOnce('/api/documents', ['payments' => [['method' => 'Card', 'amount' => '200.00']], 'tendered' => null] + $sale)->assertUnprocessable();
+
+        $posted = $this->postOnce('/api/documents', $sale)->assertOk()->assertJsonPath('change_cents', 1000)->json();
+        $document = DB::table('documents')->find($posted['id']);
+        $this->assertSame('Split', $document->method);
+        $this->assertSame(12500, (int) $document->paid_cents);
+        $this->assertSame(5000, (int) $document->tendered_cents);
+        $this->assertSame(['Card' => 8500, 'Cash' => 4000], DB::table('payments')->where('document_id', $posted['id'])->orderBy('method')->pluck('amount_cents', 'method')->map(fn ($v) => (int) $v)->all());
+        $this->getJson('/api/shifts')->assertJsonPath('shifts.0.expected_cents', 9000);
+
+        $this->postOnce('/api/documents/'.$posted['id'], ['action' => 'return', 'condition' => 'Restock'])->assertOk();
+        $this->assertSame(4000, (int) DB::table('documents')->where('kind', 'Return')->value('cash_refund_cents'));
+        $this->getJson('/api/shifts')->assertJsonPath('shifts.0.expected_cents', 5000);
+    }
 }

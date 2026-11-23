@@ -49,11 +49,18 @@ final class Documents
                 $lines[] = ['product_id' => $p->id, 'name' => $p->name, 'unit' => $p->unit, 'quantity_milli' => $q, 'price_cents' => $price, 'discount_cents' => $discount, 'tax_bp' => $p->tax_bp, 'subtotal_cents' => $net, 'tax_cents' => $ltax, 'total_cents' => $net + $ltax];
             }
             $total = $sub + $tax;
-            $paid = Amounts::parse($data['paid'] ?? '0');
+            $payments = self::payments($data);
+            $paid = array_sum(array_column($payments, 'amount_cents'));
+            $data['method'] = match (count($payments)) {
+                0 => $data['method'] ?? 'Credit',
+                1 => $payments[0]['method'],
+                default => 'Split',
+            };
+            [$tendered, $change] = self::tender($data, $payments);
             if ($paid > $total) {
                 self::fail('Payment cannot exceed the document total. Record tender/change separately.');
             }
-            if ($paid > 0 && ($data['method'] ?? 'Credit') === 'Credit') {
+            if ($paid > 0 && $data['method'] === 'Credit') {
                 self::fail('Choose Cash, Card, or Bank for a payment.');
             }
             $contact = $data['contact_id'] ?? null;
@@ -79,7 +86,7 @@ final class Documents
             if ($kind === 'Quotation' && $paid) {
                 self::fail('Quotations cannot receive payment.');
             }
-            $id = DB::table('documents')->insertGetId(['uuid' => (string) Str::uuid(), 'kind' => $kind, 'status' => $kind === 'Quotation' ? 'Draft' : 'Posted', 'contact_id' => $contact, 'location_id' => $data['location_id'], 'user_id' => $user, 'subtotal_cents' => $sub, 'tax_cents' => $tax, 'total_cents' => $total, 'paid_cents' => $paid, 'method' => $data['method'] ?? 'Credit', 'notes' => $data['notes'] ?? null, 'seller_snapshot' => json_encode(DB::table('settings')->pluck('value', 'key')->all()), 'contact_snapshot' => $contact ? json_encode((array) $c) : null, 'bill_reference' => $data['bill_reference'] ?? null, 'due_date' => $data['due_date'] ?? null, 'created_at' => now(), 'updated_at' => now()]);
+            $id = DB::table('documents')->insertGetId(['uuid' => (string) Str::uuid(), 'kind' => $kind, 'status' => $kind === 'Quotation' ? 'Draft' : 'Posted', 'contact_id' => $contact, 'location_id' => $data['location_id'], 'user_id' => $user, 'subtotal_cents' => $sub, 'tax_cents' => $tax, 'total_cents' => $total, 'paid_cents' => $paid, 'method' => $data['method'] ?? 'Credit', 'notes' => $data['notes'] ?? null, 'seller_snapshot' => json_encode(DB::table('settings')->pluck('value', 'key')->all()), 'contact_snapshot' => $contact ? json_encode((array) $c) : null, 'bill_reference' => $data['bill_reference'] ?? null, 'due_date' => $data['due_date'] ?? null, 'tendered_cents' => $tendered, 'change_cents' => $change, 'created_at' => now(), 'updated_at' => now()]);
             $number = match ($kind) {
                 'Sale' => 'POS','Invoice' => 'INV','Quotation' => 'QUO','Purchase' => 'PUR'
             }.'-'.str_pad((string) $id, 6, '0', STR_PAD_LEFT);
@@ -101,12 +108,12 @@ final class Documents
                 }
                 DB::table('document_lines')->insert($line + ['document_id' => $id]);
             }
-            if ($paid) {
-                DB::table('payments')->insert(['document_id' => $id, 'amount_cents' => $paid, 'method' => $data['method'], 'user_id' => $user, 'created_at' => now(), 'updated_at' => now()]);
+            foreach ($payments as $payment) {
+                DB::table('payments')->insert($payment + ['document_id' => $id, 'user_id' => $user, 'created_at' => now(), 'updated_at' => now()]);
             }
             DB::table('audit')->insert(['user_id' => $user, 'action' => 'document.create', 'subject' => $number, 'details' => json_encode(['kind' => $kind, 'total_cents' => $total]), 'created_at' => now()]);
 
-            return ['id' => $id, 'number' => $number, 'total_cents' => $total];
+            return ['id' => $id, 'number' => $number, 'total_cents' => $total, 'change_cents' => $change];
         }, 3);
     }
 
@@ -132,7 +139,8 @@ final class Documents
             if (! $d || ! in_array($d->kind, ['Sale', 'Invoice']) || $d->status !== 'Posted') {
                 self::fail('Only a posted sale/invoice can be returned, once.');
             }
-            $rid = DB::table('documents')->insertGetId(['uuid' => (string) Str::uuid(), 'kind' => 'Return', 'status' => 'Posted', 'original_id' => $id, 'contact_id' => $d->contact_id, 'location_id' => $d->location_id, 'user_id' => $user, 'subtotal_cents' => $d->subtotal_cents, 'tax_cents' => $d->tax_cents, 'total_cents' => $d->total_cents, 'paid_cents' => $d->paid_cents, 'method' => $d->method, 'notes' => 'Full return: '.$condition, 'seller_snapshot' => $d->seller_snapshot, 'contact_snapshot' => $d->contact_snapshot, 'created_at' => now(), 'updated_at' => now()]);
+            $cashRefund = (int) DB::table('payments')->where('document_id', $id)->where('method', 'Cash')->sum('amount_cents');
+            $rid = DB::table('documents')->insertGetId(['cash_refund_cents' => $cashRefund, 'uuid' => (string) Str::uuid(), 'kind' => 'Return', 'status' => 'Posted', 'original_id' => $id, 'contact_id' => $d->contact_id, 'location_id' => $d->location_id, 'user_id' => $user, 'subtotal_cents' => $d->subtotal_cents, 'tax_cents' => $d->tax_cents, 'total_cents' => $d->total_cents, 'paid_cents' => $d->paid_cents, 'method' => $d->method, 'notes' => 'Full return: '.$condition, 'seller_snapshot' => $d->seller_snapshot, 'contact_snapshot' => $d->contact_snapshot, 'created_at' => now(), 'updated_at' => now()]);
             $num = 'RET-'.str_pad((string) $rid, 6, '0', STR_PAD_LEFT);
             DB::table('documents')->where('id', $rid)->update(['number' => $num]);
             foreach (DB::table('document_lines')->where('document_id', $id)->get() as $line) {
@@ -150,6 +158,55 @@ final class Documents
 
             return ['id' => $rid, 'number' => $num, 'refund_cents' => $d->paid_cents];
         });
+    }
+
+    /**
+     * Applied payments from either the split `payments` list or the single `paid` + `method` fields.
+     *
+     * @return list<array{method: string, amount_cents: int}>
+     */
+    private static function payments(array $data): array
+    {
+        if (! empty($data['payments'])) {
+            $rows = [];
+            foreach ($data['payments'] as $payment) {
+                $amount = Amounts::parse((string) $payment['amount']);
+                if ($amount < 0) {
+                    self::fail('Payment amounts cannot be negative.');
+                }
+                if ($amount > 0) {
+                    $rows[] = ['method' => $payment['method'], 'amount_cents' => $amount];
+                }
+            }
+
+            return $rows;
+        }
+        $paid = Amounts::parse((string) ($data['paid'] ?? '0'));
+
+        return $paid > 0 ? [['method' => $data['method'] ?? 'Credit', 'amount_cents' => $paid]] : [];
+    }
+
+    /**
+     * Cash handed over and change due. Only cash can be over-tendered.
+     *
+     * @param  list<array{method: string, amount_cents: int}>  $payments
+     * @return array{0: ?int, 1: ?int}
+     */
+    private static function tender(array $data, array $payments): array
+    {
+        if (! isset($data['tendered']) || $data['tendered'] === '' || $data['tendered'] === null) {
+            return [null, null];
+        }
+        $cash = array_sum(array_column(array_filter($payments, fn ($p) => $p['method'] === 'Cash'), 'amount_cents'));
+        if ($cash === 0) {
+            self::fail('Cash received applies only to cash payments.');
+        }
+        $tendered = Amounts::parse((string) $data['tendered']);
+        if ($tendered < $cash) {
+            self::fail('Cash received is less than the cash payment.');
+        }
+
+        return [$tendered, $tendered - $cash];
     }
 
     public static function fail(string $message): never
