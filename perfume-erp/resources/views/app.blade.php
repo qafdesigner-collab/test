@@ -7,7 +7,7 @@
     <title>Atelier · Perfume ERP</title>
     <link rel="stylesheet" href="/assets/app.css?v={{ config('erp.version') }}">
     {{-- Modules share one global scope and load in this order; main.js starts the app. --}}
-    @foreach (['core', 'shell', 'dashboard', 'catalogue', 'inventory', 'sales', 'pos', 'manufacturing', 'projects', 'customers', 'reports', 'settings', 'main'] as $module)
+    @foreach (['core', 'shell', 'dashboard', 'catalogue', 'inventory', 'sales', 'pos', 'manufacturing', 'projects', 'customers', 'reports', 'settings', 'tables', 'main'] as $module)
         <script src="/assets/js/{{ $module }}.js?v={{ config('erp.version') }}" defer></script>
     @endforeach
 </head>

@@ -2296,3 +2296,23 @@ h3,
 .login-logo { width: auto; height: 56px; max-width: 200px; }
 .sidebar .brand.has-logo { padding: 6px 4px; }
 .brand-logo-wide { display: block; max-width: 180px; max-height: 52px; object-fit: contain; object-position: left center; }
+
+/* ── 0.5 table tools ──────────────────────────────────────────────── */
+.table-tools { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.table-search { display: flex; align-items: center; gap: 8px; flex: 1 1 220px; max-width: 340px; background: var(--white); border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; }
+.table-search span { color: var(--muted); }
+.table-search input { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 8px 0 !important; min-height: 0 !important; width: 100%; }
+.table-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; margin-left: auto; }
+.table-pager { display: flex; gap: 4px; }
+.table-pager button { min-width: 34px; padding: 4px 10px; font-size: 16px; }
+.table-pager button:disabled { opacity: .35; cursor: default; }
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable::after { content: " ↕"; opacity: .3; font-size: 11px; }
+th.sortable[aria-sort="ascending"]::after { content: " ↑"; opacity: .9; }
+th.sortable[aria-sort="descending"]::after { content: " ↓"; opacity: .9; }
+th.sortable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+tr[hidden] { display: none; }
+.table-search input:focus { outline: none; }
+.table-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); }
+.table-search input { font-size: 14px; color: var(--ink); }
+.table-pager[hidden] { display: none; }
