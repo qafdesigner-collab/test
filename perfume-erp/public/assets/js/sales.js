@@ -322,17 +322,19 @@ async function receiveOrderDialog(id) {
     'Receive goods · ' + p.number,
     `<form><div class="notice">Enter what actually arrived. Anything not received stays open on the order for a later delivery.</div>
     ${table(
-      ['Item', 'Ordered', 'Received before', 'Receiving now'],
+      ['Item', 'Ordered', 'Received before', 'Receiving now', 'Expiry (optional)'],
       open.map(
         l =>
-          `<tr><td>${esc(l.name)}<small>${money(l.price_cents)} / ${esc(l.unit)}</small></td><td>${quantity(l.quantity_milli)} ${esc(l.unit)}</td><td>${quantity(l.received_milli || 0)}</td><td><input class="receive-qty" data-line="${l.id}" inputmode="decimal" value="${(Number(l.quantity_milli) - Number(l.received_milli || 0)) / 1000}" aria-label="Quantity of ${esc(l.name)} received"></td></tr>`,
+          `<tr><td>${esc(l.name)}<small>${money(l.price_cents)} / ${esc(l.unit)}</small></td><td>${quantity(l.quantity_milli)} ${esc(l.unit)}</td><td>${quantity(l.received_milli || 0)}</td><td><input class="receive-qty" data-line="${l.id}" inputmode="decimal" value="${(Number(l.quantity_milli) - Number(l.received_milli || 0)) / 1000}" aria-label="Quantity of ${esc(l.name)} received"></td><td><input type="date" class="receive-expiry" aria-label="Expiry date of ${esc(l.name)}"></td></tr>`,
       ),
     )}
     <div class="form-grid"><label>Receive into<select name="location_id">${options(state.boot.locations, 'name', p.location_id)}</select></label>${field('Supplier delivery note / bill number', 'bill_reference', '')}</div>${formActions('Receive into stock')}</form>`,
     true,
   );
   bindForm(async (fd, key) => {
-    const lines = [...document.querySelectorAll('.receive-qty')].map(i => ({ line_id: Number(i.dataset.line), quantity: String(i.value || '0').trim() })).filter(l => Number(l.quantity) > 0);
+    const lines = [...document.querySelectorAll('.receive-qty')]
+      .map(i => ({ line_id: Number(i.dataset.line), quantity: String(i.value || '0').trim(), expires_on: i.closest('tr').querySelector('.receive-expiry').value || null }))
+      .filter(l => Number(l.quantity) > 0);
     if (!lines.length) throw new Error('Enter a quantity for at least one item.');
     const r = await api('documents/' + id, 'POST', { action: 'receive', location_id: Number(fd.get('location_id')), bill_reference: fd.get('bill_reference'), lines }, key);
     closeModal();

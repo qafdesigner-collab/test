@@ -52,6 +52,8 @@ Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
         Route::post('contacts/{id}', [A::class, 'profile'])->whereNumber('id');
         Route::get('inventory', [InventoryController::class, 'inventory']);
         Route::post('stock', [InventoryController::class, 'stock']);
+        Route::post('lots/expiry', [InventoryController::class, 'lotExpiry']);
+        Route::match(['get', 'post'], 'stock-counts', [InventoryController::class, 'counts']);
         Route::get('documents', [DocumentController::class, 'documents']);
         Route::post('documents', [DocumentController::class, 'createDocument']);
         Route::get('documents/{id}', [DocumentController::class, 'document'])->whereNumber('id');

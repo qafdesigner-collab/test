@@ -363,15 +363,18 @@ final class Documents
                     self::fail("More {$line->name} than is still outstanding on the order.");
                 }
                 $receiptLines[] = ['product_id' => $line->product_id, 'quantity' => Amounts::format($q, 3), 'price' => Amounts::format((int) $line->price_cents), 'discount' => Amounts::format($line->discount_cents ? Amounts::roundDivide($line->discount_cents * $q, $line->quantity_milli) : 0)];
-                $received[] = [$line->id, $line->received_milli + $q];
+                $received[] = [$line->id, $line->received_milli + $q, $line->product_id, $item['expires_on'] ?? null];
             }
             if (! $receiptLines) {
                 self::fail('Enter the quantity received for at least one item.');
             }
             $receipt = self::create(['kind' => 'Purchase', 'contact_id' => $order->contact_id, 'location_id' => $locationId, 'method' => 'Credit', 'paid' => '0', 'lines' => $receiptLines, 'bill_reference' => $billReference, 'notes' => 'Received against '.$order->number], $user);
             DB::table('documents')->where('id', $receipt['id'])->update(['purchase_order_id' => $id]);
-            foreach ($received as [$lineId, $total]) {
+            foreach ($received as [$lineId, $total, $productId, $expiresOn]) {
                 DB::table('document_lines')->where('id', $lineId)->update(['received_milli' => $total]);
+                if ($expiresOn) {
+                    Stock::setExpiry($productId, $receipt['number'], $expiresOn);
+                }
             }
             $outstanding = DB::table('document_lines')->where('document_id', $id)->whereColumn('received_milli', '<', 'quantity_milli')->exists();
             DB::table('documents')->where('id', $id)->update(['status' => $outstanding ? 'Partially received' : 'Received', 'updated_at' => now()]);

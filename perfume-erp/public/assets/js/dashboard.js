@@ -159,6 +159,16 @@ async function dashboardPage() {
     ) +
     `</div><div>` +
     panel('Stock to watch', lowStock, `<a class="subtle" href="#inventory">View stock →</a>`) +
+    (d.expiring?.length
+      ? panel(
+          'Expiring soon · 60 days',
+          d.expiring
+            .slice(0, 6)
+            .map(e => `<div class="list-row">${expiryBadge(e.expires_on).split(' <small>')[0]}<span class="grow"><b>${esc(e.name)}</b><small>${esc(e.lot)} · ${esc(e.location)}</small></span><span>${quantity(e.quantity_milli)} <small>${esc(e.unit)}</small></span></div>`)
+            .join(''),
+          `<a class="subtle" href="#inventory">Inventory →</a>`,
+        )
+      : '') +
     panel(
       'Production desk',
       d.batches.length

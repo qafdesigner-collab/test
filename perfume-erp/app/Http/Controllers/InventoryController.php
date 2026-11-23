@@ -50,4 +50,34 @@ class InventoryController extends ErpBaseController
             return ['ok' => true];
         });
     }
+
+    /**
+     * Set or clear the expiry date of a lot.
+     */
+    public function lotExpiry(Request $r)
+    {
+        $this->allow(['manager', 'warehouse']);
+        $v = $r->validate(['product_id' => 'required|exists:products,id', 'lot' => 'required|string|max:60', 'expires_on' => 'nullable|date_format:Y-m-d']);
+        abort_unless(DB::table('balances')->where(['product_id' => $v['product_id'], 'lot' => $v['lot']])->exists(), 404, 'That lot does not exist.');
+        Stock::setExpiry((int) $v['product_id'], $v['lot'], $v['expires_on'] ?? null);
+        $this->audit('stock.expiry', $v['lot'], ['product_id' => (int) $v['product_id'], 'expires_on' => $v['expires_on'] ?? null]);
+
+        return ['ok' => true];
+    }
+
+    /**
+     * Recent stock counts, or post a new one.
+     */
+    public function counts(Request $r)
+    {
+        $this->allow(['manager', 'warehouse']);
+        if ($r->isMethod('post')) {
+            $v = $r->validate(['location_id' => 'required|exists:locations,id', 'notes' => 'nullable|string|max:1000', 'lines' => 'required|array|min:1|max:2000', 'lines.*.product_id' => 'required|exists:products,id', 'lines.*.lot' => 'required|string|max:60', 'lines.*.expected' => 'required', 'lines.*.counted' => 'required']);
+
+            return $this->once($r, 'stock.count', fn () => Stock::postCount((int) $v['location_id'], $v['lines'], $v['notes'] ?? null, Auth::id()));
+        }
+
+        return ['counts' => DB::table('stock_counts as c')->join('locations as l', 'l.id', '=', 'c.location_id')->join('users as u', 'u.id', '=', 'c.user_id')
+            ->whereNotNull('c.number')->select('c.*', 'l.name as location', 'u.name as user')->orderByDesc('c.id')->limit(30)->get()];
+    }
 }

@@ -90,7 +90,7 @@ class DocumentController extends ErpBaseController
             return $this->once($r, 'return', fn () => Documents::returnSale($id, $r->input('condition'), Auth::id()));
         }if ($action === 'receive') {
             $this->allow(['manager', 'warehouse']);
-            $v = $r->validate(['location_id' => 'required|exists:locations,id', 'bill_reference' => 'nullable|string|max:100', 'lines' => 'required|array|min:1|max:100', 'lines.*.line_id' => 'required|integer', 'lines.*.quantity' => 'required']);
+            $v = $r->validate(['location_id' => 'required|exists:locations,id', 'bill_reference' => 'nullable|string|max:100', 'lines' => 'required|array|min:1|max:100', 'lines.*.line_id' => 'required|integer', 'lines.*.quantity' => 'required', 'lines.*.expires_on' => 'nullable|date_format:Y-m-d']);
 
             return $this->once($r, 'purchase_order.receive', fn () => Documents::receiveOrder($id, $v['lines'], (int) $v['location_id'], $v['bill_reference'] ?? null, Auth::id()));
         }if ($action === 'close') {

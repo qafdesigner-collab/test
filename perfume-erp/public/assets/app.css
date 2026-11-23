@@ -2500,3 +2500,6 @@ tr[hidden] { display: none; }
 @media (max-width: 520px) { .payment-row { grid-template-columns: 1fr 1fr 32px; } }
 .returned-note { display: block; color: var(--status-warning); font-size: 11px; }
 .document-total small { display: block; }
+.status-pill.critical { color: var(--status-critical); background: color-mix(in srgb, var(--status-critical) 12%, transparent); }
+.status-pill.critical::before { content: "■ "; font-size: 8px; }
+.count-qty { max-width: 110px; }
