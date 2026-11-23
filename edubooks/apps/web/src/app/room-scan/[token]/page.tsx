@@ -34,6 +34,10 @@ function PhoneScan({ token }: { token: string }) {
         <h1 className="text-center text-2xl font-extrabold text-slate-800">🌄 {t('Room scan')}</h1>
         {info && <p className="text-center text-slate-600">{info.title}</p>}
         {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-center text-red-800">{err}</p>}
+        <div className="space-y-2 rounded-2xl border-2 border-sky-200 bg-sky-50 p-3 text-sm text-slate-800">
+          <p lang="en" dir="ltr">🛡️ <b>This is not hacking.</b> The camera is used only for the security of the test, so every student works on their own. Only the teacher and the school see the scan; it is deleted after 30 days.</p>
+          <p lang="ar" dir="rtl">🛡️ <b>هذا ليس اختراقًا.</b> تُستخدم الكاميرا فقط لأمان الاختبار، حتى يعمل كل طالب بنفسه. لا يرى المسح إلا المعلم والمدرسة، ويُحذف بعد 30 يومًا.</p>
+        </div>
         {state === 'done' ? <div className="rounded-3xl bg-white p-6 text-center shadow-sm"><div className="text-6xl">✅</div>
             <p className="mt-2 text-xl font-bold text-slate-800">{t('Done! Your room scan was sent.')}</p><p className="mt-1 text-slate-600">{t('Go back to your computer — the test continues there.')}</p></div>
           : state === 'sending' ? <p className="rounded-3xl bg-white p-6 text-center text-lg font-bold shadow-sm">⏳ {t('Sending…')}</p>

@@ -48,6 +48,7 @@ const isWhole = (s: MediaStream) => { const ds = (s.getVideoTracks()[0]?.getSett
 export function ProctorGate({ id, p, resume, onReady }: { id: string; p: Proctor; resume: boolean; onReady: (s: Streams) => void }) {
   const { t } = useT();
   const needCam = !!(p.camera || (p.roomScan && !resume));
+  const [agreed, setAgreed] = useState(false);
   const [cam, setCam] = useState<MediaStream | null>(null); const [scr, setScr] = useState<MediaStream | null>(null);
   const [room, setRoom] = useState<string[]>([]); const [scan, setScan] = useState<number | null>(null); const [err, setErr] = useState('');
   const [part, setPart] = useState(false); const [noScreen, setNoScreen] = useState(false);
@@ -110,6 +111,23 @@ export function ProctorGate({ id, p, resume, onReady }: { id: string; p: Proctor
           <li>{t('when you leave this page or open another app')}</li>
         </ul>
         <p className="mt-2 text-sm text-slate-500">{t('Nothing is recorded before you press Start, and recording stops when you hand in.')}</p></div>
+      {/* always in English AND Arabic, whatever the language of the page — for students and their parents */}
+      <div className="grid gap-3 rounded-2xl border-2 border-sky-200 bg-sky-50 p-4 sm:grid-cols-2">
+        <div lang="en" dir="ltr" className="space-y-1 text-sm text-slate-800">
+          <p className="font-bold">🛡️ This is not hacking.</p>
+          <p>Your camera{p.screen ? ' and screen sharing are' : ' is'} used <b>only for the security of this test</b> — so that every student answers on their own, without copying, and writes their own work.</p>
+          <p>Only your teacher and your school can see the pictures. Nothing is recorded before you press Start, recording stops when you hand in, and the pictures are <b>deleted after 30 days</b>.</p>
+        </div>
+        <div lang="ar" dir="rtl" className="space-y-1 text-sm text-slate-800" style={{ fontFamily: '"Noto Sans Arabic", "Segoe UI", sans-serif' }}>
+          <p className="font-bold">🛡️ هذا ليس اختراقًا.</p>
+          <p>تُستخدم الكاميرا{p.screen ? ' ومشاركة الشاشة' : ''} <b>فقط لأمان هذا الاختبار</b> — حتى يجيب كل طالب بنفسه دون نسخ، ويكتب عمله الخاص.</p>
+          <p>لا يرى الصور إلا معلمك ومدرستك. لا يُسجَّل شيء قبل الضغط على «ابدأ»، ويتوقف التسجيل عند التسليم، وتُ<b>حذف الصور بعد 30 يومًا</b>.</p>
+        </div>
+        <label className="flex items-center justify-center gap-3 rounded-xl bg-white p-3 text-base font-bold text-slate-800 ring-1 ring-sky-200 sm:col-span-2">
+          <input type="checkbox" className="size-5 accent-emerald-600" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+          <span>I understand</span><span className="text-slate-400">/</span><span lang="ar" dir="rtl">أفهم ذلك</span>
+        </label>
+      </div>
       {/* the live camera picture (like a mirror) — it stays on during the room scan, with what to do next */}
       {(cam || scr) && !scanning && <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
         {cam ? <div className="relative overflow-hidden rounded-2xl bg-black shadow-inner">
@@ -122,7 +140,7 @@ export function ProctorGate({ id, p, resume, onReady }: { id: string; p: Proctor
       </div>}
       <ol className="space-y-3">
         {needCam && step(!!cam, ++n, t('Allow the camera'), cam ? <p className="text-emerald-800">{t('Your camera is on — you can see yourself above.')}</p>
-          : <button type="button" onClick={askCam} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white">📷 {t('Turn on the camera')}</button>)}
+          : <button type="button" disabled={!agreed} onClick={askCam} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white disabled:opacity-40">📷 {t('Turn on the camera')}</button>)}
         {p.roomScan && !resume && step(!!pano, ++n, t('Show your room (panorama)'), scanning && cam
           ? <RoomScan stream={cam} onCancel={() => setScanning(false)} onDone={(r) => { setScanning(false); setPanoState({ img: r.panorama, video: r.video, coverage: r.coverage, complete: r.complete }); }} />
           : phone ? <div className="flex flex-wrap items-center gap-4">
@@ -137,14 +155,14 @@ export function ProctorGate({ id, p, resume, onReady }: { id: string; p: Proctor
               <p className={cn('text-xs font-medium', pano.complete ? 'text-emerald-700' : 'text-amber-700')}>{pano.complete ? `✅ ${t('The whole room is scanned.')}` : `⚠ ${t('Unfinished scan ({n}%) — your teacher will see this.', { n: pano.coverage })}`}{pano.linkId ? ` · 📱 ${t('made with your phone')}` : ''}</p>
               <button type="button" onClick={doScan} className="text-xs text-sky-700 underline">{t('Scan again')}</button></div>
           : <div className="space-y-2"><p className="text-sm text-slate-600">{t('Turn the camera slowly all the way around your room: hold the laptop and turn on the spot, or unclip a USB camera and turn it. We make one wide picture of your room.')}</p>
-              <div className="flex flex-wrap gap-2"><button type="button" disabled={!cam} onClick={doScan} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white disabled:opacity-40">🔄 {t('Start the room panorama')}</button>
-                <button type="button" onClick={usePhone} className="rounded-xl bg-white px-4 py-2 font-bold text-sky-800 ring-2 ring-sky-200">📱 {t('My camera cannot turn — scan with my phone')}</button></div></div>)}
+              <div className="flex flex-wrap gap-2"><button type="button" disabled={!cam || !agreed} onClick={doScan} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white disabled:opacity-40">🔄 {t('Start the room panorama')}</button>
+                <button type="button" disabled={!agreed} onClick={usePhone} className="rounded-xl bg-white px-4 py-2 font-bold text-sky-800 ring-2 ring-sky-200 disabled:opacity-40">📱 {t('My camera cannot turn — scan with my phone')}</button></div></div>)}
         {p.screen && step(!!scr || noScreen, ++n, t('Share your whole screen'), scr ? <p className="text-emerald-800">{t('Your screen is shared — you can see it above.')}</p>
           : noScreen ? <p className="text-amber-800">{t('This device cannot share its screen. Your teacher will see this. Use a computer next time if you can.')}</p>
-          : <button type="button" onClick={askScreen} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white">🖥️ {t('Share the screen')}</button>)}
+          : <button type="button" disabled={!agreed} onClick={askScreen} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white disabled:opacity-40">🖥️ {t('Share the screen')}</button>)}
       </ol>
       {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{err}</p>}
-      <div className="text-center"><button type="button" disabled={!(camOk && roomOk && scrOk) || scanning || !!phone}
+      <div className="text-center"><button type="button" disabled={!agreed || !(camOk && roomOk && scrOk) || scanning || !!phone}
         onClick={() => onReady({ cam, scr, room, panorama: pano?.linkId ? null : pano?.img ?? null, roomVideo: pano?.video ?? null, panoLink: pano?.linkId ?? null, panoCoverage: pano?.coverage, panoComplete: pano?.complete, screenPart: part, noScreen })}
         className="rounded-2xl bg-emerald-700 px-8 py-3 text-xl font-bold text-white shadow disabled:opacity-40">▶ {t(resume ? 'Go on' : 'Start')}</button></div>
     </div>

@@ -262,7 +262,19 @@ export class LmsService {
     const targeted = (await this.q.select({ id: assessmentStudents.studentId }).from(assessmentStudents).where(eq(assessmentStudents.assessmentId, id))).map((r) => r.id);
     const ids = targeted.length ? targeted : ((await this.q.execute(sql`SELECT student_id AS id FROM enrolments WHERE class_id = ${a.classId}`)).rows as any[]).map((r) => r.id);
     const due = a.dueAt ? ` Due ${new Date(a.dueAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.` : '';
-    await this.notifyStudents(ids, { kind: 'HOMEWORK', title: `New ${String(a.kind).toLowerCase()}: ${a.title}`, body: `Your teacher has set new work.${due}`, link: `/homework/${id}` });
+    const pr = (a.proctor ?? {}) as { camera?: boolean; roomScan?: boolean; screen?: boolean };
+    const watched = !!(pr.camera || pr.roomScan || pr.screen);
+    const days = Number(process.env.PROCTOR_KEEP_DAYS || 30);
+    // watched work: students and parents are told plainly (English and Arabic) that the camera / screen are only for the test's security
+    const watchNote = watched ? `\n\n🛡️ This is a watched test: the ${[pr.camera || pr.roomScan ? 'camera' : '', pr.screen ? 'screen' : ''].filter(Boolean).join(' and ')} is used only for the security of the test, so every student answers on their own without copying. It is not hacking. Only the teacher and the school see the pictures; they are deleted after ${days} days.`
+      + `\n\n🛡️ هذا اختبار مُراقَب: تُستخدم ${[pr.camera || pr.roomScan ? 'الكاميرا' : '', pr.screen ? 'مشاركة الشاشة' : ''].filter(Boolean).join(' و')} فقط لأمان الاختبار، حتى يجيب كل طالب بنفسه دون نسخ. هذا ليس اختراقًا. لا يرى الصور إلا المعلم والمدرسة، وتُحذف بعد ${days} يومًا.` : '';
+    await this.notifyStudents(ids, { kind: 'HOMEWORK', title: `New ${String(a.kind).toLowerCase()}: ${a.title}`, body: `Your teacher has set new work.${due}${watchNote}`, link: `/homework/${id}` });
+    if (watched) {
+      const { rows: admins } = await this.q.execute(sql`SELECT u.id FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role = 'SCHOOL_ADMIN' WHERE u.school_id = ${this.ctx.schoolId} AND u.status = 'ACTIVE'`);
+      const msg = { kind: 'DATA', title: `🛡️ Watched test published: ${a.title}`, body: `Camera photos, screen pictures and room scans of each student are kept for ${days} days after their test and then deleted automatically. You will be reminded a week before.` };
+      await this.notifications.notify([{ id: this.ctx.userId }], { ...msg, link: `/teacher/assessments/${id}` });
+      await this.notifications.notify(admins as any[], { ...msg, link: '/school' });
+    }
     return { ok: true };
   }
   async close(id: string) {

@@ -253,6 +253,8 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
       .where(and(eq(licenseAssignments.userId, studentId), sql`${licenseAssignments.status} IN ('ACTIVE', 'SUSPENDED')`));
     for (const a of live) await this.endAssignment(a.id, 'RELEASED', 'Student data erased');
     // Voice recordings: the child's own, and voice notes in chats about the child.
+    // a voice message keeps a short note (a message may not be completely empty)
+    await this.q.execute(sql`UPDATE messages SET body = '🎤 Voice message (removed)' WHERE body = '' AND audio_id IN (SELECT id FROM audio_clips WHERE owner_id = ${studentId})`);
     const { rows: clips } = await this.q.execute(sql`DELETE FROM audio_clips WHERE owner_id = ${studentId}
       OR id IN (SELECT m.audio_id FROM messages m JOIN conversations c ON c.id = m.conversation_id WHERE c.student_id = ${studentId} AND m.audio_id IS NOT NULL) RETURNING storage_key`);
     // Mail: what the child received, and anything the child wrote (replies).

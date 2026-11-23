@@ -1,3 +1,22 @@
+# What's new in Knowledge Gate 1.4.19
+
+## 🗓️ Children's data is kept for 30 days, then deleted automatically
+- **Watched (online) tests:** camera photos, screen pictures, room panoramas and scan videos are kept for **30 days** after each student's test, then deleted automatically (before: 90 days). The teacher can still delete them earlier.
+- **Children's voice recordings** (voice messages, read-aloud answers, book readings) are also kept for **30 days**, then deleted automatically. A voice message in a chat then shows “🎤 Voice message (removed after 30 days)”. Staff recordings are not affected.
+- **The school is told:**
+  - when a teacher publishes a watched test, the teacher and the school admins get a notice that the pictures are kept 30 days and then deleted;
+  - **a week before** deletion, the teacher and the school admins get a reminder with the date (“📷 Test photos will be deleted on …”), so they can save anything they need;
+  - the school admins also get a weekly notice when children's voice recordings are due for deletion.
+- The number of days can be changed on the server with `PROCTOR_KEEP_DAYS` and `VOICE_KEEP_DAYS` (default 30).
+
+## 🛡️ A clear message in English and Arabic before the camera and screen share
+- Before a watched test, students see a clear message **in English and Arabic** (always both, whatever language the app is in): the camera, screen sharing and room scan are **only for the security of the test**, so every student answers on their own without copying — **it is not hacking**; only the teacher and the school see the pictures; nothing is recorded before Start; pictures are deleted after 30 days.
+- The student must tick **“I understand / أفهم ذلك”** before the camera, room scan or screen share can be turned on.
+- The same message is in the notice students and **parents** get when the test is published, and on the phone room-scan page.
+
+## 🔧 Fixed
+- Deleting a child's data (erasure) could fail when the child had sent voice messages without text. It now works, and the message shows “🎤 Voice message (removed)”.
+
 # What's new in Knowledge Gate 1.4.18
 
 ## 🌄 Room panorama: the whole room, also with a PC camera
