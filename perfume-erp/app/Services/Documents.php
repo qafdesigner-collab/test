@@ -23,6 +23,9 @@ final class Documents
                 if (! $p) {
                     self::fail('Product is unavailable.');
                 }
+                if ($kind === 'PurchaseOrder' && $p->kind === 'service') {
+                    self::fail('Services cannot be ordered from a supplier.');
+                }
                 if (in_array($kind, ['Sale', 'Invoice', 'Quotation']) && ! $p->sales_allowed) {
                     self::fail('Enable Sell individually on this product before selling or quoting it.');
                 }
@@ -33,7 +36,7 @@ final class Documents
                 if (in_array($p->unit, ['piece', 'bottle', 'box', 'carton']) && $q % 1000) {
                     self::fail('Counted products require whole quantities.');
                 }
-                $price = isset($line['price']) ? Amounts::parse($line['price']) : ($kind === 'Purchase' ? $p->cost_cents : $p->price_cents);
+                $price = isset($line['price']) && $line['price'] !== '' ? Amounts::parse($line['price']) : (in_array($kind, ['Purchase', 'PurchaseOrder']) ? $p->cost_cents : $p->price_cents);
                 if ($price > 100000000) {
                     self::fail('Unit price is too large.');
                 }
@@ -68,9 +71,9 @@ final class Documents
                 $c = DB::table('contacts')->where('id', $contact)->lockForUpdate()->first();
                 if (! $c) {
                     self::fail('Contact not found.');
-                }if ($kind === 'Purchase' && $c->kind !== 'supplier') {
+                }if (in_array($kind, ['Purchase', 'PurchaseOrder']) && $c->kind !== 'supplier') {
                     self::fail('Choose a supplier.');
-                }if ($kind !== 'Purchase' && $c->kind !== 'customer') {
+                }if (! in_array($kind, ['Purchase', 'PurchaseOrder']) && $c->kind !== 'customer') {
                     self::fail('Choose a customer.');
                 }
             }
@@ -86,9 +89,14 @@ final class Documents
             if ($kind === 'Quotation' && $paid) {
                 self::fail('Quotations cannot receive payment.');
             }
-            $id = DB::table('documents')->insertGetId(['uuid' => (string) Str::uuid(), 'kind' => $kind, 'status' => $kind === 'Quotation' ? 'Draft' : 'Posted', 'contact_id' => $contact, 'location_id' => $data['location_id'], 'user_id' => $user, 'subtotal_cents' => $sub, 'tax_cents' => $tax, 'total_cents' => $total, 'paid_cents' => $paid, 'method' => $data['method'] ?? 'Credit', 'notes' => $data['notes'] ?? null, 'seller_snapshot' => json_encode(DB::table('settings')->pluck('value', 'key')->all()), 'contact_snapshot' => $contact ? json_encode((array) $c) : null, 'bill_reference' => $data['bill_reference'] ?? null, 'due_date' => $data['due_date'] ?? null, 'tendered_cents' => $tendered, 'change_cents' => $change, 'created_at' => now(), 'updated_at' => now()]);
+            if ($kind === 'PurchaseOrder' && ($paid || ! $contact)) {
+                self::fail($paid ? 'Pay the supplier on the purchase receipt, not on the order.' : 'Choose the supplier for this purchase order.');
+            }
+            $id = DB::table('documents')->insertGetId(['uuid' => (string) Str::uuid(), 'kind' => $kind, 'status' => match ($kind) {
+                'Quotation' => 'Draft', 'PurchaseOrder' => 'Ordered', default => 'Posted'
+            }, 'contact_id' => $contact, 'location_id' => $data['location_id'], 'user_id' => $user, 'subtotal_cents' => $sub, 'tax_cents' => $tax, 'total_cents' => $total, 'paid_cents' => $paid, 'method' => $data['method'] ?? 'Credit', 'notes' => $data['notes'] ?? null, 'seller_snapshot' => json_encode(DB::table('settings')->pluck('value', 'key')->all()), 'contact_snapshot' => $contact ? json_encode((array) $c) : null, 'bill_reference' => $data['bill_reference'] ?? null, 'due_date' => $data['due_date'] ?? null, 'tendered_cents' => $tendered, 'change_cents' => $change, 'created_at' => now(), 'updated_at' => now()]);
             $number = match ($kind) {
-                'Sale' => 'POS','Invoice' => 'INV','Quotation' => 'QUO','Purchase' => 'PUR'
+                'Sale' => 'POS','Invoice' => 'INV','Quotation' => 'QUO','Purchase' => 'PUR','PurchaseOrder' => 'PO'
             }.'-'.str_pad((string) $id, 6, '0', STR_PAD_LEFT);
             DB::table('documents')->where('id', $id)->update(['number' => $number]);
             foreach ($lines as $line) {
@@ -324,6 +332,70 @@ final class Documents
             DB::table('audit')->insert(['user_id' => $user, 'action' => 'sale.partial_return', 'subject' => $number, 'details' => json_encode(['original' => $d->number, 'returned_cents' => $total, 'refund_cents' => $refund, 'refund_method' => $method, 'condition' => $condition]), 'created_at' => now()]);
 
             return ['id' => $rid, 'number' => $number, 'returned_cents' => $total, 'refund_cents' => $refund, 'refund_method' => $method];
+        });
+    }
+
+    /**
+     * Receive some or all outstanding items of a purchase order. Creates a normal purchase
+     * receipt (stock in, cost recorded) at the ordered prices and tracks what has arrived.
+     *
+     * @param  list<array{line_id: int, quantity: string}>  $items
+     */
+    public static function receiveOrder(int $id, array $items, int $locationId, ?string $billReference, int $user): array
+    {
+        return DB::transaction(function () use ($id, $items, $locationId, $billReference, $user) {
+            $order = DB::table('documents')->where('id', $id)->lockForUpdate()->first();
+            if (! $order || $order->kind !== 'PurchaseOrder' || ! in_array($order->status, ['Ordered', 'Partially received'])) {
+                self::fail('Only an open purchase order can be received.');
+            }
+            $receiptLines = [];
+            $received = [];
+            foreach ($items as $item) {
+                $line = DB::table('document_lines')->where('document_id', $id)->where('id', $item['line_id'])->lockForUpdate()->first();
+                if (! $line) {
+                    self::fail('That item is not on this purchase order.');
+                }
+                $q = Amounts::parse((string) $item['quantity'], 3);
+                if ($q === 0) {
+                    continue;
+                }
+                if ($q > $line->quantity_milli - $line->received_milli) {
+                    self::fail("More {$line->name} than is still outstanding on the order.");
+                }
+                $receiptLines[] = ['product_id' => $line->product_id, 'quantity' => Amounts::format($q, 3), 'price' => Amounts::format((int) $line->price_cents), 'discount' => Amounts::format($line->discount_cents ? Amounts::roundDivide($line->discount_cents * $q, $line->quantity_milli) : 0)];
+                $received[] = [$line->id, $line->received_milli + $q];
+            }
+            if (! $receiptLines) {
+                self::fail('Enter the quantity received for at least one item.');
+            }
+            $receipt = self::create(['kind' => 'Purchase', 'contact_id' => $order->contact_id, 'location_id' => $locationId, 'method' => 'Credit', 'paid' => '0', 'lines' => $receiptLines, 'bill_reference' => $billReference, 'notes' => 'Received against '.$order->number], $user);
+            DB::table('documents')->where('id', $receipt['id'])->update(['purchase_order_id' => $id]);
+            foreach ($received as [$lineId, $total]) {
+                DB::table('document_lines')->where('id', $lineId)->update(['received_milli' => $total]);
+            }
+            $outstanding = DB::table('document_lines')->where('document_id', $id)->whereColumn('received_milli', '<', 'quantity_milli')->exists();
+            DB::table('documents')->where('id', $id)->update(['status' => $outstanding ? 'Partially received' : 'Received', 'updated_at' => now()]);
+            DB::table('audit')->insert(['user_id' => $user, 'action' => 'purchase_order.received', 'subject' => $order->number, 'details' => json_encode(['receipt' => $receipt['number']]), 'created_at' => now()]);
+
+            return $receipt + ['order_status' => $outstanding ? 'Partially received' : 'Received'];
+        });
+    }
+
+    /**
+     * Stop waiting for the rest of a purchase order: Cancelled if nothing arrived, otherwise Closed.
+     */
+    public static function closeOrder(int $id, int $user): array
+    {
+        return DB::transaction(function () use ($id, $user) {
+            $order = DB::table('documents')->where('id', $id)->lockForUpdate()->first();
+            if (! $order || $order->kind !== 'PurchaseOrder' || ! in_array($order->status, ['Ordered', 'Partially received'])) {
+                self::fail('Only an open purchase order can be closed.');
+            }
+            $status = $order->status === 'Ordered' ? 'Cancelled' : 'Closed';
+            DB::table('documents')->where('id', $id)->update(['status' => $status, 'updated_at' => now()]);
+            DB::table('audit')->insert(['user_id' => $user, 'action' => 'purchase_order.'.strtolower($status), 'subject' => $order->number, 'details' => '{}', 'created_at' => now()]);
+
+            return ['id' => $id, 'status' => $status];
         });
     }
 

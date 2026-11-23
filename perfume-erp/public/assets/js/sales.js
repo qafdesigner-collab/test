@@ -3,17 +3,31 @@
 
 async function documentsPage(purchase) {
   await loadLists();
-  const d = await api('documents' + (purchase ? '?kind=Purchase' : ''));
-  const docs = purchase ? d.documents : d.documents.filter(x => x.kind !== 'Purchase');
+  const d = await api('documents' + (purchase ? '?kind=Purchase,PurchaseOrder' : ''));
+  const orders = purchase ? d.documents.filter(x => x.kind === 'PurchaseOrder') : [];
+  const docs = purchase ? d.documents.filter(x => x.kind === 'Purchase') : d.documents.filter(x => !['Purchase', 'PurchaseOrder'].includes(x.kind));
   $('#content').innerHTML =
     pageHead(
       purchase ? 'Purchasing' : 'Wholesale & invoices',
       purchase
         ? 'Record supplier purchases and receive stock into a location.'
         : 'Quotations, posted invoices, payments and full returns.',
-      `<button class="secondary" onclick="contactsDialog('${purchase ? 'supplier' : 'customer'}')">${purchase ? 'Suppliers' : 'Customers'}</button>${purchase ? '' : `<button class="secondary" onclick="documentDialog('Quotation')">+ Quotation</button>`}<button class="primary" onclick="documentDialog('${purchase ? 'Purchase' : 'Invoice'}')">+ ${purchase ? 'Receive purchase' : 'Create invoice'}</button>`,
+      `<button class="secondary" onclick="contactsDialog('${purchase ? 'supplier' : 'customer'}')">${purchase ? 'Suppliers' : 'Customers'}</button>${purchase ? `<button class="secondary" onclick="documentDialog('PurchaseOrder')">+ Purchase order</button>` : `<button class="secondary" onclick="documentDialog('Quotation')">+ Quotation</button>`}<button class="primary" onclick="documentDialog('${purchase ? 'Purchase' : 'Invoice'}')">+ ${purchase ? 'Receive purchase' : 'Create invoice'}</button>`,
     ) +
-    `<div class="notice">${purchase ? 'A posted purchase receives the listed goods immediately. Partial purchase orders and supplier returns are later-stage features.' : 'Invoices deduct stock immediately. Quotations do not reserve or deduct stock. Separate sales orders, partial deliveries and partial returns are later-stage features.'}</div>` +
+    `<div class="notice">${purchase ? 'Place a purchase order with a supplier, then receive goods against it as they arrive, in one or several deliveries. Receiving adds stock at the ordered price. "Receive purchase" records goods that arrived without an order. Supplier returns are a later-stage feature.' : 'Invoices deduct stock immediately. Quotations do not reserve or deduct stock. Separate sales orders, partial deliveries and partial returns are later-stage features.'}</div>` +
+    (purchase
+      ? panel(
+          'Purchase orders',
+          table(
+            ['Order', 'Supplier', 'Status', 'Ordered value', 'Received', 'Date'],
+            orders.map(
+              o =>
+                `<tr><td><button class="subtle" onclick="documentDetail(${o.id})">${esc(o.number)}</button></td><td>${esc(o.contact || '')}</td><td>${badge(o.status)}</td><td>${money(o.total_cents)}</td><td>${['Received'].includes(o.status) ? 'All' : o.status === 'Partially received' ? 'Part' : '—'}</td><td>${date(o.created_at)}</td></tr>`,
+            ),
+            'Place your first purchase order with a supplier.',
+          ),
+        )
+      : '') +
     panel(
       purchase ? 'Purchase receipts' : 'Sales documents',
       table(
@@ -58,21 +72,23 @@ function contactCreate(kind) {
 
 function documentDialog(kind) {
   const selectable = state.products.filter(
-    p => p.active && (kind === 'Purchase' ? p.kind !== 'service' : p.sales_allowed),
+    p => p.active && (['Purchase', 'PurchaseOrder'].includes(kind) ? p.kind !== 'service' : p.sales_allowed),
   );
   state.docProducts = selectable;
   modal(
-    kind === 'Purchase'
+    kind === 'PurchaseOrder'
+      ? 'New purchase order'
+      : kind === 'Purchase'
       ? 'Receive a purchase'
       : kind === 'Quotation'
         ? 'Create a quotation'
         : 'Create a wholesale invoice',
-    `<form><div class="form-grid"><label>${kind === 'Purchase' ? 'Supplier' : 'Customer'}<select name="contact_id">${options(
-      state.contacts.filter(c => c.kind === (kind === 'Purchase' ? 'supplier' : 'customer')),
+    `<form><div class="form-grid"><label>${['Purchase', 'PurchaseOrder'].includes(kind) ? 'Supplier' : 'Customer'}<select name="contact_id">${options(
+      state.contacts.filter(c => c.kind === (['Purchase', 'PurchaseOrder'].includes(kind) ? 'supplier' : 'customer')),
       'name',
       '',
       'Walk-in / no contact',
-    )}</select></label><label>Stock location<select name="location_id">${options(state.boot.locations, 'name', state.location)}</select></label>${field('Supplier bill / customer reference', 'bill_reference', '')}${field('Payment due date', 'due_date', '', 'date')}${field('Payment now (quotations: zero)', 'paid', '0.00')}<label>Payment method<select name="method">${selectOptions(['Credit', 'Cash', 'Card', 'Bank'], 'Credit')}</select></label></div><div class="section-label">Items · quantity / unit price / line discount</div><div id="doc-lines"></div><button type="button" class="secondary" onclick="addDocumentLine('${kind}')">+ Add item</button><div class="document-total" id="draft-total">Add items to see the estimated total.</div><label style="margin-top:15px">Notes<textarea name="notes"></textarea></label>${formActions(kind === 'Quotation' ? 'Save quotation' : 'Post document')}</form>`,
+    )}</select></label><label>Stock location<select name="location_id">${options(state.boot.locations, 'name', state.location)}</select></label>${kind === 'PurchaseOrder' ? `${field('Supplier quote / reference', 'bill_reference', '')}${field('Expected delivery', 'due_date', '', 'date')}<input type="hidden" name="paid" value="0"><input type="hidden" name="method" value="Credit">` : `${field('Supplier bill / customer reference', 'bill_reference', '')}${field('Payment due date', 'due_date', '', 'date')}${field('Payment now (quotations: zero)', 'paid', '0.00')}<label>Payment method<select name="method">${selectOptions(['Credit', 'Cash', 'Card', 'Bank'], 'Credit')}</select></label>`}</div><div class="section-label">Items · quantity / unit price / line discount</div><div id="doc-lines"></div><button type="button" class="secondary" onclick="addDocumentLine('${kind}')">+ Add item</button><div class="document-total" id="draft-total">Add items to see the estimated total.</div><label style="margin-top:15px">Notes<textarea name="notes"></textarea></label>${formActions(kind === 'Quotation' ? 'Save quotation' : kind === 'PurchaseOrder' ? 'Place order' : 'Post document')}</form>`,
     true,
   );
   addDocumentLine(kind);
@@ -87,7 +103,7 @@ function documentDialog(kind) {
     v.contact_id = v.contact_id ? Number(v.contact_id) : null;
     const r = await api('documents', 'POST', v, key);
     closeModal();
-    toast(r.number + ' posted');
+    toast(r.number + (kind === 'PurchaseOrder' ? ' ordered' : kind === 'Quotation' ? ' saved' : ' posted'));
     await render();
     await documentDetail(r.id);
   });
@@ -99,7 +115,7 @@ function addDocumentLine(kind) {
   div.innerHTML = `<select data-product required>${options(state.docProducts)}</select><input data-qty aria-label="Quantity" value="1" inputmode="decimal"><input data-price aria-label="Unit price" value="0.00" inputmode="decimal"><input data-discount aria-label="Line discount" value="0.00" inputmode="decimal"><button type="button" class="remove" aria-label="Remove line">×</button>`;
   div.querySelector('[data-product]').onchange = () => {
     const p = state.docProducts.find(p => p.id === Number(div.querySelector('[data-product]').value));
-    div.querySelector('[data-price]').value = decimal(kind === 'Purchase' ? p?.cost_cents : p?.price_cents);
+    div.querySelector('[data-price]').value = decimal(['Purchase', 'PurchaseOrder'].includes(kind) ? p?.cost_cents : p?.price_cents);
     draftTotal();
   };
   div.querySelector('.remove').onclick = () => {
@@ -134,13 +150,13 @@ async function documentDetail(id) {
       : state.boot.settings;
     modal(
       p.number,
-      `<article class="document-preview"><div class="document-header"><div>${state.boot.settings.logo_path ? `<img class="doc-logo" src="${logoUrl()}" alt="">` : ''}<p class="eyebrow">${esc(s.company_name)}</p><h1>${esc(p.kind === 'Sale' ? 'SALES RECEIPT' : p.kind.toUpperCase())}</h1><p class="muted tiny">${esc(s.address || '')}<br>${esc(s.phone || '')} · ${esc(s.email || '')}<br>${s.tax_id ? 'Tax ID: ' + esc(s.tax_id) : ''}</p></div><div class="right"><h2>${esc(p.number)}</h2>${badge(p.status)}<p class="tiny muted" style="margin-top:10px">${date(p.created_at)}${p.due_date ? '<br>Due ' + date(p.due_date) : ''}${p.bill_reference ? '<br>Reference: ' + esc(p.bill_reference) : ''}${d.quotation ? `<br>From quotation <button class="subtle" onclick="documentDetail(${d.quotation.id})">${esc(d.quotation.number)}</button>` : ''}${d.invoice ? `<br>Invoiced as <button class="subtle" onclick="documentDetail(${d.invoice.id})">${esc(d.invoice.number)}</button>` : ''}</p></div></div><div class="document-meta"><div><small class="muted">${p.kind === 'Purchase' ? 'Supplier' : 'Customer'}</small><br><b>${esc(d.contact?.name || 'Walk-in customer')}</b><br><small>${esc(d.contact?.address || '')}<br>${esc(d.contact?.phone || '')} ${esc(d.contact?.email || '')}${d.contact?.tax_id ? '<br>Tax ID: ' + esc(d.contact.tax_id) : ''}</small></div><div class="right"><small class="muted">Payment</small><br>${(d.payments || []).length > 1 ? d.payments.map(pay => `${esc(pay.method)} ${money(pay.amount_cents)}`).join('<br>') : esc(p.method)}${p.tendered_cents ? `<br><small class="muted">Cash received ${money(p.tendered_cents)} · change ${money(p.change_cents)}</small>` : ''}</div></div>${table(
+      `<article class="document-preview"><div class="document-header"><div>${state.boot.settings.logo_path ? `<img class="doc-logo" src="${logoUrl()}" alt="">` : ''}<p class="eyebrow">${esc(s.company_name)}</p><h1>${esc(p.kind === 'Sale' ? 'SALES RECEIPT' : p.kind === 'PurchaseOrder' ? 'PURCHASE ORDER' : p.kind.toUpperCase())}</h1><p class="muted tiny">${esc(s.address || '')}<br>${esc(s.phone || '')} · ${esc(s.email || '')}<br>${s.tax_id ? 'Tax ID: ' + esc(s.tax_id) : ''}</p></div><div class="right"><h2>${esc(p.number)}</h2>${badge(p.status)}<p class="tiny muted" style="margin-top:10px">${date(p.created_at)}${p.due_date ? '<br>Due ' + date(p.due_date) : ''}${p.bill_reference ? '<br>Reference: ' + esc(p.bill_reference) : ''}${d.purchase_order ? `<br>Against order <button class="subtle" onclick="documentDetail(${d.purchase_order.id})">${esc(d.purchase_order.number)}</button>` : ''}${p.kind === 'PurchaseOrder' && p.due_date ? '<br>Expected ' + date(p.due_date) : ''}${d.quotation ? `<br>From quotation <button class="subtle" onclick="documentDetail(${d.quotation.id})">${esc(d.quotation.number)}</button>` : ''}${d.invoice ? `<br>Invoiced as <button class="subtle" onclick="documentDetail(${d.invoice.id})">${esc(d.invoice.number)}</button>` : ''}</p></div></div><div class="document-meta"><div><small class="muted">${['Purchase', 'PurchaseOrder'].includes(p.kind) ? 'Supplier' : 'Customer'}</small><br><b>${esc(d.contact?.name || 'Walk-in customer')}</b><br><small>${esc(d.contact?.address || '')}<br>${esc(d.contact?.phone || '')} ${esc(d.contact?.email || '')}${d.contact?.tax_id ? '<br>Tax ID: ' + esc(d.contact.tax_id) : ''}</small></div><div class="right">${p.kind === 'PurchaseOrder' ? `<small class="muted">Deliver to</small><br>${esc(state.boot.locations.find(l => l.id === p.location_id)?.name || '')}</div>` : `<small class="muted">Payment</small><br>${(d.payments || []).length > 1 ? d.payments.map(pay => `${esc(pay.method)} ${money(pay.amount_cents)}`).join('<br>') : esc(p.method)}${p.tendered_cents ? `<br><small class="muted">Cash received ${money(p.tendered_cents)} · change ${money(p.change_cents)}</small>` : ''}</div>`}</div>${table(
         ['Item', 'Qty / unit', 'Unit price', 'Discount', 'Tax', 'Total'],
         d.lines.map(
           l =>
-            `<tr><td>${esc(l.name)}${Number(l.returned_milli) ? `<small class="returned-note">${quantity(l.returned_milli)} ${esc(l.unit)} returned</small>` : ''}</td><td>${quantity(l.quantity_milli)} ${esc(l.unit)}</td><td>${money(l.price_cents)}</td><td>${money(l.discount_cents)}</td><td>${money(l.tax_cents)}</td><td>${money(l.total_cents)}</td></tr>`,
+            `<tr><td>${esc(l.name)}${p.kind === 'PurchaseOrder' ? `<small class="returned-note">${quantity(l.received_milli || 0)} of ${quantity(l.quantity_milli)} received</small>` : ''}${Number(l.returned_milli) ? `<small class="returned-note">${quantity(l.returned_milli)} ${esc(l.unit)} returned</small>` : ''}</td><td>${quantity(l.quantity_milli)} ${esc(l.unit)}</td><td>${money(l.price_cents)}</td><td>${money(l.discount_cents)}</td><td>${money(l.tax_cents)}</td><td>${money(l.total_cents)}</td></tr>`,
         ),
-      )}<div class="document-total"><p>Subtotal ${money(p.subtotal_cents)} · Tax ${money(p.tax_cents)}</p><strong>${money(p.total_cents)}</strong>${Number(p.returned_cents) ? `<small>Items returned ${money(p.returned_cents)}${Number(p.refunded_cents) ? ' · refunded ' + money(p.refunded_cents) : ''}</small>` : ''}<small>Paid ${money(p.paid_cents)} · ${p.status === 'Returned' ? 'Returned' : `Balance ${money(p.total_cents - p.paid_cents - Number(p.returned_cents || 0) + Number(p.refunded_cents || 0))}`}</small></div>${p.notes ? `<p class="tiny muted" style="margin-top:20px">${esc(p.notes)}</p>` : ''}<p class="doc-footer">${esc(state.boot.settings.invoice_footer || 'Thank you for your business.')}</p></article>${invoiceCostView(d)}<div class="form-actions"><button class="secondary" onclick="window.print()">Print A4 / save PDF</button>${['Sale', 'Invoice', 'Return'].includes(p.kind) ? `<button class="secondary" onclick="printReceipt(${id})">Print receipt · 80 mm</button>` : ''}${can('manager', 'accountant') && p.status === 'Draft' && p.kind === 'Quotation' ? `<button class="secondary" onclick="quotationAction(${id},'decline')">Decline</button><button class="secondary" onclick="quotationAction(${id},'accept')">Accept quotation</button>` : ''}${can('manager', 'accountant') && ['Draft', 'Accepted'].includes(p.status) && p.kind === 'Quotation' ? `<button class="primary" onclick="convertQuotation(${id})">Convert to invoice →</button>` : ''}${can('manager', 'accountant') && p.status === 'Posted' && p.kind !== 'Return' ? `${p.paid_cents < p.total_cents ? `<button class="primary" onclick="paymentDialog(${id},${p.total_cents - p.paid_cents})">Record payment</button>` : ''}${['Sale', 'Invoice'].includes(p.kind) && d.lines.some(l => Number(l.quantity_milli) > Number(l.returned_milli || 0)) ? `<button class="secondary" onclick="partialReturnDialog(${id})">Return items</button>` : ''}${['Sale', 'Invoice'].includes(p.kind) && !Number(p.returned_cents) ? `<button class="danger" onclick="returnDialog(${id})">Full return</button>` : ''}` : ''}</div>`,
+      )}<div class="document-total"><p>Subtotal ${money(p.subtotal_cents)} · Tax ${money(p.tax_cents)}</p><strong>${money(p.total_cents)}</strong>${Number(p.returned_cents) ? `<small>Items returned ${money(p.returned_cents)}${Number(p.refunded_cents) ? ' · refunded ' + money(p.refunded_cents) : ''}</small>` : ''}${p.kind === 'PurchaseOrder' ? '<small>Order value · billed on each delivery receipt</small>' : ''}<small ${p.kind === 'PurchaseOrder' ? 'hidden' : ''}>Paid ${money(p.paid_cents)} · ${p.status === 'Returned' ? 'Returned' : `Balance ${money(p.total_cents - p.paid_cents - Number(p.returned_cents || 0) + Number(p.refunded_cents || 0))}`}</small></div>${p.notes ? `<p class="tiny muted" style="margin-top:20px">${esc(p.notes)}</p>` : ''}<p class="doc-footer">${p.kind === 'PurchaseOrder' ? 'Please quote this order number on your delivery note and invoice.' : esc(state.boot.settings.invoice_footer || 'Thank you for your business.')}</p></article>${p.kind === 'PurchaseOrder' && d.receipts.length ? `<div class="section-label">Deliveries received</div>${table(['Receipt', 'Date', 'Value'], d.receipts.map(r => `<tr><td><button class="subtle" onclick="documentDetail(${r.id})">${esc(r.number)}</button></td><td>${date(r.created_at)}</td><td>${money(r.total_cents)}</td></tr>`))}` : ''}${invoiceCostView(d)}<div class="form-actions"><button class="secondary" onclick="window.print()">Print A4 / save PDF</button>${['Sale', 'Invoice', 'Return'].includes(p.kind) ? `<button class="secondary" onclick="printReceipt(${id})">Print receipt · 80 mm</button>` : ''}${can('manager', 'accountant') && p.status === 'Draft' && p.kind === 'Quotation' ? `<button class="secondary" onclick="quotationAction(${id},'decline')">Decline</button><button class="secondary" onclick="quotationAction(${id},'accept')">Accept quotation</button>` : ''}${p.kind === 'PurchaseOrder' && ['Ordered', 'Partially received'].includes(p.status) ? `${can('manager', 'accountant') ? `<button class="secondary" onclick="closeOrder(${id})">${p.status === 'Ordered' ? 'Cancel order' : 'Close · stop waiting for the rest'}</button>` : ''}${can('manager', 'warehouse') ? `<button class="primary" onclick="receiveOrderDialog(${id})">Receive goods →</button>` : ''}` : ''}${can('manager', 'accountant') && ['Draft', 'Accepted'].includes(p.status) && p.kind === 'Quotation' ? `<button class="primary" onclick="convertQuotation(${id})">Convert to invoice →</button>` : ''}${can('manager', 'accountant') && p.status === 'Posted' && p.kind !== 'Return' ? `${p.paid_cents < p.total_cents ? `<button class="primary" onclick="paymentDialog(${id},${p.total_cents - p.paid_cents})">Record payment</button>` : ''}${['Sale', 'Invoice'].includes(p.kind) && d.lines.some(l => Number(l.quantity_milli) > Number(l.returned_milli || 0)) ? `<button class="secondary" onclick="partialReturnDialog(${id})">Return items</button>` : ''}${['Sale', 'Invoice'].includes(p.kind) && !Number(p.returned_cents) ? `<button class="danger" onclick="returnDialog(${id})">Full return</button>` : ''}` : ''}</div>`,
       true,
     );
   } catch (e) {
@@ -291,6 +307,48 @@ async function convertQuotation(id) {
     toast(r.number + ' created from the quotation');
     if (location.hash === '#wholesale') await render();
     await documentDetail(r.id);
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+
+/** Receive some or all outstanding items of a purchase order. */
+async function receiveOrderDialog(id) {
+  const d = await api('documents/' + id);
+  const p = d.document;
+  const open = d.lines.filter(l => Number(l.quantity_milli) > Number(l.received_milli || 0));
+  modal(
+    'Receive goods · ' + p.number,
+    `<form><div class="notice">Enter what actually arrived. Anything not received stays open on the order for a later delivery.</div>
+    ${table(
+      ['Item', 'Ordered', 'Received before', 'Receiving now'],
+      open.map(
+        l =>
+          `<tr><td>${esc(l.name)}<small>${money(l.price_cents)} / ${esc(l.unit)}</small></td><td>${quantity(l.quantity_milli)} ${esc(l.unit)}</td><td>${quantity(l.received_milli || 0)}</td><td><input class="receive-qty" data-line="${l.id}" inputmode="decimal" value="${(Number(l.quantity_milli) - Number(l.received_milli || 0)) / 1000}" aria-label="Quantity of ${esc(l.name)} received"></td></tr>`,
+      ),
+    )}
+    <div class="form-grid"><label>Receive into<select name="location_id">${options(state.boot.locations, 'name', p.location_id)}</select></label>${field('Supplier delivery note / bill number', 'bill_reference', '')}</div>${formActions('Receive into stock')}</form>`,
+    true,
+  );
+  bindForm(async (fd, key) => {
+    const lines = [...document.querySelectorAll('.receive-qty')].map(i => ({ line_id: Number(i.dataset.line), quantity: String(i.value || '0').trim() })).filter(l => Number(l.quantity) > 0);
+    if (!lines.length) throw new Error('Enter a quantity for at least one item.');
+    const r = await api('documents/' + id, 'POST', { action: 'receive', location_id: Number(fd.get('location_id')), bill_reference: fd.get('bill_reference'), lines }, key);
+    closeModal();
+    toast(`${r.number} received · order ${r.order_status.toLowerCase()}`);
+    await render();
+    await documentDetail(id);
+  });
+}
+
+async function closeOrder(id) {
+  if (!confirm('Stop waiting for the remaining items on this order?')) return;
+  try {
+    const r = await api('documents/' + id, 'POST', { action: 'close' });
+    toast('Order ' + r.status.toLowerCase());
+    await render();
+    await documentDetail(id);
   } catch (e) {
     toast(e.message);
   }

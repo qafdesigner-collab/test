@@ -445,4 +445,51 @@ class ErpWorkflowsTest extends TestCase
         $this->assertSame([25000, 10000], [(int) $document->returned_cents, (int) $document->refunded_cents]);
         $this->assertSame(12500, $this->getJson('/api/dashboard')->json('outstanding_cents'));
     }
+
+    public function test_purchase_order_is_received_in_parts_at_ordered_prices(): void
+    {
+        $order = ['kind' => 'PurchaseOrder', 'contact_id' => 2, 'location_id' => 1, 'method' => 'Credit', 'paid' => '0', 'lines' => [['product_id' => 7, 'quantity' => '5', 'price' => '4.00']]];
+        $stock = fn () => (int) DB::table('balances')->where(['product_id' => 7, 'location_id' => 1])->sum('quantity_milli');
+        $before = $stock();
+
+        $this->postOnce('/api/documents', ['contact_id' => null] + $order)->assertUnprocessable();
+        $this->postOnce('/api/documents', ['paid' => '5.00', 'method' => 'Cash'] + $order)->assertUnprocessable();
+        $po = $this->postOnce('/api/documents', $order)->assertOk()->json();
+        $this->assertStringStartsWith('PO-', $po['number']);
+        $this->assertSame('Ordered', DB::table('documents')->where('id', $po['id'])->value('status'));
+        $this->assertSame($before, $stock());
+        $line = DB::table('document_lines')->where('document_id', $po['id'])->first();
+        DB::table('products')->where('id', 7)->update(['cost_cents' => 99900]);
+
+        $receive = fn (string $qty) => $this->postOnce('/api/documents/'.$po['id'], ['action' => 'receive', 'location_id' => 1, 'bill_reference' => 'DN-1', 'lines' => [['line_id' => $line->id, 'quantity' => $qty]]]);
+        $this->actingAs(User::factory()->create(['role' => 'cashier']));
+        $receive('1')->assertForbidden();
+        $this->actingAs(User::factory()->create(['role' => 'warehouse']));
+
+        $receive('6')->assertUnprocessable();
+        $first = $receive('2')->assertOk()->assertJsonPath('order_status', 'Partially received')->json();
+        $this->assertSame($before + 2000, $stock());
+        $receipt = DB::table('documents')->find($first['id']);
+        $this->assertSame(['Purchase', 800, $po['id']], [$receipt->kind, (int) $receipt->total_cents, (int) $receipt->purchase_order_id]);
+
+        $receive('3')->assertOk()->assertJsonPath('order_status', 'Received');
+        $this->assertSame($before + 5000, $stock());
+        $receive('1')->assertUnprocessable();
+        $this->actingAs($this->owner);
+        $this->getJson('/api/documents/'.$po['id'])->assertJsonCount(2, 'receipts');
+        $this->postOnce('/api/documents/'.$po['id'], ['action' => 'close'])->assertUnprocessable();
+    }
+
+    public function test_purchase_orders_can_be_cancelled_or_closed(): void
+    {
+        $order = ['kind' => 'PurchaseOrder', 'contact_id' => 2, 'location_id' => 1, 'method' => 'Credit', 'paid' => '0', 'lines' => [['product_id' => 7, 'quantity' => '5']]];
+        $cancel = $this->postOnce('/api/documents', $order)->json();
+        $this->postOnce('/api/documents/'.$cancel['id'], ['action' => 'close'])->assertOk()->assertJsonPath('status', 'Cancelled');
+
+        $partial = $this->postOnce('/api/documents', $order)->json();
+        $line = DB::table('document_lines')->where('document_id', $partial['id'])->first();
+        $this->postOnce('/api/documents/'.$partial['id'], ['action' => 'receive', 'location_id' => 1, 'lines' => [['line_id' => $line->id, 'quantity' => '1']]])->assertOk();
+        $this->postOnce('/api/documents/'.$partial['id'], ['action' => 'close'])->assertOk()->assertJsonPath('status', 'Closed');
+        $this->postOnce('/api/documents/'.$partial['id'], ['action' => 'receive', 'location_id' => 1, 'lines' => [['line_id' => $line->id, 'quantity' => '1']]])->assertUnprocessable();
+    }
 }
