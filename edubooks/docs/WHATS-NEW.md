@@ -1,3 +1,14 @@
+# What's new in Knowledge Gate 1.4.17
+
+## 🌄 Watched tests: the room scan is now a panorama
+- **Show your room (panorama):** the student presses **🔄 Start the room panorama**, holds the camera (or turns the laptop) and turns slowly all the way around. The app joins the camera pictures into **one wide picture of the room** — like the panorama mode of a phone — while the student watches it grow on screen.
+  - The live camera stays on, with what to do (“Keep turning slowly — show the walls…”), a progress bar and a REC timer.
+  - Turning too fast shows **🐢 Slower please**, and pictures that do not fit are left out, so the panorama stays correct.
+  - It stops by itself when the room is covered (or after 40 seconds); **✓ Done** stops it earlier. **Scan again** is possible before starting.
+- A **short video of the scan** is recorded at the same time (small, low quality), in case the teacher wants to see it moving.
+- **For the teacher:** in the Watch column, the student's record now starts with the **🌄 room panorama** (scroll sideways, click to enlarge) and the **🎥 scan video**.
+- Students are told before starting that their teacher will see a panorama and a short video of their room. Both are kept with the other test photos (deleted after 90 days, or by the teacher).
+
 # What's new in Knowledge Gate 1.4.16
 
 ## 🎮 Games look and sound more real

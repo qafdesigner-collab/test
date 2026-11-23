@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { cn } from '@/components/ui';
+import { PanoramaBuilder, recordClip } from '@/lib/panorama';
 
 export type Proctor = { camera?: boolean; roomScan?: boolean; screen?: boolean };
 export const watched = (p?: Proctor | null) => !!(p?.camera || p?.roomScan || p?.screen);
-export type Streams = { cam: MediaStream | null; scr: MediaStream | null; room: string[]; screenPart: boolean; noScreen: boolean };
+export type Streams = { cam: MediaStream | null; scr: MediaStream | null; room: string[]; panorama?: string | null; roomVideo?: string | null; screenPart: boolean; noScreen: boolean };
 
 const canShare = () => typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getDisplayMedia;
 /** A picture of a video stream as a small JPEG data URL. */
@@ -55,15 +56,32 @@ export function ProctorGate({ p, resume, onReady }: { p: Proctor; resume: boolea
     try { setCam(await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, facingMode: 'user' }, audio: false })); }
     catch { setErr(t('The camera is blocked. Allow the camera for this website (the camera icon in the address bar), then try again. If you have no camera, tell your teacher.')); }
   };
-  const STEPS = ['Turn slowly to your left…', 'Show the wall behind you…', 'Turn to your right…', 'Show your desk and the floor…', 'Show your hands and the desk again…', 'Now look at the screen.'];
+  // the room scan: a panorama while the student turns slowly all around, and a short video of it
+  const [pano, setPano] = useState<string | null>(null); const [roomVideo, setRoomVideo] = useState<string | null>(null);
+  const [scanInfo, setScanInfo] = useState({ covered: 0, fast: false, secs: 0 });
+  const strip = useRef<HTMLCanvasElement>(null); const scanVideo = useRef<HTMLVideoElement | null>(null); const stopScan = useRef<(() => void) | null>(null);
+  const TARGET = 6; // camera-widths: about all the way around
   const doScan = async () => {
-    if (!cam) return; const shots: string[] = [];
-    for (let i = 0; i < STEPS.length; i++) {
-      setScan(i); await new Promise((r) => setTimeout(r, 2200));
-      const s = await grab(cam, 480, 0.6); if (s) shots.push(s);
-    }
-    setScan(null); setRoom(shots);
+    if (!cam) return;
+    setPano(null); setRoomVideo(null); setRoom([]); setScan(0);
+    const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.srcObject = cam; await v.play().catch(() => undefined); scanVideo.current = v;
+    for (let i = 0; i < 20 && v.readyState < 2; i++) await new Promise((r) => setTimeout(r, 100));
+    const b = new PanoramaBuilder(v); const clip = recordClip(cam); const t0 = Date.now();
+    let done = false; const finish = async () => {
+      if (done) return; done = true; clearInterval(timer);
+      const img = b.result(); const vid = clip ? await clip.stop() : null;
+      setPano(img); setRoomVideo(vid); setScan(null); v.srcObject = null; stopScan.current = null;
+    };
+    stopScan.current = () => void finish();
+    const timer = setInterval(() => {
+      b.add(); const secs = Math.round((Date.now() - t0) / 1000);
+      setScanInfo({ covered: b.covered, fast: b.tooFast, secs }); if (strip.current) b.preview(strip.current);
+      if ((b.covered >= TARGET && secs >= 8) || secs >= 40) void finish();
+    }, 220);
   };
+  useEffect(() => () => stopScan.current?.(), []);
+  const scanning = scan !== null;
+  const scanTip = scanInfo.fast ? 'Slower please — turn very slowly.' : scanInfo.covered < 1.6 ? 'Hold the camera (or the laptop) and turn slowly to your left…' : scanInfo.covered < 4 ? 'Keep turning slowly — show the walls…' : 'Almost there — keep turning until you are back at the start.';
   const askScreen = async () => {
     setErr('');
     if (!canShare()) { setNoScreen(true); return; }
@@ -73,7 +91,7 @@ export function ProctorGate({ p, resume, onReady }: { p: Proctor; resume: boolea
       setPart(false); setScr(s);
     } catch { setErr(t('Screen sharing was not allowed. Press the button again and choose “Entire screen”.')); }
   };
-  const camOk = !needCam || !!cam; const roomOk = !p.roomScan || resume || room.length > 0; const scrOk = !p.screen || !!scr || noScreen;
+  const camOk = !needCam || !!cam; const roomOk = !p.roomScan || resume || !!pano; const scrOk = !p.screen || !!scr || noScreen;
   const step = (ok: boolean, n: number, title: string, body: React.ReactNode) => (
     <li className={cn('rounded-2xl border-2 p-4', ok ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white')}>
       <p className="font-bold text-slate-800">{ok ? '✅' : `${n}.`} {title}</p><div className="mt-2">{body}</div></li>);
@@ -84,7 +102,7 @@ export function ProctorGate({ p, resume, onReady }: { p: Proctor; resume: boolea
         <p className="mt-2 text-xl font-bold text-slate-800">{t('This test is watched')}</p>
         <p className="mt-1 text-slate-600">{t('Your teacher will see:')}</p>
         <ul className="mx-auto mt-1 w-fit list-disc text-left text-slate-600 ps-5">
-          {p.roomScan && !resume && <li>{t('a short look around your room')}</li>}
+          {p.roomScan && !resume && <li>{t('a panorama picture and a short video of your room')}</li>}
           {p.camera && <li>{t('photos from your camera at random times')}</li>}
           {p.screen && <li>{t('pictures of your whole screen at random times')}</li>}
           {(p.camera || p.screen) && <li>{t('your camera and screen live, during the test')}</li>}
@@ -96,9 +114,10 @@ export function ProctorGate({ p, resume, onReady }: { p: Proctor; resume: boolea
         {cam ? <div className="relative overflow-hidden rounded-2xl bg-black shadow-inner">
           <video ref={attach(cam)} autoPlay muted playsInline className="aspect-video w-full -scale-x-100 object-cover" aria-label={t('Your camera')} />
           <span className="absolute start-2 top-2 rounded bg-red-600 px-1.5 py-0.5 text-xs font-bold text-white">● {t('Camera')}</span>
-          {scan !== null && <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 text-center">
-            <p className="text-xl font-black text-white drop-shadow">🔄 {t(STEPS[scan])}</p>
-            <div className="mt-2 flex justify-center gap-1.5">{STEPS.map((_, i) => <span key={i} className={cn('size-2.5 rounded-full', i < scan ? 'bg-emerald-400' : i === scan ? 'bg-white' : 'bg-white/40')} />)}</div></div>}
+          {scanning && <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-3 text-center">
+            <p className={cn('text-lg font-black drop-shadow sm:text-xl', scanInfo.fast ? 'text-amber-300' : 'text-white')}>{scanInfo.fast ? '🐢' : '⟵'} {t(scanTip)}</p>
+            <div className="mx-auto mt-2 h-2.5 w-3/4 overflow-hidden rounded-full bg-white/30"><div className="h-full bg-emerald-400 transition-[width]" style={{ width: `${Math.min(100, (scanInfo.covered / TARGET) * 100)}%` }} /></div></div>}
+          {scanning && <span className="absolute end-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-xs font-bold text-white">● REC {scanInfo.secs}s</span>}
         </div> : <div />}
         {scr && <div className="relative overflow-hidden rounded-2xl bg-slate-900">
           <video ref={attach(scr)} autoPlay muted playsInline className="aspect-video w-full object-contain" aria-label={t('Your shared screen')} />
@@ -107,18 +126,21 @@ export function ProctorGate({ p, resume, onReady }: { p: Proctor; resume: boolea
       <ol className="space-y-3">
         {needCam && step(!!cam, ++n, t('Allow the camera'), cam ? <p className="text-emerald-800">{t('Your camera is on — you can see yourself above.')}</p>
           : <button type="button" onClick={askCam} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white">📷 {t('Turn on the camera')}</button>)}
-        {p.roomScan && !resume && step(room.length > 0, ++n, t('Show your room'), scan !== null
-          ? <p className="text-lg font-bold text-sky-800">🔄 {t(STEPS[scan])} <span className="text-sm text-slate-500">({scan + 1}/{STEPS.length})</span></p>
-          : room.length ? <div className="flex flex-wrap items-center gap-1">{room.map((r, i) => <img key={i} src={r} alt="" className="h-12 -scale-x-100 rounded" />)}
-              <button type="button" onClick={doScan} className="ms-2 text-xs text-sky-700 underline">{t('Scan again')}</button></div>
-          : <button type="button" disabled={!cam} onClick={doScan} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white disabled:opacity-40">🔄 {t('Start the room scan')}</button>)}
+        {p.roomScan && !resume && step(!!pano, ++n, t('Show your room (panorama)'), scanning
+          ? <div className="space-y-2"><canvas ref={strip} width={900} height={150} className="h-24 w-full rounded-lg bg-slate-900" aria-label={t('Your room panorama, growing')} />
+              <div className="flex items-center gap-2 text-sm text-slate-600"><span className="flex-1">{t('Turn slowly all the way around. The picture of your room grows here.')}</span>
+                <button type="button" disabled={scanInfo.covered < 2} onClick={() => stopScan.current?.()} className="rounded-lg bg-emerald-600 px-3 py-1.5 font-bold text-white disabled:opacity-40">✓ {t('Done')}</button></div></div>
+          : pano ? <div className="space-y-1"><div className="overflow-x-auto rounded-lg bg-slate-900"><img src={pano} alt={t('Your room panorama')} className="h-28 max-w-none" /></div>
+              <button type="button" onClick={doScan} className="text-xs text-sky-700 underline">{t('Scan again')}</button></div>
+          : <div className="space-y-2"><p className="text-sm text-slate-600">{t('Hold your camera (or turn your laptop) and turn slowly all the way around your room. We make one wide picture of it.')}</p>
+              <button type="button" disabled={!cam} onClick={doScan} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white disabled:opacity-40">🔄 {t('Start the room panorama')}</button></div>)}
         {p.screen && step(!!scr || noScreen, ++n, t('Share your whole screen'), scr ? <p className="text-emerald-800">{t('Your screen is shared — you can see it above.')}</p>
           : noScreen ? <p className="text-amber-800">{t('This device cannot share its screen. Your teacher will see this. Use a computer next time if you can.')}</p>
           : <button type="button" onClick={askScreen} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white">🖥️ {t('Share the screen')}</button>)}
       </ol>
       {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{err}</p>}
-      <div className="text-center"><button type="button" disabled={!(camOk && roomOk && scrOk) || scan !== null}
-        onClick={() => onReady({ cam, scr, room, screenPart: part, noScreen })}
+      <div className="text-center"><button type="button" disabled={!(camOk && roomOk && scrOk) || scanning}
+        onClick={() => onReady({ cam, scr, room, panorama: pano, roomVideo, screenPart: part, noScreen })}
         className="rounded-2xl bg-emerald-700 px-8 py-3 text-xl font-bold text-white shadow disabled:opacity-40">▶ {t(resume ? 'Go on' : 'Start')}</button></div>
     </div>
   );
@@ -137,6 +159,8 @@ export function useProctor(id: string, p: Proctor | null, s: Streams | null, act
     let stop = false; const timers: ReturnType<typeof setTimeout>[] = [];
     // what happened at the start
     s.room.forEach((img) => void send('ROOM', { image: img }));
+    if (s.panorama) void send('PANORAMA', { image: s.panorama });
+    if (s.roomVideo) void send('ROOM_VIDEO', { video: s.roomVideo });
     if (p.screen && s.noScreen) void send('NO_SCREEN');
     if (p.screen && s.screenPart) void send('SCREEN_PART');
     const rand = (a: number, b: number) => (a + Math.random() * (b - a)) * 1000;

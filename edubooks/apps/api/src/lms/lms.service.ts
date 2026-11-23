@@ -296,7 +296,7 @@ export class LmsService {
     const tries = (await this.q.execute(sql`SELECT student_id AS "studentId", attempt, started_at AS "startedAt", submitted_at AS "submittedAt", over_time AS "overTime",
         CASE WHEN submitted_at IS NOT NULL THEN extract(epoch FROM submitted_at - started_at)::int END AS seconds
       FROM assessment_attempts WHERE assessment_id = ${id} ORDER BY attempt`)).rows as any[];
-    const watch = (await this.q.execute(sql`SELECT student_id AS "studentId", count(*) FILTER (WHERE kind IN ('ROOM','CAMERA'))::int AS photos, count(*) FILTER (WHERE kind = 'SCREEN')::int AS screens,
+    const watch = (await this.q.execute(sql`SELECT student_id AS "studentId", count(*) FILTER (WHERE kind IN ('ROOM','PANORAMA','CAMERA'))::int AS photos, count(*) FILTER (WHERE kind = 'SCREEN')::int AS screens,
         count(*) FILTER (WHERE kind = 'AWAY')::int AS away, coalesce(sum((detail->>'seconds')::int) FILTER (WHERE kind = 'AWAY'), 0)::int AS "awaySeconds",
         count(*) FILTER (WHERE kind IN ('SCREEN_OFF','CAMERA_OFF','SCREEN_PART','NO_SCREEN','NO_CAMERA','FULLSCREEN_OFF'))::int AS warnings
       FROM proctor_events WHERE assessment_id = ${id} GROUP BY student_id`)).rows as any[];
@@ -392,19 +392,29 @@ export class LmsService {
     if (!p.camera && !p.roomScan && !p.screen) throw new BadRequestException('This work is not watched');
     const open = await this.openAttempt(id);
     if (!open) throw new ConflictException('Press Start first');
-    const LIMIT: Record<string, number> = { ROOM: 12, CAMERA: 150, SCREEN: 150 };
+    const LIMIT: Record<string, number> = { ROOM: 12, PANORAMA: 3, ROOM_VIDEO: 3, CAMERA: 150, SCREEN: 150 };
     const { rows: [n] } = await this.q.execute(sql`SELECT count(*)::int AS all, count(*) FILTER (WHERE kind = ${d.kind})::int AS same FROM proctor_events
       WHERE assessment_id = ${id} AND student_id = ${this.ctx.userId} AND attempt = ${open.attempt}`) as any;
     if (n.all >= 800 || n.same >= (LIMIT[d.kind] ?? 300)) return { ok: true, skipped: true };
     let file: string | null = null;
-    if (['ROOM', 'CAMERA', 'SCREEN'].includes(d.kind)) {
+    const put = async (bytes: Buffer, ext: string) => {
+      file = path.join('proctor', a.id, `${randomUUID()}.${ext}`);
+      await fsp.mkdir(path.join(config.storageDir, 'proctor', a.id), { recursive: true });
+      await fsp.writeFile(path.join(config.storageDir, file), bytes);
+    };
+    if (['ROOM', 'PANORAMA', 'CAMERA', 'SCREEN'].includes(d.kind)) {
       const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(d.image ?? '');
       if (!m) throw new BadRequestException('The picture could not be sent');
       const bytes = Buffer.from(m[1], 'base64');
-      if (bytes.length > 600_000 || bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new BadRequestException('The picture could not be sent');
-      file = path.join('proctor', a.id, `${randomUUID()}.jpg`);
-      await fsp.mkdir(path.join(config.storageDir, 'proctor', a.id), { recursive: true });
-      await fsp.writeFile(path.join(config.storageDir, file), bytes);
+      if (bytes.length > (d.kind === 'PANORAMA' ? 1_400_000 : 600_000) || bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new BadRequestException('The picture could not be sent');
+      await put(bytes, 'jpg');
+    } else if (d.kind === 'ROOM_VIDEO') {
+      const m = /^data:video\/(webm|mp4)(?:;[^,]*)?;base64,([A-Za-z0-9+/=]+)$/.exec(d.video ?? '');
+      if (!m) throw new BadRequestException('The video could not be sent');
+      const bytes = Buffer.from(m[2], 'base64');
+      const webm = bytes.length > 4 && bytes.readUInt32BE(0) === 0x1a45dfa3; const mp4 = bytes.length > 8 && bytes.toString('latin1', 4, 8) === 'ftyp';
+      if (bytes.length > 1_400_000 || !(m[1] === 'webm' ? webm : mp4)) throw new BadRequestException('The video could not be sent');
+      await put(bytes, m[1]);
     }
     await this.q.execute(sql`INSERT INTO proctor_events (publisher_id, school_id, assessment_id, student_id, attempt, kind, file, detail)
       VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${id}, ${this.ctx.userId}, ${open.attempt}, ${d.kind}, ${file}, ${JSON.stringify(d.seconds !== undefined ? { seconds: d.seconds } : {})}::jsonb)`);
@@ -421,7 +431,9 @@ export class LmsService {
     const { rows: [e] } = await this.q.execute(sql`SELECT assessment_id AS "assessmentId", file FROM proctor_events WHERE id = ${eventId}`) as any;
     if (!e?.file) throw new NotFoundException('Not found');
     await this.assessment(e.assessmentId);
-    try { return await fsp.readFile(path.join(config.storageDir, e.file)); } catch { throw new NotFoundException('This picture was removed'); }
+    const ext = path.extname(e.file).slice(1);
+    try { return { bytes: await fsp.readFile(path.join(config.storageDir, e.file)), mime: ext === 'webm' ? 'video/webm' : ext === 'mp4' ? 'video/mp4' : 'image/jpeg' }; }
+    catch { throw new NotFoundException('This picture was removed'); }
   }
   // ---------- live view: the newest camera and screen picture of each student, every few seconds ----------
   // Kept only as the latest picture on disk (overwritten each time, removed when the student hands in) — the record of the test is the random photos above.

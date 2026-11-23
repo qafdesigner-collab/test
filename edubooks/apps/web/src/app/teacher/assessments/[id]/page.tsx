@@ -320,17 +320,24 @@ function CheckCell({ s }: { s: any }) {
   if (!copied && ai < 40) return <span className="text-xs text-emerald-700">✓ looks own work</span>;
   return <span className="flex flex-wrap gap-1">{copied > 0 && <Badge tone="danger">📋 copied {copied}</Badge>}{ai >= 40 && <Badge tone={aiTone(ai)}>🤖 AI {ai}%</Badge>}</span>;
 }
-const WATCH: Record<string, string> = { ROOM: '🔄 Room scan', CAMERA: '📷 Camera photo', SCREEN: '🖥️ Screen picture', AWAY: '↗ Left the page', SCREEN_OFF: '⚠ Stopped sharing the screen',
+const WATCH: Record<string, string> = { ROOM: '🔄 Room scan', PANORAMA: '🌄 Room panorama', ROOM_VIDEO: '🎥 Room scan video', CAMERA: '📷 Camera photo', SCREEN: '🖥️ Screen picture', AWAY: '↗ Left the page', SCREEN_OFF: '⚠ Stopped sharing the screen',
   CAMERA_OFF: '⚠ Camera turned off', SCREEN_PART: '⚠ Shared only a window, not the whole screen', NO_SCREEN: '⚠ Device cannot share its screen', NO_CAMERA: '⚠ No camera', FULLSCREEN_OFF: '⚠ Left full screen' };
 /** Everything recorded while a student did watched work: a timeline, and the photos and screen pictures. */
 function WatchDialog({ a, student, onClose }: { a: any; student: any; onClose: () => void }) {
   const q = useQuery({ queryKey: ['watch', a.id, student.id], queryFn: () => api.get<any[]>(`/teacher/assessments/${a.id}/watch/${student.id}`) });
   const [big, setBig] = useState<string | null>(null); const [ask, setAsk] = useState(false);
   const clear = useAction(() => api.del(`/teacher/assessments/${a.id}/watch`), { ok: 'Exam photos deleted', keys: ['assessment', 'watch'], after: () => { setAsk(false); onClose(); } });
-  const ev = q.data ?? []; const pics = ev.filter((e) => e.hasImage);
+  const ev = q.data ?? []; const pics = ev.filter((e) => e.hasImage && e.kind !== 'PANORAMA' && e.kind !== 'ROOM_VIDEO');
+  const panos = ev.filter((e) => e.kind === 'PANORAMA'); const vids = ev.filter((e) => e.kind === 'ROOM_VIDEO');
   const time = (d: string) => new Date(d).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   return (
     <Dialog open onOpenChange={onClose} wide title={`🛡️ ${student.displayName} — what was recorded`} description="Look at the pictures and the timeline together: leaving the page for a long time, other apps on the screen or another person in the photos can show the student had help.">
+      {(panos.length > 0 || vids.length > 0) && <div className="mb-4 space-y-2">
+        {panos.map((e) => <figure key={e.id}><figcaption className="mb-1 text-xs font-medium text-slate-600">🌄 Room panorama · {new Date(e.createdAt).toLocaleTimeString()}{e.attempt > 1 ? ` · try ${e.attempt}` : ''} — scroll sideways, click to enlarge</figcaption>
+          <div className="overflow-x-auto rounded-lg bg-slate-900"><button type="button" onClick={() => setBig(e.id)}><img src={`/api/teacher/watch/${e.id}/image`} alt="Room panorama" className="h-40 max-w-none" /></button></div></figure>)}
+        {vids.map((e) => <figure key={e.id}><figcaption className="mb-1 text-xs font-medium text-slate-600">🎥 Room scan video · {new Date(e.createdAt).toLocaleTimeString()}</figcaption>
+          <video src={`/api/teacher/watch/${e.id}/image`} controls playsInline className="max-h-56 rounded-lg bg-black" /></figure>)}
+      </div>}
       {q.error ? <ErrorBox error={q.error} /> : !q.data ? <PageLoader /> : !ev.length ? <p className="text-slate-500">Nothing was recorded.</p> : (
         <div className="grid max-h-[65vh] gap-4 overflow-y-auto md:grid-cols-[1fr_16rem]">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] content-start gap-2">{pics.map((e) => (

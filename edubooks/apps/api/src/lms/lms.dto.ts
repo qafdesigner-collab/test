@@ -43,8 +43,10 @@ export class ProctorDto {
   @IsOptional() @IsBoolean() screen?: boolean;
 }
 export class ProctorEventDto {
-  @IsIn(['ROOM', 'CAMERA', 'SCREEN', 'AWAY', 'SCREEN_OFF', 'CAMERA_OFF', 'SCREEN_PART', 'NO_SCREEN', 'NO_CAMERA', 'FULLSCREEN_OFF']) kind: string;
-  @IsOptional() @IsString() @MaxLength(800_000) image?: string;
+  @IsIn(['ROOM', 'PANORAMA', 'ROOM_VIDEO', 'CAMERA', 'SCREEN', 'AWAY', 'SCREEN_OFF', 'CAMERA_OFF', 'SCREEN_PART', 'NO_SCREEN', 'NO_CAMERA', 'FULLSCREEN_OFF']) kind: string;
+  @IsOptional() @IsString() @MaxLength(1_900_000) image?: string;
+  /** the room-scan video (WebM or MP4) */
+  @IsOptional() @IsString() @MaxLength(1_900_000) video?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(86400) seconds?: number;
 }
 export class LiveFrameDto {

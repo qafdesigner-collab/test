@@ -38,7 +38,7 @@ export class TeacherController {
   @Roles('TEACHER') @Delete('assessments/:id') del(@Param('id', Id()) id: string) { return this.svc.deleteAssessment(id); }
   @Roles(...STAFF) @Get('assessments/:id/watch/:studentId') watch(@Param('id', Id()) id: string, @Param('studentId', Id()) sid: string) { return this.svc.proctorLog(id, sid); }
   @Roles(...STAFF) @Get('watch/:eventId/image') async watchImage(@Param('eventId', Id()) eid: string, @Res() res: Response) {
-    const b = await this.svc.proctorImage(eid); res.setHeader('Content-Type', 'image/jpeg'); res.setHeader('Cache-Control', 'private, max-age=3600'); res.end(b);
+    const f = await this.svc.proctorImage(eid); res.setHeader('Content-Type', f.mime); res.setHeader('Cache-Control', 'private, max-age=3600'); res.setHeader('Accept-Ranges', 'none'); res.end(f.bytes);
   }
   @Roles(...STAFF) @Get('assessments/:id/live') live(@Param('id', Id()) id: string) { return this.svc.liveList(id); }
   @Roles(...STAFF) @Get('assessments/:id/live/:studentId/:kind') async liveImage(@Param('id', Id()) id: string, @Param('studentId', Id()) sid: string, @Param('kind') kind: string, @Res() res: Response) {
