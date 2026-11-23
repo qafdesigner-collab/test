@@ -119,6 +119,35 @@ Scan tree: `/tmp/edubooks-scan/edubooks` (HEAD `4b23abf`). All 44 `*controller.t
 
 Do not re-open excluded items (timetable onlineUrl IDOR #10, login-as+XSS #17, games/exams answer keys, mustChangePassword, admin reset revoke, commerce/erasure if gated, etc.).
 
+### Less-reviewed areas (second pass) — discarded
+
+| Candidate | Why discarded |
+|---|---|
+| Voice/Piper `POST /voice/say`, page TTS | `assertEdition` + `visibleFor`; install URLs fixed; PARENT blocked by AuthGuard path allowlist (not `/api/voice`) |
+| Audio clips `GET /messages/audio/:id` | `allowed()`: owner / SCHOOL_ADMIN / message peer / teacherClassIds enrolment / parent_students |
+| Reader `page_work` list/image/comment | `workScope` → `assertTeaches` / teacherClassIds / SCHOOL_ADMIN school-wide |
+| Groups CRUD + compare | `assertTeaches` on mutate; compare aggregates intentionally school-wide totals (no per-student for other classes) |
+| Checklists parent/student | `parent_students` / self-only; teacher paths via `own()` → `assertTeaches` |
+| Analytics `classes/:id` | `assertTeaches` at entry |
+| Training learner quiz `correct[]` | Boolean feedback only (no answer key); audience filter on PUBLISHED courses — below AuthZ MEDIUM |
+| Licensing school pools/assign | RLS `school_id = app_school()`; `lockablePool`/`assignment` schoolId checks |
+| Parents import/link | SCHOOL_ADMIN + school-scoped; parent `assertChild` |
+| Registration `asPublisher(staff:true)` | Creates SUSPENDED school; login blocks non-ACTIVE + PENDING/REJECTED registration status |
+| Branding public GET | Logo/manifest/icons only; PATCH/POST logo PUBLISHER_ADMIN |
+| Apps reader + `app-download/:token` | `assertEdition` / known HMAC capability URL (#11) |
+| Flipbook reader + `flip/:token` | `assertEdition` on mint; `sameUser` on document dest; HMAC excluded |
+| Chunked uploads | PUBLISHER_STAFF + `meta.userId` bind + `/^[a-f0-9]{32}$/` |
+| Files `assets/:id/link` / `files/:token` | `canAccessAsset`; `sameUser` on stream; no `@Roles` but AuthGuard + parent allowlist |
+| Live lessons / announcements | messaging `assertTeaches` / `myClassIds` |
+| Retention / proctor cleanup | SECURITY DEFINER + `REVOKE … FROM PUBLIC`; grant only `edubooks_app`; cron via root TX |
+| Consent / erasure | `erase_student_data` re-checks publisher/school; username confirm |
+| Room-scan phone token | SHA-256 lookup; one-shot `done_at`; binds student/assessment from link; ManualTx + withContext(student) |
+| Impersonation | Start PUBLISHER_ADMIN only; `auth/return` unbound = known #17 |
+| Webhooks | `NOTIFY_WEBHOOK_URL` env-only (not user-controlled) |
+| Nested `withContext` early-return | Skips only when ALS already set (same request TX); ManualTx paths call withContext after exit |
+
+API fingerprint: `apps/api` package `1.4.19`; `auth.guard.ts` sha256 `662e2dd2…`.
+
 ---
 
 ## Crypto / secrets / infra re-hunt (2026-11-23, very thorough) — NONE
