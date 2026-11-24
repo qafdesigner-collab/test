@@ -6,6 +6,7 @@ use App\Models\User;
 use Database\Seeders\DemoBusinessSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class DemoBusinessTest extends TestCase
@@ -14,6 +15,7 @@ class DemoBusinessTest extends TestCase
 
     public function test_owner_adds_a_consistent_demo_business_once(): void
     {
+        Storage::fake('local');
         $owner = User::factory()->create(['role' => 'owner']);
         $this->actingAs(User::factory()->create(['role' => 'manager']));
         $this->postJson('/api/system/demo', ['password' => 'password'])->assertForbidden();
@@ -29,6 +31,8 @@ class DemoBusinessTest extends TestCase
         $this->assertSame(0, DB::table('shifts')->whereNull('closed_at')->count());
         $this->assertGreaterThanOrEqual(5, DB::table('batches')->where('status', 'Completed')->count());
         $this->assertGreaterThan(20, DB::table('expenses')->count());
+        $this->assertSame(14, DB::table('images')->count());
+        Storage::disk('local')->assertExists(DB::table('images')->value('thumb'));
         $this->assertSame('system.demo_added', DB::table('audit')->orderByDesc('id')->value('action'));
         $this->assertSame($owner->id, DB::table('audit')->orderByDesc('id')->value('user_id'));
         $this->assertLessThanOrEqual(now()->timestamp, strtotime((string) DB::table('documents')->max('created_at')));

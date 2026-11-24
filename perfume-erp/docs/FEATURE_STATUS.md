@@ -1,4 +1,4 @@
-# Feature status — 0.10.0
+# Feature status — 0.10.1
 
 English is the main language; Arabic is the second language (right-to-left).
 

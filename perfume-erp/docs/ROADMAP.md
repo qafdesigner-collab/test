@@ -45,4 +45,4 @@ changes), browser screenshots, a rebuilt cPanel ZIP, a commit and a push to
 - [x] 21. Version visible to the owner only; install updates from System → Upload update
 - [x] 22. Clay and Clay Noir themes (soft raised surfaces)
 - [x] 23. Full demo business: 90 days of sales, purchases, production, expenses, shifts, loyalty and projects
-- [ ] 24. Real product photos for the demo (free-licence photos; needs an image source this environment may use)
+- [x] 24. Product photos for the demo: 14 AI-generated, unbranded bottle photos (database/data/demo-photos)

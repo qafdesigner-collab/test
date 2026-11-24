@@ -1,4 +1,4 @@
-# Atelier Perfume ERP — release 0.10.0
+# Atelier Perfume ERP — release 0.10.1
 
 A working Laravel 13 / PHP 8.3 application for a perfume company, with a responsive browser interface in English and Arabic, and a separate database per installation (MySQL/MariaDB or SQLite). No shared demonstration password is shipped.
 
@@ -20,7 +20,7 @@ Linux/macOS: `bash setup.sh`, then `bash start-local.sh`. The packaged vendor de
 
 A fresh installation is empty. Tick "Add demo data" in the installer, or (owner) Company & access → System → **Add demo business** while there are no sales yet, or run `php artisan erp:demo`: this adds a fictional perfume business with 22 products, 13 customers and suppliers and 90 days of POS and wholesale sales, purchases, production batches, expenses, shifts, loyalty and design projects.
 
-Demo records, names and placeholder bottle art are fictional; there is no third-party brand photography. Upload your own photos with the camera button on each product card.
+Demo records and names are fictional; the 14 demo perfumes come with AI-generated photos of unbranded bottles (database/data/demo-photos). There is no third-party brand photography. Upload your own photos with the camera button on each product card.
 
 ## Core workflows
 

@@ -2697,3 +2697,7 @@ footer { display: flex; justify-content: space-between; gap: 12px; }
 .update-progress { margin: 12px 0; }
 .update-bar { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; margin-bottom: 6px; }
 .update-bar i { display: block; height: 100%; width: 0; background: var(--metal, var(--accent)); transition: width .2s; }
+
+/* Product photos fill the card frame */
+.product-art { overflow: hidden; }
+.product-art img { object-fit: cover; padding: 0; }
