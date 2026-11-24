@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\TwoFactor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -19,11 +20,20 @@ class AuthController extends ErpBaseController
         $key = 'login:'.$r->ip().':'.strtolower($v['email']);
         if (RateLimiter::tooManyAttempts($key, 6)) {
             throw ValidationException::withMessages(['email' => __('Too many attempts. Try again in a minute.')]);
-        }if (! Auth::attempt($v + ['active' => true])) {
+        }
+        if (! Auth::validate($v + ['active' => true])) {
             RateLimiter::hit($key, 60);
             throw ValidationException::withMessages(['email' => __('Email or password is incorrect.')]);
-        }RateLimiter::clear($key);
+        }
+        RateLimiter::clear($key);
+        $user = Auth::getLastAttempted();
         $r->session()->regenerate();
+        if (TwoFactor::enabled($user)) {
+            $r->session()->put('two_factor', ['user' => $user->id, 'at' => now()->getTimestamp()]);
+
+            return redirect('/login/two-factor');
+        }
+        Auth::login($user);
         $this->audit('auth.login', 'user:'.Auth::id());
 
         return redirect('/');

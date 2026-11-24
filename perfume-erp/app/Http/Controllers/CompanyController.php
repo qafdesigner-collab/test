@@ -42,7 +42,7 @@ class CompanyController extends ErpBaseController
             return ['id' => $id];
         }
 
-        return ['users' => DB::table('users')->select('id', 'name', 'email', 'role', 'active')->get()];
+        return ['users' => DB::table('users')->select('id', 'name', 'email', 'role', 'active')->selectRaw('two_factor_confirmed_at is not null as two_factor')->get()];
     }
 
     public function auditLog()

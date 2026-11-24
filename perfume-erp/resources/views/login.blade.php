@@ -28,6 +28,17 @@
         <h1>{!! nl2br(e(__("A little more\norder. A lot more\npossibility."))) !!}</h1>
         <p class="muted">{{ __('Manufacture, create and sell. One connected workspace.') }}</p>
         @if (session('status'))<div class="notice">{{ session('status') }}</div>@endif
+        @if ($challenge ?? false)
+        <form method="post" action="/login/two-factor">
+            @csrf
+            <h2>{{ __('Two-step sign-in') }}</h2>
+            <p class="muted">{{ __('Enter the 6-digit code from your authenticator app, or one of your recovery codes.') }}</p>
+            <label>{{ __('Code') }}<input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required autofocus></label>
+            @if ($errors->any())<div class="error">{{ $errors->first() }}</div>@endif
+            <button class="primary full" type="submit">{{ __('Verify and continue') }} <span>{{ $arabic ? '←' : '→' }}</span></button>
+            <p class="tiny"><a href="/login">{{ __('Back to sign in') }}</a></p>
+        </form>
+        @else
         <form method="post" action="/login">
             @csrf
             <label>{{ __('Email address') }}<input name="email" type="email" autocomplete="username" value="{{ old('email') }}" required autofocus></label>
@@ -35,6 +46,7 @@
             @if ($errors->any())<div class="error">{{ $errors->first() }}</div>@endif
             <button class="primary full" type="submit">{{ __('Sign in to your workspace') }} <span>{{ $arabic ? '←' : '→' }}</span></button>
         </form>
+        @endif
         <p class="tiny muted">{{ __("Your company's private installation") }} · {{ __('Version') }} {{ config('erp.version') }}</p>
     </main>
     <aside class="login-art">

@@ -169,5 +169,16 @@
   "Loyalty points are not enabled.": "نقاط الولاء غير مفعلة.",
   "Points can only pay whole points.": "يمكن الدفع بالنقاط بعدد صحيح من النقاط فقط.",
   "The customer does not have enough loyalty points.": "لا يملك العميل نقاط ولاء كافية.",
-  "Choose the customer to pay with loyalty points.": "اختر العميل للدفع بنقاط الولاء."
+  "Choose the customer to pay with loyalty points.": "اختر العميل للدفع بنقاط الولاء.",
+  "Back to sign in": "العودة إلى تسجيل الدخول",
+  "Code": "الرمز",
+  "Enter the 6-digit code from your authenticator app, or one of your recovery codes.": "أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة، أو أحد رموز الاسترداد.",
+  "Start the set-up again.": "ابدأ الإعداد من جديد.",
+  "Switch on two-step sign-in first.": "فعّل التحقق بخطوتين أولًا.",
+  "The code is not correct.": "الرمز غير صحيح.",
+  "The code is not correct. Check the time on your phone and try again.": "الرمز غير صحيح. تحقّق من الوقت في هاتفك وحاول مجددًا.",
+  "Two-step sign-in": "التحقق بخطوتين",
+  "Two-step sign-in is already switched on.": "التحقق بخطوتين مفعّل بالفعل.",
+  "Verify and continue": "تحقق وتابع",
+  "Your sign-in expired. Please sign in again.": "انتهت مهلة تسجيل الدخول. يُرجى تسجيل الدخول مجددًا."
 }

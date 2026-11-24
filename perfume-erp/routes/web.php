@@ -14,6 +14,7 @@ use App\Http\Controllers\ManufacturingController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\SystemController;
+use App\Http\Controllers\TwoFactorController;
 use App\Http\Controllers\WorkspaceController;
 use App\Http\Middleware\EnsureActiveUser;
 use Illuminate\Support\Facades\Route;
@@ -33,6 +34,8 @@ Route::post('/install', [InstallController::class, 'install'])->middleware('thro
 Route::middleware('guest')->group(function () {
     Route::view('/login', 'login')->name('login');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:20,1');
+    Route::get('/login/two-factor', [TwoFactorController::class, 'challenge']);
+    Route::post('/login/two-factor', [TwoFactorController::class, 'verify'])->middleware('throttle:20,1');
 });
 Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
     Route::view('/', 'app');
@@ -81,6 +84,9 @@ Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
         Route::post('settings/logo', [CompanyController::class, 'logo']);
         Route::match(['get', 'post'], 'users', [CompanyController::class, 'users']);
         Route::post('password', [AuthController::class, 'password']);
+        Route::get('two-factor', [TwoFactorController::class, 'status']);
+        Route::post('two-factor', [TwoFactorController::class, 'action'])->middleware('throttle:two-factor');
+        Route::post('users/{id}/two-factor-reset', [TwoFactorController::class, 'reset'])->whereNumber('id');
         Route::get('audit', [CompanyController::class, 'auditLog']);
         Route::get('customers/{id}/360', [ReportController::class, 'customerDossier'])->whereNumber('id');
         Route::get('products/{id}/360', [ReportController::class, 'productDossier'])->whereNumber('id');

@@ -22,10 +22,10 @@ async function settingsPage() {
       ? panel(
           'Team access',
           table(
-            ['Name', 'Email', 'Role', 'Status'],
+            ['Name', 'Email', 'Role', 'Two-step', 'Status'],
             users.map(
               u =>
-                `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(u.role)}</td><td>${badge(u.active ? 'Active' : 'Disabled')} ${u.id !== state.boot.user.id ? `<button class="subtle" onclick="toggleUser(${u.id},${!u.active})">${u.active ? 'Disable' : 'Enable'}</button>` : ''}</td></tr>`,
+                `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(u.role)}</td><td>${u.two_factor ? `${badge('On')}${state.boot.user.role === 'owner' && u.id !== state.boot.user.id ? ` <button class="subtle" onclick="resetTwoFactor(${u.id},'${esc(u.name).replace(/'/g, '&#39;')}')">Reset</button>` : ''}` : '<span class="muted">Off</span>'}</td><td>${badge(u.active ? 'Active' : 'Disabled')} ${u.id !== state.boot.user.id ? `<button class="subtle" onclick="toggleUser(${u.id},${!u.active})">${u.active ? 'Disable' : 'Enable'}</button>` : ''}</td></tr>`,
             ),
           ),
           '<button class="subtle" onclick="userDialog()">+ Invite / create user</button>',
@@ -144,16 +144,116 @@ function locationDialog() {
   });
 }
 
-function passwordDialog() {
+async function passwordDialog() {
+  let tf = { available: false };
+  try {
+    tf = await api('two-factor');
+  } catch (e) {}
+  const twoStep = !tf.available
+    ? ''
+    : `<section class="two-step-box"><h3>Two-step sign-in</h3>${
+        tf.enabled
+          ? `<p>${badge('On')} Recovery codes left: <b>${tf.recovery_remaining}</b></p><p class="form-hint">Each sign-in asks for a code from your authenticator app.</p><div class="form-actions"><button type="button" class="secondary" onclick="twoFactorPasswordDialog('recovery')">New recovery codes</button><button type="button" class="subtle" onclick="twoFactorPasswordDialog('disable')">Switch off</button></div>`
+          : '<p class="form-hint">Protect your account with a code from an authenticator app (Google Authenticator, Microsoft Authenticator, Authy…).</p><div class="form-actions"><button type="button" class="primary" onclick="twoFactorPasswordDialog(\'setup\')">Set up two-step sign-in</button></div>'
+      }</section>`;
   modal(
-    'Change your password',
-    `<form>${field('Current password', 'current_password', '', 'password')}${field('New password · at least 12 characters', 'password', '', 'password')}${field('Confirm new password', 'password_confirmation', '', 'password')}${formActions('Change password')}</form>`,
+    'Your account',
+    `<form><h3>Change your password</h3>${field('Current password', 'current_password', '', 'password')}${field('New password · at least 12 characters', 'password', '', 'password')}${field('Confirm new password', 'password_confirmation', '', 'password')}${formActions('Change password')}</form>${twoStep}`,
   );
   bindForm(async fd => {
     await api('password', 'POST', Object.fromEntries(fd));
     closeModal();
     toast('Password changed');
   });
+}
+
+/** Loads the QR code library only when someone sets up two-step sign-in. */
+function loadQrLibrary() {
+  if (typeof qrcode === 'function') return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = '/assets/js/vendor/qrcode.js?v=' + encodeURIComponent(state.boot.build);
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('The QR code could not be loaded. Type the key into your app instead.'));
+    document.head.appendChild(script);
+  });
+}
+
+function qrSvg(text) {
+  const qr = qrcode(0, 'M');
+  qr.addData(text);
+  qr.make();
+  return qr.createSvgTag({ cellSize: 5, margin: 3, scalable: true });
+}
+
+function twoFactorPasswordDialog(action) {
+  const titles = { setup: 'Set up two-step sign-in', recovery: 'New recovery codes', disable: 'Switch off two-step sign-in' };
+  const notes = {
+    setup: 'Confirm your password to start.',
+    recovery: 'Your old recovery codes will stop working.',
+    disable: 'Your account will only be protected by your password.',
+  };
+  modal(titles[action], `<form><p class="form-hint">${notes[action]}</p>${field('Current password', 'password', '', 'password')}${formActions('Continue')}</form>`);
+  bindForm(async fd => {
+    const result = await api('two-factor', 'POST', { action, password: fd.get('password') });
+    if (action === 'setup') return twoFactorSetupDialog(result);
+    if (action === 'recovery') return recoveryCodesDialog(result.recovery_codes);
+    closeModal();
+    toast('Two-step sign-in switched off');
+  });
+}
+
+async function twoFactorSetupDialog(setup) {
+  let qr = '';
+  try {
+    await loadQrLibrary();
+    qr = `<div class="qr-box" data-no-translate>${qrSvg(setup.uri)}</div>`;
+  } catch (e) {
+    qr = `<p class="error">${esc(e.message)}</p>`;
+  }
+  const key = setup.secret.replace(/(.{4})/g, '$1 ').trim();
+  modal(
+    'Set up two-step sign-in',
+    `<form><ol class="setup-steps"><li>Open your authenticator app and scan this QR code.</li><li>Or type this key: <code class="secret-key" data-no-translate>${esc(key)}</code></li><li>Enter the 6-digit code the app shows.</li></ol>${qr}${field('6-digit code', 'code')}${formActions('Switch on')}</form>`,
+  );
+  const input = $('.modal input[name="code"]');
+  input.setAttribute('inputmode', 'numeric');
+  input.setAttribute('autocomplete', 'one-time-code');
+  input.focus();
+  bindForm(async fd => {
+    const result = await api('two-factor', 'POST', { action: 'confirm', code: fd.get('code') });
+    toast('Two-step sign-in switched on');
+    recoveryCodesDialog(result.recovery_codes);
+  });
+}
+
+function recoveryCodesDialog(codes) {
+  modal(
+    'Recovery codes',
+    `<p class="notice">Keep these codes somewhere safe. Each one signs you in once if you lose your phone. They are shown only now.</p><ol class="recovery-codes" data-no-translate>${codes.map(c => `<li><code>${esc(c)}</code></li>`).join('')}</ol><div class="form-actions"><button type="button" class="secondary" onclick="copyRecoveryCodes()">Copy</button><button type="button" class="secondary" onclick="window.print()">Print</button><button type="button" class="primary" onclick="closeModal()">I have saved them</button></div>`,
+  );
+}
+
+async function copyRecoveryCodes() {
+  const text = [...document.querySelectorAll('.recovery-codes code')].map(c => c.textContent).join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Copied');
+  } catch (e) {
+    toast('Copy is not available. Write the codes down or print them.');
+  }
+}
+
+async function resetTwoFactor(id, name) {
+  const question = state.lang === 'ar' ? `إيقاف التحقق بخطوتين لـ ${name}؟ يمكنه إعداده مجددًا بعد تسجيل الدخول.` : `Switch off two-step sign-in for ${name}? They can set it up again after signing in.`;
+  if (!confirm(question)) return;
+  try {
+    await api('users/' + id + '/two-factor-reset', 'POST', {});
+    toast('Two-step sign-in reset');
+    await settingsPage();
+  } catch (e) {
+    toast(e.message);
+  }
 }
 
 function systemPanel(x) {

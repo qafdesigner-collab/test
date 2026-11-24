@@ -73,6 +73,22 @@ Sign in as the owner and open **Company & access → Edit company**:
 Each person can switch the interface between **English and العربية** from the menu (Language).
 Give products an **Arabic name** (Catalogue → Edit product) so it prints under the English name on invoices.
 
+## Two-step sign-in (recommended for owner and managers)
+
+1. Click your name at the bottom of the menu → **Set up two-step sign-in**.
+2. Scan the QR code with an authenticator app (Google Authenticator, Microsoft Authenticator,
+   Authy…), type the 6-digit code and save the 8 recovery codes somewhere safe.
+3. From then on, signing in asks for the password and then a code from the app.
+
+Lost phone: sign in with one recovery code (each works once), then switch off and set up
+again. The owner can also reset a manager's two-step sign-in in **Company & access → Team
+access**. If the owner has lost both the phone and the recovery codes, run once in cPanel →
+Terminal (or as a one-time cron job):
+
+```bash
+php /home/USER/perfume-erp/artisan erp:two-factor-off owner@example.com
+```
+
 ## Updating to a new version
 
 1. **Company & access → System → Download backup now.**

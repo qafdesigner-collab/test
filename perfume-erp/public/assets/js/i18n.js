@@ -62,6 +62,7 @@ const I18N_PATTERNS = [
   [/^(\d+) design or packaging projects? in progress\.$/, '$1 مشروع تصميم أو تغليف قيد التنفيذ.'],
   [/^Development release (.+)\.$/, 'إصدار تطويري $1.'],
   [/^· (\d+) invoices include estimated costs · (\d+) invoices have missing historical costs\.$/, '· $1 فاتورة بتكاليف تقديرية · $2 فاتورة بدون تكلفة تاريخية.'],
+  [/^(.+) →$/, '$1 ←'],
 ];
 
 const I18N_EXTRA = {

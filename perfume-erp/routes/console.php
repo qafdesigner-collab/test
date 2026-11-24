@@ -4,6 +4,7 @@ use App\Models\User;
 use App\Services\Backup;
 use App\Services\Installation;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('erp:install {--demo : Add fictional sample catalogue}', function () {
@@ -55,3 +56,16 @@ Schedule::command('erp:backup-auto')->dailyAt('02:17');
 Artisan::command('erp:library', function () {
     $this->call('db:seed', ['--class' => 'Database\\Seeders\\InspirationLibrarySeeder', '--force' => true]);
 })->purpose('Add missing internal inspiration references from the bundled library');
+
+Artisan::command('erp:two-factor-off {email : Email address of the account}', function (string $email) {
+    $count = DB::table('users')->where('email', $email)->update(['two_factor_secret' => null, 'two_factor_recovery_codes' => null, 'two_factor_confirmed_at' => null, 'two_factor_last_step' => null, 'updated_at' => now()]);
+    if (! $count) {
+        $this->error('No account uses that email address.');
+
+        return 1;
+    }
+    DB::table('audit')->insert(['user_id' => null, 'action' => 'user.two_factor_reset', 'subject' => 'email:'.$email, 'details' => json_encode(['source' => 'command']), 'created_at' => now()]);
+    $this->info('Two-step sign-in is switched off for '.$email.'. Sign in with the password and set it up again.');
+
+    return 0;
+})->purpose('Emergency: switch off two-step sign-in for an account that lost its phone and recovery codes');
