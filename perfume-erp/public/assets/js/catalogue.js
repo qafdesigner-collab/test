@@ -150,7 +150,7 @@ function catalogueRender() {
       'The perfume catalogue',
       'Find the right fragrance by scent, style or inspiration.',
       can('manager', 'warehouse')
-        ? '<button class="secondary" onclick="libraryDialog()">Inspiration library</button><button class="primary" onclick="productDialog()">+ Add product</button>'
+        ? '<button class="secondary" onclick="labelsDialog()">Print labels</button><button class="secondary" onclick="libraryDialog()">Inspiration library</button><button class="primary" onclick="productDialog()">+ Add product</button>'
         : '',
     ) +
     catalogueToolbar() +
@@ -394,4 +394,78 @@ function importLibraryDialog() {
     $('#import-result').innerHTML = `<div class="notice"><b>${r.added} added · ${r.updated} updated · ${r.skipped} already in the library</b>${r.errors.length ? `<br>${r.errors.length} row${r.errors.length === 1 ? '' : 's'} skipped:<br>${r.errors.map(e => `Row ${e.row}: ${esc(e.message)}`).join('<br>')}` : ''}</div>`;
     toast(`${r.added} references added`);
   });
+}
+
+
+/* ── Barcode and price labels ─────────────────────────────────────────────── */
+
+/** Consumer price including VAT, as shown on shelves and labels in the UAE. */
+function shelfPrice(p) {
+  return Math.round(p.price_cents * (1 + Number(p.tax_bp || 0) / 10000));
+}
+
+function labelsDialog() {
+  const products = state.products.filter(p => p.active && p.kind !== 'service');
+  const missing = products.filter(p => !p.barcode).length;
+  modal(
+    'Print labels',
+    `<form><div class="form-grid"><label>Label format<select name="format"><option value="a4">A4 sheet · 3 × 8 labels (70 × 37 mm)</option><option value="roll">Label printer · 50 × 30 mm</option></select></label>
+    <div><label class="check-row"><input type="checkbox" name="price" value="1" checked style="width:auto"> Show price (incl. VAT)</label><label class="check-row"><input type="checkbox" name="arabic" value="1" checked style="width:auto"> Show Arabic name</label></div></div>
+    ${missing ? `<div class="notice">${missing} product${missing === 1 ? ' has' : 's have'} no barcode. <button type="button" class="subtle" id="make-barcodes">Create in-store barcodes</button></div>` : ''}
+    <div class="library-actions"><button type="button" class="secondary" data-fill="1">1 of each</button><button type="button" class="secondary" data-fill="stock">One per item in stock</button><button type="button" class="secondary" data-fill="0">Clear</button></div>
+    ${table(
+      ['Product', 'Barcode', 'Price incl. VAT', 'In stock', 'Copies'],
+      products.map(p => `<tr><td><b>${esc(p.name)}</b><small>${esc(p.sku)}</small></td><td>${p.barcode ? esc(p.barcode) : '<span class="muted">—</span>'}</td><td>${money(shelfPrice(p))}</td><td>${quantity(p.stock_milli || 0)}</td><td><input class="label-copies" data-id="${p.id}" data-stock="${Math.max(0, Math.floor((p.stock_milli || 0) / 1000))}" inputmode="numeric" value="0" aria-label="Copies of ${esc(p.name)}"></td></tr>`),
+    )}${formActions('Print labels')}</form>`,
+    true,
+  );
+  document.querySelectorAll('[data-fill]').forEach(b =>
+    b.addEventListener('click', () => document.querySelectorAll('.label-copies').forEach(i => (i.value = b.dataset.fill === 'stock' ? Math.min(200, Number(i.dataset.stock)) : b.dataset.fill))),
+  );
+  $('#make-barcodes')?.addEventListener('click', async () => {
+    const r = await api('products/barcodes', 'POST', {});
+    toast(`${r.assigned.length} barcode${r.assigned.length === 1 ? '' : 's'} created`);
+    await loadLists(true);
+    labelsDialog();
+  });
+  bindForm(async fd => {
+    const copies = [...document.querySelectorAll('.label-copies')].flatMap(i => Array(Math.min(500, Math.max(0, Math.floor(Number(i.value) || 0)))).fill(Number(i.dataset.id)));
+    if (!copies.length) throw new Error('Enter how many labels to print for at least one product.');
+    printLabels(copies.map(id => state.products.find(p => p.id === id)), { format: fd.get('format'), price: fd.get('price') === '1', arabic: fd.get('arabic') === '1' });
+  });
+}
+
+function printLabels(items, options) {
+  const s = state.boot.settings;
+  const a4 = options.format === 'a4';
+  const label = p => `<div class="label">
+      <div class="brand">${esc(s.company_name || '')}</div>
+      <div class="name">${esc(p.name)}</div>
+      ${options.arabic && p.name_ar ? `<div class="ar" dir="rtl">${esc(p.name_ar)}</div>` : ''}
+      <div class="meta">${[p.size, p.concentration].filter(Boolean).map(esc).join(' · ')}</div>
+      ${options.price && p.sales_allowed && p.price_cents > 0 ? `<div class="price">${money(shelfPrice(p))}${Number(p.tax_bp) ? '<small> incl. VAT · شامل الضريبة</small>' : ''}</div>` : ''}
+      ${p.barcode ? barcodeSvg(p.barcode, { height: 34 }) : '<div class="nobar">No barcode</div>'}
+    </div>`;
+  const css = `
+    @page { size: ${a4 ? 'A4' : '50mm 30mm'}; margin: 0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Segoe UI", Arial, "Noto Sans Arabic", sans-serif; color: #000; }
+    .sheet { ${a4 ? 'display: grid; grid-template-columns: repeat(3, 70mm); grid-auto-rows: 37.125mm; width: 210mm;' : ''} }
+    .label { ${a4 ? 'width: 70mm; height: 37.125mm; padding: 2.5mm 4mm;' : 'width: 50mm; height: 30mm; padding: 1.5mm 2.5mm; page-break-after: always;'} overflow: hidden; display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .brand { font-size: ${a4 ? 7 : 6}pt; letter-spacing: .08em; text-transform: uppercase; color: #444; }
+    .name { font-size: ${a4 ? 10 : 8}pt; font-weight: 700; line-height: 1.1; max-height: 2.2em; overflow: hidden; }
+    .ar { font-size: ${a4 ? 9 : 7}pt; line-height: 1.5; margin: 0.3mm 0; }
+    .meta { font-size: 6.5pt; color: #333; }
+    .price { font-size: ${a4 ? 11 : 9}pt; font-weight: 700; } .price small { font-size: 6pt; font-weight: 400; }
+    .barcode { width: ${a4 ? 48 : 42}mm; height: ${a4 ? 12 : 10}mm; margin-top: auto; }
+    .nobar { margin-top: auto; font-size: 7pt; color: #888; }
+    @media screen { body { background: #ddd; padding: 10px; } .sheet { background: #fff; margin: auto; ${a4 ? '' : 'display: flex; flex-wrap: wrap; gap: 6px; width: auto; background: none;'} } .label { ${a4 ? 'outline: 1px dashed #ccc;' : 'background: #fff; outline: 1px dashed #ccc;'} } }`;
+  const w = window.open('', '_blank', a4 ? 'width=900,height=1000' : 'width=600,height=700');
+  if (!w) {
+    toast('Allow pop-ups for this site to print labels.');
+    return;
+  }
+  w.document.open();
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Labels</title><style>${css}</style></head><body><div class="sheet">${items.map(label).join('')}</div><script>window.addEventListener('load', () => setTimeout(() => window.print(), 300));<\/script></body></html>`);
+  w.document.close();
 }

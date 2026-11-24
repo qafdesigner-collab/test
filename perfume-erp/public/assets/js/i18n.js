@@ -33,6 +33,7 @@ const I18N_PATTERNS = [
   [/^(\d+) day(s)?$/, '$1 يوم'],
   [/^Held \((\d+)\)$/, 'معلقة ($1)'],
   [/^Paid (.+)$/, 'المدفوع $1'],
+  [/^(\d+) products? ha(s|ve) no barcode\.$/, '$1 منتج بدون باركود.'],
   [/^Release · (.+)$/, 'الإصدار · $1'],
   [/^Release (.+)\.$/, 'الإصدار $1.'],
   [/^([A-Z0-9-]+) · (piece|hour|bottle|box|carton|litre)$/, '$1 · $2'],

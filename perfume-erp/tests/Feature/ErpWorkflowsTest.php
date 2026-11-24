@@ -558,4 +558,23 @@ class ErpWorkflowsTest extends TestCase
         $snapshot = json_decode($document->json('document.seller_snapshot'), true);
         $this->assertSame(['1', 'عطور نور', '100123456700003'], [$snapshot['vat_registered'], $snapshot['company_name_ar'], $snapshot['tax_id']]);
     }
+
+    public function test_missing_barcodes_get_valid_in_store_ean13_codes(): void
+    {
+        DB::table('products')->whereIn('id', [2, 3])->update(['barcode' => null]);
+        $kept = DB::table('products')->where('id', 1)->value('barcode');
+
+        $assigned = collect($this->postJson('/api/products/barcodes')->assertOk()->json('assigned'))->keyBy('id');
+        $this->assertSame(['200000000002', '200000000003'], [substr($assigned[2]['barcode'], 0, 12), substr($assigned[3]['barcode'], 0, 12)]);
+        foreach ($assigned as $row) {
+            $digits = array_map('intval', str_split($row['barcode']));
+            $sum = array_sum(array_map(fn ($d, $i) => $d * ($i % 2 ? 3 : 1), array_slice($digits, 0, 12), array_keys(array_slice($digits, 0, 12))));
+            $this->assertSame((10 - $sum % 10) % 10, $digits[12]);
+        }
+        $this->assertSame($kept, DB::table('products')->where('id', 1)->value('barcode'));
+        $this->assertSame([], $this->postJson('/api/products/barcodes')->json('assigned'));
+
+        $this->actingAs(User::factory()->create(['role' => 'cashier']));
+        $this->postJson('/api/products/barcodes')->assertForbidden();
+    }
 }

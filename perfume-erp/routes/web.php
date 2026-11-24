@@ -47,6 +47,7 @@ Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
         Route::post('products', [CatalogueController::class, 'saveProduct']);
         Route::post('products/{id}', [CatalogueController::class, 'saveProduct'])->whereNumber('id');
         Route::match(['get', 'post'], 'references', [CatalogueController::class, 'references']);
+        Route::post('products/barcodes', [CatalogueController::class, 'generateBarcodes']);
         Route::post('references/import', [CatalogueController::class, 'importReferences'])->middleware('throttle:system');
         Route::get('references/export', [CatalogueController::class, 'exportReferences']);
         Route::post('products/{id}/images', [CatalogueController::class, 'uploadImage'])->whereNumber('id');

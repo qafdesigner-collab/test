@@ -187,4 +187,38 @@ class CatalogueController extends ErpBaseController
 
         return response(ReferenceLibrary::csv($template), 200, ['Content-Type' => 'text/csv; charset=UTF-8', 'Content-Disposition' => 'attachment; filename="'.($template ? 'inspiration-template' : 'inspiration-library-'.date('Y-m-d')).'.csv"']);
     }
+
+    /**
+     * Give every active stocked product without a barcode an in-store EAN-13 (prefix 20, reserved for
+     * internal use): 20 + product id padded to 10 digits + check digit.
+     */
+    public function generateBarcodes()
+    {
+        $this->allow(['manager', 'warehouse']);
+        $assigned = [];
+        foreach (DB::table('products')->where('active', true)->where(fn ($q) => $q->whereNull('barcode')->orWhere('barcode', ''))->orderBy('id')->get(['id', 'name']) as $product) {
+            $code = self::ean13('20'.str_pad((string) $product->id, 10, '0', STR_PAD_LEFT));
+            if (DB::table('products')->where('barcode', $code)->exists()) {
+                continue;
+            }
+            DB::table('products')->where('id', $product->id)->update(['barcode' => $code, 'updated_at' => now()]);
+            $assigned[] = ['id' => $product->id, 'name' => $product->name, 'barcode' => $code];
+        }
+        $this->audit('products.barcodes', 'catalogue', ['assigned' => count($assigned)]);
+
+        return ['assigned' => $assigned];
+    }
+
+    /**
+     * Append the EAN-13 check digit to 12 digits.
+     */
+    public static function ean13(string $twelve): string
+    {
+        $sum = 0;
+        foreach (str_split($twelve) as $i => $digit) {
+            $sum += (int) $digit * ($i % 2 ? 3 : 1);
+        }
+
+        return $twelve.((10 - $sum % 10) % 10);
+    }
 }
