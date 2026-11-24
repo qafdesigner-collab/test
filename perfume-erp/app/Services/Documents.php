@@ -18,6 +18,9 @@ final class Documents
             if ($kind === 'Sale' && ! DB::table('shifts')->where('user_id', $user)->whereNull('closed_at')->exists()) {
                 self::fail(__('Open a cashier shift before selling.'));
             }
+            $customerPricing = in_array($kind, ['Sale', 'Invoice', 'Quotation']) && ! empty($data['contact_id'])
+                ? ['discount_bp' => (int) DB::table('contacts')->where('id', $data['contact_id'])->value('discount_bp'), 'prices' => DB::table('customer_prices')->where('contact_id', $data['contact_id'])->pluck('price_cents', 'product_id')]
+                : null;
             foreach ($data['lines'] as $line) {
                 $p = DB::table('products')->where('id', $line['product_id'])->where('active', true)->first();
                 if (! $p) {
@@ -36,12 +39,13 @@ final class Documents
                 if (in_array($p->unit, ['piece', 'bottle', 'box', 'carton']) && $q % 1000) {
                     self::fail(__('Counted products require whole quantities.'));
                 }
-                $price = isset($line['price']) && $line['price'] !== '' ? Amounts::parse($line['price']) : (in_array($kind, ['Purchase', 'PurchaseOrder']) ? $p->cost_cents : $p->price_cents);
+                $price = isset($line['price']) && $line['price'] !== '' ? Amounts::parse($line['price']) : (in_array($kind, ['Purchase', 'PurchaseOrder']) ? $p->cost_cents : (int) ($customerPricing['prices'][$p->id] ?? $p->price_cents));
                 if ($price > 100000000) {
                     self::fail(__('Unit price is too large.'));
                 }
-                $discount = Amounts::parse($line['discount'] ?? '0');
                 $gross = Amounts::roundDivide($q * $price, 1000);
+                $automaticDiscount = $customerPricing && $customerPricing['discount_bp'] && ! isset($customerPricing['prices'][$p->id]) ? Amounts::roundDivide($gross * $customerPricing['discount_bp'], 10000) : 0;
+                $discount = isset($line['discount']) && $line['discount'] !== '' ? Amounts::parse($line['discount']) : $automaticDiscount;
                 if ($discount > $gross) {
                     self::fail(__('Discount exceeds the line value.'));
                 }

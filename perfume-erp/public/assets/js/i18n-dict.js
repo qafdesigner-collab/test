@@ -640,4 +640,12 @@ const I18N_DICT = {
   "Price incl. VAT": "السعر شامل الضريبة",
   "In stock": "في المخزون",
   "Copies": "النسخ",
+  "Price list": "قائمة الأسعار",
+  "Discount": "الخصم",
+  "Standard discount %": "نسبة الخصم المعتادة %",
+  "Special prices · excluding VAT": "أسعار خاصة · بدون ضريبة",
+  "+ Add special price": "+ إضافة سعر خاص",
+  "Save price list": "حفظ قائمة الأسعار",
+  "Applied automatically on quotations, invoices and POS sales for this customer. A special price replaces the list price and gets no extra discount; other products get the standard discount.": "تُطبق تلقائيًا على عروض الأسعار والفواتير ومبيعات نقطة البيع لهذا العميل. السعر الخاص يحل محل سعر القائمة دون خصم إضافي، وباقي المنتجات تحصل على الخصم المعتاد.",
+  "Price list saved": "تم حفظ قائمة الأسعار",
 };

@@ -164,5 +164,6 @@
   "Enter a positive amount; VAT cannot exceed the amount.": "أدخل مبلغًا موجبًا؛ لا يمكن أن تتجاوز الضريبة المبلغ.",
   "Only cash expenses can be paid from the cashier drawer.": "يمكن دفع المصروفات النقدية فقط من درج الكاشير.",
   "This expense is already voided.": "هذا المصروف ملغى بالفعل.",
-  "Not enough unexpired stock for :product. Expired lots cannot be sold or used.": "لا يوجد مخزون غير منتهي الصلاحية كافٍ للمنتج :product. لا يمكن بيع الدفعات المنتهية أو استخدامها."
+  "Not enough unexpired stock for :product. Expired lots cannot be sold or used.": "لا يوجد مخزون غير منتهي الصلاحية كافٍ للمنتج :product. لا يمكن بيع الدفعات المنتهية أو استخدامها.",
+  "The discount cannot exceed 100%.": "لا يمكن أن يتجاوز الخصم 100%."
 }

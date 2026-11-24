@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Amounts;
+use App\Services\Documents;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -25,5 +26,38 @@ class ContactController extends ErpBaseController
         }
 
         return ['contacts' => DB::table('contacts')->orderBy('name')->get()];
+    }
+
+    /**
+     * A customer's standard discount and special prices (read), or replace them (managers and accountants).
+     * Special prices win over the discount: a product with its own price gets no extra discount.
+     */
+    public function pricing(Request $r, int $id)
+    {
+        $this->allow(['manager', 'accountant', 'warehouse', 'cashier']);
+        $contact = DB::table('contacts')->find($id);
+        abort_unless($contact && $contact->kind === 'customer', 404);
+        if ($r->isMethod('post')) {
+            $this->allow(['manager', 'accountant']);
+            $v = $r->validate(['discount' => 'required', 'prices' => 'present|array|max:500', 'prices.*.product_id' => 'required|distinct|exists:products,id', 'prices.*.price' => 'required']);
+            $discount = Amounts::parse($v['discount']);
+            if ($discount > 10000) {
+                Documents::fail(__('The discount cannot exceed 100%.'));
+            }
+            DB::transaction(function () use ($id, $v, $discount) {
+                DB::table('contacts')->where('id', $id)->update(['discount_bp' => $discount, 'updated_at' => now()]);
+                DB::table('customer_prices')->where('contact_id', $id)->delete();
+                foreach ($v['prices'] as $row) {
+                    DB::table('customer_prices')->insert(['contact_id' => $id, 'product_id' => $row['product_id'], 'price_cents' => Amounts::parse($row['price']), 'created_at' => now(), 'updated_at' => now()]);
+                }
+            });
+            $this->audit('contact.pricing', 'contact:'.$id, ['discount_bp' => $discount, 'special_prices' => count($v['prices'])]);
+        }
+
+        return [
+            'discount_bp' => (int) DB::table('contacts')->where('id', $id)->value('discount_bp'),
+            'prices' => DB::table('customer_prices as c')->join('products as p', 'p.id', '=', 'c.product_id')->where('c.contact_id', $id)
+                ->select('c.product_id', 'p.name', 'p.sku', 'c.price_cents', 'p.price_cents as list_price_cents')->orderBy('p.name')->get(),
+        ];
     }
 }

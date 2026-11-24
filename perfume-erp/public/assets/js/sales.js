@@ -46,10 +46,10 @@ function contactsDialog(kind = 'customer') {
   modal(
     kind === 'supplier' ? 'Supplier directory' : 'Customer directory',
     table(
-      ['Name', 'Contact', 'Credit limit'],
+      kind === 'customer' ? ['Name', 'Contact', 'Credit limit', 'Discount', ''] : ['Name', 'Contact', 'Credit limit'],
       list.map(
         c =>
-          `<tr><td>${esc(c.name)}</td><td>${esc(c.phone || c.email || '—')}</td><td>${money(c.credit_cents)}</td></tr>`,
+          `<tr><td>${esc(c.name)}</td><td>${esc(c.phone || c.email || '—')}</td><td>${money(c.credit_cents)}</td>${kind === 'customer' ? `<td>${c.discount_bp ? (c.discount_bp / 100).toFixed(2).replace(/\.00$/, '') + '%' : '—'}</td><td>${can('manager', 'accountant') ? `<button class="subtle" onclick="priceListDialog(${c.id})">Price list</button>` : ''}</td>` : ''}</tr>`,
       ),
     ) +
       `<div class="form-actions"><button class="primary" onclick="contactCreate('${kind}')">+ Add ${kind}</button></div>`,
@@ -91,6 +91,9 @@ function documentDialog(kind) {
     )}</select></label><label>Stock location<select name="location_id">${options(state.boot.locations, 'name', state.location)}</select></label>${kind === 'PurchaseOrder' ? `${field('Supplier quote / reference', 'bill_reference', '')}${field('Expected delivery', 'due_date', '', 'date')}<input type="hidden" name="paid" value="0"><input type="hidden" name="method" value="Credit">` : `${field('Supplier bill / customer reference', 'bill_reference', '')}${field('Payment due date', 'due_date', '', 'date')}${field('Payment now (quotations: zero)', 'paid', '0.00')}<label>Payment method<select name="method">${selectOptions(['Credit', 'Cash', 'Card', 'Bank'], 'Credit')}</select></label>`}</div><div class="section-label">Items · quantity / unit price / line discount</div><div id="doc-lines"></div><button type="button" class="secondary" onclick="addDocumentLine('${kind}')">+ Add item</button><div class="document-total" id="draft-total">Add items to see the estimated total.</div><label style="margin-top:15px">Notes<textarea name="notes"></textarea></label>${formActions(kind === 'Quotation' ? 'Save quotation' : kind === 'PurchaseOrder' ? 'Place order' : 'Post document')}</form>`,
     true,
   );
+  state.docPricing = null;
+  $('.modal select[name=contact_id]').insertAdjacentHTML('afterend', '<small class="muted" id="pricing-note"></small>');
+  $('.modal select[name=contact_id]').addEventListener('change', e => useCustomerPricing(Number(e.target.value) || null, kind));
   addDocumentLine(kind);
   bindForm(async (fd, key) => {
     const lines = Array.from(document.querySelectorAll('#doc-lines .line-editor')).map(el => ({
@@ -115,9 +118,13 @@ function addDocumentLine(kind) {
   div.innerHTML = `<select data-product required>${options(state.docProducts)}</select><input data-qty aria-label="Quantity" value="1" inputmode="decimal"><input data-price aria-label="Unit price" value="0.00" inputmode="decimal"><input data-discount aria-label="Line discount" value="0.00" inputmode="decimal"><button type="button" class="remove" aria-label="Remove line">×</button>`;
   div.querySelector('[data-product]').onchange = () => {
     const p = state.docProducts.find(p => p.id === Number(div.querySelector('[data-product]').value));
-    div.querySelector('[data-price]').value = decimal(['Purchase', 'PurchaseOrder'].includes(kind) ? p?.cost_cents : p?.price_cents);
+    div.querySelector('[data-price]').value = decimal(['Purchase', 'PurchaseOrder'].includes(kind) ? p?.cost_cents : customerPrice(p));
+    div.querySelector('[data-discount]').dataset.auto = '1';
+    applyCustomerDiscount(div);
     draftTotal();
   };
+  div.querySelector('[data-discount]').addEventListener('input', e => (e.target.dataset.auto = '0'));
+  div.querySelector('[data-qty]').addEventListener('input', () => applyCustomerDiscount(div));
   div.querySelector('.remove').onclick = () => {
     div.remove();
     draftTotal();
@@ -484,4 +491,80 @@ function taxInvoiceMarkup(d, s) {
     ${p.notes ? `<p class="ti-notes">${esc(p.notes)}</p>` : ''}
     <p class="doc-footer">${esc(state.boot.settings.invoice_footer || 'Thank you for your business.')}<br><span lang="ar" dir="rtl">شكرًا لتعاملكم معنا.</span></p>
   </article>`;
+}
+
+
+/* ── Customer price lists ──────────────────────────────────────────────── */
+
+/** Price for the customer chosen in the document form: their special price, else the list price. */
+function customerPrice(p) {
+  if (!p) return 0;
+  const special = state.docPricing?.prices.find(x => x.product_id === p.id);
+  return special ? special.price_cents : p.price_cents;
+}
+
+/** Fill the line discount from the customer's standard discount, unless typed by hand or a special price applies. */
+function applyCustomerDiscount(line) {
+  const input = line.querySelector('[data-discount]');
+  if (input.dataset.auto === '0' || !state.docPricing) return;
+  const id = Number(line.querySelector('[data-product]').value);
+  const special = state.docPricing.prices.some(x => x.product_id === id);
+  const gross = Math.round(Number(line.querySelector('[data-qty]').value || 0) * toCentsValue(line.querySelector('[data-price]').value));
+  input.value = decimal(special ? 0 : Math.round((gross * state.docPricing.discount_bp) / 10000));
+  input.dataset.auto = '1';
+}
+
+function toCentsValue(v) {
+  const n = Number(String(v).replace(/,/g, ''));
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+
+/** Load the chosen customer's pricing and re-price every line in the open document form. */
+async function useCustomerPricing(contactId, kind) {
+  state.docPricing = contactId && ['Invoice', 'Quotation'].includes(kind) ? await api(`contacts/${contactId}/pricing`) : null;
+  const note = $('#pricing-note');
+  if (note) note.textContent = state.docPricing && (state.docPricing.discount_bp || state.docPricing.prices.length) ? `Customer pricing applied: ${state.docPricing.discount_bp ? (state.docPricing.discount_bp / 100).toFixed(2).replace(/\.00$/, '') + '% discount' : ''}${state.docPricing.discount_bp && state.docPricing.prices.length ? ' · ' : ''}${state.docPricing.prices.length ? state.docPricing.prices.length + ' special price(s)' : ''}` : '';
+  document.querySelectorAll('#doc-lines .line-editor').forEach(line => {
+    const p = state.docProducts.find(x => x.id === Number(line.querySelector('[data-product]').value));
+    if (p) line.querySelector('[data-price]').value = decimal(customerPrice(p));
+    line.querySelector('[data-discount]').dataset.auto = '1';
+    applyCustomerDiscount(line);
+  });
+  draftTotal();
+}
+
+async function priceListDialog(id) {
+  const c = state.contacts.find(x => x.id === id);
+  const d = await api(`contacts/${id}/pricing`);
+  const sellable = state.products.filter(p => p.active && p.sales_allowed);
+  const row = (productId = '', price = '') => `<div class="line-editor price-row"><select data-product required>${options(sellable, 'name', productId)}</select><input data-price aria-label="Special price" inputmode="decimal" value="${price}"><small class="muted list-price"></small><button type="button" class="remove" aria-label="Remove">×</button></div>`;
+  modal(
+    'Price list · ' + c.name,
+    `<form><div class="notice">Applied automatically on quotations, invoices and POS sales for this customer. A special price replaces the list price and gets no extra discount; other products get the standard discount.</div>
+    <label>Standard discount %<input name="discount" inputmode="decimal" value="${(d.discount_bp / 100).toFixed(2)}"></label>
+    <div class="section-label">Special prices · excluding VAT</div><div id="price-rows">${d.prices.map(x => row(x.product_id, decimal(x.price_cents))).join('')}</div>
+    <button type="button" class="secondary" id="add-price">+ Add special price</button>${formActions('Save price list')}</form>`,
+    true,
+  );
+  const wire = el => {
+    const show = () => {
+      const p = sellable.find(x => x.id === Number(el.querySelector('[data-product]').value));
+      el.querySelector('.list-price').textContent = p ? 'List ' + money(p.price_cents) : '';
+    };
+    el.querySelector('[data-product]').addEventListener('change', show);
+    el.querySelector('.remove').addEventListener('click', () => el.remove());
+    show();
+  };
+  document.querySelectorAll('.price-row').forEach(wire);
+  $('#add-price').addEventListener('click', () => {
+    $('#price-rows').insertAdjacentHTML('beforeend', row());
+    wire($('#price-rows').lastElementChild);
+  });
+  bindForm(async fd => {
+    const prices = [...document.querySelectorAll('.price-row')].map(el => ({ product_id: Number(el.querySelector('[data-product]').value), price: el.querySelector('[data-price]').value.trim() }));
+    await api(`contacts/${id}/pricing`, 'POST', { discount: fd.get('discount') || '0', prices });
+    state.contacts = (await api('contacts')).contacts;
+    closeModal();
+    toast('Price list saved');
+  });
 }

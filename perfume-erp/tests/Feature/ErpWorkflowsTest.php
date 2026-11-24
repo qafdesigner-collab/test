@@ -577,4 +577,28 @@ class ErpWorkflowsTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => 'cashier']));
         $this->postJson('/api/products/barcodes')->assertForbidden();
     }
+
+    public function test_customer_price_lists_apply_special_prices_and_discount(): void
+    {
+        $this->postJson('/api/contacts/1/pricing', ['discount' => '101', 'prices' => []])->assertUnprocessable();
+        $this->postJson('/api/contacts/1/pricing', ['discount' => '10', 'prices' => [['product_id' => 1, 'price' => '100.00']]])->assertOk()
+            ->assertJsonPath('discount_bp', 1000)->assertJsonPath('prices.0.price_cents', 10000);
+        $this->getJson('/api/contacts/2/pricing')->assertNotFound();
+
+        $invoice = $this->postOnce('/api/documents', ['kind' => 'Invoice', 'contact_id' => 1, 'location_id' => 1, 'method' => 'Credit', 'paid' => '0', 'lines' => [['product_id' => 1, 'quantity' => '2'], ['product_id' => 2, 'quantity' => '1']]])->assertOk()->json();
+        $lines = DB::table('document_lines')->where('document_id', $invoice['id'])->orderBy('id')->get();
+        $this->assertSame([10000, 0], [(int) $lines[0]->price_cents, (int) $lines[0]->discount_cents]);
+        $list = (int) DB::table('products')->where('id', 2)->value('price_cents');
+        $this->assertSame([$list, intdiv($list, 10)], [(int) $lines[1]->price_cents, (int) $lines[1]->discount_cents]);
+
+        $manual = $this->postOnce('/api/documents', ['kind' => 'Quotation', 'contact_id' => 1, 'location_id' => 1, 'method' => 'Credit', 'paid' => '0', 'lines' => [['product_id' => 2, 'quantity' => '1', 'price' => '50.00', 'discount' => '0']]])->assertOk()->json();
+        $this->assertSame([5000, 0], [(int) DB::table('document_lines')->where('document_id', $manual['id'])->value('price_cents'), (int) DB::table('document_lines')->where('document_id', $manual['id'])->value('discount_cents')]);
+
+        $cashier = User::factory()->create(['role' => 'cashier']);
+        $this->actingAs($cashier);
+        $this->postJson('/api/contacts/1/pricing', ['discount' => '50', 'prices' => []])->assertForbidden();
+        $this->postOnce('/api/shifts', ['action' => 'open', 'amount' => '0'])->assertOk();
+        $sale = $this->postOnce('/api/documents', ['kind' => 'Sale', 'contact_id' => 1, 'location_id' => 1, 'lines' => [['product_id' => 1, 'quantity' => '1']], 'payments' => [['method' => 'Cash', 'amount' => '100.00']]])->assertOk()->json();
+        $this->assertSame(10000, (int) DB::table('documents')->where('id', $sale['id'])->value('total_cents'));
+    }
 }
