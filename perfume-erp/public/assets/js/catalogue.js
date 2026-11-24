@@ -370,7 +370,7 @@ function libraryDialog() {
   const families = [...new Set(refs.map(r => r.family).filter(Boolean))].sort();
   modal(
     `Inspiration library · ${refs.length} references`,
-    `<div class="notice">Internal staff reference only: brand and perfume names are never shown to customers as an affiliation. Notes are published summaries; your perfumer should confirm them before formulating. ${refs.length - own} come with the system, ${own} were added by your team.</div>
+    `<div class="notice">Internal staff reference only: brand and perfume names are never shown to customers as an affiliation. Notes are published summaries; your perfumer should confirm them before formulating. Add only photos your team took or has permission to use. ${refs.length - own} come with the system, ${own} were added by your team.</div>
     <div class="library-actions">${can('manager', 'warehouse') ? '<button class="primary" onclick="referenceDialog()">+ Add one</button><button class="secondary" onclick="importLibraryDialog()">Import from Excel / CSV</button>' : ''}<a class="secondary" href="/api/references/export">Export all (CSV)</a></div>
     <div class="library-filters"><input type="search" id="library-search" placeholder="Search by name, house or note…" aria-label="Search the library"><select id="library-family" aria-label="Family"><option value="">All families</option>${families.map(f => `<option>${esc(f)}</option>`).join('')}</select><select id="library-gender" aria-label="For"><option value="">All</option>${selectOptions(['Men', 'Women', 'Unisex'], '')}</select></div>
     <p class="tiny muted" id="library-count"></p><div class="pyramid-grid" id="library-cards"></div><div class="library-more"><button type="button" class="secondary" id="library-more" hidden>Show more</button></div>`,
@@ -395,16 +395,59 @@ function libraryDialog() {
   $('#library-family').addEventListener('change', () => ((shown = LIBRARY_PAGE), draw()));
   $('#library-gender').addEventListener('change', () => ((shown = LIBRARY_PAGE), draw()));
   $('#library-more').addEventListener('click', () => ((shown += LIBRARY_PAGE), draw()));
+  state.libraryDraw = draw;
   draw();
 }
 
-/** One reference as a note-pyramid card: house, name, family, audience and top / heart / base notes. */
+/** One reference as a note-pyramid card: photo, house, name, family, audience, top / heart / base notes and actions. */
 function referenceCard(r) {
   const pyramid = r.top_notes || r.heart_notes || r.base_notes;
   const rows = pyramid
     ? [['Top', r.top_notes], ['Heart', r.heart_notes], ['Base', r.base_notes]].map(([label, notes]) => `<div class="pyr-row"><b>${label}</b><span>${esc(notes || '—')}</span></div>`).join('')
     : `<div class="pyr-row"><b>Notes</b><span>${esc(r.notes || '—')}</span></div>`;
-  return `<article class="pyr-card"><div class="house" data-no-translate>${esc(r.brand)}</div><h4 data-no-translate>${esc(r.name)}</h4><div class="meta">${r.family ? `<span class="badge" data-no-translate>${esc(r.family)}</span>` : ''}${r.gender ? `<span class="badge">${esc(r.gender)}</span>` : ''}${r.library ? '' : '<span class="badge">Added by your team</span>'}</div>${rows}</article>`;
+  const photo = r.photo_path ? `<img class="pyr-photo" src="/media/reference/${r.id}?v=${encodeURIComponent(r.photo_path.slice(-12, -4))}" alt="${esc(r.brand + ' ' + r.name)}" loading="lazy">` : '';
+  const search = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(`${r.brand} ${r.name} perfume`);
+  const manage = can('manager', 'warehouse')
+    ? `<button type="button" class="subtle" onclick="referencePhotoUpload(${r.id})">${r.photo_path ? 'Change photo' : 'Add photo'}</button>${r.photo_path ? `<button type="button" class="subtle" onclick="referencePhotoRemove(${r.id})">Remove photo</button>` : ''}`
+    : '';
+  return `<article class="pyr-card${r.photo_path ? ' has-photo' : ''}">${photo}<div class="house" data-no-translate>${esc(r.brand)}</div><h4 data-no-translate>${esc(r.name)}</h4><div class="meta">${r.family ? `<span class="badge" data-no-translate>${esc(r.family)}</span>` : ''}${r.gender ? `<span class="badge">${esc(r.gender)}</span>` : ''}${r.library ? '' : '<span class="badge">Added by your team</span>'}</div>${rows}<div class="pyr-actions"><a class="subtle" href="${search}" target="_blank" rel="noopener noreferrer">Search the web ↗</a>${manage}</div></article>`;
+}
+
+/** Your own photo of a reference (taken by your team or used with permission). */
+function referencePhotoUpload(id) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/jpeg,image/png,image/webp';
+  input.addEventListener('change', async () => {
+    if (!input.files[0]) return;
+    const body = new FormData();
+    body.append('photo', input.files[0]);
+    try {
+      const r = await api(`references/${id}/photo`, 'POST', body);
+      updateReference(id, { photo_path: r.photo_path });
+      toast('Photo saved');
+    } catch (e) {
+      toast(e.message);
+    }
+  });
+  input.click();
+}
+
+async function referencePhotoRemove(id) {
+  if (!confirm(state.lang === 'ar' ? 'إزالة هذه الصورة؟' : 'Remove this photo?')) return;
+  try {
+    await api(`references/${id}/photo`, 'POST', { remove: 1 });
+    updateReference(id, { photo_path: null });
+    toast('Photo removed');
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+function updateReference(id, changes) {
+  const ref = state.references.find(r => r.id === id);
+  if (ref) Object.assign(ref, changes);
+  if (state.libraryDraw && $('#library-cards')) state.libraryDraw();
 }
 
 function importLibraryDialog() {

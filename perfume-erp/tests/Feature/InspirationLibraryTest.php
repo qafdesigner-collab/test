@@ -7,6 +7,7 @@ use Database\Seeders\InspirationLibrarySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class InspirationLibraryTest extends TestCase
@@ -114,5 +115,25 @@ class InspirationLibraryTest extends TestCase
         $this->assertSame('Ambroxan, cedar, labdanum', $sauvage->base_notes);
         $aventus = DB::table('references')->where('brand', 'Creed')->where('name', 'Aventus')->first();
         $this->assertSame(['Our own top', null, 'Our own panel notes'], [$aventus->top_notes, $aventus->heart_notes, $aventus->notes]);
+    }
+
+    public function test_team_photo_is_re_encoded_served_and_removable(): void
+    {
+        Storage::fake('local');
+        $id = DB::table('references')->insertGetId(['brand' => 'House', 'name' => 'Photo Test', 'created_at' => now(), 'updated_at' => now()]);
+        $this->actingAs(User::factory()->create(['role' => 'cashier']));
+        $this->post("/api/references/{$id}/photo", ['photo' => UploadedFile::fake()->image('b.png', 1600, 1200)], ['Accept' => 'application/json'])->assertForbidden();
+
+        $this->actingAs(User::factory()->create(['role' => 'warehouse']));
+        $this->post("/api/references/{$id}/photo", ['photo' => UploadedFile::fake()->createWithContent('x.jpg', 'not an image')], ['Accept' => 'application/json'])->assertUnprocessable();
+        $path = $this->post("/api/references/{$id}/photo", ['photo' => UploadedFile::fake()->image('b.png', 1600, 1200)], ['Accept' => 'application/json'])->assertOk()->json('photo_path');
+        $this->assertStringEndsWith('.jpg', $path);
+        [$w, $h] = getimagesizefromstring(Storage::disk('local')->get($path));
+        $this->assertSame([800, 600], [$w, $h]);
+        $this->get("/media/reference/{$id}")->assertOk()->assertHeader('Content-Type', 'image/jpeg');
+
+        $this->postJson("/api/references/{$id}/photo", ['remove' => 1])->assertOk();
+        Storage::disk('local')->assertMissing($path);
+        $this->get("/media/reference/{$id}")->assertNotFound();
     }
 }

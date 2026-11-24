@@ -757,4 +757,10 @@ const I18N_DICT = {
   "No reference matches.": "لا يوجد مرجع مطابق.",
   "Search the library": "ابحث في المكتبة",
   "All": "الكل",
+  "Search the web ↗": "ابحث في الويب ↗",
+  "Add photo": "إضافة صورة",
+  "Change photo": "تغيير الصورة",
+  "Remove photo": "إزالة الصورة",
+  "Photo saved": "تم حفظ الصورة",
+  "Photo removed": "تمت إزالة الصورة",
 };

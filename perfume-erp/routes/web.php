@@ -53,6 +53,7 @@ Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
         Route::post('products/barcodes', [CatalogueController::class, 'generateBarcodes']);
         Route::post('references/import', [CatalogueController::class, 'importReferences'])->middleware('throttle:system');
         Route::get('references/export', [CatalogueController::class, 'exportReferences']);
+        Route::post('references/{id}/photo', [CatalogueController::class, 'referencePhoto'])->whereNumber('id');
         Route::post('products/{id}/images', [CatalogueController::class, 'uploadImage'])->whereNumber('id');
         Route::post('images/{id}', [CatalogueController::class, 'imageAction'])->whereNumber('id');
         Route::match(['get', 'post'], 'contacts', [ContactController::class, 'contacts']);
@@ -105,4 +106,5 @@ Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
         Route::post('system/backup', [SystemController::class, 'backup'])->middleware('throttle:system');
     });
     Route::get('media/image/{id}', [CatalogueController::class, 'image'])->whereNumber('id');
+    Route::get('media/reference/{id}', [CatalogueController::class, 'referencePhotoImage'])->whereNumber('id');
 });

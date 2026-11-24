@@ -106,6 +106,58 @@ class CatalogueController extends ErpBaseController
         return ['references' => DB::table('references')->orderBy('brand')->orderBy('name')->get()];
     }
 
+    /**
+     * Add, replace or remove the team's own photo of an inspiration reference. The upload is re-encoded
+     * as a JPEG of at most 800 px, which also drops any metadata. No brand photography is bundled.
+     */
+    public function referencePhoto(Request $r, int $id)
+    {
+        $this->allow(['manager', 'warehouse']);
+        $reference = DB::table('references')->find($id);
+        abort_unless($reference, 404);
+        if ($r->boolean('remove')) {
+            if ($reference->photo_path) {
+                Storage::disk('local')->delete($reference->photo_path);
+            }
+            DB::table('references')->where('id', $id)->update(['photo_path' => null, 'updated_at' => now()]);
+            $this->audit('reference.photo_removed', 'reference:'.$id);
+
+            return ['photo_path' => null];
+        }
+        $r->validate(['photo' => 'required|image|mimes:jpg,jpeg,png,webp|max:6144|dimensions:max_width=6000,max_height=6000']);
+        $image = @imagecreatefromstring((string) file_get_contents($r->file('photo')->getRealPath()));
+        if (! $image) {
+            Documents::fail(__('Image cannot be decoded.'));
+        }
+        $w = imagesx($image);
+        $h = imagesy($image);
+        $ratio = min(1, 800 / max($w, $h));
+        $resized = imagecreatetruecolor(max(1, (int) ($w * $ratio)), max(1, (int) ($h * $ratio)));
+        imagefill($resized, 0, 0, imagecolorallocate($resized, 255, 255, 255));
+        imagecopyresampled($resized, $image, 0, 0, 0, 0, imagesx($resized), imagesy($resized), $w, $h);
+        ob_start();
+        imagejpeg($resized, null, 86);
+        $path = 'references/'.Str::uuid().'.jpg';
+        Storage::disk('local')->put($path, (string) ob_get_clean());
+        imagedestroy($image);
+        imagedestroy($resized);
+        if ($reference->photo_path) {
+            Storage::disk('local')->delete($reference->photo_path);
+        }
+        DB::table('references')->where('id', $id)->update(['photo_path' => $path, 'updated_at' => now()]);
+        $this->audit('reference.photo', 'reference:'.$id);
+
+        return ['photo_path' => $path];
+    }
+
+    public function referencePhotoImage(int $id)
+    {
+        $path = DB::table('references')->where('id', $id)->value('photo_path');
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path, null, ['Content-Type' => 'image/jpeg', 'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, max-age=86400']);
+    }
+
     public function uploadImage(Request $r, int $id)
     {
         $this->allow(['manager', 'warehouse']);

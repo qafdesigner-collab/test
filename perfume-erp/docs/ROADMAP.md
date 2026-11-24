@@ -37,5 +37,5 @@ changes), browser screenshots, a rebuilt cPanel ZIP, a commit and a push to
 - [x] 15. Premium themes: Obsidian & Champagne, Maison (couture ivory), Oud (emerald & brass) with a theme picker, bundled fonts, English + Arabic, printing unaffected
 - [x] 16. Note pyramid: top / heart / base notes for inspiration references, in import/export and shown as pyramid cards
 - [x] 17. Library data: 500+ widely used designer, niche and Middle Eastern references with note pyramids and families
-- [ ] 18. Reference photos: upload your own photo per reference, plus a "search the web" link (no bundled brand photos)
+- [x] 18. Reference photos: upload your own photo per reference, plus a "search the web" link (no bundled brand photos)
 - [ ] 19. Final pass for 0.8.0: tests on SQLite and MySQL, every page in each theme (English and Arabic), fresh cPanel install, docs

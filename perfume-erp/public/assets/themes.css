@@ -153,4 +153,6 @@
 :root[data-theme="obsidian"] .pyr-card h4{font-weight:500;font-size:19px}
 .pyr-card .meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .pyr-row{display:grid;grid-template-columns:64px 1fr;gap:10px;padding:7px 0;border-top:1px solid var(--hair,var(--line));font-size:13px;color:var(--ink)}
-.pyr-row b{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600;padding-top:2px}
+.pyr-row b{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600;padding-top:2px}.pyr-photo{display:block;width:calc(100% + 36px);margin:-16px -18px 12px;height:190px;object-fit:contain;background:#fff;border-bottom:1px solid var(--hair,var(--line));border-radius:var(--r,12px) var(--r,12px) 0 0}
+.pyr-actions{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;padding-top:8px;border-top:1px solid var(--hair,var(--line));font-size:12.5px}
+.pyr-actions .subtle{padding:0;background:none;border:0;cursor:pointer;color:var(--label,var(--accent));font:inherit}
