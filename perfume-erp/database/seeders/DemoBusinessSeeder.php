@@ -19,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -91,6 +92,7 @@ class DemoBusinessSeeder extends Seeder
             $this->settings();
             $this->catalogue();
             $this->contacts();
+            $this->photos();
         });
         $this->purchasing($start);
         $this->production($start);
@@ -150,6 +152,41 @@ class DemoBusinessSeeder extends Seeder
             $cost = (int) DB::table('products')->where('sku', $sku)->value('cost_cents');
             Stock::move($this->sku[$sku], 1, 'OPEN-'.$sku, $bottles * 1000, 'Opening stock', 'DEMO', $this->owner->id, $bottles * $cost, 'Opening stock at cost');
             $this->transfer($sku, 'OPEN-'.$sku, intdiv($bottles, 2));
+        }
+    }
+
+    /**
+     * Attach the bundled free-licence demo photos (database/data/demo-photos, credits in CREDITS.md).
+     */
+    private function photos(): void
+    {
+        $list = database_path('data/demo-photos/photos.php');
+        if (! is_file($list)) {
+            return;
+        }
+        foreach (require $list as $sku => [$file, $credit]) {
+            $source = database_path('data/demo-photos/'.$file);
+            $product = $this->sku[$sku] ?? null;
+            if (! $product || ! is_file($source) || DB::table('images')->where('product_id', $product)->exists()) {
+                continue;
+            }
+            $image = @imagecreatefromstring((string) file_get_contents($source));
+            if (! $image) {
+                continue;
+            }
+            $key = (string) Str::uuid();
+            Storage::disk('local')->put('products/'.$key.'.jpg', (string) file_get_contents($source));
+            $w = imagesx($image);
+            $h = imagesy($image);
+            $ratio = min(1, 600 / max($w, $h));
+            $thumb = imagecreatetruecolor(max(1, (int) ($w * $ratio)), max(1, (int) ($h * $ratio)));
+            imagecopyresampled($thumb, $image, 0, 0, 0, 0, imagesx($thumb), imagesy($thumb), $w, $h);
+            ob_start();
+            imagejpeg($thumb, null, 85);
+            Storage::disk('local')->put('products/'.$key.'-thumb.jpg', (string) ob_get_clean());
+            imagedestroy($image);
+            imagedestroy($thumb);
+            DB::table('images')->insert(['product_id' => $product, 'path' => 'products/'.$key.'.jpg', 'thumb' => 'products/'.$key.'-thumb.jpg', 'alt' => $credit, 'position' => 0, 'created_at' => now(), 'updated_at' => now()]);
         }
     }
 
