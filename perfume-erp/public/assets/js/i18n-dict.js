@@ -756,4 +756,5 @@ const I18N_DICT = {
   "Search by name, house or note…": "ابحث بالاسم أو الدار أو النوتة…",
   "No reference matches.": "لا يوجد مرجع مطابق.",
   "Search the library": "ابحث في المكتبة",
+  "All": "الكل",
 };

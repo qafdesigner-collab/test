@@ -17,7 +17,8 @@ class InspirationLibraryTest extends TestCase
     {
         $this->seed(InspirationLibrarySeeder::class);
         $count = DB::table('references')->count();
-        $this->assertGreaterThan(100, $count);
+        $this->assertGreaterThan(500, $count);
+        $this->assertSame(0, DB::table('references')->whereNull('top_notes')->orWhereNull('heart_notes')->orWhereNull('base_notes')->count());
         $this->assertSame($count, DB::table('references')->where('library', true)->count());
 
         DB::table('references')->where('brand', 'Creed')->where('name', 'Aventus')->update(['notes' => 'Our own panel notes']);
@@ -98,5 +99,20 @@ class InspirationLibraryTest extends TestCase
         $this->postJson('/api/references', ['brand' => 'House B', 'name' => 'Fresh One', 'top_notes' => 'Lemon', 'base_notes' => 'Cedar'])->assertOk();
         $this->assertSame('Lemon, Cedar', DB::table('references')->where('name', 'Fresh One')->value('notes'));
         $this->assertStringContainsString('"Golden Oud",Unisex,"Amber Woody","Saffron, bergamot","Rose, oud","Amber, musk"', $this->get('/api/references/export')->getContent());
+    }
+
+    public function test_update_fills_the_pyramid_of_older_bundled_references_only(): void
+    {
+        $this->seed(InspirationLibrarySeeder::class);
+        // An installation from before 0.8.0: bundled rows without a pyramid, one edited by staff.
+        DB::table('references')->where('library', true)->update(['top_notes' => null, 'heart_notes' => null, 'base_notes' => null]);
+        DB::table('references')->where('brand', 'Creed')->where('name', 'Aventus')->update(['top_notes' => 'Our own top', 'notes' => 'Our own panel notes']);
+
+        $this->seed(InspirationLibrarySeeder::class);
+
+        $sauvage = DB::table('references')->where('brand', 'Dior')->where('name', 'Sauvage EDT')->first();
+        $this->assertSame('Ambroxan, cedar, labdanum', $sauvage->base_notes);
+        $aventus = DB::table('references')->where('brand', 'Creed')->where('name', 'Aventus')->first();
+        $this->assertSame(['Our own top', null, 'Our own panel notes'], [$aventus->top_notes, $aventus->heart_notes, $aventus->notes]);
     }
 }
