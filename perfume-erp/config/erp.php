@@ -1,5 +1,7 @@
 <?php
 
+$version = '0.9.1';
+
 return [
 
     /*
@@ -16,6 +18,15 @@ return [
 
     'sqlite_path' => database_path('database.sqlite'),
 
-    'version' => '0.9.0',
+    'version' => $version,
+
+    /* Where update packages are installed; empty means this installation. Only the tests change it. */
+    'update_root' => null,
+
+    /*
+     * Cache-busting code for CSS and JS links. Derived from the version and the application key so the
+     * release number is not readable from the page source; only the owner sees it in the System panel.
+     */
+    'asset_version' => substr(hash('sha256', $version.'|'.env('APP_KEY', '')), 0, 10),
 
 ];

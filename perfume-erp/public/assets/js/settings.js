@@ -15,7 +15,7 @@ async function settingsPage() {
     ) +
     panel(
       'Your installation',
-      `<div class="panel-body"><div class="detail-grid"><div><h2>${esc(s.company_name)}</h2><p class="muted">${esc(s.address)}<br>${esc(s.email)} · ${esc(s.phone)}</p><small>Currency ${esc(s.currency)} · Tax ID ${esc(s.tax_id || 'not configured')}</small></div><div class="notice">Private single-company installation.<br>Release ${esc(state.boot.build)}.<br>Local LAN operation is supported by the server. Hybrid branch syncing, electronic invoicing and terminal drivers are not enabled.</div></div></div>`,
+      `<div class="panel-body"><div class="detail-grid"><div><h2>${esc(s.company_name)}</h2><p class="muted">${esc(s.address)}<br>${esc(s.email)} · ${esc(s.phone)}</p><small>Currency ${esc(s.currency)} · Tax ID ${esc(s.tax_id || 'not configured')}</small></div><div class="notice">Private single-company installation.<br>Local LAN operation is supported by the server. Hybrid branch syncing, electronic invoicing and terminal drivers are not enabled.</div></div></div>`,
     ) +
     (system ? systemPanel(system) : '') +
     (can()
@@ -291,7 +291,7 @@ function systemPanel(x) {
   return panel(
     'System · updates and backups',
     `<div class="panel-body"><div class="detail-grid"><div><p><b>Version</b> ${esc(x.version)}<br><b>Database</b> ${esc(x.database === 'sqlite' ? 'SQLite file' : 'MySQL / MariaDB')}<br><b>PHP</b> ${esc(x.php)}</p>${pending ? `<div class="notice"><b>${pending} database update${pending > 1 ? 's' : ''} waiting.</b> New program files were uploaded. Back up first, then apply the update.</div>` : '<p class="muted">The database is up to date.</p>'}</div><div><p class="form-hint">Daily automatic backup (cPanel → Cron Jobs → once per day):</p><pre class="cron-line">php ${esc(x.artisan)} erp:backup-auto</pre><p class="tiny muted">Keeps the newest 14 backups in perfume-erp/storage/app/backups. Also keep cPanel's own backups switched on.</p></div></div>${backups}</div>`,
-    `<button class="secondary" onclick="systemPasswordDialog('backup')">Download backup now</button>${pending ? '<button class="primary" onclick="systemPasswordDialog(\'update\')">Apply update</button>' : ''}`,
+    `<button class="secondary" onclick="systemPasswordDialog('backup')">Download backup now</button><button class="secondary" onclick="uploadUpdateDialog()">Upload update</button>${pending ? '<button class="primary" onclick="systemPasswordDialog(\'update\')">Apply update</button>' : ''}`,
   );
 }
 
@@ -336,5 +336,47 @@ function systemPasswordDialog(action) {
     setTimeout(() => URL.revokeObjectURL(link.href), 10000);
     closeModal();
     toast('Backup downloaded. Store it securely.');
+  });
+}
+
+/** Install a new atelier-erp-cpanel ZIP from the browser: upload in 1 MB pieces, install, then update the database. */
+function uploadUpdateDialog() {
+  modal(
+    'Upload update',
+    `<form><p class="form-hint">Choose the new <b>atelier-erp-cpanel-….zip</b> file you received. A backup is saved on the server first, then the new files are installed. Your settings, data and uploads are kept.</p>
+    <label>Update package (ZIP)<input type="file" name="package" accept=".zip,application/zip" required></label>${field('Your password', 'password', '', 'password')}
+    <div class="update-progress" hidden><div class="update-bar"><i></i></div><small id="update-status"></small></div>${formActions('Install update')}</form>`,
+  );
+  bindForm(async fd => {
+    const file = fd.get('package');
+    const password = fd.get('password');
+    const status = text => ($('#update-status').textContent = text);
+    $('.update-progress').hidden = false;
+    status('Checking your password…');
+    const start = await api('system/package', 'POST', { action: 'start', password, size: file.size });
+    try {
+      const parts = Math.ceil(file.size / start.chunk_size);
+      for (let i = 0; i < parts; i++) {
+        const body = new FormData();
+        body.append('action', 'chunk');
+        body.append('id', start.id);
+        body.append('index', String(i));
+        body.append('chunk', file.slice(i * start.chunk_size, (i + 1) * start.chunk_size), 'part');
+        await api('system/package', 'POST', body);
+        $('.update-bar i').style.width = Math.round(((i + 1) / parts) * 100) + '%';
+        status(`Uploading… ${Math.round(((i + 1) / parts) * 100)}%`);
+      }
+    } catch (e) {
+      await api('system/package', 'POST', { action: 'cancel', id: start.id }).catch(() => {});
+      throw e;
+    }
+    status('Saving a backup and installing the new files…');
+    const done = await api('system/package', 'POST', { action: 'finish', id: start.id });
+    status('Updating the database…');
+    const system = await api('system');
+    if (system.pending_updates.length) await api('system/update', 'POST', { password });
+    status(`Updated from ${done.from} to ${done.version}. Reloading…`);
+    toast(`Updated to ${done.version}`);
+    setTimeout(() => location.reload(), 1500);
   });
 }

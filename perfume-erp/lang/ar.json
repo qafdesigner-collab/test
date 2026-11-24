@@ -150,7 +150,6 @@
   "Add fictional demo products so I can try the system first": "إضافة منتجات تجريبية وهمية لتجربة النظام أولًا",
   "Install Atelier ERP →": "تثبيت Atelier ERP ←",
   "Version": "الإصدار",
-  "282 inspiration references are added automatically.": "تُضاف 282 مرجع إلهام تلقائيًا.",
   "PHP 8.3 or newer (you have :version)": "PHP 8.3 أو أحدث (لديك :version)",
   "PHP extension: :name": "إضافة PHP: :name",
   "Database driver: MySQL (pdo_mysql) or SQLite (pdo_sqlite)": "مشغل قاعدة البيانات: MySQL (pdo_mysql) أو SQLite (pdo_sqlite)",
@@ -181,5 +180,14 @@
   "Two-step sign-in is already switched on.": "التحقق بخطوتين مفعّل بالفعل.",
   "Verify and continue": "تحقق وتابع",
   "Your sign-in expired. Please sign in again.": "انتهت مهلة تسجيل الدخول. يُرجى تسجيل الدخول مجددًا.",
-  "Too Many Attempts.": "محاولات كثيرة. حاول مرة أخرى بعد دقيقة."
+  "Too Many Attempts.": "محاولات كثيرة. حاول مرة أخرى بعد دقيقة.",
+  "546 inspiration references are added automatically.": "تُضاف 546 مرجع إلهام تلقائيًا.",
+  "The update package contains an unexpected file: :name": "تحتوي حزمة التحديث على ملف غير متوقع: :name",
+  "This is not an Atelier ERP update package. Upload the atelier-erp-cpanel ZIP file.": "هذه ليست حزمة تحديث Atelier ERP. ارفع ملف atelier-erp-cpanel بصيغة ZIP.",
+  "The version of the update package cannot be read.": "تعذّرت قراءة إصدار حزمة التحديث.",
+  "This package is older (:package) than the installed version. Older versions cannot be installed.": "هذه الحزمة (:package) أقدم من الإصدار المثبت. لا يمكن تثبيت إصدارات أقدم.",
+  "The uploaded file is not a valid ZIP file.": "الملف المرفوع ليس ملف ZIP صالحًا.",
+  "The upload was interrupted. Start again.": "انقطع الرفع. ابدأ من جديد.",
+  "The upload is larger than announced. Start again.": "الملف أكبر من الحجم المعلن. ابدأ من جديد.",
+  "The upload is incomplete. Start again.": "الرفع غير مكتمل. ابدأ من جديد."
 }

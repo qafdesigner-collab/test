@@ -100,9 +100,21 @@ php /home/USER/perfume-erp/artisan erp:two-factor-off owner@example.com
 
 ## Updating to a new version
 
+**From inside the ERP (from 0.9.1 on, recommended):**
+
+1. Sign in as the owner → **Company & access → System → Upload update**.
+2. Choose the new `atelier-erp-cpanel-….zip`, type your password and click **Install update**.
+3. The ERP saves a backup in `perfume-erp/storage/app/backups/before-update-….zip`, installs the new
+   files, updates the database and reloads. Your `.env`, data, uploads and settings are kept. Older
+   packages and files that are not an Atelier ERP package are refused.
+
+**With the File Manager (versions before 0.9.1, or if the server does not allow PHP to write files):**
+
 1. **Company & access → System → Download backup now.**
 2. Upload the new ZIP and extract it over the old files. Your `.env` and the data in `storage` are not in the ZIP, so your settings and files stay.
 3. Sign in as the owner → **Company & access → System**. If it shows "database update waiting", click **Apply update** and confirm with your password.
+
+Only the owner sees the version number (in the System panel); it is not shown on the sign-in page or to other staff.
 
 ## Troubleshooting
 

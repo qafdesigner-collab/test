@@ -13,8 +13,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>{{ __('Sign in') }} · Atelier ERP</title>
     <script>try{document.documentElement.dataset.theme=localStorage.getItem('atelier-theme')||'obsidian'}catch(e){document.documentElement.dataset.theme='obsidian'}</script>
-    <link rel="stylesheet" href="/assets/app.css?v={{ config('erp.version') }}">
-    <link rel="stylesheet" href="/assets/themes.css?v={{ config('erp.version') }}">
+    <link rel="stylesheet" href="/assets/app.css?v={{ config('erp.asset_version') }}">
+    <link rel="stylesheet" href="/assets/themes.css?v={{ config('erp.asset_version') }}">
     @if (preg_match('/^#[0-9a-fA-F]{6}$/', (string) ($brand['brand_color'] ?? '')))<style>:root{--accent:{{ $brand['brand_color'] }}}</style>@endif
 </head>
 <body class="login-body">
@@ -48,7 +48,7 @@
             <button class="primary full" type="submit">{{ __('Sign in to your workspace') }} <span>{{ $arabic ? '←' : '→' }}</span></button>
         </form>
         @endif
-        <p class="tiny muted">{{ __("Your company's private installation") }} · {{ __('Version') }} {{ config('erp.version') }}</p>
+        <p class="tiny muted">{{ __("Your company's private installation") }}</p>
     </main>
     @if (! empty($brand['login_image_path']))
     <aside class="login-art has-photo" style="--login-photo:url('/media/login-image?v={{ substr(sha1($brand['login_image_path']), 0, 8) }}')">

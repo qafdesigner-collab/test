@@ -7,7 +7,7 @@
 # Requires PHP 8.3, Composer and zip on the build machine. The server needs no SSH.
 set -euo pipefail
 cd "$(dirname "$0")"
-VERSION=$(sed -n "s/.*'version' => '\([^']*\)'.*/\1/p" config/erp.php)
+VERSION=$(sed -n "s/^\$version = '\([^']*\)';.*/\1/p" config/erp.php)
 OUT=dist/build
 rm -rf "$OUT" && mkdir -p "$OUT/perfume-erp" "$OUT/public_html"
 
@@ -17,7 +17,7 @@ tar cf - \
   --exclude='./storage/logs/*.log' --exclude='./storage/framework/sessions/*' \
   --exclude='./storage/framework/views/*.php' --exclude='./storage/framework/cache/data/*' \
   --exclude='./storage/app/private/*' --exclude='./bootstrap/cache/*.php' \
-  --exclude='./storage/app/*.zip' --exclude='./storage/app/backups/*' --exclude=./storage/framework/testing \
+  --exclude='./storage/app/*.zip' --exclude='./storage/app/backups/*' --exclude=./storage/app/updates --exclude=./storage/framework/testing \
   --exclude=./.phpunit.result.cache --exclude=./.phpunit.cache . | (cd "$OUT/perfume-erp" && tar xf -)
 
 # Reuse the local vendor folder (run composer install first) and strip development-only packages.

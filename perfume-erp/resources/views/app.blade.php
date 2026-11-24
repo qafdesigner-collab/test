@@ -6,11 +6,11 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Atelier · Perfume ERP</title>
     <script>try{document.documentElement.dataset.theme=localStorage.getItem('atelier-theme')||'obsidian';var l=localStorage.getItem('atelier-lang');if(l==='ar'){document.documentElement.lang=l;document.documentElement.dir='rtl'}}catch(e){document.documentElement.dataset.theme='obsidian'}</script>
-    <link rel="stylesheet" href="/assets/app.css?v={{ config('erp.version') }}">
-    <link rel="stylesheet" href="/assets/themes.css?v={{ config('erp.version') }}">
+    <link rel="stylesheet" href="/assets/app.css?v={{ config('erp.asset_version') }}">
+    <link rel="stylesheet" href="/assets/themes.css?v={{ config('erp.asset_version') }}">
     {{-- Modules share one global scope and load in this order; main.js starts the app. --}}
     @foreach (['core', 'barcodes', 'shell', 'dashboard', 'catalogue', 'inventory', 'sales', 'pos', 'manufacturing', 'projects', 'customers', 'reports', 'expenses', 'profit', 'settings', 'tables', 'i18n-dict', 'i18n', 'main'] as $module)
-        <script src="/assets/js/{{ $module }}.js?v={{ config('erp.version') }}" defer></script>
+        <script src="/assets/js/{{ $module }}.js?v={{ config('erp.asset_version') }}" defer></script>
     @endforeach
 </head>
 <body>
@@ -50,7 +50,7 @@
         </main>
         <footer>
             <span id="footer-company"></span>
-            <span class="footer-right">Atelier ERP · {{ config('erp.version') }}</span>
+            <span class="footer-right">Atelier ERP</span>
         </footer>
     </div>
 

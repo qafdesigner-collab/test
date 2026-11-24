@@ -84,7 +84,7 @@
 
         <div class="install-actions">
             <button class="primary" type="submit">{{ __("Install Atelier ERP \u2192") }}</button>
-            <span class="tiny muted">{{ __('Version') }} {{ config('erp.version') }} · {{ __('282 inspiration references are added automatically.') }}</span>
+            <span class="tiny muted">{{ __('Version') }} {{ config('erp.version') }} · {{ __('546 inspiration references are added automatically.') }}</span>
         </div>
     </form>
 </main>

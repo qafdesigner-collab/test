@@ -771,4 +771,11 @@ const I18N_DICT = {
   "Sign-in photo removed": "تمت إزالة صورة تسجيل الدخول",
   "Change colour theme": "تغيير المظهر",
   "Change language": "تغيير اللغة",
+  "Upload update": "رفع تحديث",
+  "Update package (ZIP)": "حزمة التحديث (ZIP)",
+  "Your password": "كلمة المرور",
+  "Install update →": "تثبيت التحديث ←",
+  "Checking your password…": "جارٍ التحقق من كلمة المرور…",
+  "Saving a backup and installing the new files…": "جارٍ حفظ نسخة احتياطية وتثبيت الملفات الجديدة…",
+  "Updating the database…": "جارٍ تحديث قاعدة البيانات…",
 };

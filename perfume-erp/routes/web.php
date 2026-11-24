@@ -106,6 +106,7 @@ Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
         Route::get('system', [SystemController::class, 'status']);
         Route::post('system/update', [SystemController::class, 'update'])->middleware('throttle:system');
         Route::post('system/backup', [SystemController::class, 'backup'])->middleware('throttle:system');
+        Route::post('system/package', [SystemController::class, 'package'])->middleware('throttle:update-package');
     });
     Route::get('media/image/{id}', [CatalogueController::class, 'image'])->whereNumber('id');
     Route::get('media/reference/{id}', [CatalogueController::class, 'referencePhotoImage'])->whereNumber('id');
