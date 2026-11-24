@@ -86,11 +86,11 @@ function checkoutDialog() {
     shiftDialog();
     return;
   }
-  const total = state.cartTotal;
+  let total = state.cartTotal;
   modal(
     'Take payment',
-    `<form class="checkout"><div class="checkout-total"><span>Total to pay</span><strong>${money(total)}</strong></div>
-    <label>Customer<select name="contact_id">${options(state.contacts.filter(c => c.kind === 'customer'), 'name', '', 'Walk-in customer')}</select></label>
+    `<form class="checkout"><div class="checkout-total"><span>Total to pay<small id="customer-price-note"></small></span><strong>${money(total)}</strong></div>
+    <label>Customer<select name="contact_id">${options(state.contacts.filter(c => c.kind === 'customer'), 'name', '', 'Walk-in customer')}</select></label><div id="loyalty-box" class="loyalty-box" hidden></div>
     <div class="section-label">Payment</div>
     <div class="quick-methods"><button type="button" class="secondary" data-all="Cash">All cash</button><button type="button" class="secondary" data-all="Card">All card</button><button type="button" class="secondary" data-all="Bank">All bank transfer</button><button type="button" class="subtle" id="add-payment">+ Split payment</button></div>
     <div id="payment-rows"></div>
@@ -103,7 +103,7 @@ function checkoutDialog() {
     if (rows.children.length >= 4) return;
     const row = document.createElement('div');
     row.className = 'payment-row';
-    row.innerHTML = `<select aria-label="Payment method">${selectOptions(['Cash', 'Card', 'Bank'], method)}</select><input aria-label="Amount" inputmode="decimal" value="${decimal(cents)}"><button type="button" class="subtle" aria-label="Remove payment">×</button>`;
+    row.innerHTML = `<select aria-label="Payment method">${selectOptions(state.loyalty?.enabled ? ['Cash', 'Card', 'Bank', 'Points'] : ['Cash', 'Card', 'Bank'], method)}</select><input aria-label="Amount" inputmode="decimal" value="${decimal(cents)}"><button type="button" class="subtle" aria-label="Remove payment">×</button>`;
     row.querySelector('button').addEventListener('click', () => {
       row.remove();
       refresh();
@@ -134,6 +134,37 @@ function checkoutDialog() {
           : `<span>Paid ${money(paid)}</span><b class="ok">Fully paid ✓</b>`;
   };
   addRow('Cash', total);
+  state.loyalty = null;
+  $('.modal select[name=contact_id]').addEventListener('change', async e => {
+    const id = Number(e.target.value);
+    const pricing = id ? await api(`contacts/${id}/pricing`).catch(() => null) : null;
+    total = cartTotalFor(pricing);
+    $('.checkout-total strong').textContent = money(total);
+    $('#customer-price-note').textContent = total !== state.cartTotal ? `Customer price applied · list price ${money(state.cartTotal)}` : '';
+    rows.innerHTML = '';
+    addRow('Cash', total);
+    refresh();
+    state.loyalty = id ? await api(`contacts/${id}/loyalty`).catch(() => null) : null;
+    const box = $('#loyalty-box');
+    if (!state.loyalty?.enabled) {
+      box.hidden = true;
+      return;
+    }
+    const worth = state.loyalty.balance * state.loyalty.point_value_cents;
+    box.hidden = false;
+    box.innerHTML = `<span>Loyalty points: <b>${state.loyalty.balance.toLocaleString('en')}</b> · worth ${money(worth)}</span>${state.loyalty.balance ? '<button type="button" class="secondary" id="use-points">Use points</button>' : ''}`;
+    $('#use-points')?.addEventListener('click', () => {
+      const value = state.loyalty.point_value_cents;
+      const use = Math.min(worth, Math.floor(total / value) * value);
+      if (!use) return toast('Nothing left to pay with points.');
+      [...rows.children].forEach(r => r.querySelector('select').value === 'Points' && r.remove());
+      const first = rows.firstElementChild;
+      if (first) first.querySelector('input').value = decimal(total - use);
+      else if (total - use > 0) addRow('Cash', total - use);
+      addRow('Points', use);
+      refresh();
+    });
+  });
   document.querySelectorAll('[data-all]').forEach(b =>
     b.addEventListener('click', () => {
       rows.innerHTML = '';
@@ -350,4 +381,17 @@ function printZReport() {
   w.document.open();
   w.document.write(html);
   w.document.close();
+}
+
+
+/** Basket total for a customer's price list, computed the same way as the server (special price, else discount %). */
+function cartTotalFor(pricing) {
+  if (!pricing) return state.cartTotal;
+  return state.cart.reduce((sum, line) => {
+    const p = state.products.find(x => x.id === line.id);
+    const special = pricing.prices.find(x => x.product_id === p.id);
+    const gross = Math.round(line.qty * (special ? special.price_cents : p.price_cents));
+    const net = gross - (special ? 0 : Math.round((gross * pricing.discount_bp) / 10000));
+    return sum + net + Math.round((net * p.tax_bp) / 10000);
+  }, 0);
 }

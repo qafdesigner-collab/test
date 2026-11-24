@@ -14,6 +14,7 @@ async function customersPage() {
 }
 
 async function customer360(id) {
+  setTimeout(() => loyaltyPanel(id), 0);
   if (location.hash !== '#customers') {
     location.hash = 'customers';
     return setTimeout(() => customer360(id), 250);
@@ -41,7 +42,7 @@ async function customer360(id) {
         'Customer 360 · internal company record',
         `${can('manager', 'accountant') ? `<button class="secondary" onclick="statementDialog(${id})">Statement</button>` : ''}<button class="secondary" onclick="customerProfileDialog(${id})">Edit profile / phone</button><button class="secondary" onclick="customersPage()">Customer list</button><button class="primary" onclick="printCustomer360()">Print 360 record</button>`,
       ) +
-      `<div class="dossier-sheet"><p class="customer-contact">${esc(d.customer.phone || '')} ${esc(d.customer.email || '')}<br>${esc(d.customer.address || '')}</p><div class="stats">${reportStat('Linked products', d.products.length, 'From projects and invoices')}${reportStat('Projects', d.projects.length, 'Design and packaging')}${reportStat('Sales excluding tax', money(rev), 'Active posted invoices')}${reportStat('Outstanding', money(balance), 'Customer balance')}</div><section class="panel"><div class="panel-head"><h2>Products</h2></div><div class="panel-body"><div class="catalogue">${d.products.map(p => `<article class="product-card" onclick="product360(${p.id})">${productArt(p)}<div class="product-info"><h3>${esc(p.name)}</h3><p>${esc(p.size || p.sku)}</p><button class="subtle">Open full product record</button></div></article>`).join('') || '<p>Link a product to a customer project or create an invoice to build this record.</p>'}</div></div></section><section class="panel"><div class="panel-head"><h2>Order progress</h2></div><div class="panel-body progress-chart">${counts.map(c => `<div><span>${esc(c.name)}</span><div><i style="width:${d.projects.length ? (c.value / d.projects.length) * 100 : 0}%"></i></div><b>${c.value} / ${d.projects.length}</b></div>`).join('')}</div></section>${d.projects.map(project360Panel).join('')}${panel(
+      `<div class="dossier-sheet"><p class="customer-contact">${esc(d.customer.phone || '')} ${esc(d.customer.email || '')}<br>${esc(d.customer.address || '')}</p><div class="stats">${reportStat('Linked products', d.products.length, 'From projects and invoices')}${reportStat('Projects', d.projects.length, 'Design and packaging')}${reportStat('Sales excluding tax', money(rev), 'Active posted invoices')}${reportStat('Outstanding', money(balance), 'Customer balance')}</div><div id="loyalty-panel"></div><section class="panel"><div class="panel-head"><h2>Products</h2></div><div class="panel-body"><div class="catalogue">${d.products.map(p => `<article class="product-card" onclick="product360(${p.id})">${productArt(p)}<div class="product-info"><h3>${esc(p.name)}</h3><p>${esc(p.size || p.sku)}</p><button class="subtle">Open full product record</button></div></article>`).join('') || '<p>Link a product to a customer project or create an invoice to build this record.</p>'}</div></div></section><section class="panel"><div class="panel-head"><h2>Order progress</h2></div><div class="panel-body progress-chart">${counts.map(c => `<div><span>${esc(c.name)}</span><div><i style="width:${d.projects.length ? (c.value / d.projects.length) * 100 : 0}%"></i></div><b>${c.value} / ${d.projects.length}</b></div>`).join('')}</div></section>${d.projects.map(project360Panel).join('')}${panel(
         'Invoices and quotations',
         table(
           ['Document', 'Type', 'Status', 'Total', 'Paid'],
@@ -104,4 +105,16 @@ function productRecordMarkup(d) {
       ),
     ),
   )}</article><div class="form-actions"><button class="primary" onclick="window.print()">Print / save product PDF</button></div>`;
+}
+
+
+async function loyaltyPanel(id) {
+  const d = await api(`contacts/${id}/loyalty`).catch(() => null);
+  const box = $('#loyalty-panel');
+  if (!box || !d?.enabled) return;
+  const reason = { earn: 'Earned', redeem: 'Used', return: 'Returned sale', restore: 'Given back' };
+  box.innerHTML = panel(
+    `Loyalty points · ${d.balance.toLocaleString('en')} (worth ${money(d.balance * d.point_value_cents)})`,
+    table(['Date', 'Reason', 'Document', 'Points'], d.history.map(h => `<tr><td>${date(h.created_at)}</td><td>${reason[h.reason] || esc(h.reason)}</td><td>${esc(h.number || '')}</td><td>${h.points > 0 ? '+' : ''}${h.points}</td></tr>`), 'No points yet.'),
+  );
 }

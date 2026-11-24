@@ -165,5 +165,9 @@
   "Only cash expenses can be paid from the cashier drawer.": "يمكن دفع المصروفات النقدية فقط من درج الكاشير.",
   "This expense is already voided.": "هذا المصروف ملغى بالفعل.",
   "Not enough unexpired stock for :product. Expired lots cannot be sold or used.": "لا يوجد مخزون غير منتهي الصلاحية كافٍ للمنتج :product. لا يمكن بيع الدفعات المنتهية أو استخدامها.",
-  "The discount cannot exceed 100%.": "لا يمكن أن يتجاوز الخصم 100%."
+  "The discount cannot exceed 100%.": "لا يمكن أن يتجاوز الخصم 100%.",
+  "Loyalty points are not enabled.": "نقاط الولاء غير مفعلة.",
+  "Points can only pay whole points.": "يمكن الدفع بالنقاط بعدد صحيح من النقاط فقط.",
+  "The customer does not have enough loyalty points.": "لا يملك العميل نقاط ولاء كافية.",
+  "Choose the customer to pay with loyalty points.": "اختر العميل للدفع بنقاط الولاء."
 }

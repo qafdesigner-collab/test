@@ -93,6 +93,14 @@ final class Documents
             if ($kind === 'Quotation' && $paid) {
                 self::fail(__('Quotations cannot receive payment.'));
             }
+            $pointsPaid = array_sum(array_column(array_filter($payments, fn ($p) => $p['method'] === 'Points'), 'amount_cents'));
+            $pointsRedeemed = 0;
+            if ($pointsPaid) {
+                if (! $contact || ! in_array($kind, ['Sale', 'Invoice'])) {
+                    self::fail(__('Choose the customer to pay with loyalty points.'));
+                }
+                $pointsRedeemed = Loyalty::pointsFor($contact, $pointsPaid);
+            }
             if ($kind === 'PurchaseOrder' && ($paid || ! $contact)) {
                 self::fail($paid ? 'Pay the supplier on the purchase receipt, not on the order.' : 'Choose the supplier for this purchase order.');
             }
@@ -122,6 +130,10 @@ final class Documents
             }
             foreach ($payments as $payment) {
                 DB::table('payments')->insert($payment + ['document_id' => $id, 'user_id' => $user, 'created_at' => now(), 'updated_at' => now()]);
+            }
+            if ($contact && in_array($kind, ['Sale', 'Invoice'])) {
+                Loyalty::record($contact, $id, -$pointsRedeemed, 'redeem', $user);
+                Loyalty::record($contact, $id, Loyalty::earnedFor($total, $pointsPaid), 'earn', $user);
             }
             DB::table('audit')->insert(['user_id' => $user, 'action' => 'document.create', 'subject' => $number, 'details' => json_encode(['kind' => $kind, 'total_cents' => $total]), 'created_at' => now()]);
 
@@ -190,7 +202,9 @@ final class Documents
                 self::fail(__('Items from this sale were already returned. Return the remaining items line by line.'));
             }
             $cashRefund = (int) DB::table('payments')->where('document_id', $id)->where('method', 'Cash')->sum('amount_cents');
-            $rid = DB::table('documents')->insertGetId(['cash_refund_cents' => $cashRefund, 'uuid' => (string) Str::uuid(), 'kind' => 'Return', 'status' => 'Posted', 'original_id' => $id, 'contact_id' => $d->contact_id, 'location_id' => $d->location_id, 'user_id' => $user, 'subtotal_cents' => $d->subtotal_cents, 'tax_cents' => $d->tax_cents, 'total_cents' => $d->total_cents, 'paid_cents' => $d->paid_cents, 'method' => $d->method, 'notes' => 'Full return: '.$condition, 'seller_snapshot' => $d->seller_snapshot, 'contact_snapshot' => $d->contact_snapshot, 'created_at' => now(), 'updated_at' => now()]);
+            $moneyRefund = Loyalty::splitRefund($d, (int) $d->paid_cents, $user);
+            Loyalty::reverseEarned($d, (int) $d->total_cents, $user);
+            $rid = DB::table('documents')->insertGetId(['cash_refund_cents' => $cashRefund, 'uuid' => (string) Str::uuid(), 'kind' => 'Return', 'status' => 'Posted', 'original_id' => $id, 'contact_id' => $d->contact_id, 'location_id' => $d->location_id, 'user_id' => $user, 'subtotal_cents' => $d->subtotal_cents, 'tax_cents' => $d->tax_cents, 'total_cents' => $d->total_cents, 'paid_cents' => $moneyRefund, 'method' => $d->method, 'notes' => 'Full return: '.$condition, 'seller_snapshot' => $d->seller_snapshot, 'contact_snapshot' => $d->contact_snapshot, 'created_at' => now(), 'updated_at' => now()]);
             $num = 'RET-'.str_pad((string) $rid, 6, '0', STR_PAD_LEFT);
             DB::table('documents')->where('id', $rid)->update(['number' => $num]);
             foreach (DB::table('document_lines')->where('document_id', $id)->get() as $line) {
@@ -204,9 +218,9 @@ final class Documents
                 }
             }
             DB::table('documents')->where('id', $id)->update(['status' => 'Returned', 'updated_at' => now()]);
-            DB::table('audit')->insert(['user_id' => $user, 'action' => 'sale.return', 'subject' => $num, 'details' => json_encode(['original' => $d->number, 'refund_recorded_cents' => $d->paid_cents, 'condition' => $condition]), 'created_at' => now()]);
+            DB::table('audit')->insert(['user_id' => $user, 'action' => 'sale.return', 'subject' => $num, 'details' => json_encode(['original' => $d->number, 'refund_recorded_cents' => $moneyRefund, 'condition' => $condition]), 'created_at' => now()]);
 
-            return ['id' => $rid, 'number' => $num, 'refund_cents' => $d->paid_cents];
+            return ['id' => $rid, 'number' => $num, 'refund_cents' => $moneyRefund];
         });
     }
 
@@ -310,11 +324,13 @@ final class Documents
             $netTotal = $d->total_cents - $d->returned_cents - $total;
             $netPaid = $d->paid_cents - $d->refunded_cents;
             $refund = max(0, $netPaid - $netTotal);
-            if ($refund > 0 && ! in_array($refundMethod, ['Cash', 'Card', 'Bank'], true)) {
+            $moneyRefund = Loyalty::splitRefund($d, $refund, $user);
+            if ($moneyRefund > 0 && ! in_array($refundMethod, ['Cash', 'Card', 'Bank'], true)) {
                 self::fail(__('Choose how the refund is paid back: Cash, Card or Bank.'));
             }
-            $method = $refund > 0 ? $refundMethod : 'Credit';
-            $rid = DB::table('documents')->insertGetId(['uuid' => (string) Str::uuid(), 'kind' => 'Return', 'status' => 'Posted', 'original_id' => $id, 'contact_id' => $d->contact_id, 'location_id' => $d->location_id, 'user_id' => $user, 'subtotal_cents' => $sub, 'tax_cents' => $tax, 'total_cents' => $total, 'paid_cents' => $refund, 'method' => $method, 'cash_refund_cents' => $method === 'Cash' ? $refund : 0, 'notes' => 'Partial return: '.$condition, 'seller_snapshot' => $d->seller_snapshot, 'contact_snapshot' => $d->contact_snapshot, 'created_at' => now(), 'updated_at' => now()]);
+            $method = $moneyRefund > 0 ? $refundMethod : 'Credit';
+            Loyalty::reverseEarned($d, (int) $d->returned_cents + $total, $user);
+            $rid = DB::table('documents')->insertGetId(['uuid' => (string) Str::uuid(), 'kind' => 'Return', 'status' => 'Posted', 'original_id' => $id, 'contact_id' => $d->contact_id, 'location_id' => $d->location_id, 'user_id' => $user, 'subtotal_cents' => $sub, 'tax_cents' => $tax, 'total_cents' => $total, 'paid_cents' => $moneyRefund, 'method' => $method, 'cash_refund_cents' => $method === 'Cash' ? $moneyRefund : 0, 'notes' => 'Partial return: '.$condition, 'seller_snapshot' => $d->seller_snapshot, 'contact_snapshot' => $d->contact_snapshot, 'created_at' => now(), 'updated_at' => now()]);
             $number = 'RET-'.str_pad((string) $rid, 6, '0', STR_PAD_LEFT);
             DB::table('documents')->where('id', $rid)->update(['number' => $number]);
             foreach ($returnLines as $returnLine) {
@@ -335,7 +351,7 @@ final class Documents
             DB::table('documents')->where('id', $id)->update(['returned_cents' => $d->returned_cents + $total, 'refunded_cents' => $d->refunded_cents + $refund, 'updated_at' => now()]);
             DB::table('audit')->insert(['user_id' => $user, 'action' => 'sale.partial_return', 'subject' => $number, 'details' => json_encode(['original' => $d->number, 'returned_cents' => $total, 'refund_cents' => $refund, 'refund_method' => $method, 'condition' => $condition]), 'created_at' => now()]);
 
-            return ['id' => $rid, 'number' => $number, 'returned_cents' => $total, 'refund_cents' => $refund, 'refund_method' => $method];
+            return ['id' => $rid, 'number' => $number, 'returned_cents' => $total, 'refund_cents' => $moneyRefund, 'points_restored_cents' => $refund - $moneyRefund, 'refund_method' => $method];
         });
     }
 

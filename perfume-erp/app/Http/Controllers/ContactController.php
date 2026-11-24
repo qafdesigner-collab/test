@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Amounts;
 use App\Services\Documents;
+use App\Services\Loyalty;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -58,6 +59,25 @@ class ContactController extends ErpBaseController
             'discount_bp' => (int) DB::table('contacts')->where('id', $id)->value('discount_bp'),
             'prices' => DB::table('customer_prices as c')->join('products as p', 'p.id', '=', 'c.product_id')->where('c.contact_id', $id)
                 ->select('c.product_id', 'p.name', 'p.sku', 'c.price_cents', 'p.price_cents as list_price_cents')->orderBy('p.name')->get(),
+        ];
+    }
+
+    /**
+     * Loyalty points balance and recent history for a customer.
+     */
+    public function loyalty(int $id)
+    {
+        $this->allow(['manager', 'accountant', 'cashier']);
+        $contact = DB::table('contacts')->find($id);
+        abort_unless($contact && $contact->kind === 'customer', 404);
+        $settings = Loyalty::settings();
+
+        return [
+            'enabled' => $settings['enabled'],
+            'balance' => Loyalty::balance($id),
+            'point_value_cents' => $settings['point_value_cents'],
+            'history' => DB::table('loyalty_transactions as t')->leftJoin('documents as d', 'd.id', '=', 't.document_id')->where('t.contact_id', $id)
+                ->select('t.created_at', 't.points', 't.reason', 'd.number')->orderByDesc('t.id')->limit(30)->get(),
         ];
     }
 }

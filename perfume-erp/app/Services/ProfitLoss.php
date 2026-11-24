@@ -44,6 +44,12 @@ final class ProfitLoss
             $months[(int) substr((string) $expense->spent_on, 5, 2)]['expenses_cents'] += $net;
             $categories[$expense->category] = ($categories[$expense->category] ?? 0) + $net;
         }
+        $points = DB::table('payments as p')->join('documents as d', 'd.id', '=', 'p.document_id')->where('p.method', 'Points')->whereIn('d.kind', ['Sale', 'Invoice'])
+            ->whereBetween('p.created_at', [$from, $to])->get(['p.created_at', 'p.amount_cents']);
+        foreach ($points as $payment) {
+            $months[(int) substr((string) $payment->created_at, 5, 2)]['expenses_cents'] += (int) $payment->amount_cents;
+            $categories['Loyalty rewards'] = ($categories['Loyalty rewards'] ?? 0) + (int) $payment->amount_cents;
+        }
         arsort($categories);
 
         $totals = ['revenue_cents' => 0, 'cogs_cents' => 0, 'gross_profit_cents' => 0, 'expenses_cents' => 0, 'net_profit_cents' => 0];

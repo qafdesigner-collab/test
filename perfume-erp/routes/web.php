@@ -54,6 +54,7 @@ Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
         Route::post('images/{id}', [CatalogueController::class, 'imageAction'])->whereNumber('id');
         Route::match(['get', 'post'], 'contacts', [ContactController::class, 'contacts']);
         Route::post('contacts/{id}', [A::class, 'profile'])->whereNumber('id');
+        Route::get('contacts/{id}/loyalty', [ContactController::class, 'loyalty'])->whereNumber('id');
         Route::match(['get', 'post'], 'contacts/{id}/pricing', [ContactController::class, 'pricing'])->whereNumber('id');
         Route::get('inventory', [InventoryController::class, 'inventory']);
         Route::post('stock', [InventoryController::class, 'stock']);
