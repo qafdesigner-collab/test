@@ -24,7 +24,7 @@ Artisan::command('erp:install {--demo : Add fictional sample catalogue}', functi
     Installation::createOwner($name, $email, $password);
     $this->call('db:seed', ['--class' => 'Database\\Seeders\\InspirationLibrarySeeder', '--force' => true]);
     if ($this->option('demo')) {
-        $this->call('db:seed', ['--class' => 'Database\\Seeders\\PerfumeSeeder', '--force' => true]);
+        $this->call('db:seed', ['--class' => 'Database\\Seeders\\DemoBusinessSeeder', '--force' => true]);
     }
     Installation::markInstalled();
     $this->info('Owner created. Sign in at /login. No default shared password is used.');
@@ -69,3 +69,8 @@ Artisan::command('erp:two-factor-off {email : Email address of the account}', fu
 
     return 0;
 })->purpose('Emergency: switch off two-step sign-in for an account that lost its phone and recovery codes');
+
+Artisan::command('erp:demo', function () {
+    $this->info('Adding a fictional demo business with 90 days of history. This can take a minute…');
+    $this->call('db:seed', ['--class' => 'Database\\Seeders\\DemoBusinessSeeder', '--force' => true]);
+})->purpose('Add the full demo business to an installation that has no sales or purchases yet');

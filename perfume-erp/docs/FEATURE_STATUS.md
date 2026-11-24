@@ -1,4 +1,4 @@
-# Feature status — 0.9.1
+# Feature status — 0.10.0
 
 English is the main language; Arabic is the second language (right-to-left).
 
@@ -17,7 +17,9 @@ English is the main language; Arabic is the second language (right-to-left).
 | Manufacturing | Approved formula versions, batches with material issue, maturation, QC, accepted/rejected output, batch costing | Rework, measured consumption overrides |
 | Design | Briefs, artwork versions, approvals, customer review links (WhatsApp), packaging workflow stages | Native design files, time tracking |
 | Finance | Expenses by category (void with reason), monthly profit & loss with chart and CSV, receivables ageing, bilingual customer statements, product profitability, CSV exports | Full double-entry accounting, balance sheet, bank reconciliation |
-| Reports & UI | Dashboard with sales charts, best sellers, low stock and expiry; Customer/Product 360; sortable, filterable, paged tables; six themes (Light, Dark, Auto and the premium Obsidian, Maison and Oud) with printing always in light; responsive desktop/tablet/phone | Scheduled email reports |
+| Reports & UI | Dashboard with sales charts, best sellers, low stock and expiry; Customer/Product 360; sortable, filterable, paged tables; eight themes (Light, Dark, Auto, the premium Obsidian, Maison and Oud, and the soft-raised Clay and Clay Noir) with printing always in light; responsive desktop/tablet/phone | Scheduled email reports |
 | Not enabled | Hybrid branch synchronisation, licence server | — |
 
-Automated tests: 94 feature tests (SQLite) and the same business suites on MySQL/MariaDB 10.11. Tests are development evidence; do a pilot with real data and check tax and accounting requirements with your accountant before relying on the system for filing.
+Automated tests: 96 feature tests (SQLite) and the same business suites on MySQL/MariaDB 10.11. Tests are development evidence; do a pilot with real data and check tax and accounting requirements with your accountant before relying on the system for filing.
+
+Demo: a full fictional business (90 days of history) can be added from the installer, the owner's System panel or `php artisan erp:demo`, only while there are no sales or purchases.

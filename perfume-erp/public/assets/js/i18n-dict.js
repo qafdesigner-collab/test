@@ -778,4 +778,10 @@ const I18N_DICT = {
   "Checking your password…": "جارٍ التحقق من كلمة المرور…",
   "Saving a backup and installing the new files…": "جارٍ حفظ نسخة احتياطية وتثبيت الملفات الجديدة…",
   "Updating the database…": "جارٍ تحديث قاعدة البيانات…",
+  "Clay": "صلصال",
+  "Clay Noir": "صلصال داكن",
+  "Soft raised clay, warm sand": "صلصال ناعم بارز، رملي دافئ",
+  "Soft raised clay, after dark": "صلصال ناعم بارز، داكن",
+  "Add demo business": "إضافة نشاط تجريبي",
+  "Add demo business →": "إضافة نشاط تجريبي ←",
 };

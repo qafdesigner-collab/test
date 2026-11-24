@@ -291,7 +291,7 @@ function systemPanel(x) {
   return panel(
     'System · updates and backups',
     `<div class="panel-body"><div class="detail-grid"><div><p><b>Version</b> ${esc(x.version)}<br><b>Database</b> ${esc(x.database === 'sqlite' ? 'SQLite file' : 'MySQL / MariaDB')}<br><b>PHP</b> ${esc(x.php)}</p>${pending ? `<div class="notice"><b>${pending} database update${pending > 1 ? 's' : ''} waiting.</b> New program files were uploaded. Back up first, then apply the update.</div>` : '<p class="muted">The database is up to date.</p>'}</div><div><p class="form-hint">Daily automatic backup (cPanel → Cron Jobs → once per day):</p><pre class="cron-line">php ${esc(x.artisan)} erp:backup-auto</pre><p class="tiny muted">Keeps the newest 14 backups in perfume-erp/storage/app/backups. Also keep cPanel's own backups switched on.</p></div></div>${backups}</div>`,
-    `<button class="secondary" onclick="systemPasswordDialog('backup')">Download backup now</button><button class="secondary" onclick="uploadUpdateDialog()">Upload update</button>${pending ? '<button class="primary" onclick="systemPasswordDialog(\'update\')">Apply update</button>' : ''}`,
+    `<button class="secondary" onclick="systemPasswordDialog('backup')">Download backup now</button><button class="secondary" onclick="uploadUpdateDialog()">Upload update</button>${x.demo_available ? '<button class="secondary" onclick="demoDialog()">Add demo business</button>' : ''}${pending ? '<button class="primary" onclick="systemPasswordDialog(\'update\')">Apply update</button>' : ''}`,
   );
 }
 
@@ -378,5 +378,18 @@ function uploadUpdateDialog() {
     status(`Updated from ${done.from} to ${done.version}. Reloading…`);
     toast(`Updated to ${done.version}`);
     setTimeout(() => location.reload(), 1500);
+  });
+}
+
+/** Fill an empty installation with a fictional business: 90 days of sales, purchases, production and expenses. */
+function demoDialog() {
+  modal(
+    'Add demo business',
+    `<form><p class="form-hint">Adds a fictional perfume business so you can try every page: 22 products, 13 customers and suppliers, 90 days of POS and wholesale sales, purchases, production batches, expenses, shifts, loyalty points and design projects. Only possible while there are no sales or purchases. Remove it later by reinstalling or restoring a backup.</p>${field('Your password', 'password', '', 'password')}${formActions('Add demo business')}</form>`,
+  );
+  bindForm(async fd => {
+    const r = await api('system/demo', 'POST', { password: fd.get('password') });
+    toast(`Demo business added · ${r.documents} documents`);
+    setTimeout(() => location.reload(), 1200);
   });
 }

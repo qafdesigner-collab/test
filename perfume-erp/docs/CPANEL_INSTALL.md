@@ -77,7 +77,7 @@ Give products an **Arabic name** (Catalogue → Edit product) so it prints under
 ## Look and feel
 
 Use the theme and language buttons at the top right to choose Light, Dark, Auto, Obsidian, Maison or
-Oud and English or Arabic. Each computer or phone remembers its own choice; new devices start in
+Oud, Clay or Clay Noir and English or Arabic. Each computer or phone remembers its own choice; new devices start in
 Obsidian. Company & access → Edit company also takes a large photo for the sign-in page. Fonts are included in the package, so nothing is loaded
 from the internet. After updating from an older version, click **Apply update** in Company & access →
 System: this also adds the note pyramids and new references to the inspiration library.

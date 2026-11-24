@@ -39,3 +39,10 @@ changes), browser screenshots, a rebuilt cPanel ZIP, a commit and a push to
 - [x] 17. Library data: 500+ widely used designer, niche and Middle Eastern references with note pyramids and families
 - [x] 18. Reference photos: upload your own photo per reference, plus a "search the web" link (no bundled brand photos)
 - [x] 19. Final pass for 0.8.0: tests on SQLite and MySQL, every page in each theme (English and Arabic), fresh cPanel install, docs
+
+## Phase 4 (0.9 – 0.10)
+- [x] 20. Inspiration library in the side menu; theme and language in the top bar; sign-in page photo; product photo button
+- [x] 21. Version visible to the owner only; install updates from System → Upload update
+- [x] 22. Clay and Clay Noir themes (soft raised surfaces)
+- [x] 23. Full demo business: 90 days of sales, purchases, production, expenses, shifts, loyalty and projects
+- [ ] 24. Real product photos for the demo (free-licence photos; needs an image source this environment may use)

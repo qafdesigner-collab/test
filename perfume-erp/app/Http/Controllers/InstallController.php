@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Services\Installation;
+use Database\Seeders\DemoBusinessSeeder;
 use Database\Seeders\InspirationLibrarySeeder;
-use Database\Seeders\PerfumeSeeder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -86,7 +86,7 @@ class InstallController extends Controller
             Installation::createOwner($v['name'], strtolower($v['email']), $v['password'], $v['company_name'], strtoupper($v['currency']));
             (new InspirationLibrarySeeder)->run();
             if ($r->boolean('demo') && ! DB::table('products')->exists()) {
-                (new PerfumeSeeder)->run();
+                (new DemoBusinessSeeder)->run();
                 foreach (['company_name' => $v['company_name'], 'currency' => strtoupper($v['currency']), 'email' => strtolower($v['email'])] as $key => $value) {
                     DB::table('settings')->updateOrInsert(['key' => $key], ['value' => $value]);
                 }

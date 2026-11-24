@@ -150,7 +150,7 @@ async function render() {
   }
 }
 
-const THEMES = { light: 'Light', dark: 'Dark', auto: 'Auto', obsidian: 'Obsidian', maison: 'Maison', oud: 'Oud' };
+const THEMES = { light: 'Light', dark: 'Dark', auto: 'Auto', obsidian: 'Obsidian', maison: 'Maison', oud: 'Oud', clay: 'Clay', 'clay-noir': 'Clay Noir' };
 
 /** Swatches shown in the theme picker: background, surface, accent, text. */
 const THEME_SWATCHES = {
@@ -160,6 +160,8 @@ const THEME_SWATCHES = {
   obsidian: ['#0d0e10', '#1b1e22', '#cbb48a', '#ece6da', 'Black with champagne gold'],
   maison: ['#f6f3ed', '#fffdf9', '#121212', '#a68a52', 'Ivory couture with a gold thread'],
   oud: ['#0a1411', '#13251f', '#b8935a', '#efe8d8', 'Deep emerald with brushed brass'],
+  clay: ['#ede5da', '#f6f0e8', '#b9875a', '#3b3026', 'Soft raised clay, warm sand'],
+  'clay-noir': ['#2a2521', '#312b26', '#d2a574', '#f1e7da', 'Soft raised clay, after dark'],
 };
 
 function setTheme(theme) {

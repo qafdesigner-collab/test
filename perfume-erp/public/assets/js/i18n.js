@@ -70,6 +70,7 @@ const I18N_PATTERNS = [
   [/^Uploading… (\d+)%$/, 'جارٍ الرفع… $1%'],
   [/^Updated from ([\d.]+) to ([\d.]+)\. Reloading…$/, 'تم التحديث من $1 إلى $2. جارٍ إعادة التحميل…'],
   [/^Updated to ([\d.]+)$/, 'تم التحديث إلى $1'],
+  [/^Demo business added · (\d+) documents$/, 'تمت إضافة النشاط التجريبي · $1 مستند'],
 ];
 
 const I18N_EXTRA = {

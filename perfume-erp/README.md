@@ -1,4 +1,4 @@
-# Atelier Perfume ERP — release 0.9.1
+# Atelier Perfume ERP — release 0.10.0
 
 A working Laravel 13 / PHP 8.3 application for a perfume company, with a responsive browser interface in English and Arabic, and a separate database per installation (MySQL/MariaDB or SQLite). No shared demonstration password is shipped.
 
@@ -18,13 +18,9 @@ Linux/macOS: `bash setup.sh`, then `bash start-local.sh`. The packaged vendor de
 
 ## Fictional demonstration data
 
-A fresh installation is empty. To explore the catalogue with six fictional fragrances and sample materials, use `php artisan erp:install --demo` **instead of** the normal installer owner step, on a freshly migrated database with no users. Alternatively, after normal setup and before creating any products, run:
+A fresh installation is empty. Tick "Add demo data" in the installer, or (owner) Company & access → System → **Add demo business** while there are no sales yet, or run `php artisan erp:demo`: this adds a fictional perfume business with 22 products, 13 customers and suppliers and 90 days of POS and wholesale sales, purchases, production batches, expenses, shifts, loyalty and design projects.
 
-```sh
-php artisan db:seed --class=Database\\Seeders\\PerfumeSeeder
-```
-
-On Windows PowerShell, pass the class as `'Database\Seeders\PerfumeSeeder'`. The seeder refuses to run over an existing product catalogue. Demo records, reference names and placeholder bottle art are fictional. There is no third-party brand photography. Upload your own product photos using Catalogue → product → Manage images.
+Demo records, names and placeholder bottle art are fictional; there is no third-party brand photography. Upload your own photos with the camera button on each product card.
 
 ## Core workflows
 
@@ -35,7 +31,7 @@ On Windows PowerShell, pass the class as `'Database\Seeders\PerfumeSeeder'`. The
 - **Wholesale:** quotations convert to invoices in one click. Customer price lists (fixed prices or a discount %) apply automatically. Posted invoices deduct stock; credit is checked against the customer's limit. Full and partial returns, payments capped at the balance, bilingual UAE tax invoices and customer statements with ageing.
 - **POS:** open a shift, scan or pick products, hold baskets, split payments (cash/card/bank) with change, loyalty points (earn and redeem), 80 mm receipts, and an end-of-day Z report. Cashiers cannot override prices. Card terminals and cash drawers are not connected.
 - **Finance:** expenses by category, monthly profit & loss, receivables ageing and product profitability.
-- **Themes:** use the theme button in the top bar (next to the language button) to choose Light, Dark, Auto, Obsidian (black and champagne gold), Maison (ivory couture) or Oud (emerald and brass). The choice is saved per device; printouts always use the light theme.
+- **Themes:** use the theme button in the top bar (next to the language button) to choose Light, Dark, Auto, Obsidian (black and champagne gold), Maison (ivory couture), Oud (emerald and brass), Clay or Clay Noir (soft raised clay surfaces). The choice is saved per device; printouts always use the light theme.
 - **Inspiration library:** its own page in the menu lists 546 reference perfumes with top, heart and base notes. Search by name or note, filter by family or audience, add your own photo, or open a web image search. Notes are summaries: have your perfumer confirm them.
 - **Photos:** change a product photo from the camera button on its card; upload a large photo for the sign-in page in Company & access → Edit company.
 - **Security:** roles per user; owners and managers can switch on two-step sign-in with an authenticator app (click your name in the menu).

@@ -189,5 +189,8 @@
   "The uploaded file is not a valid ZIP file.": "الملف المرفوع ليس ملف ZIP صالحًا.",
   "The upload was interrupted. Start again.": "انقطع الرفع. ابدأ من جديد.",
   "The upload is larger than announced. Start again.": "الملف أكبر من الحجم المعلن. ابدأ من جديد.",
-  "The upload is incomplete. Start again.": "الرفع غير مكتمل. ابدأ من جديد."
+  "The upload is incomplete. Start again.": "الرفع غير مكتمل. ابدأ من جديد.",
+  "Demo data can only be added to an installation without sales or purchases.": "لا يمكن إضافة البيانات التجريبية إلا إلى تثبيت بلا مبيعات أو مشتريات.",
+  "Demo data can only be added to an empty catalogue or the sample catalogue.": "لا يمكن إضافة البيانات التجريبية إلا إلى كتالوج فارغ أو الكتالوج التجريبي.",
+  "Create the owner account before adding demo data.": "أنشئ حساب المالك قبل إضافة البيانات التجريبية."
 }

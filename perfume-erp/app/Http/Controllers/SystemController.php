@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Services\Backup;
 use App\Services\UpdatePackage;
+use Database\Seeders\DemoBusinessSeeder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class SystemController extends Controller
@@ -30,6 +32,7 @@ class SystemController extends Controller
             'artisan' => base_path('artisan'),
             'pending_updates' => $this->pendingMigrations(),
             'backups' => Backup::automaticBackups(),
+            'demo_available' => ! DB::table('documents')->exists(),
         ];
     }
 
@@ -134,6 +137,26 @@ class SystemController extends Controller
         if ($upload && is_file($this->packagePath($upload['id']))) {
             unlink($this->packagePath($upload['id']));
         }
+    }
+
+    /**
+     * Add the full demo business (90 days of history) to an installation without sales or purchases.
+     *
+     * @return array<string, mixed>
+     */
+    public function demo(Request $r): array
+    {
+        $this->ownerOnly();
+        $this->confirmPassword($r);
+        @set_time_limit(300);
+        try {
+            (new DemoBusinessSeeder)->run();
+        } catch (RuntimeException $e) {
+            throw ValidationException::withMessages(['demo' => $e->getMessage()]);
+        }
+        $this->audit('system.demo_added', 'database');
+
+        return ['documents' => DB::table('documents')->count()];
     }
 
     /**
