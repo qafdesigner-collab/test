@@ -108,4 +108,21 @@ class StockControlTest extends TestCase
         $sell('2')->assertUnprocessable()->assertJsonFragment(['Not enough unexpired stock for Ocean Breeze. Expired lots cannot be sold or used.']);
         $this->assertSame(1000, $this->quantity(1, 'LOT-LATE'));
     }
+
+    public function test_reorder_suggestions_count_open_orders_and_group_by_last_supplier(): void
+    {
+        DB::table('products')->update(['reorder_milli' => 0]);
+        DB::table('products')->where('id', 7)->update(['reorder_milli' => 30000000]);
+        $this->postOnce('/api/documents', ['kind' => 'Purchase', 'contact_id' => 2, 'location_id' => 1, 'method' => 'Credit', 'paid' => '0', 'lines' => [['product_id' => 7, 'quantity' => '1', 'price' => '2.50']]])->assertOk();
+        $stock = (int) DB::table('balances')->where('product_id', 7)->sum('quantity_milli');
+
+        $group = $this->getJson('/api/reorder')->assertOk()->json('groups.0');
+        $this->assertSame(2, $group['supplier_id']);
+        $this->assertSame(['product_id' => 7, 'on_order_milli' => 0, 'suggested_milli' => 60000000 - $stock, 'last_cost_cents' => 250], array_intersect_key($group['items'][0], array_flip(['product_id', 'on_order_milli', 'suggested_milli', 'last_cost_cents'])));
+
+        $this->postOnce('/api/documents', ['kind' => 'PurchaseOrder', 'contact_id' => 2, 'location_id' => 1, 'method' => 'Credit', 'paid' => '0', 'lines' => [['product_id' => 7, 'quantity' => '5000']]])->assertOk();
+        $this->assertSame(5000000, $this->getJson('/api/reorder')->json('groups.0.items.0.on_order_milli'));
+        $this->postOnce('/api/documents', ['kind' => 'PurchaseOrder', 'contact_id' => 2, 'location_id' => 1, 'method' => 'Credit', 'paid' => '0', 'lines' => [['product_id' => 7, 'quantity' => '20000']]])->assertOk();
+        $this->assertSame([], $this->getJson('/api/reorder')->json('groups'));
+    }
 }

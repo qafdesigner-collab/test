@@ -4,6 +4,7 @@
 async function documentsPage(purchase) {
   await loadLists();
   const d = await api('documents' + (purchase ? '?kind=Purchase,PurchaseOrder,SupplierReturn' : ''));
+  const reorder = purchase && can('manager', 'warehouse', 'accountant') ? (await api('reorder')).groups : [];
   const orders = purchase ? d.documents.filter(x => x.kind === 'PurchaseOrder') : [];
   const docs = purchase ? d.documents.filter(x => ['Purchase', 'SupplierReturn'].includes(x.kind)) : d.documents.filter(x => !['Purchase', 'PurchaseOrder', 'SupplierReturn'].includes(x.kind));
   $('#content').innerHTML =
@@ -15,6 +16,7 @@ async function documentsPage(purchase) {
       `<button class="secondary" onclick="contactsDialog('${purchase ? 'supplier' : 'customer'}')">${purchase ? 'Suppliers' : 'Customers'}</button>${purchase ? `<button class="secondary" onclick="documentDialog('PurchaseOrder')">+ Purchase order</button>` : `<button class="secondary" onclick="documentDialog('Quotation')">+ Quotation</button>`}<button class="primary" onclick="documentDialog('${purchase ? 'Purchase' : 'Invoice'}')">+ ${purchase ? 'Receive purchase' : 'Create invoice'}</button>`,
     ) +
     `<div class="notice">${purchase ? 'Place a purchase order with a supplier, then receive goods against it as they arrive, in one or several deliveries. Receiving adds stock at the ordered price. "Receive purchase" records goods that arrived without an order. To send goods back, open the purchase receipt and choose "Return to supplier".' : 'Invoices deduct stock immediately. Quotations do not reserve or deduct stock. Separate sales orders, partial deliveries and partial returns are later-stage features.'}</div>` +
+    (reorder.length ? reorderPanel(reorder) : '') +
     (purchase
       ? panel(
           'Purchase orders',
@@ -567,4 +569,41 @@ async function priceListDialog(id) {
     closeModal();
     toast('Price list saved');
   });
+}
+
+
+/* ── Reorder suggestions ───────────────────────────────────────────────── */
+
+function reorderPanel(groups) {
+  state.reorder = groups;
+  const suppliers = state.contacts.filter(c => c.kind === 'supplier');
+  return panel(
+    'Reorder suggestions',
+    `<div class="panel-body"><p class="muted">Stock plus open orders is at or below the reorder level. Suggested quantities top stock up to twice the reorder level; change them before ordering.</p>${groups
+      .map(
+        (g, gi) => `<div class="reorder-group" data-group="${gi}"><div class="reorder-head">${g.supplier_id ? `<b>${esc(g.supplier)}</b><small>Last supplier</small>` : `<label>Supplier<select data-supplier>${options(suppliers, 'name', '', 'Choose a supplier…')}</select></label>`}<button class="primary" onclick="createReorder(${gi})">Create purchase order →</button></div>
+        ${table(
+          ['Product', 'In stock', 'On order', 'Reorder level', 'Last cost', 'Order quantity'],
+          g.items.map(i => `<tr><td><b>${esc(i.name)}</b><small>${esc(i.sku)}</small></td><td>${quantity(i.stock_milli)} ${esc(i.unit)}</td><td>${quantity(i.on_order_milli)}</td><td>${quantity(i.reorder_milli)}</td><td>${money(i.last_cost_cents)}</td><td><input class="reorder-qty" data-product="${i.product_id}" data-cost="${i.last_cost_cents}" inputmode="decimal" value="${i.suggested_milli / 1000}" aria-label="Quantity of ${esc(i.name)} to order"></td></tr>`),
+        )}</div>`,
+      )
+      .join('')}</div>`,
+  );
+}
+
+async function createReorder(index) {
+  const box = document.querySelector(`.reorder-group[data-group="${index}"]`);
+  const g = state.reorder[index];
+  const supplier = g.supplier_id || Number(box.querySelector('[data-supplier]')?.value);
+  if (!supplier) return toast('Choose a supplier first.');
+  const lines = [...box.querySelectorAll('.reorder-qty')].filter(i => Number(i.value) > 0).map(i => ({ product_id: Number(i.dataset.product), quantity: i.value.trim(), price: decimal(Number(i.dataset.cost)) }));
+  if (!lines.length) return toast('Enter a quantity for at least one product.');
+  try {
+    const r = await api('documents', 'POST', { kind: 'PurchaseOrder', contact_id: supplier, location_id: state.location, method: 'Credit', paid: '0', lines });
+    toast(r.number + ' ordered');
+    await render();
+    await documentDetail(r.id);
+  } catch (e) {
+    toast(e.message);
+  }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Amounts;
 use App\Services\Documents;
+use App\Services\Reorder;
 use App\Services\Stock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -79,5 +80,15 @@ class InventoryController extends ErpBaseController
 
         return ['counts' => DB::table('stock_counts as c')->join('locations as l', 'l.id', '=', 'c.location_id')->join('users as u', 'u.id', '=', 'c.user_id')
             ->whereNotNull('c.number')->select('c.*', 'l.name as location', 'u.name as user')->orderByDesc('c.id')->limit(30)->get()];
+    }
+
+    /**
+     * Products to reorder, grouped by supplier.
+     */
+    public function reorder()
+    {
+        $this->allow(['manager', 'warehouse', 'accountant']);
+
+        return ['groups' => Reorder::suggestions()];
     }
 }

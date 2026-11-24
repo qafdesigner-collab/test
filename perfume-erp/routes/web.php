@@ -58,6 +58,7 @@ Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
         Route::get('inventory', [InventoryController::class, 'inventory']);
         Route::post('stock', [InventoryController::class, 'stock']);
         Route::post('lots/expiry', [InventoryController::class, 'lotExpiry']);
+        Route::get('reorder', [InventoryController::class, 'reorder']);
         Route::match(['get', 'post'], 'stock-counts', [InventoryController::class, 'counts']);
         Route::get('documents', [DocumentController::class, 'documents']);
         Route::post('documents', [DocumentController::class, 'createDocument']);
