@@ -36,7 +36,9 @@ class ShiftController extends ErpBaseController
 
                 return ['id' => $shift->id, 'variance_cents' => $amount - ($shift->opening_cents + $cash)];
             });
-        }$rows = DB::table('shifts')->where('user_id', Auth::id())->orderByDesc('id')->limit(20)->get();
+        }$everyone = $r->boolean('all') && in_array(Auth::user()->role, ['owner', 'manager']);
+        $rows = DB::table('shifts as s')->join('users as u', 'u.id', '=', 's.user_id')->when(! $everyone, fn ($q) => $q->where('s.user_id', Auth::id()))
+            ->select('s.*', 'u.name as cashier')->orderByDesc('s.id')->limit($everyone ? 60 : 20)->get();
         foreach ($rows as $s) {
             $s->expected_cents = $s->opening_cents + $this->shiftCash($s);
         }
@@ -54,5 +56,39 @@ class ShiftController extends ErpBaseController
         $expenses = DB::table('expenses')->where('user_id', $s->user_id)->where('from_drawer', true)->whereNull('voided_at')->whereBetween('created_at', [$s->opened_at, $end])->sum('amount_cents');
 
         return (int) $received - (int) $refunds - (int) $expenses;
+    }
+
+    /**
+     * End-of-day (Z) report for one shift: sales, VAT, payments by method, refunds, drawer expenses and cash.
+     */
+    public function report(int $id)
+    {
+        $this->allow(['manager', 'cashier']);
+        $s = DB::table('shifts as s')->join('users as u', 'u.id', '=', 's.user_id')->where('s.id', $id)->select('s.*', 'u.name as cashier')->first();
+        abort_unless($s, 404);
+        if (Auth::user()->role === 'cashier') {
+            abort_unless($s->user_id === Auth::id(), 403);
+        }
+        $end = $s->closed_at ?? now();
+        $sales = DB::table('documents')->where('user_id', $s->user_id)->whereIn('kind', ['Sale', 'Invoice'])->whereIn('status', ['Posted', 'Returned'])->whereBetween('created_at', [$s->opened_at, $end]);
+        $returns = DB::table('documents')->where('user_id', $s->user_id)->where('kind', 'Return')->whereBetween('created_at', [$s->opened_at, $end]);
+        $payments = DB::table('payments as p')->join('documents as d', 'd.id', '=', 'p.document_id')->where('p.user_id', $s->user_id)->whereIn('d.kind', ['Sale', 'Invoice'])
+            ->whereBetween('p.created_at', [$s->opened_at, $end])->groupBy('p.method')->selectRaw('p.method, COUNT(*) as count, SUM(p.amount_cents) as amount')->get();
+        $refunds = (clone $returns)->get(['method', 'paid_cents', 'cash_refund_cents']);
+        $expenses = DB::table('expenses')->where('user_id', $s->user_id)->where('from_drawer', true)->whereNull('voided_at')->whereBetween('created_at', [$s->opened_at, $end])->get(['number', 'category', 'description', 'amount_cents']);
+        $items = DB::table('document_lines as l')->join('documents as d', 'd.id', '=', 'l.document_id')->where('d.user_id', $s->user_id)->whereIn('d.kind', ['Sale', 'Invoice'])
+            ->whereIn('d.status', ['Posted', 'Returned'])->whereBetween('d.created_at', [$s->opened_at, $end])
+            ->groupBy('l.product_id', 'l.name', 'l.unit')->select('l.name', 'l.unit')->selectRaw('SUM(l.quantity_milli) as quantity_milli, SUM(l.total_cents) as total_cents')->orderByDesc('total_cents')->limit(10)->get();
+        $cash = $this->shiftCash($s);
+
+        return [
+            'shift' => $s,
+            'sales' => ['count' => (clone $sales)->count(), 'net_cents' => (int) (clone $sales)->sum('subtotal_cents'), 'vat_cents' => (int) (clone $sales)->sum('tax_cents'), 'total_cents' => (int) (clone $sales)->sum('total_cents'), 'discount_cents' => (int) DB::table('document_lines')->whereIn('document_id', (clone $sales)->select('id'))->sum('discount_cents')],
+            'payments' => $payments->map(fn ($p) => ['method' => $p->method, 'count' => (int) $p->count, 'amount_cents' => (int) $p->amount])->values(),
+            'returns' => ['count' => $refunds->count(), 'refund_cents' => (int) $refunds->sum('paid_cents'), 'cash_refund_cents' => (int) $refunds->sum(fn ($r) => $r->cash_refund_cents ?? ($r->method === 'Cash' ? $r->paid_cents : 0))],
+            'expenses' => $expenses,
+            'cash' => ['opening_cents' => (int) $s->opening_cents, 'movement_cents' => $cash, 'expected_cents' => (int) $s->opening_cents + $cash, 'counted_cents' => $s->counted_cents === null ? null : (int) $s->counted_cents, 'variance_cents' => $s->variance_cents === null ? null : (int) $s->variance_cents],
+            'items' => $items->map(fn ($i) => ['name' => $i->name, 'unit' => $i->unit, 'quantity_milli' => (int) $i->quantity_milli, 'total_cents' => (int) $i->total_cents])->values(),
+        ];
     }
 }

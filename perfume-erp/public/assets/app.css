@@ -2628,3 +2628,7 @@ tr.total-row td { border-top: 2px solid var(--line) !important; }
 .reorder-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; background: var(--accent-soft); flex-wrap: wrap; }
 .reorder-head b { display: block; } .reorder-head small { color: var(--muted); }
 .reorder-qty { max-width: 110px; }
+.z-report .stats { margin-bottom: 16px; }
+.z-cash { width: 100%; }
+.ok-text { color: var(--status-good); font-weight: 600; }
+.due-text { color: var(--status-warning); font-weight: 600; }

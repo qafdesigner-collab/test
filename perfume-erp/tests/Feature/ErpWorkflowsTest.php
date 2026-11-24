@@ -601,4 +601,39 @@ class ErpWorkflowsTest extends TestCase
         $sale = $this->postOnce('/api/documents', ['kind' => 'Sale', 'contact_id' => 1, 'location_id' => 1, 'lines' => [['product_id' => 1, 'quantity' => '1']], 'payments' => [['method' => 'Cash', 'amount' => '100.00']]])->assertOk()->json();
         $this->assertSame(10000, (int) DB::table('documents')->where('id', $sale['id'])->value('total_cents'));
     }
+
+    public function test_end_of_day_report_reconciles_the_cash_drawer(): void
+    {
+        $cashier = User::factory()->create(['role' => 'cashier', 'name' => 'Sara']);
+        $this->actingAs($cashier);
+        $this->postOnce('/api/shifts', ['action' => 'open', 'amount' => '200.00'])->assertOk();
+        $sale = fn (array $payments) => $this->postOnce('/api/documents', ['kind' => 'Sale', 'location_id' => 1, 'lines' => [['product_id' => 1, 'quantity' => '1']], 'payments' => $payments])->assertOk()->json();
+        $sale([['method' => 'Cash', 'amount' => '125.00']]);
+        $sale([['method' => 'Card', 'amount' => '125.00']]);
+        $split = $sale([['method' => 'Cash', 'amount' => '25.00'], ['method' => 'Card', 'amount' => '100.00']]);
+
+        $this->actingAs($this->owner);
+        $this->postOnce('/api/documents/'.$split['id'], ['action' => 'return', 'condition' => 'Restock'])->assertOk();
+        $this->actingAs($cashier);
+        $shift = DB::table('shifts')->where('user_id', $cashier->id)->first();
+        DB::table('documents')->where('kind', 'Return')->update(['user_id' => $cashier->id]);
+        DB::table('expenses')->insert(['number' => 'EXP-T1', 'spent_on' => now()->toDateString(), 'category' => 'Other', 'description' => 'Water', 'amount_cents' => 1000, 'method' => 'Cash', 'from_drawer' => true, 'user_id' => $cashier->id, 'created_at' => now(), 'updated_at' => now()]);
+        $closed = $this->postOnce('/api/shifts', ['action' => 'close', 'amount' => '310.00'])->assertOk()->json();
+
+        $report = $this->getJson('/api/shifts/'.$shift->id.'/report')->assertOk()->json();
+        $this->assertSame(3, $report['sales']['count']);
+        $this->assertSame(37500, $report['sales']['total_cents']);
+        $this->assertSame(['Card' => 22500, 'Cash' => 15000], collect($report['payments'])->sortBy('method')->pluck('amount_cents', 'method')->all());
+        $this->assertSame([1, 12500, 2500], [$report['returns']['count'], $report['returns']['refund_cents'], $report['returns']['cash_refund_cents']]);
+        $this->assertSame(20000 + 15000 - 2500 - 1000, $report['cash']['expected_cents']);
+        $this->assertSame(31000 - 31500, $report['cash']['variance_cents']);
+        $this->assertSame($closed['variance_cents'], $report['cash']['variance_cents']);
+
+        $other = User::factory()->create(['role' => 'cashier']);
+        $this->actingAs($other);
+        $this->getJson('/api/shifts/'.$shift->id.'/report')->assertForbidden();
+        $this->getJson('/api/shifts?all=1')->assertOk()->assertJsonCount(0, 'shifts');
+        $this->actingAs(User::factory()->create(['role' => 'manager']));
+        $this->assertContains('Sara', array_column($this->getJson('/api/shifts?all=1')->json('shifts'), 'cashier'));
+    }
 }

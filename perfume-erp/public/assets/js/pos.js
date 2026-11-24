@@ -9,7 +9,7 @@ async function posPage() {
     pageHead(
       'Point of sale',
       'Find a fragrance. Build the basket. Make their day.',
-      `<button class="secondary" onclick="shiftDialog()">${state.openShift ? 'Close shift' : 'Open shift'} · ${state.openShift ? 'active' : 'required'}</button>`,
+      `<button class="secondary" onclick="shiftListDialog()">Shift reports</button><button class="secondary" onclick="shiftDialog()">${state.openShift ? 'Close shift' : 'Open shift'} · ${state.openShift ? 'active' : 'required'}</button>`,
     ) +
     (!state.openShift ? '<div class="notice">Open your cashier shift before posting a sale.</div>' : '') +
     `<div class="pos-layout"><section>${catalogueToolbar(true)}<div id="product-results"><div class="catalogue">${filteredProducts(
@@ -254,13 +254,14 @@ function shiftDialog() {
   const s = state.openShift;
   modal(
     s ? 'Close cashier shift' : 'Open cashier shift',
-    `<form>${s ? `<p>Expected cash: <b>${money(s.expected_cents)}</b></p><p class="muted tiny">Opening float plus cash receipts less recorded cash refunds.</p>` : ''}${field(s ? 'Counted cash' : 'Opening cash float', 'amount', '0.00')}${formActions(s ? 'Close shift' : 'Open shift')}</form>`,
+    `<form>${s ? `<p>Expected cash: <b>${money(s.expected_cents)}</b></p><p class="muted tiny">Opening float plus cash receipts less cash refunds and cash expenses paid from the drawer.</p>` : ''}${field(s ? 'Counted cash' : 'Opening cash float', 'amount', '0.00')}${formActions(s ? 'Close shift' : 'Open shift')}</form>`,
   );
   bindForm(async (fd, key) => {
     const r = await api('shifts', 'POST', { action: s ? 'close' : 'open', amount: fd.get('amount') }, key);
     closeModal();
     toast(s ? 'Shift closed · variance ' + money(r.variance_cents) : 'Shift opened');
     await posPage();
+    if (s) await shiftReport(r.id);
   });
 }
 
@@ -278,4 +279,75 @@ function cartSet(id, value) {
   const line = state.cart.find(l => l.id === id);
   line.qty = Number(value);
   cartRender();
+}
+
+
+/* ── End-of-day (Z) report ─────────────────────────────────────────────── */
+
+async function shiftListDialog() {
+  const d = await api('shifts' + (can('manager') ? '?all=1' : ''));
+  modal(
+    'Shift reports',
+    table(
+      ['Cashier', 'Opened', 'Closed', 'Expected cash', 'Counted', 'Difference', ''],
+      d.shifts.map(
+        s => `<tr><td>${esc(s.cashier)}</td><td>${dateTime(s.opened_at)}</td><td>${s.closed_at ? dateTime(s.closed_at) : badge('Open')}</td><td>${money(s.expected_cents)}</td><td>${s.counted_cents === null ? '—' : money(s.counted_cents)}</td><td>${s.variance_cents === null ? '—' : varianceText(s.variance_cents)}</td><td><button class="subtle" onclick="shiftReport(${s.id})">Report</button></td></tr>`,
+      ),
+      'No shifts yet.',
+    ),
+    true,
+  );
+}
+
+function dateTime(value) {
+  return new Date(String(value).replace(' ', 'T')).toLocaleString('en', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function varianceText(cents) {
+  return cents === 0 ? '<span class="ok-text">0.00 ✓</span>' : `<span class="${cents < 0 ? 'overdue' : 'due-text'}">${cents > 0 ? '+' : '−'}${money(Math.abs(cents))}</span>`;
+}
+
+async function shiftReport(id) {
+  const r = await api(`shifts/${id}/report`);
+  state.zReport = r;
+  const c = r.cash;
+  const row = (label, value) => `<tr><th>${label}</th><td>${value}</td></tr>`;
+  modal(
+    'End-of-day report',
+    `<article class="z-report">
+      <p class="muted">${esc(r.shift.cashier)} · ${dateTime(r.shift.opened_at)} – ${r.shift.closed_at ? dateTime(r.shift.closed_at) : 'still open'}</p>
+      <div class="stats">${statTile('Sales', money(r.sales.total_cents), `${r.sales.count} sale${r.sales.count === 1 ? '' : 's'} incl. VAT`)}${statTile('VAT collected', money(r.sales.vat_cents), 'Net ' + money(r.sales.net_cents))}${statTile('Refunds', money(r.returns.refund_cents), `${r.returns.count} return${r.returns.count === 1 ? '' : 's'}`)}${statTile('Cash difference', c.variance_cents === null ? 'Open' : varianceText(c.variance_cents), c.counted_cents === null ? 'Shift not closed yet' : 'Counted ' + money(c.counted_cents))}</div>
+      <div class="dashboard-grid"><div>
+      ${panel('Payments received', table(['Method', 'Payments', 'Amount'], r.payments.map(p => `<tr><td>${esc(p.method)}</td><td>${p.count}</td><td>${money(p.amount_cents)}</td></tr>`), 'No payments in this shift.'))}
+      ${panel('Best-selling items', table(['Item', 'Quantity', 'Total'], r.items.map(i => `<tr><td>${esc(i.name)}</td><td>${quantity(i.quantity_milli)} ${esc(i.unit)}</td><td>${money(i.total_cents)}</td></tr>`), 'No items sold.'))}
+      </div><div>
+      ${panel('Cash drawer', `<table class="ti-totals z-cash">${row('Opening float', money(c.opening_cents))}${row('Cash sales and payments', money(r.payments.filter(p => p.method === 'Cash').reduce((a, p) => a + p.amount_cents, 0)))}${row('Cash refunds', '−' + money(r.returns.cash_refund_cents))}${row('Cash expenses from drawer', '−' + money(r.expenses.reduce((a, e) => a + Number(e.amount_cents), 0)))}<tr class="grand"><th>Expected cash</th><td>${money(c.expected_cents)}</td></tr>${row('Counted cash', c.counted_cents === null ? '—' : money(c.counted_cents))}${row('Difference', c.variance_cents === null ? '—' : varianceText(c.variance_cents))}</table>`)}
+      ${r.expenses.length ? panel('Drawer expenses', table(['Expense', 'Amount'], r.expenses.map(e => `<tr><td>${esc(e.number)} · ${esc(e.description)}</td><td>${money(e.amount_cents)}</td></tr>`))) : ''}
+      </div></div></article><div class="form-actions"><button class="secondary" onclick="window.print()">Print A4 / save PDF</button><button class="primary" onclick="printZReport()">Print 80 mm</button></div>`,
+    true,
+  );
+}
+
+function printZReport() {
+  const r = state.zReport;
+  const s = state.boot.settings;
+  const c = r.cash;
+  const line = (en, ar, value) => `<tr><td>${en}<br><span class="ar">${ar}</span></td><td class="r">${value}</td></tr>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Z report</title><style>
+    @page { size: 80mm auto; margin: 4mm; } body { font: 12px/1.35 ui-monospace, Menlo, Consolas, monospace; width: 72mm; margin: 0; color: #000; }
+    .c { text-align: center; } .r { text-align: right; white-space: nowrap; vertical-align: top; } .ar { font-family: Tahoma, "Noto Sans Arabic", sans-serif; font-size: 11px; }
+    h1 { font-size: 15px; margin: 2px 0; } hr { border: 0; border-top: 1px dashed #000; margin: 6px 0; } table { width: 100%; border-collapse: collapse; } td { padding: 1px 0; }
+  </style></head><body>
+    <div class="c"><h1>${esc(s.company_name)}</h1><b>END OF DAY (Z) REPORT</b><br><span class="ar">تقرير نهاية اليوم</span></div><hr>
+    <p>Cashier / الكاشير: ${esc(r.shift.cashier)}<br>${dateTime(r.shift.opened_at)} – ${r.shift.closed_at ? dateTime(r.shift.closed_at) : 'open'}</p><hr>
+    <table>${line('Sales count', 'عدد المبيعات', r.sales.count)}${line('Net sales', 'صافي المبيعات', money(r.sales.net_cents))}${line('VAT', 'الضريبة', money(r.sales.vat_cents))}${line('Total sales', 'إجمالي المبيعات', '<b>' + money(r.sales.total_cents) + '</b>')}${line('Discounts', 'الخصومات', money(r.sales.discount_cents))}</table><hr>
+    <table>${r.payments.map(p => line(esc(p.method) + ' (' + p.count + ')', {Cash: 'نقدًا', Card: 'بطاقة', Bank: 'تحويل بنكي'}[p.method] || '', money(p.amount_cents))).join('')}${line('Refunds (' + r.returns.count + ')', 'المبالغ المستردة', '−' + money(r.returns.refund_cents))}</table><hr>
+    <table>${line('Opening float', 'الرصيد الافتتاحي', money(c.opening_cents))}${line('Expected cash', 'النقد المتوقع', '<b>' + money(c.expected_cents) + '</b>')}${line('Counted cash', 'النقد المعدود', c.counted_cents === null ? '—' : money(c.counted_cents))}${line('Difference', 'الفرق', c.variance_cents === null ? '—' : (c.variance_cents > 0 ? '+' : c.variance_cents < 0 ? '−' : '') + money(Math.abs(c.variance_cents)))}</table><hr>
+    <p class="c">Printed ${new Date().toLocaleString('en')}</p>
+    <script>window.addEventListener('load', () => window.print());<\/script></body></html>`;
+  const w = window.open('', '_blank', 'width=420,height=720');
+  if (!w) return toast('Allow pop-ups for this site to print.');
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
 }

@@ -75,6 +75,7 @@ Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
         Route::post('projects/{id}/artwork', [DesignProjectController::class, 'uploadArtwork'])->whereNumber('id');
         Route::get('artwork/{id}', [DesignProjectController::class, 'artwork'])->whereNumber('id');
         Route::match(['get', 'post'], 'shifts', [ShiftController::class, 'shifts']);
+        Route::get('shifts/{id}/report', [ShiftController::class, 'report'])->whereNumber('id');
         Route::match(['get', 'post'], 'settings', [CompanyController::class, 'settings']);
         Route::post('settings/logo', [CompanyController::class, 'logo']);
         Route::match(['get', 'post'], 'users', [CompanyController::class, 'users']);
