@@ -280,3 +280,28 @@ Scan trees:
 | Flipbook `Access-Control-Allow-Origin: *` | Cookie-less capability URLs; known HMAC/#11 family |
 | Workflow cpanel zip artifact | Built package, not secrets |
 | TradingView `alert()` | Not a vuln per prompt |
+
+---
+
+## Injection / XSS / SSRF / path hunt (2026-11-24 ~01:35 UTC) — NONE NEW
+
+Scan trees @ `6604b15` (API 1.4.20):
+- `/tmp/sec-scan/edubooks/edubooks/apps/api`
+- `/tmp/sec-scan/edubooks/edubooks/apps/web`
+- `/tmp/sec-scan/edubooks/edubooks/packaging`
+- `/tmp/sec-scan/edubooks/lms`
+
+**Result: NONE NEW** — no new MEDIUM+ complete attack chain beyond known exclusions (#1, #3, #8, #9, #11–#13, #15–#17, OCR pdftoppm, cPanel unzip, LMS CSP XSS / pick SQL, flip CORS).
+
+### Surfaces reviewed (held)
+
+| Area | Evidence | Why held |
+|---|---|---|
+| Command injection | `voice/piper.ts`, `ai/ocr.ts`, `ai/ocr-install.ts`, `ai/extract.ts`, `storage/pdf-compress.ts`, `packaging/cpanel/{app,embedded-db}.js` | `execFile`/`spawn` argv; allowlisted voice ids / langs; server tmp paths; no shell concatenation of user strings |
+| SSRF | piper/ocr-install fetch; `notifications/channels.ts`; AI settings; mail; system download | Fixed upstream or env-only webhook; known AI/mail/update SSRF families |
+| Path traversal | `files.controller`, chunked, flip `safeUnzip`+serve segs, LocalDriver, LMS `basename`, voicesDir | Root/prefix checks; hex upload ids; `VOICES[id]` gate |
+| XSS | `dangerouslySetInnerHTML` office-view/ai-chat; print-preview srcdoc; hotspots; training; whiteboard; games; branding | Known PPTX #15; other sinks escape or React text; hex colors; https URL checks |
+| Header / redirect / cookie | login `next=`, Content-Disposition, `eb_session` | Relative `next` only; filename sanitised; httpOnly+SameSite |
+| SQL | drizzle `sql\` / `sql.raw` / orderBy; LMS `pick`+`?` | Bound params; identifiers from schema/allowlists |
+| LMS | routes/auth/ai file serve | IDOR helpers; env AI URL; excluded seed/session/rate/CSP |
+| Packaging | public_html updater; cPanel updater unzip; restore tar | Known #16; unzip path checks held; restore needs FS write |
