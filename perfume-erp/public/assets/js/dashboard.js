@@ -109,7 +109,7 @@ async function dashboardPage() {
   const d = await api('dashboard');
   const s = d.sales;
   const first = esc(state.boot.user.name.split(' ')[0]);
-  const today = new Date().toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long' });
+  const today = new Date().toLocaleDateString(state.lang === 'ar' ? 'ar-AE-u-nu-latn' : 'en', { weekday: 'long', day: 'numeric', month: 'long' });
   const stats = s
     ? statTile('Sales · last 30 days', money(s.period.revenue_cents), `${s.period.documents} posted sales and invoices`, deltaBadge(s.period.revenue_cents, s.period.previous_revenue_cents)) +
       statTile(

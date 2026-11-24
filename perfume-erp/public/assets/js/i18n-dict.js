@@ -732,4 +732,5 @@ const I18N_DICT = {
   "Copy is not available. Write the codes down or print them.": "النسخ غير متاح. اكتب الرموز أو اطبعها.",
   "Two-step sign-in reset": "أُعيد ضبط التحقق بخطوتين",
   "The QR code could not be loaded. Type the key into your app instead.": "تعذّر تحميل رمز QR. اكتب المفتاح في التطبيق بدلًا من ذلك.",
+  "Too Many Attempts.": "محاولات كثيرة. حاول مرة أخرى بعد دقيقة.",
 };

@@ -1,4 +1,4 @@
-# Atelier Perfume ERP — release 0.6.0
+# Atelier Perfume ERP — release 0.7.0
 
 A working Laravel 13 / PHP 8.3 application for a perfume company, with a responsive browser interface in English and Arabic, and a separate database per installation (MySQL/MariaDB or SQLite). No shared demonstration password is shipped.
 
@@ -29,12 +29,15 @@ On Windows PowerShell, pass the class as `'Database\Seeders\PerfumeSeeder'`. The
 ## Core workflows
 
 - **Products:** add finished perfumes/materials/packaging/services, scent families and notes, style, actual origin, audience, concentration, internal inspiration reference, SKU/barcode, base units and prices. Use custom comma-separated families/tags. Add photos, choose a cover or remove a photo.
-- **Inventory:** opening balances and adjustments require a reason. Transfers move a particular lot between locations. Quantities use the defined base unit; conversion between cartons/bottles or mass/volume is not implemented.
-- **Purchases:** post a purchase receipt; goods immediately enter the selected location. This is not a separate purchase-order/partial-receipt workflow.
-- **Wholesale:** draft quotations do not move stock or accept payment. Managers can accept/decline them. Posted invoices immediately deduct stock; credit is checked against the customer's configured limit. Record payments separately. Full sale returns can restock or record a non-restocked return; actual card/bank refunds must be processed externally.
-- **POS:** open a cashier shift, select products or search a barcode, fill the basket and post a sale. Closing a shift compares counted cash against its opening float and recorded cash receipts/refunds. Cashiers cannot override prices or discounts. This version records one payment method per sale; split tenders and terminal connections are pending.
+- **Labels:** generate EAN-13 barcodes for products without one and print product or shelf labels (name, Arabic name, price, barcode) on A4 sheets or a label printer.
+- **Inventory:** opening balances and adjustments require a reason. Transfers move a particular lot between locations. Lots can carry expiry dates; stock counts post differences with a reason. Issue order is FIFO or FEFO (Company settings). Reorder suggestions group low items by supplier and draft a purchase order in one click.
+- **Purchases:** purchase orders with one or several deliveries, direct purchase receipts, supplier payments and returns to supplier.
+- **Wholesale:** quotations convert to invoices in one click. Customer price lists (fixed prices or a discount %) apply automatically. Posted invoices deduct stock; credit is checked against the customer's limit. Full and partial returns, payments capped at the balance, bilingual UAE tax invoices and customer statements with ageing.
+- **POS:** open a shift, scan or pick products, hold baskets, split payments (cash/card/bank) with change, loyalty points (earn and redeem), 80 mm receipts, and an end-of-day Z report. Cashiers cannot override prices. Card terminals and cash drawers are not connected.
+- **Finance:** expenses by category, monthly profit & loss, receivables ageing and product profitability.
+- **Security:** roles per user; owners and managers can switch on two-step sign-in with an authenticator app (click your name in the menu).
 - **Manufacturing:** create a formula using quantities per finished bottle in each material's base unit. A manager approves the immutable version. Plan a batch, issue materials/packaging, start maturation, record QC, and complete with actual accepted/rejected bottle counts. Accepted units become batch-tracked stock. Material consumption uses planned BOM quantities; operator-measured consumption overrides and rework are pending.
-- **Design:** create a brief, assign a team member, record printing/packaging specifications and upload proof versions (PDF/images). Managers record approval evidence or revision instructions. New uploads clear the active approval. Delivery requires an approved file. Customer self-service approval is pending.
+- **Design:** create a brief, assign a team member, record printing/packaging specifications and upload proof versions (PDF/images). Managers record approval evidence or revision instructions. New uploads clear the active approval. Delivery requires an approved file. Customers can review and approve artwork through a private link.
 
 ## Data and privacy
 
@@ -46,7 +49,7 @@ Each company needs its own application directory, database, storage and APP_KEY.
 
 The included start scripts bind to localhost for review/development. A local office server can bind to an approved LAN interface; restrict firewall access and use a proper web server/TLS for multi-user service. This works while the server/LAN is available without an internet connection. It does **not** synchronize disconnected branches.
 
-For an online deployment: use PHP-FPM with Nginx/Apache, point the document root to `public/`, configure a separate database and private storage, set `APP_ENV=production`, `APP_DEBUG=false`, your real `APP_URL`, secure cookies under HTTPS, and proper backup/monitoring. SQLite is the tested database. Other configured Laravel database drivers have not been acceptance-tested with these workflows. PHP's built-in server is not the production hosting plan.
+For an online deployment: use PHP-FPM with Nginx/Apache, point the document root to `public/`, configure a separate database and private storage, set `APP_ENV=production`, `APP_DEBUG=false`, your real `APP_URL`, secure cookies under HTTPS, and proper backup/monitoring. SQLite and MySQL/MariaDB are both tested with these workflows. PHP's built-in server is not the production hosting plan.
 
 ## Tests and recovery
 

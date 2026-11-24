@@ -180,5 +180,6 @@
   "Two-step sign-in": "التحقق بخطوتين",
   "Two-step sign-in is already switched on.": "التحقق بخطوتين مفعّل بالفعل.",
   "Verify and continue": "تحقق وتابع",
-  "Your sign-in expired. Please sign in again.": "انتهت مهلة تسجيل الدخول. يُرجى تسجيل الدخول مجددًا."
+  "Your sign-in expired. Please sign in again.": "انتهت مهلة تسجيل الدخول. يُرجى تسجيل الدخول مجددًا.",
+  "Too Many Attempts.": "محاولات كثيرة. حاول مرة أخرى بعد دقيقة."
 }
