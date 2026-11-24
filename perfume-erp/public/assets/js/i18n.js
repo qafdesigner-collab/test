@@ -65,6 +65,8 @@ const I18N_PATTERNS = [
   [/^(.+) →$/, '$1 ←'],
   [/^(\d[\d,]*) of (\d[\d,]*) references$/, '$1 من $2 مرجعًا'],
   [/^Internal staff reference only: brand and perfume names are never shown to customers as an affiliation\. Notes are published summaries; your perfumer should confirm them before formulating\. Add only photos your team took or has permission to use\. (\d+) come with the system, (\d+) were added by your team\.$/, 'مرجع داخلي للموظفين فقط: لا تُعرض أسماء الدور والعطور على العملاء كادعاء انتماء. النوتات ملخصات منشورة، ويجب أن يتحقق منها خبير العطور قبل التركيب. أضف فقط صورًا التقطها فريقك أو لديك إذن باستخدامها. $1 مرفقة مع النظام، و$2 أضافها فريقك.'],
+  [/^(\d[\d,]*) reference perfumes with their top, heart and base notes\.$/, '$1 عطرًا مرجعيًا مع نوتات القمة والقلب والقاعدة.'],
+  [/^Change photo of (.+)$/, 'تغيير صورة $1'],
 ];
 
 const I18N_EXTRA = {

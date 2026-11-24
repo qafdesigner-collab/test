@@ -52,7 +52,10 @@ function productArt(p, extra = '') {
 }
 
 function productCard(p, pos = false) {
-  return `<article class="product-card" onclick="${pos ? 'cartAdd' : 'productDetail'}(${p.id})">${productArt(p)}<div class="product-info"><h3>${esc(p.name)}</h3><div class="product-subtitle">${esc(p.size || p.sku)} · ${esc(p.audience || p.unit)}</div><div class="scent-tags">${p.families
+  const photo = !pos && can('manager', 'warehouse')
+    ? `<button type="button" class="photo-button" onclick="event.stopPropagation();imageDialog(${p.id})" aria-label="Change photo of ${esc(p.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h3l1.5-2.5h7L17 8.5h3v10H4z"/><circle cx="12" cy="13" r="3.2"/></svg><span>${p.images.length ? 'Change photo' : 'Add photo'}</span></button>`
+    : '';
+  return `<article class="product-card" onclick="${pos ? 'cartAdd' : 'productDetail'}(${p.id})">${productArt(p)}${photo}<div class="product-info"><h3>${esc(p.name)}</h3><div class="product-subtitle">${esc(p.size || p.sku)} · ${esc(p.audience || p.unit)}</div><div class="scent-tags">${p.families
     .slice(0, 3)
     .map(t => `<span>${esc(t)}</span>`)
     .join(
@@ -150,7 +153,7 @@ function catalogueRender() {
       'The perfume catalogue',
       'Find the right fragrance by scent, style or inspiration.',
       can('manager', 'warehouse')
-        ? '<button class="secondary" onclick="labelsDialog()">Print labels</button><button class="secondary" onclick="libraryDialog()">Inspiration library</button><button class="primary" onclick="productDialog()">+ Add product</button>'
+        ? '<button class="secondary" onclick="labelsDialog()">Print labels</button><button class="primary" onclick="productDialog()">+ Add product</button>'
         : '',
     ) +
     catalogueToolbar() +
@@ -198,7 +201,8 @@ function referenceDialog() {
     await api('references', 'POST', Object.fromEntries(fd));
     closeModal();
     toast('Reference added');
-    await cataloguePage();
+    state.references = (await api('references')).references;
+    await render();
   });
 }
 
@@ -294,6 +298,7 @@ function imageDialog(id) {
   bindForm(async fd => {
     await api(`products/${id}/images`, 'POST', fd);
     await loadLists();
+    if (location.hash === '#catalogue') catalogueRender();
     imageDialog(id);
     toast('Image uploaded');
   });
@@ -303,6 +308,7 @@ async function imageAction(id, action, product) {
   try {
     await api('images/' + id, 'POST', { action });
     await loadLists();
+    if (location.hash === '#catalogue') catalogueRender();
     imageDialog(product);
     toast(action === 'cover' ? 'Cover updated' : 'Image removed');
   } catch (e) {
@@ -364,18 +370,22 @@ function fragranceProfileView(p) {
 /** Browse, import and export the internal inspiration library. */
 const LIBRARY_PAGE = 48;
 
+/** Older buttons and links open the library page. */
 function libraryDialog() {
+  location.hash = 'library';
+}
+
+async function libraryPage() {
+  if (!state.references.length) state.references = (await api('references')).references;
   const refs = state.references;
   const own = refs.filter(r => !r.library).length;
   const families = [...new Set(refs.map(r => r.family).filter(Boolean))].sort();
-  modal(
-    `Inspiration library · ${refs.length} references`,
-    `<div class="notice">Internal staff reference only: brand and perfume names are never shown to customers as an affiliation. Notes are published summaries; your perfumer should confirm them before formulating. Add only photos your team took or has permission to use. ${refs.length - own} come with the system, ${own} were added by your team.</div>
+  $('#content').innerHTML =
+    pageHead('Inspiration library', `${refs.length} reference perfumes with their top, heart and base notes.`, '') +
+    `<div class="library-page"><div class="notice">Internal staff reference only: brand and perfume names are never shown to customers as an affiliation. Notes are published summaries; your perfumer should confirm them before formulating. Add only photos your team took or has permission to use. ${refs.length - own} come with the system, ${own} were added by your team.</div>
     <div class="library-actions">${can('manager', 'warehouse') ? '<button class="primary" onclick="referenceDialog()">+ Add one</button><button class="secondary" onclick="importLibraryDialog()">Import from Excel / CSV</button>' : ''}<a class="secondary" href="/api/references/export">Export all (CSV)</a></div>
     <div class="library-filters"><input type="search" id="library-search" placeholder="Search by name, house or note…" aria-label="Search the library"><select id="library-family" aria-label="Family"><option value="">All families</option>${families.map(f => `<option>${esc(f)}</option>`).join('')}</select><select id="library-gender" aria-label="For"><option value="">All</option>${selectOptions(['Men', 'Women', 'Unisex'], '')}</select></div>
-    <p class="tiny muted" id="library-count"></p><div class="pyramid-grid" id="library-cards"></div><div class="library-more"><button type="button" class="secondary" id="library-more" hidden>Show more</button></div>`,
-    true,
-  );
+    <p class="tiny muted" id="library-count"></p><div class="pyramid-grid" id="library-cards"></div><div class="library-more"><button type="button" class="secondary" id="library-more" hidden>Show more</button></div></div>`;
   let shown = LIBRARY_PAGE;
   const draw = () => {
     const words = $('#library-search').value.toLowerCase().split(/\s+/).filter(Boolean);
@@ -464,6 +474,7 @@ function importLibraryDialog() {
     body.append('update', fd.get('update') ? '1' : '0');
     const r = await api('references/import', 'POST', body);
     state.references = (await api('references')).references;
+    if (location.hash === '#library') libraryPage();
     $('#import-result').innerHTML = `<div class="notice"><b>${r.added} added · ${r.updated} updated · ${r.skipped} already in the library</b>${r.errors.length ? `<br>${r.errors.length} row${r.errors.length === 1 ? '' : 's'} skipped:<br>${r.errors.map(e => `Row ${e.row}: ${esc(e.message)}`).join('<br>')}` : ''}</div>`;
     toast(`${r.added} references added`);
   });

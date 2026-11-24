@@ -62,6 +62,7 @@ function companyDialog() {
     'Company details',
     `<form><div class="form-grid">${field('Company name', 'company_name', s.company_name)}${field('Email', 'email', s.email, 'email')}${field('Phone', 'phone', s.phone)}${field('TRN · tax registration number', 'tax_id', s.tax_id)}<label>VAT registered<select name="vat_registered">${selectOptions(['0', '1'], s.vat_registered === '1' ? '1' : '0').replace('>0<', '>No · plain invoices<').replace('>1<', '>Yes · tax invoices with VAT summary<')}</select></label>${field('Company name in Arabic', 'company_name_ar', s.company_name_ar || '', 'text', 'dir="rtl"')}<label>Customer loyalty points<select name="loyalty_enabled"><option value="0" ${s.loyalty_enabled !== '1' ? 'selected' : ''}>Off</option><option value="1" ${s.loyalty_enabled === '1' ? 'selected' : ''}>On · customers earn and redeem points</option></select></label>${field('Points earned per AED 1', 'loyalty_points_per_aed', s.loyalty_points_per_aed ?? '1')}${field('Value of one point in fils (5 = 100 points worth AED 5)', 'loyalty_point_value_fils', s.loyalty_point_value_fils ?? '5')}<label>Stock leaves in this order<select name="stock_issue_order"><option value="fifo" ${s.stock_issue_order !== 'fefo' ? 'selected' : ''}>FIFO · oldest stock first</option><option value="fefo" ${s.stock_issue_order === 'fefo' ? 'selected' : ''}>FEFO · earliest expiry first, never expired stock</option></select></label><label class="span2">Address in Arabic<textarea name="address_ar" dir="rtl">${esc(s.address_ar || '')}</textarea></label>${''}${field('Currency · three-letter code', 'currency', s.currency)}<label class="span2">Address<textarea name="address">${esc(s.address)}</textarea></label>
     <div class="span2"><div class="section-label">Logo</div><div class="logo-preview">${s.logo_path ? `<img src="${logoUrl()}" alt="Current logo">` : '<span class="muted">No logo yet. The letter mark is used.</span>'}<label class="secondary file-button">Upload PNG, JPG or WebP (max 2 MB)<input type="file" id="logo-file" accept="image/png,image/jpeg,image/webp" hidden></label>${s.logo_path ? '<button type="button" class="subtle" id="logo-remove">Remove</button>' : ''}</div></div>
+    <div class="span2"><div class="section-label">Sign-in page photo</div><div class="logo-preview login-photo-preview">${s.login_image_path ? `<img src="/media/login-image?v=${encodeURIComponent(s.login_image_path.slice(-16, -4))}" alt="Current sign-in photo">` : '<span class="muted">No photo yet. The bottle illustration is shown.</span>'}<label class="secondary file-button">Upload a photo (JPG, PNG or WebP, max 8 MB)<input type="file" id="login-photo-file" accept="image/png,image/jpeg,image/webp" hidden></label>${s.login_image_path ? '<button type="button" class="subtle" id="login-photo-remove">Remove</button>' : ''}</div><p class="form-hint">Shown large on the sign-in page, for example your shop, your bottles or a campaign photo. Use photos you own.</p></div>
     <div class="span2"><div class="section-label">Brand colour</div><div class="color-row">${BRAND_COLORS.map(([name, hex]) => `<button type="button" class="color-swatch ${hex === current ? 'is-selected' : ''}" style="background:${hex}" title="${name}" aria-label="${name}" data-color="${hex}"></button>`).join('')}<label class="tiny">Custom <input type="color" id="brand-custom" value="${current}" style="width:44px;height:32px;padding:0;border:0"></label><input type="hidden" name="brand_color" value="${current}"></div><p class="form-hint">Used for buttons, the menu and charts. Dark colours keep white text readable.</p></div>
     <label class="span2">Printed invoice footer · thank-you note, bank details or terms<textarea name="invoice_footer" maxlength="500">${esc(s.invoice_footer || '')}</textarea></label></div>${formActions('Save company')}</form>`,
   );
@@ -88,6 +89,27 @@ function companyDialog() {
       $('#form-error').textContent = err.message;
       $('#form-error').hidden = false;
     }
+  });
+  $('#login-photo-file').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('image', file);
+    try {
+      await api('settings/login-image', 'POST', fd);
+      state.boot = await api('bootstrap');
+      toast('Sign-in photo updated');
+      companyDialog();
+    } catch (err) {
+      $('#form-error').textContent = err.message;
+      $('#form-error').hidden = false;
+    }
+  });
+  $('#login-photo-remove')?.addEventListener('click', async () => {
+    await api('settings/login-image', 'POST', { remove: true });
+    state.boot = await api('bootstrap');
+    toast('Sign-in photo removed');
+    companyDialog();
   });
   $('#logo-remove')?.addEventListener('click', async () => {
     await api('settings/logo', 'POST', { remove: true });

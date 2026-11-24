@@ -5,6 +5,7 @@ const navItems = [
   ['customers', '◎', 'Customer 360', ['manager']],
   ['dashboard', '◫', 'Overview', ['manager', 'accountant', 'warehouse', 'production', 'cashier', 'designer']],
   ['catalogue', '◇', 'Perfume catalogue', ['manager', 'accountant', 'warehouse', 'production', 'cashier', 'designer']],
+  ['library', '❦', 'Inspiration library', ['manager', 'warehouse', 'production', 'cashier']],
   ['inventory', '▤', 'Inventory', ['manager', 'warehouse', 'production', 'accountant']],
   ['wholesale', '↗', 'Wholesale & invoices', ['manager', 'accountant', 'warehouse']],
   ['purchasing', '↓', 'Purchasing', ['manager', 'accountant', 'warehouse']],
@@ -17,6 +18,29 @@ const navItems = [
   ['expenses', '◈', 'Expenses', ['manager', 'accountant']],
   ['settings', '⚙', 'Company & access', ['manager']],
 ];
+
+/** Thin line icons for the menu (24 × 24, drawn with the text colour). */
+const NAV_ICONS = {
+  customers: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 19.5c1.2-3.4 3.8-5 7-5s5.8 1.6 7 5"/>',
+  dashboard: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="4.5" rx="1.5"/><rect x="13" y="10.5" width="7" height="9.5" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/>',
+  catalogue: '<path d="M10 3.5h4v3h-4z"/><path d="M8.5 6.5h7l1.5 3v9.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 19V9.5z"/><path d="M9.5 13h5"/>',
+  library: '<path d="M4 5.5c2.7-1 5.3-1 8 .8 2.7-1.8 5.3-1.8 8-.8v13c-2.7-1-5.3-1-8 .8-2.7-1.8-5.3-1.8-8-.8z"/><path d="M12 6.3v13"/>',
+  inventory: '<path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/>',
+  wholesale: '<path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4M9.5 12h6M9.5 15.5h6"/>',
+  purchasing: '<path d="M3.5 6.5h10v9h-10zM13.5 9.5h4l3 3v3h-7"/><circle cx="7.5" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
+  pos: '<path d="M5 8h14l-1.2 11.5H6.2z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>',
+  production: '<path d="M10 3.5v6L5 18.5a1.5 1.5 0 0 0 1.3 2h11.4a1.5 1.5 0 0 0 1.3-2L14 9.5v-6M8.5 3.5h7M7.5 15h9"/>',
+  formulas: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5M12 14.5v2.5"/>',
+  projects: '<path d="M4 20l4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="M14 7.5l3 3"/>',
+  reports: '<path d="M4 20h16M7 16.5V11M11.5 16.5V6.5M16 16.5V9"/>',
+  profit: '<path d="M4 17l5.5-5.5 3.5 3.5 7-7"/><path d="M15 8h5v5"/>',
+  expenses: '<rect x="3.5" y="6" width="17" height="12.5" rx="2"/><path d="M3.5 10h17M15.5 14.5h2"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.3M12 18.2v2.3M3.5 12h2.3M18.2 12h2.3M6 6l1.6 1.6M16.4 16.4L18 18M6 18l1.6-1.6M16.4 7.6L18 6"/>',
+};
+
+function navIcon(key) {
+  return `<svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true">${NAV_ICONS[key] || ''}</svg>`;
+}
 
 const tabletNavigation = window.matchMedia('(max-width: 1180px)');
 
@@ -87,7 +111,7 @@ function navigation() {
     .filter(x => can(...x[3]))
     .map(
       (x, i) =>
-        `${x[0] === 'reports' ? '<div class="nav-separator"></div>' : ''}<a class="nav-item ${page === x[0] ? 'active' : ''}" href="#${x[0]}"><span class="nav-icon">${x[1]}</span>${x[2]}</a>`,
+        `${x[0] === 'reports' ? '<div class="nav-separator"></div>' : ''}<a class="nav-item ${page === x[0] ? 'active' : ''}" href="#${x[0]}"><span class="nav-icon">${navIcon(x[0])}</span>${x[2]}</a>`,
     )
     .join('');
 }
@@ -107,6 +131,7 @@ async function render() {
       customers: customersPage,
       dashboard: dashboardPage,
       catalogue: cataloguePage,
+      library: libraryPage,
       inventory: inventoryPage,
       wholesale: () => documentsPage(false),
       purchasing: () => documentsPage(true),

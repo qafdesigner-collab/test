@@ -1,4 +1,4 @@
-# Feature status — 0.8.1
+# Feature status — 0.9.0
 
 English is the main language; Arabic is the second language (right-to-left).
 
@@ -6,7 +6,7 @@ English is the main language; Arabic is the second language (right-to-left).
 |---|---|---|
 | Installation | cPanel package (no SSH), web installer with server check and install code, MySQL/MariaDB or SQLite, one-click database update, backups (download + daily cron, MySQL dump restorable in phpMyAdmin) | Signed automatic updates, desktop installer |
 | Identity | Session sign-in, CSRF, throttling, roles (owner, manager, accountant, warehouse, production, cashier, designer), disabled accounts, password confirmation for sensitive actions, two-step sign-in with authenticator app codes and one-time recovery codes for owner and managers (owner reset, emergency command) | Fine-grained permissions, branch scoping |
-| Company | Details, currency, TRN and VAT registration, Arabic name/address, logo, brand colour, invoice footer, stock locations, users, stock issue order (FIFO/FEFO) | Multiple companies in one installation |
+| Company | Details, currency, TRN and VAT registration, Arabic name/address, logo, sign-in page photo, brand colour, invoice footer, stock locations, users, stock issue order (FIFO/FEFO) | Multiple companies in one installation |
 | Language | English ⇄ Arabic switch for the whole interface, sign-in page, installer and server messages; bilingual printed documents | Arabic-Indic digits, translation of user-entered data |
 | Catalogue | Products and units, scent families and note layers, fragrance profile, images, Arabic product names, EAN-13 barcode generation, printable product and shelf labels (A4 sheets and label printers), internal inspiration library (546 designer, niche and Middle Eastern references with top / heart / base note pyramids, search and filters, your own photo per reference and a web-search link) with Excel/CSV import and export | Product variants, image re-ordering |
 | Inventory | Lot/location balances and ledger, adjustments, transfers, lot expiry dates and warnings, physical stock counts with stale-count protection, FIFO or FEFO issue (expired lots blocked under FEFO), reorder suggestions per supplier with one-click draft purchase orders | Reservations, quarantine locations, in-transit transfers |
@@ -20,4 +20,4 @@ English is the main language; Arabic is the second language (right-to-left).
 | Reports & UI | Dashboard with sales charts, best sellers, low stock and expiry; Customer/Product 360; sortable, filterable, paged tables; six themes (Light, Dark, Auto and the premium Obsidian, Maison and Oud) with printing always in light; responsive desktop/tablet/phone | Scheduled email reports |
 | Not enabled | Hybrid branch synchronisation, licence server | — |
 
-Automated tests: 89 feature tests (SQLite) and the same business suites on MySQL/MariaDB 10.11. Tests are development evidence; do a pilot with real data and check tax and accounting requirements with your accountant before relying on the system for filing.
+Automated tests: 90 feature tests (SQLite) and the same business suites on MySQL/MariaDB 10.11. Tests are development evidence; do a pilot with real data and check tax and accounting requirements with your accountant before relying on the system for filing.

@@ -156,3 +156,22 @@
 .pyr-row b{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600;padding-top:2px}.pyr-photo{display:block;width:calc(100% + 36px);margin:-16px -18px 12px;height:190px;object-fit:contain;background:#fff;border-bottom:1px solid var(--hair,var(--line));border-radius:var(--r,12px) var(--r,12px) 0 0}
 .pyr-actions{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;padding-top:8px;border-top:1px solid var(--hair,var(--line));font-size:12.5px}
 .pyr-actions .subtle{padding:0;background:none;border:0;cursor:pointer;color:var(--label,var(--accent));font:inherit}
+
+/* Premium shell details */
+@media screen {
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .top-pill{background:transparent;border-color:var(--hair);color:var(--ink);font-family:Manrope,"Segoe UI",sans-serif;letter-spacing:.03em}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .top-pill svg{color:var(--label)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .top-pill:hover{border-color:var(--metal)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .topbar{height:72px}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .topbar-title{font-family:var(--head);font-weight:var(--head-w);font-size:21px;letter-spacing:.08em}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .nav-item{font-size:13.5px;letter-spacing:.02em;padding-block:10px}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .nav-icon{color:var(--label)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .nav-item.active .nav-icon{color:var(--active-ink)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .workspace-label{font-size:10px;margin-top:8px}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .sidebar{padding-top:28px}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .brand-logo-wide{max-height:56px}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .photo-button{background:color-mix(in srgb,var(--surface) 90%,transparent);color:var(--ink);border-color:var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) footer{font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+:root[data-theme="maison"] .top-pill{border-radius:2px}
+}
+:root .login-art.has-photo{background:var(--login-photo) center/cover no-repeat !important}

@@ -63,4 +63,26 @@ class CompanyBrandingTest extends TestCase
         $this->post('/logout');
         $this->get('/login')->assertOk()->assertSee('--accent:#8a2c3b', false)->assertSee('Noor Perfumes');
     }
+
+    public function test_sign_in_photo_can_be_uploaded_shown_and_removed(): void
+    {
+        Storage::fake('local');
+        $this->actingAs(User::factory()->create(['role' => 'cashier']));
+        $this->post('/api/settings/login-image', ['image' => UploadedFile::fake()->image('shop.jpg', 3000, 2000)], ['Accept' => 'application/json'])->assertForbidden();
+
+        $this->actingAs(User::factory()->create(['role' => 'manager']));
+        $this->post('/api/settings/login-image', ['image' => UploadedFile::fake()->image('shop.jpg', 3000, 2000)], ['Accept' => 'application/json'])->assertOk();
+        $path = DB::table('settings')->where('key', 'login_image_path')->value('value');
+        [$w] = getimagesizefromstring(Storage::disk('local')->get($path));
+        $this->assertSame(2400, $w);
+
+        auth()->logout();
+        $this->get('/login')->assertOk()->assertSee('login-art has-photo', false);
+        $this->get('/media/login-image')->assertOk()->assertHeader('Content-Type', 'image/jpeg');
+
+        $this->actingAs(User::factory()->create(['role' => 'owner']));
+        $this->postJson('/api/settings/login-image', ['remove' => true])->assertOk();
+        Storage::disk('local')->assertMissing($path);
+        $this->get('/media/login-image')->assertNotFound();
+    }
 }

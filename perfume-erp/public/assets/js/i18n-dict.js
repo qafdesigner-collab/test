@@ -763,4 +763,12 @@ const I18N_DICT = {
   "Remove photo": "إزالة الصورة",
   "Photo saved": "تم حفظ الصورة",
   "Photo removed": "تمت إزالة الصورة",
+  "Sign-in page photo": "صورة صفحة تسجيل الدخول",
+  "No photo yet. The bottle illustration is shown.": "لا توجد صورة بعد. يظهر رسم الزجاجة.",
+  "Upload a photo (JPG, PNG or WebP, max 8 MB)": "ارفع صورة (JPG أو PNG أو WebP، حتى 8 ميغابايت)",
+  "Shown large on the sign-in page, for example your shop, your bottles or a campaign photo. Use photos you own.": "تظهر بحجم كبير في صفحة تسجيل الدخول، مثل متجرك أو زجاجاتك أو صورة حملة. استخدم صورًا تملكها.",
+  "Sign-in photo updated": "تم تحديث صورة تسجيل الدخول",
+  "Sign-in photo removed": "تمت إزالة صورة تسجيل الدخول",
+  "Change colour theme": "تغيير المظهر",
+  "Change language": "تغيير اللغة",
 };

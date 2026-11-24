@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -105,6 +106,55 @@ class CompanyController extends ErpBaseController
     /**
      * The logo is public branding (shown on the sign-in page), never other private files.
      */
+    /**
+     * Upload or remove the large photo on the sign-in page. Re-encoded as JPEG (max 2400 px), which drops metadata.
+     */
+    public function loginImage(Request $r)
+    {
+        $this->allow(['manager']);
+        $current = DB::table('settings')->where('key', 'login_image_path')->value('value');
+        if ($r->boolean('remove')) {
+            if ($current) {
+                Storage::disk('local')->delete($current);
+            }
+            DB::table('settings')->where('key', 'login_image_path')->delete();
+            $this->audit('settings.login_image_removed', 'company');
+
+            return ['login_image' => null];
+        }
+        $r->validate(['image' => 'required|image|mimes:jpg,jpeg,png,webp|max:8192|dimensions:max_width=8000,max_height=8000']);
+        $image = @imagecreatefromstring((string) file_get_contents($r->file('image')->getRealPath()));
+        if (! $image) {
+            Documents::fail(__('Image cannot be decoded.'));
+        }
+        $w = imagesx($image);
+        $h = imagesy($image);
+        $ratio = min(1, 2400 / max($w, $h));
+        $resized = imagecreatetruecolor(max(1, (int) ($w * $ratio)), max(1, (int) ($h * $ratio)));
+        imagecopyresampled($resized, $image, 0, 0, 0, 0, imagesx($resized), imagesy($resized), $w, $h);
+        ob_start();
+        imagejpeg($resized, null, 85);
+        $path = 'branding/login-'.Str::random(12).'.jpg';
+        Storage::disk('local')->put($path, (string) ob_get_clean());
+        imagedestroy($image);
+        imagedestroy($resized);
+        if ($current) {
+            Storage::disk('local')->delete($current);
+        }
+        DB::table('settings')->updateOrInsert(['key' => 'login_image_path'], ['value' => $path]);
+        $this->audit('settings.login_image_uploaded', 'company');
+
+        return ['login_image' => '/media/login-image?v='.substr(sha1($path), 0, 8)];
+    }
+
+    public function loginImageFile()
+    {
+        $path = DB::table('settings')->where('key', 'login_image_path')->value('value');
+        abort_unless($path && str_starts_with($path, 'branding/login-') && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path, null, ['Content-Type' => 'image/jpeg', 'Cache-Control' => 'public, max-age=86400', 'X-Content-Type-Options' => 'nosniff']);
+    }
+
     public function logoImage()
     {
         $path = DB::table('settings')->where('key', 'logo_path')->value('value');

@@ -1,7 +1,7 @@
 @php
     $arabic = app()->getLocale() === 'ar';
     try {
-        $brand = \Illuminate\Support\Facades\DB::table('settings')->whereIn('key', ['logo_path', 'company_name', 'brand_color'])->pluck('value', 'key');
+        $brand = \Illuminate\Support\Facades\DB::table('settings')->whereIn('key', ['logo_path', 'company_name', 'brand_color', 'login_image_path'])->pluck('value', 'key');
     } catch (\Throwable) {
         $brand = collect();
     }
@@ -12,7 +12,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>{{ __('Sign in') }} · Atelier ERP</title>
-    <script>try{document.documentElement.dataset.theme=localStorage.getItem('atelier-theme')||'light'}catch(e){document.documentElement.dataset.theme='light'}</script>
+    <script>try{document.documentElement.dataset.theme=localStorage.getItem('atelier-theme')||'obsidian'}catch(e){document.documentElement.dataset.theme='obsidian'}</script>
     <link rel="stylesheet" href="/assets/app.css?v={{ config('erp.version') }}">
     <link rel="stylesheet" href="/assets/themes.css?v={{ config('erp.version') }}">
     @if (preg_match('/^#[0-9a-fA-F]{6}$/', (string) ($brand['brand_color'] ?? '')))<style>:root{--accent:{{ $brand['brand_color'] }}}</style>@endif
@@ -50,10 +50,16 @@
         @endif
         <p class="tiny muted">{{ __("Your company's private installation") }} · {{ __('Version') }} {{ config('erp.version') }}</p>
     </main>
+    @if (! empty($brand['login_image_path']))
+    <aside class="login-art has-photo" style="--login-photo:url('/media/login-image?v={{ substr(sha1($brand['login_image_path']), 0, 8) }}')">
+        <p>{!! nl2br(e(__("CRAFTED WITH CARE.\nMANAGED WITH CLARITY."))) !!}</p>
+    </aside>
+    @else
     <aside class="login-art">
         <div class="orb"></div>
         <div class="big-bottle"><div class="cap"></div><div class="bottle"><span>ATELIER</span><small>EAU DE PARFUM</small></div></div>
         <p>{!! nl2br(e(__("CRAFTED WITH CARE.\nMANAGED WITH CLARITY."))) !!}</p>
     </aside>
+    @endif
 </body>
 </html>

@@ -2661,3 +2661,34 @@ tr.total-row td { border-top: 2px solid var(--line) !important; }
 .library-filters input { flex: 1 1 260px; }
 .library-filters select { flex: 0 1 200px; }
 .library-more { display: flex; justify-content: center; margin-top: 14px; }
+
+/* ── 0.9 shell: line icons, theme and language in the top bar ───────── */
+.nav-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; }
+.nav-svg, .top-pill svg, .icon-button svg, .photo-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+.top-pill { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--white); color: var(--ink); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.top-pill:hover { border-color: var(--accent); }
+.top-pill b { font-weight: 500; }
+.icon-button svg { display: block; }
+.topbar-title { font-weight: 600; letter-spacing: .02em; }
+.user-card-gear { opacity: .6; }
+footer { display: flex; justify-content: space-between; gap: 12px; }
+@media (max-width: 760px) {
+  .top-pill span, .top-pill b { display: none; }
+  .top-pill { width: 36px; padding: 0; justify-content: center; }
+  .topbar-right select { max-width: 120px; }
+}
+
+/* Change a product photo straight from its card */
+.product-card { position: relative; }
+.photo-button { position: absolute; top: 18px; inset-inline-end: 18px; z-index: 2; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; border: 1px solid #0000001a; background: #ffffffe6; color: #222; font-size: 12px; cursor: pointer; opacity: 0; transition: opacity .15s; }
+.product-card:hover .photo-button, .photo-button:focus-visible { opacity: 1; }
+@media (hover: none) { .photo-button { opacity: 1; } .photo-button span { display: none; } }
+
+/* Your own photo on the sign-in page */
+.login-art.has-photo { background-size: cover !important; background-position: center !important; position: relative; }
+.login-art.has-photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, #000000a0); }
+.login-art.has-photo p { position: absolute; bottom: 48px; left: 0; right: 0; z-index: 1; color: #fff !important; text-align: center; }
+.login-photo-preview img { max-height: 90px; border-radius: 8px; }
+
+.library-page .notice { margin-bottom: 12px; }
