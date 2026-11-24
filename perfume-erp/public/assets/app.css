@@ -2645,3 +2645,13 @@ tr.total-row td { border-top: 2px solid var(--line) !important; }
 .recovery-codes{columns:2;gap:24px;margin:14px 0;padding-inline-start:22px;font-size:15px;line-height:2}
 .recovery-codes code{letter-spacing:.05em}
 @media print{body:has(.recovery-codes) .sidebar,body:has(.recovery-codes) .app-main{display:none}body:has(.recovery-codes) .modal-overlay{position:static;background:none}body:has(.recovery-codes) .modal-close,body:has(.recovery-codes) .form-actions{display:none}}
+
+/* Theme picker */
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.theme-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); color: var(--ink); text-align: start; cursor: pointer; }
+.theme-card:hover { border-color: var(--accent); }
+.theme-card.selected { outline: 2px solid var(--metal, var(--accent)); outline-offset: 1px; }
+.theme-card small { color: var(--muted); font-size: 12px; }
+.theme-sample { display: flex; gap: 6px; align-items: flex-end; width: 100%; height: 64px; padding: 10px; border-radius: 8px; border: 1px solid #0000001a; margin-bottom: 6px; }
+.theme-sample i { display: block; width: 22px; height: 22px; border-radius: 50%; border: 1px solid #ffffff33; }
+.theme-sample i:first-child { width: 46px; height: 34px; border-radius: 6px; }

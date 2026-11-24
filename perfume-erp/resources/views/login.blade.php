@@ -14,6 +14,7 @@
     <title>{{ __('Sign in') }} · Atelier ERP</title>
     <script>try{document.documentElement.dataset.theme=localStorage.getItem('atelier-theme')||'light'}catch(e){document.documentElement.dataset.theme='light'}</script>
     <link rel="stylesheet" href="/assets/app.css?v={{ config('erp.version') }}">
+    <link rel="stylesheet" href="/assets/themes.css?v={{ config('erp.version') }}">
     @if (preg_match('/^#[0-9a-fA-F]{6}$/', (string) ($brand['brand_color'] ?? '')))<style>:root{--accent:{{ $brand['brand_color'] }}}</style>@endif
 </head>
 <body class="login-body">

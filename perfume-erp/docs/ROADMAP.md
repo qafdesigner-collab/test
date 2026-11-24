@@ -32,3 +32,10 @@ changes), browser screenshots, a rebuilt cPanel ZIP, a commit and a push to
 - [x] 12. Customer loyalty: points earned on POS and invoice sales, redeemed as a discount, balance on receipts and Customer 360
 - [x] 13. Two-step sign-in (authenticator app codes) for owner and managers, with recovery codes
 - [x] 14. Final pass for 0.7.0: tests on SQLite and MySQL, every page in English and Arabic, fresh cPanel install, docs
+
+## Phase 3 (0.8.0)
+- [x] 15. Premium themes: Obsidian & Champagne, Maison (couture ivory), Oud (emerald & brass) with a theme picker, bundled fonts, English + Arabic, printing unaffected
+- [ ] 16. Note pyramid: top / heart / base notes for inspiration references, in import/export and shown as pyramid cards
+- [ ] 17. Library data: 500+ widely used designer, niche and Middle Eastern references with note pyramids and families
+- [ ] 18. Reference photos: upload your own photo per reference, plus a "search the web" link (no bundled brand photos)
+- [ ] 19. Final pass for 0.8.0: tests on SQLite and MySQL, every page in each theme (English and Arabic), fresh cPanel install, docs

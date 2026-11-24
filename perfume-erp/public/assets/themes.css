@@ -1,0 +1,156 @@
+/* Atelier Perfume ERP · premium themes: Obsidian & Champagne, Maison, Oud.
+   Fonts: Playfair Display, Manrope, Cormorant Garamond, Amiri (SIL Open Font License, see fonts/LICENSES.txt).
+   Screen only: printed documents always use the light theme. */
+@font-face{font-family:Playfair;font-weight:400;src:url(/assets/fonts/playfair-display-latin-400-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Playfair;font-weight:500;src:url(/assets/fonts/playfair-display-latin-500-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Playfair;font-weight:600;src:url(/assets/fonts/playfair-display-latin-600-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Manrope;font-weight:300;src:url(/assets/fonts/manrope-latin-300-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Manrope;font-weight:400;src:url(/assets/fonts/manrope-latin-400-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Manrope;font-weight:500;src:url(/assets/fonts/manrope-latin-500-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Manrope;font-weight:600;src:url(/assets/fonts/manrope-latin-600-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Manrope;font-weight:700;src:url(/assets/fonts/manrope-latin-700-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Cormorant;font-weight:500;src:url(/assets/fonts/cormorant-garamond-latin-500-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Cormorant;font-weight:600;src:url(/assets/fonts/cormorant-garamond-latin-600-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Amiri;font-weight:400;src:url(/assets/fonts/amiri-arabic-400-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Amiri;font-weight:700;src:url(/assets/fonts/amiri-arabic-700-normal.woff2) format("woff2");font-display:swap}
+@media screen {
+
+/* A · OBSIDIAN & CHAMPAGNE — quiet, watch-maker dark */
+:root[data-theme="obsidian"]{--bg:#0d0e10;--surface:#15171a;--surface2:#1b1e22;--hair:#272a2f;--ink:#ece6da;--muted:#8a8d92;--metal:#cbb48a;--metal-ink:#15120c;
+  --side:#0a0b0d;--side-ink:#b9b6ae;--active-bg:#1b1e22;--active-ink:#e6d3ad;--head:Manrope,"Segoe UI",sans-serif;--head-w:300;--head-size:2.5em;--r:10px;--label:#cbb48a;
+  --th-bg:#121417;--input:#101215;--shadow:0 1px 0 #ffffff08 inset,0 20px 40px #0006;color-scheme:dark;
+  --paper:var(--bg);--white:var(--surface);--line:var(--hair);--accent:#cbb48a;--accent-soft:#2a261d;--chart-mark:#cbb48a;--chart-grid:#24272b;--chart-axis:#7f8287;--chart-text:#ece6da}
+/* B · MAISON — Parisian couture: ivory paper, black ink, a thread of gold */
+:root[data-theme="maison"]{--bg:#f6f3ed;--surface:#fffdf9;--surface2:#f9f6f0;--hair:#e2dbcd;--ink:#121212;--muted:#6e695f;--metal:#121212;--metal-ink:#fff;
+  --side:#fffdf9;--side-ink:#3a3630;--active-bg:#121212;--active-ink:#fff;--head:Playfair,Amiri,Georgia,serif;--head-w:400;--head-size:2.9em;--r:2px;--label:#a68a52;
+  --th-bg:#f6f3ed;--input:#fff;--shadow:none;
+  --paper:var(--bg);--white:var(--surface);--line:var(--hair);--accent:#121212;--accent-soft:#efe9dd;--chart-mark:#121212;--chart-grid:#ece6da;--chart-axis:#7c766b;--chart-text:#121212}
+/* C · OUD — deep emerald, brushed brass, Arabian-house warmth */
+:root[data-theme="oud"]{--bg:#0a1411;--surface:#0f1d19;--surface2:#13251f;--hair:#1f342d;--ink:#efe8d8;--muted:#8fa197;--metal:#b8935a;--metal-ink:#0a1411;
+  --side:#07100d;--side-ink:#b7c2b9;--active-bg:transparent;--active-ink:#d9b77d;--head:Cormorant,Amiri,Georgia,serif;--head-w:600;--head-size:3em;--r:12px;--label:#b8935a;
+  --th-bg:#0c1915;--input:#0b1714;--shadow:0 20px 40px #0007;color-scheme:dark;
+  --paper:var(--bg);--white:var(--surface);--line:var(--hair);--accent:#b8935a;--accent-soft:#1f2a1f;--chart-mark:#b8935a;--chart-grid:#1c2e28;--chart-axis:#7f938a;--chart-text:#efe8d8}
+
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) body{background:var(--bg) !important;color:var(--ink);font-family:Manrope,"Segoe UI",sans-serif}
+:root[data-theme="oud"] body{background:radial-gradient(900px 500px at 85% -10%,#173a2f 0%,transparent 60%),var(--bg) !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) h1,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .login-card h1{font-family:var(--head);font-weight:var(--head-w);font-size:var(--head-size);letter-spacing:-.01em;line-height:1.05;color:var(--ink) !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) h2,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) h3,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .panel h2,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .modal-header h2{font-family:var(--head);font-weight:var(--head-w);color:var(--ink) !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .panel h2{font-size:1.5em}
+:root[data-theme="obsidian"] .panel h2,:root[data-theme="obsidian"] .modal-header h2{font-weight:500;font-size:1.15em;letter-spacing:.01em}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .eyebrow{color:var(--label) !important;letter-spacing:.28em;font-size:10.5px;font-weight:600}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .muted,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) small,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .stat-label,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .stat-foot{color:var(--muted)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .stat-label{text-transform:uppercase;letter-spacing:.16em;font-size:10.5px;font-weight:600}
+
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .sidebar{background:var(--side) !important;border-right:1px solid var(--hair) !important;color:var(--side-ink)}
+:root[dir="rtl"]:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .sidebar{border-left:1px solid var(--hair) !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .brand{color:var(--ink);font-family:var(--head)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .brand small,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .workspace-label{color:var(--label);letter-spacing:.24em}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .brand-mark{background:transparent !important;border:1px solid var(--metal) !important;color:var(--metal) !important;font-family:var(--head)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .nav-item{color:var(--side-ink);border-radius:var(--r)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .nav-item:hover{background:var(--surface2);color:var(--ink)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .nav-icon{color:var(--muted)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .nav-item.active{background:var(--active-bg) !important;color:var(--active-ink) !important;box-shadow:none !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .nav-item.active .nav-icon{color:var(--active-ink)}
+:root[data-theme="obsidian"] .nav-item.active,:root[data-theme="oud"] .nav-item.active{box-shadow:inset 2px 0 0 var(--metal) !important}
+:root[dir="rtl"][data-theme="obsidian"] .nav-item.active,:root[dir="rtl"][data-theme="oud"] .nav-item.active{box-shadow:inset -2px 0 0 var(--metal) !important}
+:root[data-theme="oud"] .nav-item.active{background:linear-gradient(90deg,#b8935a1f,transparent) !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .nav-separator{border-color:var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .user-card{background:var(--surface2);border:1px solid var(--hair);color:var(--ink);border-radius:var(--r)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .avatar{background:transparent;border:1px solid var(--metal);color:var(--metal)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .build-badge,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .connection,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .logout,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .theme-toggle,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .user-card small{color:var(--muted)}
+
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .topbar{background:color-mix(in srgb,var(--bg) 86%,transparent) !important;border-color:var(--hair) !important;backdrop-filter:blur(12px)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .topbar-title{font-family:var(--head);color:var(--ink) !important;letter-spacing:.06em}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .topbar select{color:var(--ink)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .server-chip,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .icon-button{background:transparent;color:var(--muted);border:1px solid var(--hair);border-radius:var(--r)}
+
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .primary{background:var(--metal) !important;color:var(--metal-ink) !important;border:1px solid var(--metal) !important;border-radius:var(--r) !important;box-shadow:none !important;font-weight:600;letter-spacing:.04em}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .primary:hover{filter:brightness(1.1)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .secondary{background:transparent !important;color:var(--ink) !important;border:1px solid var(--hair) !important;border-radius:var(--r) !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .secondary:hover{border-color:var(--metal) !important}
+:root[data-theme="maison"] .primary,:root[data-theme="maison"] .secondary{text-transform:uppercase;font-size:12px;letter-spacing:.16em;padding-inline:20px}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .subtle,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) a.subtle,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .panel-head a{color:var(--label)}
+
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .panel,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .stat,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .product-card,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .project-card,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .customer-card{background:var(--surface) !important;border:1px solid var(--hair) !important;border-radius:var(--r) !important;box-shadow:var(--shadow) !important}
+:root[data-theme="maison"] .stat{border-top:2px solid var(--label) !important}
+:root[data-theme="oud"] .stat{background:linear-gradient(160deg,#13251f,#0f1d19) !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .stat-number{font-family:var(--head);font-weight:var(--head-w);font-size:2.1em;color:var(--ink)}
+:root[data-theme="oud"] .stat-number{color:#e2c48f}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .panel-head{border-color:var(--hair) !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) th{background:var(--th-bg) !important;color:var(--muted) !important;letter-spacing:.16em}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) td,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .list-row{border-color:var(--hair) !important;color:var(--ink)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) input,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) select,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) textarea{background:var(--input) !important;color:var(--ink) !important;border-color:var(--hair) !important;border-radius:var(--r) !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) input:focus,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) select:focus{outline:1px solid var(--metal) !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) label{color:var(--muted)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .badge{background:transparent;color:var(--label);border:1px solid color-mix(in srgb,var(--label) 45%,transparent);border-radius:999px}
+:root[data-theme="maison"] .badge{border-radius:2px;text-transform:uppercase;letter-spacing:.1em;font-size:10px}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .notice{background:var(--surface2);color:var(--muted);border-color:var(--hair);border-radius:var(--r)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .product-art{background:var(--surface2) !important}
+:root[data-theme="oud"] .product-art{background:radial-gradient(circle at 50% 45%,#1d3a31,#0f1d19) !important}
+:root[data-theme="obsidian"] .product-art{background:radial-gradient(circle at 50% 45%,#262a30,#15171a) !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .product-art .category-badge{background:var(--surface);color:var(--label);border:1px solid var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .scent-tags span{background:transparent;color:var(--muted);border:1px solid var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .product-bottom{border-color:var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .product-card h3{font-family:var(--head);font-weight:var(--head-w);color:var(--ink)}
+:root[data-theme="obsidian"] .product-card h3{font-weight:600}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .modal-overlay{background:#000000a8 !important;backdrop-filter:blur(6px)}
+:root[data-theme="maison"] .modal-overlay{background:#f6f3edcc !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .modal,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .modal-header{background:var(--surface) !important;color:var(--ink);border-radius:var(--r)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .modal{border:1px solid var(--hair);box-shadow:0 30px 80px #0005}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .modal-close{background:transparent;color:var(--ink);border:1px solid var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .toggle-buttons{background:transparent;border-color:var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .toggle-buttons button{color:var(--muted)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .toggle-buttons .selected{background:var(--metal);color:var(--metal-ink)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .table-search,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .cron-line{background:var(--input);border-color:var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .table-tools{border-color:var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) footer{color:var(--muted);border-color:var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .stat-icon{background:transparent;color:var(--label);border:1px solid var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .document-total,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .metric-grid div,:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .note-layer{background:var(--surface2) !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .empty h3{color:var(--ink)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .cart-quantity button{background:var(--surface2);color:var(--ink)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) #toast{background:var(--ink);color:var(--bg)}
+:root[data-theme="obsidian"] .brand-logo-wide,:root[data-theme="obsidian"] .brand-logo,:root[data-theme="oud"] .brand-logo-wide,:root[data-theme="oud"] .brand-logo{background:#fff;padding:4px 8px;border-radius:6px}
+
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .login-body{background:var(--bg) !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .login-card{background:var(--surface);color:var(--ink);border-radius:var(--r);border:1px solid var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .login-art{background:var(--surface2) !important}
+:root[data-theme="oud"] .login-art{background:radial-gradient(circle at 50% 45%,#1d3f34 0%,#08110e 70%) !important}
+:root[data-theme="obsidian"] .login-art{background:radial-gradient(circle at 50% 45%,#2a2c30 0%,#0a0b0d 70%) !important}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .login-art p{color:var(--label);letter-spacing:.3em}
+:root:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]) .login-art .orb{border-color:color-mix(in srgb,var(--metal) 40%,transparent) !important}
+
+:root[dir="rtl"]:is([data-theme="obsidian"],[data-theme="maison"],[data-theme="oud"]){--head:Amiri,Georgia,serif}
+:root[dir="rtl"][data-theme="obsidian"]{--head:Manrope,"Segoe UI",sans-serif}
+
+
+/* Remaining components on the two dark premium themes */
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .badge.red,:root:is([data-theme="obsidian"],[data-theme="oud"]) .error{background:#3a1f1d;color:#f2a59c;border-color:#5a2e2a}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .badge.blue{background:#1d2a38;color:#9fb9d6}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .badge.amber{background:#3a2f14;color:#e0b04d}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .drop-zone{background:var(--surface2);color:var(--muted);border-color:var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .document-preview,:root:is([data-theme="obsidian"],[data-theme="oud"]) .empty{color:var(--ink)}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .image-tile button,:root:is([data-theme="obsidian"],[data-theme="oud"]) .line-editor .remove{background:var(--surface2);color:var(--ink)}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .cost-sheet,:root:is([data-theme="obsidian"],[data-theme="oud"]) .fragrance-profile,:root:is([data-theme="obsidian"],[data-theme="oud"]) .internal-costs{background:var(--surface) !important;border-color:var(--hair) !important}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .stage-done{background:#17382a;color:#8fe0b5}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .stage-pending{background:var(--surface2);color:var(--muted)}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .progress-chart > div > div{background:var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .artwork-tile{border-color:var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .artwork-file{background:var(--surface2);color:var(--ink)}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .chart-baseline{stroke:var(--hair)}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .chart-tip{background:var(--ink);color:var(--bg)}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .color-swatch{border-color:var(--surface)}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .project-card .project-icon{background:var(--surface2);color:var(--muted)}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) input::placeholder,:root:is([data-theme="obsidian"],[data-theme="oud"]) textarea::placeholder{color:var(--muted)}
+:root:is([data-theme="obsidian"],[data-theme="oud"]) .status-good,:root:is([data-theme="obsidian"],[data-theme="oud"]) .positive{color:var(--status-good,#7fc79a)}
+:root:is([data-theme="obsidian"],[data-theme="oud"]){--status-good:#7fc79a;--status-warning:#e0b04d;--status-warning-soft:#3a2f14;--status-critical:#f07a7f}
+}
+
+/* Library pyramid */
+.pyramid-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+.pyr-card{border:1px solid var(--hair,var(--line));border-radius:var(--r,12px);padding:16px 18px;background:var(--surface2,var(--paper))}
+.pyr-card .house{font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--label,var(--accent));font-weight:600}
+.pyr-card h4{margin:4px 0 8px;font-family:var(--head,Georgia,serif);font-weight:var(--head-w,500);font-size:22px;color:var(--ink)}
+:root[data-theme="obsidian"] .pyr-card h4{font-weight:500;font-size:19px}
+.pyr-card .meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.pyr-row{display:grid;grid-template-columns:64px 1fr;gap:10px;padding:7px 0;border-top:1px solid var(--hair,var(--line));font-size:13px;color:var(--ink)}
+.pyr-row b{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600;padding-top:2px}

@@ -125,17 +125,42 @@ async function render() {
   }
 }
 
-const THEMES = { light: 'Light', dark: 'Dark', auto: 'Auto' };
+const THEMES = { light: 'Light', dark: 'Dark', auto: 'Auto', obsidian: 'Obsidian', maison: 'Maison', oud: 'Oud' };
 
-/** Light → Dark → Auto (follows the device setting). Saved per browser. */
-function cycleTheme() {
-  const order = Object.keys(THEMES);
-  const next = order[(order.indexOf(document.documentElement.dataset.theme || 'light') + 1) % order.length];
-  document.documentElement.dataset.theme = next;
+/** Swatches shown in the theme picker: background, surface, accent, text. */
+const THEME_SWATCHES = {
+  light: ['#f6f5f1', '#ffffff', '#835049', '#24333d', 'Clean and bright'],
+  dark: ['#101715', '#18211e', '#5fc28f', '#e4ece8', 'Easy on the eyes at night'],
+  auto: ['#f6f5f1', '#101715', '#835049', '#e4ece8', 'Follows your device'],
+  obsidian: ['#0d0e10', '#1b1e22', '#cbb48a', '#ece6da', 'Black with champagne gold'],
+  maison: ['#f6f3ed', '#fffdf9', '#121212', '#a68a52', 'Ivory couture with a gold thread'],
+  oud: ['#0a1411', '#13251f', '#b8935a', '#efe8d8', 'Deep emerald with brushed brass'],
+};
+
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
   try {
-    localStorage.setItem('atelier-theme', next);
+    localStorage.setItem('atelier-theme', theme);
   } catch {}
   showThemeName();
+}
+
+/** Kept for older buttons: opens the picker. */
+function cycleTheme() {
+  themeDialog();
+}
+
+function themeDialog() {
+  const current = document.documentElement.dataset.theme || 'light';
+  modal(
+    'Choose a theme',
+    `<div class="theme-grid">${Object.entries(THEMES)
+      .map(([key, name]) => {
+        const [bg, surface, accent, ink, note] = THEME_SWATCHES[key];
+        return `<button type="button" class="theme-card${key === current ? ' selected' : ''}" onclick="setTheme('${key}');themeDialog()"><span class="theme-sample" style="background:${bg}"><i style="background:${surface}"></i><i style="background:${accent}"></i><i style="background:${ink}"></i></span><b>${name}</b><small>${note}</small></button>`;
+      })
+      .join('')}</div><p class="form-hint">Saved on this device. Printed documents always use the light theme.</p>`,
+  );
 }
 
 function showThemeName() {
@@ -158,7 +183,7 @@ function applyBranding() {
   const root = document.documentElement.style;
   if (/^#[0-9a-f]{6}$/i.test(s.brand_color || '')) {
     root.setProperty('--accent', s.brand_color);
-    root.setProperty('--accent-soft', `color-mix(in srgb, ${s.brand_color} 12%, #fff)`);
+    root.setProperty('--accent-soft', `color-mix(in srgb, ${s.brand_color} 14%, var(--white))`);
   } else {
     root.removeProperty('--accent');
     root.removeProperty('--accent-soft');

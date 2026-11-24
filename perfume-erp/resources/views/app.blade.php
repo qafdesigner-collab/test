@@ -7,6 +7,7 @@
     <title>Atelier · Perfume ERP</title>
     <script>try{document.documentElement.dataset.theme=localStorage.getItem('atelier-theme')||'light';var l=localStorage.getItem('atelier-lang');if(l==='ar'){document.documentElement.lang=l;document.documentElement.dir='rtl'}}catch(e){document.documentElement.dataset.theme='light'}</script>
     <link rel="stylesheet" href="/assets/app.css?v={{ config('erp.version') }}">
+    <link rel="stylesheet" href="/assets/themes.css?v={{ config('erp.version') }}">
     {{-- Modules share one global scope and load in this order; main.js starts the app. --}}
     @foreach (['core', 'barcodes', 'shell', 'dashboard', 'catalogue', 'inventory', 'sales', 'pos', 'manufacturing', 'projects', 'customers', 'reports', 'expenses', 'profit', 'settings', 'tables', 'i18n-dict', 'i18n', 'main'] as $module)
         <script src="/assets/js/{{ $module }}.js?v={{ config('erp.version') }}" defer></script>
@@ -22,7 +23,7 @@
         <nav id="navigation"></nav>
         <div class="sidebar-bottom">
             <div class="connection"><i></i><span>Connected to this server</span></div>
-            <button type="button" class="theme-toggle" onclick="cycleTheme()" aria-label="Change colour theme"><span aria-hidden="true">◐</span> Theme: <b id="theme-name">Light</b></button>
+            <button type="button" class="theme-toggle" onclick="themeDialog()" aria-label="Change colour theme"><span aria-hidden="true">◐</span> Theme: <b id="theme-name">Light</b></button>
             <button type="button" class="theme-toggle" onclick="cycleLanguage()" aria-label="Change language"><span aria-hidden="true">文</span> <span>Language:</span> <b data-no-translate id="language-name">English</b></button>
             <div class="build-badge">Release · {{ config('erp.version') }}</div>
             <button class="user-card" onclick="passwordDialog()">
