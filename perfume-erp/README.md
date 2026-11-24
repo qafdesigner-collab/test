@@ -1,4 +1,4 @@
-# Atelier Perfume ERP — release 0.7.0
+# Atelier Perfume ERP — release 0.8.0
 
 A working Laravel 13 / PHP 8.3 application for a perfume company, with a responsive browser interface in English and Arabic, and a separate database per installation (MySQL/MariaDB or SQLite). No shared demonstration password is shipped.
 
@@ -35,6 +35,8 @@ On Windows PowerShell, pass the class as `'Database\Seeders\PerfumeSeeder'`. The
 - **Wholesale:** quotations convert to invoices in one click. Customer price lists (fixed prices or a discount %) apply automatically. Posted invoices deduct stock; credit is checked against the customer's limit. Full and partial returns, payments capped at the balance, bilingual UAE tax invoices and customer statements with ageing.
 - **POS:** open a shift, scan or pick products, hold baskets, split payments (cash/card/bank) with change, loyalty points (earn and redeem), 80 mm receipts, and an end-of-day Z report. Cashiers cannot override prices. Card terminals and cash drawers are not connected.
 - **Finance:** expenses by category, monthly profit & loss, receivables ageing and product profitability.
+- **Themes:** click Theme in the menu to choose Light, Dark, Auto, Obsidian (black and champagne gold), Maison (ivory couture) or Oud (emerald and brass). The choice is saved per device; printouts always use the light theme.
+- **Inspiration library:** Catalogue → Inspiration library lists 546 reference perfumes with top, heart and base notes. Search by name or note, filter by family or audience, add your own photo, or open a web image search. Notes are summaries: have your perfumer confirm them.
 - **Security:** roles per user; owners and managers can switch on two-step sign-in with an authenticator app (click your name in the menu).
 - **Manufacturing:** create a formula using quantities per finished bottle in each material's base unit. A manager approves the immutable version. Plan a batch, issue materials/packaging, start maturation, record QC, and complete with actual accepted/rejected bottle counts. Accepted units become batch-tracked stock. Material consumption uses planned BOM quantities; operator-measured consumption overrides and rework are pending.
 - **Design:** create a brief, assign a team member, record printing/packaging specifications and upload proof versions (PDF/images). Managers record approval evidence or revision instructions. New uploads clear the active approval. Delivery requires an approved file. Customers can review and approve artwork through a private link.

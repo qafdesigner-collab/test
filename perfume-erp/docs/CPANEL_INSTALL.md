@@ -73,6 +73,13 @@ Sign in as the owner and open **Company & access → Edit company**:
 Each person can switch the interface between **English and العربية** from the menu (Language).
 Give products an **Arabic name** (Catalogue → Edit product) so it prints under the English name on invoices.
 
+## Look and feel
+
+Click **Theme** at the bottom of the menu to choose Light, Dark, Auto, Obsidian, Maison or Oud. Each
+computer or phone remembers its own choice. Fonts are included in the package, so nothing is loaded
+from the internet. After updating from an older version, click **Apply update** in Company & access →
+System: this also adds the note pyramids and new references to the inspiration library.
+
 ## Two-step sign-in (recommended for owner and managers)
 
 1. Click your name at the bottom of the menu → **Set up two-step sign-in**.
