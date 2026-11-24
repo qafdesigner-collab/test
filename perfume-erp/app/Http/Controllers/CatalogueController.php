@@ -94,7 +94,10 @@ class CatalogueController extends ErpBaseController
         $this->allow(['manager', 'warehouse', 'cashier', 'production']);
         if ($r->isMethod('post')) {
             $this->allow(['manager', 'warehouse']);
-            $v = $r->validate(['brand' => 'required|string|max:100', 'name' => ['required', 'string', 'max:150', Rule::unique('references')->where('brand', $r->input('brand'))], 'notes' => 'nullable|string|max:2000', 'gender' => ['nullable', Rule::in(['Men', 'Women', 'Unisex'])], 'family' => 'nullable|string|max:80']);
+            $v = $r->validate(['brand' => 'required|string|max:100', 'name' => ['required', 'string', 'max:150', Rule::unique('references')->where('brand', $r->input('brand'))], 'notes' => 'nullable|string|max:2000', 'gender' => ['nullable', Rule::in(['Men', 'Women', 'Unisex'])], 'family' => 'nullable|string|max:80', 'top_notes' => 'nullable|string|max:500', 'heart_notes' => 'nullable|string|max:500', 'base_notes' => 'nullable|string|max:500']);
+            if (empty($v['notes'])) {
+                $v['notes'] = implode(', ', array_filter([$v['top_notes'] ?? null, $v['heart_notes'] ?? null, $v['base_notes'] ?? null])) ?: null;
+            }
             $id = DB::table('references')->insertGetId($v + ['created_at' => now(), 'updated_at' => now()]);
 
             return ['id' => $id];

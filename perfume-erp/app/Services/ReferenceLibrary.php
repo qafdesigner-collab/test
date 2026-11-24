@@ -7,7 +7,7 @@ use Illuminate\Validation\ValidationException;
 
 final class ReferenceLibrary
 {
-    public const COLUMNS = ['brand', 'name', 'gender', 'family', 'notes'];
+    public const COLUMNS = ['brand', 'name', 'gender', 'family', 'top_notes', 'heart_notes', 'base_notes', 'notes'];
 
     private const MAX_ROWS = 5000;
 
@@ -18,6 +18,9 @@ final class ReferenceLibrary
         'gender' => ['gender', 'for', 'audience', 'sex'],
         'family' => ['family', 'olfactive family', 'scent family', 'type', 'category'],
         'notes' => ['notes', 'key notes', 'description', 'accords'],
+        'top_notes' => ['top_notes', 'top', 'top notes', 'head notes', 'opening'],
+        'heart_notes' => ['heart_notes', 'heart', 'heart notes', 'middle', 'middle notes', 'mid notes'],
+        'base_notes' => ['base_notes', 'base', 'base notes', 'dry down', 'drydown'],
     ];
 
     /**
@@ -64,10 +67,15 @@ final class ReferenceLibrary
                 $name = $value('name');
                 $family = $value('family');
                 $notes = $value('notes');
+                $pyramid = ['top_notes' => $value('top_notes'), 'heart_notes' => $value('heart_notes'), 'base_notes' => $value('base_notes')];
+                if ($notes === '') {
+                    $notes = implode(', ', array_filter($pyramid));
+                }
                 $problem = match (true) {
                     $brand === '' || $name === '' => 'Brand and name are required.',
                     mb_strlen($brand) > 100 || mb_strlen($name) > 150 => 'Brand (100) or name (150 characters) is too long.',
                     mb_strlen($family) > 80 || mb_strlen($notes) > 2000 => 'Family (80) or notes (2,000 characters) is too long.',
+                    max(array_map('mb_strlen', $pyramid)) > 500 => 'Top, heart or base notes are too long (500 characters each).',
                     default => null,
                 };
                 if ($problem) {
@@ -77,7 +85,7 @@ final class ReferenceLibrary
 
                     continue;
                 }
-                $data = array_filter(['gender' => self::gender($value('gender')), 'family' => $family ?: null, 'notes' => $notes ?: null], fn ($v) => $v !== null);
+                $data = array_filter(['gender' => self::gender($value('gender')), 'family' => $family ?: null, 'notes' => $notes ?: null] + array_map(fn ($v) => $v ?: null, $pyramid), fn ($v) => $v !== null);
                 $key = mb_strtolower($brand).'|'.mb_strtolower($name);
                 if ($existing->has($key)) {
                     if ($update && $data) {
@@ -105,8 +113,8 @@ final class ReferenceLibrary
     public static function csv(bool $template): string
     {
         $rows = $template
-            ? [['Example House', 'Example Oud Intense', 'Unisex', 'Amber Woody', 'Saffron, rose, oud, vanilla'], ['Another Brand', 'Fresh Citrus No. 2', 'Men', 'Citrus Aromatic', 'Bergamot, lemon, lavender, cedar']]
-            : DB::table('references')->orderBy('brand')->orderBy('name')->get()->map(fn ($r) => [$r->brand, $r->name, $r->gender, $r->family, $r->notes])->all();
+            ? [['Example House', 'Example Oud Intense', 'Unisex', 'Amber Woody', 'Saffron, bergamot', 'Rose, oud', 'Vanilla, amber, musk', ''], ['Another Brand', 'Fresh Citrus No. 2', 'Men', 'Citrus Aromatic', 'Bergamot, lemon', 'Lavender', 'Cedar', '']]
+            : DB::table('references')->orderBy('brand')->orderBy('name')->get()->map(fn ($r) => [$r->brand, $r->name, $r->gender, $r->family, $r->top_notes, $r->heart_notes, $r->base_notes, $r->notes])->all();
         $out = fopen('php://temp', 'w+');
         fwrite($out, "\xEF\xBB\xBF");
         fputcsv($out, self::COLUMNS);

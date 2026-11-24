@@ -78,11 +78,25 @@ class InspirationLibraryTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => 'manager']));
         DB::table('references')->insert(['brand' => '=HYPERLINK("x")', 'name' => 'Formula test', 'created_at' => now(), 'updated_at' => now()]);
         $csv = $this->get('/api/references/export')->assertOk()->getContent();
-        $this->assertStringContainsString('brand,name,gender,family,notes', $csv);
+        $this->assertStringContainsString('brand,name,gender,family,top_notes,heart_notes,base_notes,notes', $csv);
         $this->assertStringContainsString("\"'=HYPERLINK(\"\"x\"\")\"", $csv);
         $this->assertStringContainsString('Example House', $this->get('/api/references/export?template=1')->getContent());
 
         $this->actingAs(User::factory()->create(['role' => 'cashier']));
         $this->post('/api/references/import', ['file' => UploadedFile::fake()->createWithContent('a.csv', "brand,name\nA,B\n")], ['Accept' => 'application/json'])->assertForbidden();
+    }
+
+    public function test_import_reads_top_heart_and_base_notes(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'manager']));
+        $csv = "Brand,Perfume,Gender,Family,Top notes,Middle notes,Base notes\nHouse A,Golden Oud,Unisex,Amber Woody,\"Saffron, bergamot\",\"Rose, oud\",\"Amber, musk\"\n";
+        $this->post('/api/references/import', ['file' => UploadedFile::fake()->createWithContent('p.csv', $csv)], ['Accept' => 'application/json'])->assertOk()->assertJson(['added' => 1]);
+        $ref = DB::table('references')->where('name', 'Golden Oud')->first();
+        $this->assertSame(['Saffron, bergamot', 'Rose, oud', 'Amber, musk'], [$ref->top_notes, $ref->heart_notes, $ref->base_notes]);
+        $this->assertSame('Saffron, bergamot, Rose, oud, Amber, musk', $ref->notes);
+
+        $this->postJson('/api/references', ['brand' => 'House B', 'name' => 'Fresh One', 'top_notes' => 'Lemon', 'base_notes' => 'Cedar'])->assertOk();
+        $this->assertSame('Lemon, Cedar', DB::table('references')->where('name', 'Fresh One')->value('notes'));
+        $this->assertStringContainsString('"Golden Oud",Unisex,"Amber Woody","Saffron, bergamot","Rose, oud","Amber, musk"', $this->get('/api/references/export')->getContent());
     }
 }

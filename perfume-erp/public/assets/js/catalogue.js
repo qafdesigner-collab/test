@@ -192,7 +192,7 @@ function filterReferenceOptions(input) {
 function referenceDialog() {
   modal(
     'Add an inspiration reference',
-    `<form><div class="notice">An internal reference fragrance, separate from your own product and its origin. ${state.references.length} references are already in the library.</div><div class="form-grid">${field('Reference brand', 'brand')}${field('Reference perfume', 'name')}<label>For<select name="gender"><option value="">Unspecified</option>${selectOptions(['Men', 'Women', 'Unisex'], '')}</select></label>${field('Olfactive family', 'family')}<label class="span2">Key notes / internal notes<textarea name="notes"></textarea></label></div>${formActions('Add reference')}</form>`,
+    `<form><div class="notice">An internal reference fragrance, separate from your own product and its origin. ${state.references.length} references are already in the library.</div><div class="form-grid">${field('Reference brand', 'brand')}${field('Reference perfume', 'name')}<label>For<select name="gender"><option value="">Unspecified</option>${selectOptions(['Men', 'Women', 'Unisex'], '')}</select></label>${field('Olfactive family', 'family')}${field('Top notes', 'top_notes')}${field('Heart notes', 'heart_notes')}${field('Base notes', 'base_notes')}<label class="span2">Other notes (optional)<textarea name="notes"></textarea></label></div>${formActions('Add reference')}</form>`,
   );
   bindForm(async fd => {
     await api('references', 'POST', Object.fromEntries(fd));
@@ -362,25 +362,55 @@ function fragranceProfileView(p) {
 
 
 /** Browse, import and export the internal inspiration library. */
+const LIBRARY_PAGE = 48;
+
 function libraryDialog() {
   const refs = state.references;
   const own = refs.filter(r => !r.library).length;
+  const families = [...new Set(refs.map(r => r.family).filter(Boolean))].sort();
   modal(
     `Inspiration library · ${refs.length} references`,
-    `<div class="notice">Internal staff reference only: brand and perfume names are never shown to customers as an affiliation. ${refs.length - own} come with the system, ${own} were added by your team.</div>
+    `<div class="notice">Internal staff reference only: brand and perfume names are never shown to customers as an affiliation. Notes are published summaries; your perfumer should confirm them before formulating. ${refs.length - own} come with the system, ${own} were added by your team.</div>
     <div class="library-actions">${can('manager', 'warehouse') ? '<button class="primary" onclick="referenceDialog()">+ Add one</button><button class="secondary" onclick="importLibraryDialog()">Import from Excel / CSV</button>' : ''}<a class="secondary" href="/api/references/export">Export all (CSV)</a></div>
-    ${table(
-      ['Brand', 'Perfume', 'For', 'Family', 'Key notes'],
-      refs.map(r => `<tr><td><b>${esc(r.brand)}</b></td><td>${esc(r.name)}${r.library ? '' : '<small>Added by your team</small>'}</td><td>${esc(r.gender || '—')}</td><td>${esc(r.family || '—')}</td><td><small>${esc(r.notes || '')}</small></td></tr>`),
-    )}`,
+    <div class="library-filters"><input type="search" id="library-search" placeholder="Search by name, house or note…" aria-label="Search the library"><select id="library-family" aria-label="Family"><option value="">All families</option>${families.map(f => `<option>${esc(f)}</option>`).join('')}</select><select id="library-gender" aria-label="For"><option value="">All</option>${selectOptions(['Men', 'Women', 'Unisex'], '')}</select></div>
+    <p class="tiny muted" id="library-count"></p><div class="pyramid-grid" id="library-cards"></div><div class="library-more"><button type="button" class="secondary" id="library-more" hidden>Show more</button></div>`,
     true,
   );
+  let shown = LIBRARY_PAGE;
+  const draw = () => {
+    const words = $('#library-search').value.toLowerCase().split(/\s+/).filter(Boolean);
+    const family = $('#library-family').value;
+    const gender = $('#library-gender').value;
+    const hits = refs.filter(
+      r =>
+        (!family || r.family === family) &&
+        (!gender || r.gender === gender) &&
+        words.every(w => [r.brand, r.name, r.family, r.top_notes, r.heart_notes, r.base_notes, r.notes].join(' ').toLowerCase().includes(w)),
+    );
+    $('#library-count').textContent = `${hits.length} of ${refs.length} references`;
+    $('#library-cards').innerHTML = hits.length ? hits.slice(0, shown).map(referenceCard).join('') : '<p class="muted">No reference matches.</p>';
+    $('#library-more').hidden = hits.length <= shown;
+  };
+  $('#library-search').addEventListener('input', () => ((shown = LIBRARY_PAGE), draw()));
+  $('#library-family').addEventListener('change', () => ((shown = LIBRARY_PAGE), draw()));
+  $('#library-gender').addEventListener('change', () => ((shown = LIBRARY_PAGE), draw()));
+  $('#library-more').addEventListener('click', () => ((shown += LIBRARY_PAGE), draw()));
+  draw();
+}
+
+/** One reference as a note-pyramid card: house, name, family, audience and top / heart / base notes. */
+function referenceCard(r) {
+  const pyramid = r.top_notes || r.heart_notes || r.base_notes;
+  const rows = pyramid
+    ? [['Top', r.top_notes], ['Heart', r.heart_notes], ['Base', r.base_notes]].map(([label, notes]) => `<div class="pyr-row"><b>${label}</b><span>${esc(notes || '—')}</span></div>`).join('')
+    : `<div class="pyr-row"><b>Notes</b><span>${esc(r.notes || '—')}</span></div>`;
+  return `<article class="pyr-card"><div class="house" data-no-translate>${esc(r.brand)}</div><h4 data-no-translate>${esc(r.name)}</h4><div class="meta">${r.family ? `<span class="badge" data-no-translate>${esc(r.family)}</span>` : ''}${r.gender ? `<span class="badge">${esc(r.gender)}</span>` : ''}${r.library ? '' : '<span class="badge">Added by your team</span>'}</div>${rows}</article>`;
 }
 
 function importLibraryDialog() {
   modal(
     'Import inspiration references',
-    `<form><ol class="steps"><li>Download the <a href="/api/references/export?template=1">template</a> and open it in Excel or Google Sheets.</li><li>Fill one perfume per row: <b>brand</b> and <b>name</b> are required; gender (Men / Women / Unisex), family and notes are optional.</li><li>Save as <b>CSV</b> (File → Save as → CSV UTF-8) and choose the file below.</li></ol>
+    `<form><ol class="steps"><li>Download the <a href="/api/references/export?template=1">template</a> and open it in Excel or Google Sheets.</li><li>Fill one perfume per row: <b>brand</b> and <b>name</b> are required; gender (Men / Women / Unisex), family, top notes, heart notes, base notes and other notes are optional.</li><li>Save as <b>CSV</b> (File → Save as → CSV UTF-8) and choose the file below.</li></ol>
     <label>CSV file<input type="file" name="file" accept=".csv,text/csv" required></label>
     <label class="check-row"><input type="checkbox" name="update" value="1" style="width:auto"> Update gender, family and notes of references that already exist</label>
     <div id="import-result"></div>${formActions('Import')}</form>`,

@@ -2655,3 +2655,9 @@ tr.total-row td { border-top: 2px solid var(--line) !important; }
 .theme-sample { display: flex; gap: 6px; align-items: flex-end; width: 100%; height: 64px; padding: 10px; border-radius: 8px; border: 1px solid #0000001a; margin-bottom: 6px; }
 .theme-sample i { display: block; width: 22px; height: 22px; border-radius: 50%; border: 1px solid #ffffff33; }
 .theme-sample i:first-child { width: 46px; height: 34px; border-radius: 6px; }
+
+/* Inspiration library filters */
+.library-filters { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0 6px; }
+.library-filters input { flex: 1 1 260px; }
+.library-filters select { flex: 0 1 200px; }
+.library-more { display: flex; justify-content: center; margin-top: 14px; }

@@ -63,6 +63,8 @@ const I18N_PATTERNS = [
   [/^Development release (.+)\.$/, 'إصدار تطويري $1.'],
   [/^· (\d+) invoices include estimated costs · (\d+) invoices have missing historical costs\.$/, '· $1 فاتورة بتكاليف تقديرية · $2 فاتورة بدون تكلفة تاريخية.'],
   [/^(.+) →$/, '$1 ←'],
+  [/^(\d[\d,]*) of (\d[\d,]*) references$/, '$1 من $2 مرجعًا'],
+  [/^Internal staff reference only: brand and perfume names are never shown to customers as an affiliation\. Notes are published summaries; your perfumer should confirm them before formulating\. (\d+) come with the system, (\d+) were added by your team\.$/, 'مرجع داخلي للموظفين فقط: لا تُعرض أسماء الدور والعطور على العملاء كادعاء انتماء. النوتات ملخصات منشورة، ويجب أن يتحقق منها خبير العطور قبل التركيب. $1 مرفقة مع النظام، و$2 أضافها فريقك.'],
 ];
 
 const I18N_EXTRA = {
