@@ -17,6 +17,7 @@ tar cf - \
   --exclude='./storage/logs/*.log' --exclude='./storage/framework/sessions/*' \
   --exclude='./storage/framework/views/*.php' --exclude='./storage/framework/cache/data/*' \
   --exclude='./storage/app/private/*' --exclude='./bootstrap/cache/*.php' \
+  --exclude='./storage/app/*.zip' --exclude='./storage/app/backups/*' --exclude=./storage/framework/testing \
   --exclude=./.phpunit.result.cache --exclude=./.phpunit.cache . | (cd "$OUT/perfume-erp" && tar xf -)
 
 # Reuse the local vendor folder (run composer install first) and strip development-only packages.
@@ -53,8 +54,24 @@ $app->usePublicPath(__DIR__);
 $app->handleRequest(Request::capture());
 PHP
 
-# If the application folder is ever placed inside a web root by mistake, refuse to serve it.
-printf '<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n    Deny from all\n</IfModule>\n' > "$OUT/perfume-erp/.htaccess"
+# The application folder itself must never be served. Sub-folders inherit this file, so it must not
+# simply deny everything: that would also block perfume-erp/public, the recommended document root.
+# If a domain's document root points at perfume-erp by mistake, every request is passed on to
+# public/ (so .env, storage and the code stay unreachable); without mod_rewrite nothing is served.
+cat > "$OUT/perfume-erp/.htaccess" <<'HTACCESS'
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+<IfModule !mod_rewrite.c>
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Deny from all
+    </IfModule>
+</IfModule>
+HTACCESS
 cp docs/CPANEL_INSTALL.md "$OUT/README-CPANEL.md"
 
 for d in "$OUT/perfume-erp/storage/app/private" "$OUT/perfume-erp/storage/framework/sessions" "$OUT/perfume-erp/storage/framework/views" "$OUT/perfume-erp/storage/framework/cache/data" "$OUT/perfume-erp/storage/logs"; do mkdir -p "$d"; done

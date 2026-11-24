@@ -1,3 +1,9 @@
+# This folder is the web root. Allow it explicitly so a stricter rule in a parent folder
+# (for example the perfume-erp folder on cPanel) cannot block the application.
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes

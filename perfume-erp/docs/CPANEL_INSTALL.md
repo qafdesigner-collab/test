@@ -22,7 +22,8 @@ Example: `erp.yourcompany.com`.
    Upload `atelier-erp-cpanel-….zip` and **Extract** it.
    You now have a folder `perfume-erp` next to `public_html`.
 2. **cPanel → Domains → Create a New Domain** (or Subdomains): `erp.yourcompany.com`.
-   Set **Document Root** to `perfume-erp/public`.
+   Set **Document Root** to `perfume-erp/public`. (If it points to `perfume-erp` instead, the ERP still
+   works and keeps its private files hidden, but `perfume-erp/public` is the cleaner setting.)
 3. Delete the extracted `public_html` folder from the ZIP if it was created inside your home folder (Option A does not use it). Do **not** delete your real website's `public_html`.
 4. Open `https://erp.yourcompany.com` and continue with "Run the installer" below.
 
@@ -106,6 +107,7 @@ php /home/USER/perfume-erp/artisan erp:two-factor-off owner@example.com
 
 | What you see | What to do |
 |---|---|
+| "403 Forbidden" on every page, including /install | Packages before 0.8.1 blocked the `perfume-erp/public` folder. Delete the old `perfume-erp` folder (if you have not installed yet) or extract the 0.8.1 ZIP over it. Also check the domain's Document Root is `perfume-erp/public` (Option A) or your `public_html` (Option B). |
 | "500 Internal Server Error" straight away | PHP version is below 8.3. Set PHP 8.3 in MultiPHP Manager. |
 | A list of files instead of the app | The document root points to the wrong folder. It must be `perfume-erp/public` (Option A) or contain `index.php` from the ZIP's `public_html` (Option B). |
 | "Could not connect to the database" | Check the name/user/password. Both start with your cPanel username and an underscore. The user must be added to the database with ALL PRIVILEGES. |

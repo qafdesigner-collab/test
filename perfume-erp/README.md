@@ -1,4 +1,4 @@
-# Atelier Perfume ERP — release 0.8.0
+# Atelier Perfume ERP — release 0.8.1
 
 A working Laravel 13 / PHP 8.3 application for a perfume company, with a responsive browser interface in English and Arabic, and a separate database per installation (MySQL/MariaDB or SQLite). No shared demonstration password is shipped.
 
