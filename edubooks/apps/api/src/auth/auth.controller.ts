@@ -7,6 +7,7 @@ import { config } from '../config';
 import { AuthService } from './auth.service';
 import { DbService } from '../db/db.service';
 import { sql } from 'drizzle-orm';
+import { pictureUrl } from '../people/avatars';
 import { ChangePasswordDto, LoginDto } from './auth.dto';
 import { SESSION_COOKIE } from './auth.guard';
 import { RETURN_COOKIE } from './login-as.controller';
@@ -35,12 +36,12 @@ export class AuthController {
   @Get('me')
   async me(@Req() req: any) {
     const m = req.me;
-    const { rows: [p] } = await this.db.q.execute(sql`SELECT photo_at FROM users WHERE id = ${m.user_id}`) as any;
-    m.photo_at = p?.photo_at ?? null;
+    const { rows: [p] } = await this.db.q.execute(sql`SELECT photo_key IS NOT NULL AS has, photo_at, avatar FROM users WHERE id = ${m.user_id}`) as any;
+    m.photo_url = p ? pictureUrl(m.user_id, p.has, p.photo_at, p.avatar) : null;
     return {
       id: m.user_id, username: m.username, displayName: m.display_name, roles: m.roles, mustChangePassword: m.impersonator_id ? false : m.must_change_password,
       impersonatedBy: m.impersonator_id ? { id: m.impersonator_id, name: m.impersonator_name } : null,
-      photoUrl: m.photo_at ? `/api/users/${m.user_id}/photo?v=${new Date(m.photo_at).getTime()}` : null,
+      photoUrl: m.photo_url,
       publisherId: m.publisher_id, school: m.school_id ? { id: m.school_id, name: m.school_name, code: m.school_code } : null,
     };
   }

@@ -1,3 +1,24 @@
+# What's new in Knowledge Gate 1.4.22
+
+## 🎮 Three new games
+- **⚽ Penalty kick** — the answers sit in the goal; the right one is a **GOAL!** past the keeper, a wrong one is saved. A scoreboard shows every shot.
+- **🏃 Running race** — every right answer is a big step towards the finish line; the rival (🐇 rabbit, 🐢 turtle, 🐕, 🐎, 🦊 or 🚗) runs on a clock. The teacher sets how fast the rival runs.
+- **🔨 Whack-a-mole** — moles pop out of nine holes holding letters, numbers or pictures; bonk only the right ones before the time is up. They get faster as you go.
+- Teachers and the super admin make them like a quiz (questions with 2–4 choices) or like Bubble pop (what to bonk and what not).
+
+## 🎁 20 ready-made games
+- **Game library → 🎁 Add ready-made games** adds 20 games for every school in the **⚽ Sports** and **🎲 General games** collections: Penalty kick (adding, sports quiz), Running race (times tables, animal sounds), Whack-a-mole (even numbers, sports balls, vowels), sports memory and sorting, a fingers workout, colour memory, counting fruit, land/sea/sky, shapes, healthy habits, word building, listening, number bubbles, tracing 1–5 and Arabic letters ا ب ت ث. Already added games are not added twice.
+- **Load demo data** adds them too.
+- On the students’ Play page the book sections come first, then ⚽ Sports and 🎲 General games.
+
+## 🧸 3D pictures instead of a photo
+- In **My photo**, everyone can now also choose a picture: **teachers**, **students** (girls and boys, with and without hijab, different skin tones, graduates), **animals** (owl, panda, fox, tiger, koala…) and **study** pictures (books, rocket, star…). They are colourful 3D pictures (Fluent Emoji 3D by Microsoft, MIT licence).
+- The picture shows everywhere a photo does: the top bar, the welcome window and the timeline. Choosing a picture replaces the photo, and a new photo replaces the picture.
+
+## 📰 Sample news for demos, and “new posts” in the welcome window
+- A sales person’s new demo school now comes with **6 sample posts**: Sports Day (pinned event), seeds in the garden, the art gallery, a Science Fair event, Reading Week and National Day — each with a drawn picture (no real children). Demo accounts get 3D pictures. An existing demo school gets them with **📰 Add sample news** on **My demo accounts**. **Load demo data** adds them to the demo school as well.
+- The **welcome window** now says **“You have N new posts on the timeline”** when the school or the child’s class has posted since the timeline was last opened (students, parents, teachers and school admins). A click opens the timeline.
+
 # What's new in Knowledge Gate 1.4.21
 
 ## 📰 School timeline

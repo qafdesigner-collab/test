@@ -9,13 +9,15 @@ import { useMe } from '@/lib/session';
 import { useT } from '@/lib/i18n';
 import { cn } from '@/components/ui';
 
-const initials = (n?: string) => (n ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '🙂';
+const initials = (n?: string) => (n ?? '').split(/\s+/).filter((w) => /^\p{L}/u.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '🙂';
 
 /** A person's photo, or their initials when they have none. With `open`, a click shows the photo large. */
 export function Avatar({ name, photoUrl, size = 40, className, style, open }: { name?: string; photoUrl?: string | null; size?: number; className?: string; style?: React.CSSProperties; open?: boolean }) {
   const [big, setBig] = useState(false);
+  const pic = photoUrl?.startsWith('/avatars/');
   const face = photoUrl
-    ? <img src={photoUrl} alt={name ?? ''} className={cn('shrink-0 rounded-full object-cover shadow', className)} style={{ width: size, height: size, ...style }} />
+    ? <img src={photoUrl} alt={name ?? ''} className={cn('shrink-0 rounded-full shadow', pic ? 'bg-gradient-to-br from-sky-100 via-violet-100 to-amber-100 object-contain p-[8%]' : 'object-cover', className)}
+        style={{ width: size, height: size, ...style, ...(pic ? { background: undefined } : {}) }} />
     : <span className={cn('grid shrink-0 place-items-center rounded-full font-extrabold text-white shadow', className)} style={{ width: size, height: size, fontSize: size * 0.36, background: 'linear-gradient(115deg,#6857cf,#d9847a)', ...style }} aria-hidden={!name}>{initials(name)}</span>;
   if (!open || !photoUrl) return face;
   return <>
@@ -62,14 +64,16 @@ export function MyPhoto({ size = 40, className, style }: { size?: number; classN
     setBusy(true);
     try { await api.post('/me/photo', { image: await squareJpeg(f) }); done(); } catch (e: any) { setErr(e?.message ?? String(e)); } finally { setBusy(false); if (file.current) file.current.value = ''; }
   };
-  const remove = async () => { setBusy(true); try { await api.del('/me/photo'); done(); } finally { setBusy(false); } };
+  const remove = async () => { setBusy(true); try { await api.del('/me/photo'); await api.post('/me/avatar', { avatar: null }); done(); } finally { setBusy(false); } };
+  const choose = async (a: string) => { setBusy(true); setErr(''); try { await api.post('/me/avatar', { avatar: a }); done(); } catch (e: any) { setErr(e?.message ?? String(e)); } finally { setBusy(false); } };
+  const current = me.photoUrl?.startsWith('/avatars/') ? me.photoUrl.slice(9, -5) : null;
   return <>
     <button type="button" onClick={() => setOpen(true)} className="focus-ring shrink-0 rounded-full" aria-label={t('My photo')} title={t('My photo')}>
       <Avatar name={me.displayName} photoUrl={me.photoUrl} size={size} className={className} style={style} />
     </button>
     {open && createPortal(
       <div role="dialog" aria-modal="true" aria-label={t('My photo')} className="fixed inset-0 z-[70] grid place-items-center bg-slate-900/60 p-4" onClick={() => setOpen(false)}>
-        <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
           <div className="mb-4 flex justify-end"><button type="button" onClick={() => setOpen(false)} className="rounded-full p-1 text-slate-500 hover:bg-slate-100" aria-label={t('Close')}><X className="size-5" /></button></div>
           <div className="mx-auto w-fit"><Avatar name={me.displayName} photoUrl={me.photoUrl} size={176} open /></div>
           <p className="mt-3 text-xl font-extrabold text-slate-800">{me.displayName}</p>
@@ -80,6 +84,16 @@ export function MyPhoto({ size = 40, className, style }: { size?: number; classN
               <Camera className="size-4" />{me.photoUrl ? t('Change photo') : t('Add a photo')}</button>
             {me.photoUrl && <button type="button" disabled={busy || !!me.impersonatedBy} onClick={remove} className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 font-bold text-slate-700 disabled:opacity-50"><Trash2 className="size-4" />{t('Remove')}</button>}
           </div>
+          <div className="mt-5 text-start">
+            <p className="mb-2 text-sm font-extrabold text-slate-700">{t('…or choose a picture')}</p>
+            {AVATAR_GROUPS.map((g) => <div key={g.label} className="mb-3">
+              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">{t(g.label)}</p>
+              <div className="grid grid-cols-6 gap-1.5">{g.items.map((a) => (
+                <button key={a} type="button" disabled={busy || !!me.impersonatedBy} onClick={() => choose(a)} aria-label={a.replace(/-/g, ' ')} aria-pressed={current === a}
+                  className={cn('aspect-square rounded-2xl p-1 transition hover:scale-110 disabled:opacity-50', current === a ? 'bg-violet-100 ring-2 ring-violet-500' : 'bg-slate-50 hover:bg-violet-50')}>
+                  <img src={`/avatars/${a}.webp`} alt="" className="size-full object-contain" loading="lazy" /></button>))}</div>
+            </div>)}
+          </div>
           {me.impersonatedBy && <p className="mt-3 text-xs text-amber-700">{t('Only this person can change their photo.')}</p>}
           {err && <p role="alert" className="mt-3 text-sm text-red-700">{err}</p>}
           <p className="mt-4 text-xs text-slate-500">{t('Your photo is seen only by people in your school (and the publisher’s team).')}</p>
@@ -88,6 +102,14 @@ export function MyPhoto({ size = 40, className, style }: { size?: number; classN
     )}
   </>;
 }
+
+/** Ready-made 3D pictures (Fluent Emoji 3D, MIT — see /avatars/LICENSE.txt). */
+const AVATAR_GROUPS = [
+  { label: 'Teachers', items: ['teacher-woman', 'teacher-man', 'teacher', 'teacher-woman-2', 'teacher-man-2', 'graduate'] },
+  { label: 'Students', items: ['girl', 'boy', 'girl-2', 'boy-2', 'girl-3', 'boy-3', 'girl-hijab', 'girl-hijab-2', 'boy-turban', 'child', 'graduate-girl', 'graduate-boy'] },
+  { label: 'Animals', items: ['owl', 'panda', 'fox', 'tiger', 'koala', 'rabbit', 'bear', 'lion', 'frog', 'monkey', 'cat', 'dog', 'penguin', 'unicorn', 'turtle', 'elephant'] },
+  { label: 'Study', items: ['books', 'pencil', 'backpack', 'rocket', 'star', 'palette', 'football', 'microscope', 'brain', 'bulb'] },
+];
 
 /** Good morning / noon / afternoon / evening / night, from the clock of the device the person is using. */
 export function greeting(d = new Date()) {
@@ -102,6 +124,7 @@ export function greeting(d = new Date()) {
 const TODO: Record<string, { icon: string; text: string }> = {
   homework: { icon: '📝', text: 'You have {n} homework to do' },
   dueSoon: { icon: '⏰', text: '{n} homework due in the next 2 days' },
+  posts: { icon: '📰', text: 'You have {n} new posts on the timeline' },
   toMark: { icon: '✅', text: '{n} answers are waiting for your marking' },
   licences: { icon: '🔑', text: '{n} book licences end within 30 days' },
   demos: { icon: '⏳', text: '{n} demo schools end within 7 days' },

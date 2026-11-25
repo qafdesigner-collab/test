@@ -1,7 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/components/ui/toast';
 import { Gamepad2, Plus } from 'lucide-react';
 import { api, fmtDate } from '@/lib/api';
 import { Badge, EmptyState, PageLoader, Select } from '@/components/ui';
@@ -16,6 +17,7 @@ export default function AdminGames() {
   return (
     <div className="space-y-6">
       <PageHeader title="Game library" sub="Reusable learning games linked to your books and lessons. Published games appear for every school licensed for the book — and for every school when they are in a collection (General games, Sports).">
+        <StarterButton />
         <Link href="/admin/games/new" className="focus-ring inline-flex h-10 items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700"><Plus className="size-4" />New game</Link>
       </PageHeader>
       <div className="flex flex-wrap gap-2"><Select className="w-72" aria-label="Book" value={editionId} onChange={(e) => setEditionId(e.target.value)}><option value="">All books</option>{eds.data?.map((e) => <option key={e.id} value={e.id}>{e.packageTitle} · {e.label}</option>)}</Select>
@@ -31,4 +33,16 @@ export default function AdminGames() {
       )}
     </div>
   );
+}
+
+/** Adds the ready-made General games and Sports games (the ones not in the library yet). */
+function StarterButton() {
+  const qc = useQueryClient(); const toast = useToast(); const [busy, setBusy] = useState(false);
+  const go = async () => {
+    setBusy(true);
+    try { const r = await api.post<{ added: number; total: number }>('/publishing/games/starter-pack'); toast(r.added ? `${r.added} ready-made games added` : 'All ready-made games are already in your library'); qc.invalidateQueries({ queryKey: ['libGames'] }); }
+    finally { setBusy(false); }
+  };
+  return <button type="button" onClick={go} disabled={busy} title="Penalty kick, Running race, Whack-a-mole and more — for every school"
+    className="focus-ring inline-flex h-10 items-center gap-1.5 rounded-lg bg-white px-4 text-sm font-medium text-slate-800 ring-1 ring-slate-300 hover:bg-slate-50 disabled:opacity-50">🎁 {busy ? 'Adding…' : 'Add ready-made games'}</button>;
 }

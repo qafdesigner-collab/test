@@ -16,7 +16,7 @@ export default function LearnGames() {
     const where = [...(g.bookTitle ? [g.bookTitle] : []), ...(g.categories ?? []).map((c: string) => COLL[c] ?? c)];
     for (const w of where.length ? where : [t('More games')]) (m[w] ??= []).push(g);
     return m;
-  }, {}));
+  }, {})).sort(([a], [b]) => Number(Object.values(COLL).includes(a)) - Number(Object.values(COLL).includes(b))); // books first, then the collections
   return (
     <div className="space-y-10"><h1 className="text-4xl font-black text-slate-800">{t('🎮 Play & learn')}</h1>
       {!q.data.length && <p className="rounded-[2rem] bg-white p-8 text-center text-xl font-bold text-slate-500">{t('No games yet!')}</p>}

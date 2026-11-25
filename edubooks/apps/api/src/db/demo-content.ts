@@ -1,6 +1,9 @@
 /* Sample content shared by the demo seed (tests, fresh demo installs) and the "Load demo data" tool.
  * All units/lessons are clearly marked "(sample)": placeholders, NOT real publisher textbook content.
  * Runs as the OWNER role (bypasses RLS). */
+import { seedDemoPosts } from '../demo/timeline-demo';
+import { STARTER_GAMES } from '../games/starter-pack';
+import { validateContent } from '../games/engines';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -311,5 +314,17 @@ export async function demoExtras(db: NodePgDatabase<typeof s>, P: string, admin:
     (${P}, ${course.id}, 2, 'Setting homework', 'TEXT', 'Open Homework & tests, choose New, pick the book lesson and add questions. Publish it when you are ready.', 4)`);
   await x(sql`INSERT INTO training_lessons (publisher_id, course_id, sort, title, kind, quiz, minutes) VALUES
     (${P}, ${course.id}, 3, 'Quick check', 'QUIZ', ${JSON.stringify([{ q: 'Where do you find your books?', options: ['My books', 'Games'], answer: 0 }])}::jsonb, 2)`);
-  void admin;
+  // friendly 3D pictures for the demo accounts, then the school timeline: news, events and pictures
+  for (const [k, a] of [['principal', 'teacher-man-2'], ['teacher1', 'teacher-woman'], ['student1', 'girl-hijab'], ['student2', 'boy-2'], ['student3', 'girl'], ['parent1', 'owl']])
+    if (u[k]) await x(sql`UPDATE users SET avatar = ${a} WHERE id = ${u[k]}`);
+  await seedDemoPosts((q) => x(q) as any, createDriver(), { publisherId: P, schoolId: S, principal: u.principal, teacher: u.teacher1, classId: cls, direct: true });
+  // the ready-made General games and Sports games (removed again with the demo data)
+  const have = new Set(((await x(sql`SELECT title FROM game_activities WHERE publisher_id = ${P} AND school_id IS NULL`)).rows as any[]).map((g) => g.title));
+  for (const g of STARTER_GAMES) {
+    if (have.has(g.title)) continue;
+    const { content } = validateContent(g.engine as any, g.content);
+    const row = (await x(sql`INSERT INTO game_activities (publisher_id, engine, title, instructions, difficulty, content, published, categories, created_by)
+      VALUES (${P}, ${g.engine}::game_engine, ${g.title}, ${g.instructions}, ${g.difficulty}, ${JSON.stringify(content)}::jsonb, true, ${`{${g.categories.join(',')}}`}::text[], ${admin.id}) RETURNING id`)).rows[0] as any;
+    await o.record('game_activities', row.id);
+  }
 }

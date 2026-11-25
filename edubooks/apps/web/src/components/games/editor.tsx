@@ -28,6 +28,9 @@ export const EMPTY_CONTENT: Record<Engine, any> = {
   BUBBLE_POP: { task: 'Pop the letter B!', targets: ['B', 'b'], others: ['D', 'P', 'd', 'p', 'R'], goal: 8, seconds: 60 },
   FINGERS: { rounds: [{ show: '3', answer: 3 }, { show: '🍎🍎🍎🍎🍎', answer: 5 }, { show: '2 + 2', answer: 4 }, { show: '1', answer: 1 }] },
   AIR_WRITING: { items: ['A', 'B', 'C', '1', '2'] },
+  PENALTY_KICK: { questions: [{ prompt: '2 + 2 = ?', options: ['3', '4', '5'], answer: 1 }, { prompt: 'Which is a fruit?', options: ['🍎', '🚗', '⚽'], answer: 0 }, { prompt: '5 − 1 = ?', options: ['4', '6'], answer: 0 }] },
+  RUNNING_RACE: { seconds: 8, rival: '🐇', questions: [{ prompt: '3 + 1 = ?', options: ['4', '5', '2'], answer: 0 }, { prompt: 'Which animal flies?', options: ['🐶', '🐦', '🐟'], answer: 1 }, { prompt: '10 − 5 = ?', options: ['4', '6', '5'], answer: 2 }] },
+  WHACK_A_MOLE: { task: 'Bonk the letter A!', targets: ['A', 'a'], others: ['B', 'D', 'E', 'b', 'o'], goal: 10, seconds: 60 },
 };
 const list = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
 
@@ -66,11 +69,18 @@ export function ContentForm({ engine, value, onChange }: { engine: Engine; value
         <Input aria-label="Sentence" className="min-w-56 flex-1" placeholder="A is for ___ 🍎" value={r.text} onChange={(e) => set({ text: e.target.value })} />
         <Input aria-label="Answer" className="w-28" placeholder="answer" value={r.answer} onChange={(e) => set({ answer: e.target.value })} />
         <Input aria-label="Choices" className="w-44" placeholder="choices (optional)" value={r.options.join(', ')} onChange={(e) => set({ options: list(e.target.value) })} /></>} />;
-    case 'QUIZ':
-      return <Rows label="Add question" rows={v.questions} blank={{ prompt: '', options: ['', ''], answer: 0 }} onChange={(questions) => onChange({ questions })} render={(r, set) => <>
+    case 'QUIZ': case 'PENALTY_KICK': case 'RUNNING_RACE': {
+      const qs = <Rows label="Add question" rows={v.questions} blank={{ prompt: '', options: ['', ''], answer: 0 }} onChange={(questions) => onChange({ questions })} render={(r, set) => <>
         <Input aria-label="Question" className="min-w-56 flex-1" placeholder="Question" value={r.prompt} onChange={(e) => set({ prompt: e.target.value })} />
         <Input aria-label="Choices" className="w-52" placeholder="choices, commas" value={r.options.join(', ')} onChange={(e) => set({ options: list(e.target.value) })} />
-        <Select aria-label="Correct choice" className="w-36" value={r.answer} onChange={(e) => set({ answer: Number(e.target.value) })}>{r.options.map((o, i) => <option key={i} value={i}>✓ {o || `choice ${i + 1}`}</option>)}</Select></>} />;
+        <Select aria-label="Correct choice" className="w-36" value={r.answer} onChange={(e) => set({ answer: Number(e.target.value) })}>{r.options.map((o, i) => <option key={i} value={i}>✓ {o || `choice ${i + 1}`}</option>)}</Select></>} />
+      if (engine !== 'RUNNING_RACE') return <div className="space-y-2">{qs}{engine === 'PENALTY_KICK' && <p className="text-xs text-slate-500">⚽ The choices sit in the goal (2–4 each). A right answer is a goal; a wrong one is saved by the keeper.</p>}</div>;
+      return <div className="space-y-3">{qs}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Seconds per question for the rival"><Input type="number" min={4} max={30} value={v.seconds ?? 8} onChange={(e) => onChange({ ...v, seconds: Number(e.target.value) })} /></Field>
+          <Field label="Rival runner"><Select value={v.rival ?? '🐇'} onChange={(e) => onChange({ ...v, rival: e.target.value })}>{['🐇', '🐢', '🐕', '🐎', '🦊', '🚗'].map((x) => <option key={x}>{x}</option>)}</Select></Field>
+        </div><p className="text-xs text-slate-500">🏃 Each right answer moves the child towards the finish; the rival runs on a clock. Fewer seconds = a faster rival.</p></div>;
+    }
     case 'SHAPES':
       return <div className="space-y-3"><div className="flex flex-wrap gap-2">{SHAPES.map((s) => (
         <label key={s} className={cn('cursor-pointer rounded-lg border px-3 py-1.5 text-sm', v.shapes.includes(s) ? 'border-brand-500 bg-brand-50' : 'border-slate-200')}>
@@ -92,7 +102,7 @@ export function ContentForm({ engine, value, onChange }: { engine: Engine; value
         <Button type="button" size="sm" variant="secondary" disabled={!v.items.length} onClick={() => printTracingSheet(v, 'Handwriting practice')}>🖨 Print as a worksheet</Button>
         <p className="text-xs text-slate-500">Children trace each one with a finger, a stylus or the mouse; the app checks that they follow the letters, gives stars and says the letter.</p>
       </div>;
-    case 'BUBBLE_POP':
+    case 'BUBBLE_POP': case 'WHACK_A_MOLE':
       return <div className="space-y-3">
         <Field label="Task (read aloud)"><Input value={v.task} maxLength={120} placeholder="Pop the letter B!" onChange={(e) => onChange({ ...v, task: e.target.value })} /></Field>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -100,10 +110,10 @@ export function ContentForm({ engine, value, onChange }: { engine: Engine; value
           <Field label="Not these (commas)"><Input value={v.others.join(', ')} placeholder="D, P, d, p" onChange={(e) => onChange({ ...v, others: list(e.target.value) })} /></Field>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Bubbles to pop to win"><Input type="number" min={3} max={20} value={v.goal} onChange={(e) => onChange({ ...v, goal: Number(e.target.value) })} /></Field>
+          <Field label={engine === 'WHACK_A_MOLE' ? 'Moles to bonk to win' : 'Bubbles to pop to win'}><Input type="number" min={3} max={20} value={v.goal} onChange={(e) => onChange({ ...v, goal: Number(e.target.value) })} /></Field>
           <Field label="Time (seconds)"><Input type="number" min={30} max={180} value={v.seconds} onChange={(e) => onChange({ ...v, seconds: Number(e.target.value) })} /></Field>
         </div>
-        <p className="text-xs text-slate-500">📷 Children point with a finger in the air in front of the camera to pop the right bubbles (or tap them on the screen). The camera picture stays on the device.</p>
+        <p className="text-xs text-slate-500">{engine === 'WHACK_A_MOLE' ? '🔨 Moles pop out of nine holes holding these; children tap only the right ones before the time is up.' : '📷 Children point with a finger in the air in front of the camera to pop the right bubbles (or tap them on the screen). The camera picture stays on the device.'}</p>
       </div>;
     case 'FINGERS':
       return <div className="space-y-2">

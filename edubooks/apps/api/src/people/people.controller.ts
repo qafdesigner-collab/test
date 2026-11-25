@@ -17,6 +17,10 @@ import { hashPassword } from '../auth/password';
 import { friendlyPassword } from '../common/creds';
 import { SchoolsService } from '../schools/schools.service';
 import { SchoolsModule } from '../schools/schools.module';
+import { AVATARS, pictureUrl } from './avatars';
+import { TimelineModule, TimelineService } from '../timeline/timeline.controller';
+import { createDriver } from '../storage/storage.driver';
+import { seedDemoPosts } from '../demo/timeline-demo';
 
 const ANY = ['PUBLISHER_ADMIN', 'PUBLISHER_EDITOR', 'PUBLISHER_SALES', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT'];
 const PHOTO = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/;
@@ -36,11 +40,12 @@ class StaffDto {
   @IsIn(['PUBLISHER_SALES', 'PUBLISHER_EDITOR', 'PUBLISHER_ADMIN']) role!: string;
   @IsOptional() @IsString() @MinLength(8) @MaxLength(100) password?: string;
 }
+class AvatarDto { @IsOptional() @IsIn([...AVATARS, null]) avatar!: string | null; }
 class StatusDto { @IsIn(['ACTIVE', 'SUSPENDED']) status!: string; }
 
 @Injectable()
 export class PeopleService {
-  constructor(private readonly db: DbService, private readonly assets: AssetsService, private readonly audit: AuditService, private readonly schools: SchoolsService) {}
+  constructor(private readonly db: DbService, private readonly assets: AssetsService, private readonly audit: AuditService, private readonly schools: SchoolsService, private readonly timeline: TimelineService) {}
   private async rows(q: ReturnType<typeof sql>) { return (await this.db.q.execute(q)).rows as any[]; }
   private get ctx() { return this.db.ctx; }
 
@@ -64,8 +69,14 @@ export class PeopleService {
     return { photoUrl: null };
   }
   async photoInfo(id: string) {
-    const [u] = await this.rows(sql`SELECT photo_at FROM users WHERE id = ${id}`);
-    return { photoUrl: u?.photo_at ? `/api/users/${id}/photo?v=${new Date(u.photo_at).getTime()}` : null };
+    const [u] = await this.rows(sql`SELECT photo_key IS NOT NULL AS has, photo_at, avatar FROM users WHERE id = ${id}`);
+    return { photoUrl: u ? pictureUrl(id, u.has, u.photo_at, u.avatar) : null, avatar: u?.avatar ?? null };
+  }
+  async setAvatar(avatar: string | null) {
+    if (avatar !== null && !(AVATARS as readonly string[]).includes(avatar)) throw new BadRequestException('Choose one of the pictures');
+    const [r] = await this.rows(sql`SELECT * FROM set_my_avatar(${avatar})`);
+    if (r?.old_key) this.assets.driver.remove(r.old_key).catch(() => undefined);
+    return this.photoInfo(this.ctx.userId);
   }
   /** Only people the viewer may see (row security): the same school, or publisher staff. */
   async readPhoto(id: string) {
@@ -105,6 +116,12 @@ export class PeopleService {
       const mine = roles.includes('PUBLISHER_ADMIN') ? sql`TRUE` : sql`(created_by = ${me} OR demo_owner_id = ${me})`;
       const [r] = await this.rows(sql`SELECT count(*)::int AS n FROM schools WHERE is_demo AND status = 'ACTIVE' AND demo_expires_at BETWEEN now() AND now() + interval '7 days' AND ${mine}`);
       add('demos', r.n, '/admin/sales');
+    }
+    // new posts on the school timeline (from the class or the whole school)
+    if (this.ctx.schoolId) {
+      const n = await this.timeline.newCount();
+      const link = roles.includes('SCHOOL_ADMIN') ? '/school/timeline' : roles.includes('TEACHER') ? '/teacher/timeline' : roles.includes('STUDENT') ? '/learn/timeline' : '/parent/timeline';
+      if (n > 0) todo.unshift({ key: 'posts', n, link });
     }
     return { notifications: notes, unread, todo, ...(await this.photoInfo(me)) };
   }
@@ -157,13 +174,19 @@ export class PeopleService {
       .map(({ issued, ...u }) => ({ ...u, password: issued ? unseal(issued) : null })) : [];
     const others = await this.rows(sql`SELECT id, name, code::text AS code, demo_expires_at AS "expiresAt", status FROM schools
       WHERE is_demo AND created_by = ${me} AND demo_owner_id IS NULL ORDER BY created_at DESC LIMIT 50`);
-    return { school: s ?? null, logins, others };
+    const posts = s ? (await this.rows(sql`SELECT count(*)::int AS n FROM timeline_posts WHERE school_id = ${s.id}`))[0].n : 0;
+    return { school: s ?? null, logins, others, posts };
   }
   async createMyDemo() {
     const [has] = await this.rows(sql`SELECT 1 FROM schools WHERE demo_owner_id = ${this.ctx.userId}`);
     if (has) throw new ConflictException('You already have your demo school.');
     const [me] = await this.rows(sql`SELECT display_name FROM users WHERE id = ${this.ctx.userId}`);
     await this.schools.createDemo({ name: `Demo – ${me.display_name}`, productVersionIds: [], days: 365 }, { ownerId: this.ctx.userId });
+    // friendly 3D pictures for the demo accounts
+    const [sc] = await this.rows(sql`SELECT id FROM schools WHERE demo_owner_id = ${this.ctx.userId}`);
+    for (const [u, a] of [['principal', 'teacher-man-2'], ['teacher', 'teacher-woman'], ['student1', 'girl-hijab'], ['student2', 'boy-2'], ['parent1', 'owl']])
+      await this.rows(sql`UPDATE users SET avatar = ${a} WHERE school_id = ${sc.id} AND username = ${u} AND photo_key IS NULL`);
+    await this.samplePosts();
     return this.myDemo();
   }
   async renewMyDemo() {
@@ -171,6 +194,18 @@ export class PeopleService {
     if (!r.length) throw new NotFoundException('You have no demo school yet.');
     await this.rows(sql`UPDATE license_pools SET valid_until = (now() + interval '365 days')::date WHERE school_id = ${r[0].id}`);
     return this.myDemo();
+  }
+  /** Sample news posts and events with pictures in my demo school (when it has none yet). */
+  async samplePosts() {
+    const [sc] = await this.rows(sql`SELECT id, publisher_id FROM schools WHERE demo_owner_id = ${this.ctx.userId}`);
+    if (!sc) throw new NotFoundException('You have no demo school yet.');
+    const [has] = await this.rows(sql`SELECT 1 FROM timeline_posts WHERE school_id = ${sc.id} LIMIT 1`);
+    if (has) throw new ConflictException('Your demo school already has posts.');
+    const ppl = await this.rows(sql`SELECT u.id, r.role::text AS role FROM users u JOIN user_roles r ON r.user_id = u.id WHERE u.school_id = ${sc.id}`);
+    const [cls] = await this.rows(sql`SELECT id FROM classes WHERE school_id = ${sc.id} ORDER BY created_at LIMIT 1`);
+    const added = await seedDemoPosts((q) => this.db.q.execute(q) as any, createDriver(), { publisherId: sc.publisher_id, schoolId: sc.id,
+      principal: ppl.find((p) => p.role === 'SCHOOL_ADMIN')?.id, teacher: ppl.find((p) => p.role === 'TEACHER')?.id, classId: cls?.id ?? null });
+    return { added };
   }
   /** Fresh passwords for all accounts of my demo school (e.g. after a customer tried them). */
   async resetMyDemo() {
@@ -193,6 +228,10 @@ export class PeopleController {
     if (c.impersonatorId) throw new ForbiddenException('You are signed in as this person; only they can change their photo.');
     return this.svc.setPhoto(d.image);
   }
+  @Roles(...ANY) @Post('me/avatar') @HttpCode(200) setAvatar(@Ctx() c: any, @Body() d: AvatarDto) {
+    if (c.impersonatorId) throw new ForbiddenException('You are signed in as this person; only they can change their picture.');
+    return this.svc.setAvatar(d.avatar ?? null);
+  }
   @Roles(...ANY) @Delete('me/photo') removePhoto(@Ctx() c: any) {
     if (c.impersonatorId) throw new ForbiddenException('You are signed in as this person; only they can change their photo.');
     return this.svc.removePhoto();
@@ -212,9 +251,10 @@ export class PeopleController {
 
   @Roles('PUBLISHER_SALES', 'PUBLISHER_ADMIN') @Get('sales/my-demo') myDemo() { return this.svc.myDemo(); }
   @Roles('PUBLISHER_SALES', 'PUBLISHER_ADMIN') @Post('sales/my-demo') createMyDemo() { return this.svc.createMyDemo(); }
+  @Roles('PUBLISHER_SALES', 'PUBLISHER_ADMIN') @Post('sales/my-demo/sample-posts') @HttpCode(200) async samplePosts() { await this.svc.samplePosts(); return this.svc.myDemo(); }
   @Roles('PUBLISHER_SALES', 'PUBLISHER_ADMIN') @Post('sales/my-demo/renew') @HttpCode(200) renew() { return this.svc.renewMyDemo(); }
   @Roles('PUBLISHER_SALES', 'PUBLISHER_ADMIN') @Post('sales/my-demo/reset-passwords') @HttpCode(200) resetDemo() { return this.svc.resetMyDemo(); }
 }
 
-@Module({ imports: [SchoolsModule], controllers: [PeopleController], providers: [PeopleService] })
+@Module({ imports: [SchoolsModule, TimelineModule], controllers: [PeopleController], providers: [PeopleService] })
 export class PeopleModule {}

@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 
 /** The 15 reusable game engines. Content is plain data, so one engine serves any book or lesson. */
-export const ENGINES = ['ALPHABET_MATCH', 'PICTURE_WORD', 'COUNTING', 'SORTING', 'MEMORY', 'FILL_BLANK', 'QUIZ', 'SHAPES', 'WORD_BUILD', 'PUZZLE', 'SPELLING_BEE', 'SENTENCE_BUILDER', 'LISTENING', 'TRACING', 'COLORING', 'BUBBLE_POP', 'FINGERS', 'AIR_WRITING'] as const;
+export const ENGINES = ['ALPHABET_MATCH', 'PICTURE_WORD', 'COUNTING', 'SORTING', 'MEMORY', 'FILL_BLANK', 'QUIZ', 'SHAPES', 'WORD_BUILD', 'PUZZLE', 'SPELLING_BEE', 'SENTENCE_BUILDER', 'LISTENING', 'TRACING', 'COLORING', 'BUBBLE_POP', 'FINGERS', 'AIR_WRITING', 'PENALTY_KICK', 'RUNNING_RACE', 'WHACK_A_MOLE'] as const;
 export type Engine = (typeof ENGINES)[number];
 export const SHAPES = ['circle', 'square', 'triangle', 'rectangle', 'star', 'heart', 'oval', 'diamond'] as const;
 
@@ -39,10 +39,12 @@ export function validateContent(engine: Engine, c: any): { content: any; maxScor
       for (const x of sentences) if (x.options.length && !x.options.includes(x.answer)) x.options.push(x.answer);
       return { content: { sentences }, maxScore: sentences.length };
     }
-    case 'QUIZ': {
+    case 'QUIZ': case 'PENALTY_KICK': case 'RUNNING_RACE': {
+      // Penalty kick: each right answer is a goal. Running race: each right answer is a step; the rival runs on a clock.
       const questions = arr(c?.questions).map((q: any) => ({ prompt: s(q?.prompt, 200), options: arr(q?.options).map((o) => s(o, 60)).filter(Boolean).slice(0, 4), answer: Math.round(Number(q?.answer)) }))
         .filter((q) => q.prompt && q.options.length >= 2 && q.answer >= 0 && q.answer < q.options.length);
       if (!questions.length || questions.length > 20) bad('Add 1–20 questions, each with 2–4 choices and the right one marked');
+      if (engine === 'RUNNING_RACE') return { content: { questions, seconds: Math.max(4, Math.min(30, Math.round(Number(c?.seconds) || 8))), rival: s(c?.rival, 8) || '🐇' }, maxScore: questions.length };
       return { content: { questions }, maxScore: questions.length };
     }
     case 'SHAPES': {
@@ -95,7 +97,7 @@ export function validateContent(engine: Engine, c: any): { content: any; maxScor
       const task = s(c?.task, 160);
       return { content: { image, task }, maxScore: 1 };
     }
-    case 'BUBBLE_POP': {
+    case 'BUBBLE_POP': case 'WHACK_A_MOLE': {
       // bubbles with letters, numbers, words or pictures float up; the child pops the right ones (fingertip in the air, or a tap)
       const items = (x: unknown) => [...new Set(arr(x).map((v: any) => s(v, 12)).filter(Boolean))].slice(0, 20);
       const targets = items(c?.targets); const others = items(c?.others).filter((x) => !targets.includes(x));

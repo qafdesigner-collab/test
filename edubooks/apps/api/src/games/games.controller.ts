@@ -49,6 +49,7 @@ export class GamesController {
   // Publisher library
   @Roles(...PUBLISHER_STAFF) @Get('publishing/games') library(@Query('editionId') editionId?: string, @Query('engine') engine?: string, @Query('category') category?: string) { return this.games.libraryList({ editionId, engine, category }); }
   @Roles(...PUBLISHER_STAFF) @Get('publishing/games/:id') libGet(@Param('id', Id()) id: string) { return this.games.get(id); }
+  @Roles('PUBLISHER_ADMIN', 'PUBLISHER_EDITOR') @Post('publishing/games/starter-pack') starter() { return this.games.addStarterPack(); }
   @Roles(...PUBLISHER_STAFF) @Post('publishing/games') libCreate(@Body() d: GameDto) { return this.games.create(d, null); }
   @Roles(...PUBLISHER_STAFF) @Patch('publishing/games/:id') libUpdate(@Param('id', Id()) id: string, @Body() d: UpdateGameDto) { const { engine: _e, ...rest } = d; return this.games.update(id, rest, null); }
   @Roles(...PUBLISHER_STAFF) @Delete('publishing/games/:id') libDelete(@Param('id', Id()) id: string) { return this.games.remove(id, null); }

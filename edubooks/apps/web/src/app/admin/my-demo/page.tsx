@@ -48,6 +48,7 @@ export default function MyDemoPage() {
             <h2 className="text-lg font-bold text-slate-900">{d.school.name}</h2>
             <p className="text-sm text-slate-600">School code <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono font-bold text-slate-900">{d.school.code}</span> · valid until {fmtDate(d.school.expiresAt)}</p>
           </div>
+          {d.posts === 0 && <Button variant="secondary" loading={busy === 'posts'} onClick={() => act('posts', '/sales/my-demo/sample-posts', 'Sample news added')}>📰 Add sample news</Button>}
           <Button variant="secondary" loading={busy === 'renew'} onClick={() => act('renew', '/sales/my-demo/renew', 'Renewed for a year')}><RefreshCw className="size-4" />Renew for a year</Button>
           <Button variant="secondary" loading={busy === 'reset'} onClick={() => act('reset', '/sales/my-demo/reset-passwords', 'New passwords made')}><KeyRound className="size-4" />New passwords</Button>
         </Card>

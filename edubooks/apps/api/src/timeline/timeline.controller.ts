@@ -17,6 +17,7 @@ import { AccessService } from '../lms/access.service';
 import { LmsModule } from '../lms/lms.module';
 import { NotificationsModule } from '../notifications/notifications.controller';
 import { NotificationsService } from '../notifications/notifications.service';
+import { pictureUrl } from '../people/avatars';
 
 const READERS = ['SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT'];
 const WRITERS = ['SCHOOL_ADMIN', 'TEACHER'];
@@ -75,7 +76,7 @@ export class TimelineService {
   async feed(q: FeedQuery) {
     const classes = await this.myClasses(); const limit = Math.min(Math.max(q.limit ?? 15, 1), 50);
     const list = await this.rows(sql`SELECT p.id, p.kind, p.title, p.body, p.event_at AS "eventAt", p.place, p.images, p.pinned, p.created_at AS "createdAt", p.updated_at AS "updatedAt",
-        p.author_id AS "authorId", u.display_name AS "authorName", u.photo_at AS "authorPhotoAt",
+        p.author_id AS "authorId", u.display_name AS "authorName", u.photo_at AS "authorPhotoAt", u.photo_key IS NOT NULL AS "authorHasPhoto", u.avatar AS "authorAvatar",
         CASE WHEN EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role = 'SCHOOL_ADMIN') THEN 'School admin' ELSE coalesce(nullif(u.designation, ''), 'Teacher') END AS "authorRole",
         p.class_id AS "classId", CASE WHEN c.id IS NOT NULL THEN c.name || CASE WHEN c.section <> '' THEN ' ' || c.section ELSE '' END END AS "className",
         (SELECT coalesce(json_object_agg(emoji, n), '{}') FROM (SELECT emoji, count(*)::int AS n FROM timeline_likes l WHERE l.post_id = p.id GROUP BY emoji) x) AS reactions,
@@ -83,16 +84,25 @@ export class TimelineService {
       FROM timeline_posts p JOIN users u ON u.id = p.author_id LEFT JOIN classes c ON c.id = p.class_id
       WHERE ${this.seen(classes)} ${q.classId ? sql`AND p.class_id = ${q.classId}` : sql``} ${q.before ? sql`AND p.created_at < ${q.before}` : sql``}
       ORDER BY ${q.before ? sql`` : sql`p.pinned DESC,`} p.created_at DESC LIMIT ${limit + 1}`);
+    if (!q.before && !q.classId && limit > 3 && !(this.ctx as any).impersonatorId) await this.rows(sql`SELECT mark_timeline_seen()`);
     const more = list.length > limit; const items = list.slice(0, limit);
     const admin = this.is('SCHOOL_ADMIN');
     return {
-      items: items.map(({ authorPhotoAt, images, ...p }) => ({
+      items: items.map(({ authorPhotoAt, authorHasPhoto, authorAvatar, images, ...p }) => ({
         ...p, images: (images as string[]).map((_k, i) => `/api/timeline/${p.id}/images/${i}?v=${new Date(p.updatedAt).getTime()}`),
-        authorPhoto: authorPhotoAt ? `/api/users/${p.authorId}/photo?v=${new Date(authorPhotoAt).getTime()}` : null,
+        authorPhoto: pictureUrl(p.authorId, authorHasPhoto, authorPhotoAt, authorAvatar),
         canEdit: admin || p.authorId === this.ctx.userId, canPin: admin,
       })),
       more, next: more ? items[items.length - 1].createdAt : null,
     };
+  }
+
+  /** Posts by others that I can see and have not seen yet (since I last opened the timeline; at most the last 14 days). */
+  async newCount() {
+    const classes = await this.myClasses();
+    const [r] = await this.rows(sql`SELECT count(*)::int AS n FROM timeline_posts p, users me WHERE me.id = ${this.ctx.userId}
+      AND p.author_id <> me.id AND p.created_at > greatest(coalesce(me.timeline_seen_at, now() - interval '14 days'), now() - interval '14 days') AND ${this.seen(classes)}`);
+    return r.n as number;
   }
 
   /** Upcoming events (next 60 days) for the top of the timeline. */
@@ -209,7 +219,7 @@ export class TimelineService {
     const key = (p?.images as string[] | undefined)?.[n];
     if (!key) throw new NotFoundException('Picture not found');
     const ext = key.split('.').pop();
-    return { stream: await this.assets.driver.read(key), mime: ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg' };
+    return { stream: await this.assets.driver.read(key), mime: ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'svg' ? 'image/svg+xml' : 'image/jpeg' };
   }
 }
 
@@ -229,9 +239,10 @@ export class TimelineController {
   async image(@Param('id', ParseUUIDPipe) id: string, @Param('n', ParseIntPipe) n: number, @Res() res: Response) {
     const f = await this.svc.image(id, n);
     res.setHeader('Content-Type', f.mime); res.setHeader('Cache-Control', 'private, max-age=604800'); res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'");
     f.stream.on('error', () => res.destroy()).pipe(res);
   }
 }
 
-@Module({ imports: [LmsModule, NotificationsModule], controllers: [TimelineController], providers: [TimelineService] })
+@Module({ imports: [LmsModule, NotificationsModule], controllers: [TimelineController], providers: [TimelineService], exports: [TimelineService] })
 export class TimelineModule {}

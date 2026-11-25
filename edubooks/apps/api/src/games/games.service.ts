@@ -6,6 +6,7 @@ import { bookEditions, bookPackages, gameActivities, gameAssignments, gameAttemp
 import { AuditService } from '../audit/audit.service';
 import { AccessService } from '../lms/access.service';
 import { BADGES, Engine, starsFor, validateContent } from './engines';
+import { STARTER_GAMES } from './starter-pack';
 
 export interface GameInput {
   engine: Engine; title: string; instructions?: string; difficulty?: number; editionId?: string | null; lessonId?: string | null; content: unknown; published?: boolean; categories?: string[];
@@ -84,6 +85,21 @@ export class GamesService {
     await this.q.delete(gameActivities).where(eq(gameActivities.id, id));
     await this.audit.log('games.delete', 'game', id, `Deleted game “${g.title}”`);
     return { ok: true };
+  }
+
+  /** Adds the ready-made General games and Sports games that are not in the library yet (matched by title). */
+  async addStarterPack() {
+    const have = new Set((await this.q.select({ title: gameActivities.title }).from(gameActivities).where(isNull(gameActivities.schoolId))).map((r) => r.title));
+    let added = 0;
+    for (const g of STARTER_GAMES) {
+      if (have.has(g.title)) continue;
+      const { content } = validateContent(g.engine as Engine, g.content);
+      await this.q.insert(gameActivities).values({ publisherId: this.ctx.publisherId, schoolId: null, engine: g.engine as Engine, title: g.title, instructions: g.instructions,
+        difficulty: g.difficulty, content, published: true, categories: cats(g.categories), createdBy: this.ctx.userId });
+      added++;
+    }
+    if (added) await this.audit.log('games.starter_pack', 'game', null, `Added ${added} ready-made games (General games and Sports)`);
+    return { added, total: STARTER_GAMES.length };
   }
 
   // ===================== teacher =====================

@@ -11,6 +11,10 @@ const AR: Record<string, string> = {
   'School news': 'أخبار المدرسة', 'Nothing on the timeline yet.': 'لا يوجد شيء في الأخبار بعد.', 'Show older posts': 'عرض المنشورات الأقدم', 'Pinned': 'مثبّت', 'More': 'المزيد', Edit: 'تعديل', Unpin: 'إلغاء التثبيت', 'Pin to the top': 'تثبيت في الأعلى', Delete: 'حذف', 'Delete this post?': 'حذف هذا المنشور؟',
   Save: 'حفظ', 'School admin': 'إدارة المدرسة', 'News, photos and events from the school and your children’s classes.': 'أخبار وصور وفعاليات من المدرسة ومن فصول أبنائك.',
   // photo and welcome window
+  '…or choose a picture': '…أو اختر صورة', Teachers: 'المعلمون', Students: 'الطلاب', Animals: 'الحيوانات', Study: 'الدراسة',
+  'You have {n} new posts on the timeline': 'لديك {n} منشورات جديدة في أخبار المدرسة',
+  'Goal!': 'هدف!', 'GOAL!': 'هدف!', 'Saved!': 'تصدّى لها الحارس!', 'Tap the right answer to shoot!': 'اضغط على الإجابة الصحيحة لتسدد!',
+  'You won the race!': 'فزت بالسباق!', 'The rival won this time!': 'فاز المنافس هذه المرة!', 'Bonk the right ones!': 'اضرب الصحيحة!', 'Empty hole': 'حفرة فارغة',
   '⚽ Sports': '⚽ الرياضة', '🎲 General games': '🎲 ألعاب عامة',
   'My photo': 'صورتي', 'Please choose a picture.': 'يرجى اختيار صورة.', 'Change photo': 'تغيير الصورة', 'Add a photo': 'إضافة صورة', Remove: 'إزالة',
   'Only this person can change their photo.': 'يمكن لصاحب الحساب فقط تغيير صورته.', 'Your photo is seen only by people in your school (and the publisher’s team).': 'لا يرى صورتك إلا من في مدرستك (وفريق دار النشر).',

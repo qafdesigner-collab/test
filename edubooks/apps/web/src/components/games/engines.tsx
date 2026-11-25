@@ -7,8 +7,9 @@ import { sfx } from '@/lib/sfx';
 import { Tracing } from './tracing';
 import { Coloring } from './coloring';
 import { AirWriting, BubblePop, ShowFingers } from './camera';
+import { PenaltyKick, RunningRace, WhackAMole } from './sports';
 
-export type Engine = 'ALPHABET_MATCH' | 'PICTURE_WORD' | 'COUNTING' | 'SORTING' | 'MEMORY' | 'FILL_BLANK' | 'QUIZ' | 'SHAPES' | 'WORD_BUILD' | 'PUZZLE' | 'SPELLING_BEE' | 'SENTENCE_BUILDER' | 'LISTENING' | 'TRACING' | 'COLORING' | 'BUBBLE_POP' | 'FINGERS' | 'AIR_WRITING';
+export type Engine = 'ALPHABET_MATCH' | 'PICTURE_WORD' | 'COUNTING' | 'SORTING' | 'MEMORY' | 'FILL_BLANK' | 'QUIZ' | 'SHAPES' | 'WORD_BUILD' | 'PUZZLE' | 'SPELLING_BEE' | 'SENTENCE_BUILDER' | 'LISTENING' | 'TRACING' | 'COLORING' | 'BUBBLE_POP' | 'FINGERS' | 'AIR_WRITING' | 'PENALTY_KICK' | 'RUNNING_RACE' | 'WHACK_A_MOLE';
 export interface EngineProps { content: any; onFinish: (score: number) => void; say: (t: string) => void; onProgress?: (done: number, total: number) => void }
 export const ENGINE_INFO: Record<Engine, { label: string; icon: string; color: string }> = {
   ALPHABET_MATCH: { label: 'Alphabet match', icon: '🔤', color: '#f97316' }, PICTURE_WORD: { label: 'Picture & word', icon: '🖼️', color: '#ec4899' },
@@ -21,6 +22,8 @@ export const ENGINE_INFO: Record<Engine, { label: string; icon: string; color: s
   TRACING: { label: 'Handwriting tracing', icon: '✍️', color: '#2563eb' }, COLORING: { label: 'Colouring', icon: '🎨', color: '#d946ef' },
   BUBBLE_POP: { label: 'Bubble pop (camera)', icon: '🫧', color: '#0891b2' }, FINGERS: { label: 'Show me fingers (camera)', icon: '✋', color: '#ea580c' },
   AIR_WRITING: { label: 'Air writing (camera)', icon: '☝️', color: '#e11d48' },
+  PENALTY_KICK: { label: 'Penalty kick', icon: '⚽', color: '#16a34a' }, RUNNING_RACE: { label: 'Running race', icon: '🏃', color: '#f97316' },
+  WHACK_A_MOLE: { label: 'Whack-a-mole', icon: '🔨', color: '#a16207' },
 };
 
 // ---------- helpers ----------
@@ -342,7 +345,9 @@ export const ENGINES: Record<Engine, (p: EngineProps) => React.JSX.Element> = {
   ALPHABET_MATCH: Match, PICTURE_WORD: Match, MEMORY: Memory, COUNTING: Counting, SORTING: Sorting, FILL_BLANK: FillBlank, QUIZ: Quiz, SHAPES: Shapes, WORD_BUILD: WordBuild, PUZZLE: Puzzle,
   SPELLING_BEE: SpellingBee, SENTENCE_BUILDER: SentenceBuilder, LISTENING: Listening, TRACING: Tracing, COLORING: Coloring,
   BUBBLE_POP: BubblePop, FINGERS: ShowFingers, AIR_WRITING: AirWriting,
+  PENALTY_KICK: PenaltyKick, RUNNING_RACE: RunningRace, WHACK_A_MOLE: WhackAMole,
 };
 export const maxScore = (engine: Engine, c: any) => ({ ALPHABET_MATCH: c.pairs?.length, PICTURE_WORD: c.pairs?.length, MEMORY: c.pairs?.length, COUNTING: c.rounds,
   SORTING: c.categories?.reduce((n: number, k: any) => n + k.items.length, 0), FILL_BLANK: c.sentences?.length, QUIZ: c.questions?.length, SHAPES: c.rounds, WORD_BUILD: c.words?.length, PUZZLE: 3,
-  SPELLING_BEE: c.words?.length, SENTENCE_BUILDER: c.sentences?.length, LISTENING: c.rounds?.length, TRACING: c.items?.length, COLORING: 1, BUBBLE_POP: c.goal, FINGERS: c.rounds?.length, AIR_WRITING: c.items?.length }[engine] ?? 1);
+  SPELLING_BEE: c.words?.length, SENTENCE_BUILDER: c.sentences?.length, LISTENING: c.rounds?.length, TRACING: c.items?.length, COLORING: 1, BUBBLE_POP: c.goal, FINGERS: c.rounds?.length, AIR_WRITING: c.items?.length,
+  PENALTY_KICK: c.questions?.length, RUNNING_RACE: c.questions?.length, WHACK_A_MOLE: c.goal }[engine] ?? 1);
