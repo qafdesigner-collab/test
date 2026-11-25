@@ -1,4 +1,5 @@
 'use client';
+import { ClassGoals } from '@/components/classroom';
 import Link from 'next/link';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { api, fmtDay } from '@/lib/api';
@@ -70,6 +71,7 @@ export default function TeacherHome() {
           </div>
         )}
       </Hero>
+      <ClassGoals classes={(classes.data ?? []).map((c: any) => ({ id: c.id, name: `${c.name}${c.section ? ` ${c.section}` : ''}`, students: c.students }))} />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile icon="👥" bg="#ede9fe" value={pupils} label={`students in ${classes.data.length} class${classes.data.length === 1 ? '' : 'es'}`} href="/teacher/classes" />

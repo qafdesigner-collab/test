@@ -1,4 +1,5 @@
 'use client';
+import { FeedbackWall } from '@/components/classroom';
 import { TimelinePeek } from '@/components/timeline';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -36,6 +37,9 @@ export default function ParentHome() {
             <span className="block font-semibold">{k.displayName}</span><span className={cn('block text-xs', sel === k.id ? 'text-sky-50' : 'text-slate-600')}>{k.className ?? t('No class yet')}</span>
           </button>))}
       </div>
+      {sel && <a href={`/parent/week?student=${sel}`} className="flex items-center gap-3 rounded-3xl bg-gradient-to-r from-sky-500 via-violet-500 to-pink-500 p-4 text-white shadow hover:opacity-95">
+        <span className="text-3xl">📅</span><span className="flex-1"><b className="block text-lg">{t('This week')}</b><span className="text-sm opacity-90">{t('Stars, homework, stickers and what is coming next week')}</span></span><span className="text-xl">▶</span></a>}
+      {sel && <FeedbackWall studentId={sel} />}
       {sel && <Child id={sel} />}
     </div>
   );

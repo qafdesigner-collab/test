@@ -1,3 +1,24 @@
+# What's new in Knowledge Gate 1.4.23
+
+## 🏅 Stickers and voice notes on children's work
+- When a teacher marks homework or a test (**View** on a student), or opens **Book work** (tracing, drawing, reading aloud), there is a new box: tap stickers — **⭐ Great!, 👏 Well done, 🌟 Super star, ✍️ Neat work, 📚 Great reading, 🧠 Clever thinking, 🎨 So creative, 📈 Big improvement, ❤️ Kind helper, 💪 Keep trying** (up to 5) — **record a short voice note** and add a line. It is saved at once.
+- The child sees big stickers and can **listen to the teacher's voice** on their homework result and on the book page; the student home shows **🏅 Stickers from my teacher**. Parents see them on their page and in the weekly summary. The child and the parents get a notification.
+- Only the child, their parents and their teachers can play the voice note.
+
+## 🏆 Class reward board
+- On the teacher dashboard: start **one goal for the whole class**, e.g. **90 stars → 🎉 Class party** (or extra playtime, movie time, pyjama day, free art time, story time). A good number of stars is suggested from the class size.
+- Every star counts for the class: games, homework, book work and the teacher's stickers — **no ranking of children**.
+- Students see the goal filling up on their home page; when it is reached there is confetti and everyone (and the parents) gets a “🎉 Our class did it!” notification.
+
+## 📅 Plan my week
+- **Lesson planner → 📅 Plan my week**: choose the class, the book and the week. The next lessons of the book are put on the days of the week — following the class **timetable** for that subject when there is one — and **holidays from the school calendar are skipped** (e.g. Commemoration Day, UAE National Day). Untick any lesson, then **Make the lesson plans**. Each plan opens in the planner, where **Write with AI** fills in the steps.
+- The next week starts after the last lesson planned.
+
+## 📅 The parents' weekly summary
+- Every **Friday afternoon** (UAE time), each parent gets **their child's week**: stars, homework done (and score), games, stickers and voice notes from the teacher, book work, attendance, **what the class learned**, anything **not handed in**, and **what is coming next week** (holidays, events, homework due). It comes as a notification, and by email when email is switched on.
+- Parents can open it any time: **📅 This week** on their home page (English and Arabic).
+- The day and time zone can be changed on the server: `DIGEST_DAY` (default Fri) and `DIGEST_TZ` (default Asia/Dubai).
+
 # What's new in Knowledge Gate 1.4.22
 
 ## 🎮 Three new games

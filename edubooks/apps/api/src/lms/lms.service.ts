@@ -390,7 +390,7 @@ export class LmsService {
       editionId: a.editionId, bookComponentId: a.bookComponentId, bookPage: a.bookPage,
       // Answers are NEVER sent before the work is marked.
       items: items.map((i) => ({ id: i.id, type: i.type, prompt: i.prompt, options: i.options, points: i.points, ...(reveal && i.type !== 'SHORT' && i.type !== 'READING' ? { answer: i.answer } : {}) })),
-      submission: sub ? { status: sub.status, submittedAt: sub.submittedAt, answers: reveal ? sub.answers : (sub.answers as any[]).map((x) => ({ itemId: x.itemId, response: x.response })),
+      submission: sub ? { id: sub.id, status: sub.status, submittedAt: sub.submittedAt, answers: reveal ? sub.answers : (sub.answers as any[]).map((x) => ({ itemId: x.itemId, response: x.response })),
         score: reveal || (sub.status === 'GRADED' || sub.status === 'RETURNED') ? sub.score : null, maxScore: sub.maxScore, feedback: reveal ? sub.feedback : '', attempt: sub.attempt } : null,
     };
   }

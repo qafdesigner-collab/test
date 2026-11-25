@@ -10,6 +10,17 @@ const AR: Record<string, string> = {
   // timeline
   'School news': 'أخبار المدرسة', 'Nothing on the timeline yet.': 'لا يوجد شيء في الأخبار بعد.', 'Show older posts': 'عرض المنشورات الأقدم', 'Pinned': 'مثبّت', 'More': 'المزيد', Edit: 'تعديل', Unpin: 'إلغاء التثبيت', 'Pin to the top': 'تثبيت في الأعلى', Delete: 'حذف', 'Delete this post?': 'حذف هذا المنشور؟',
   Save: 'حفظ', 'School admin': 'إدارة المدرسة', 'News, photos and events from the school and your children’s classes.': 'أخبار وصور وفعاليات من المدرسة ومن فصول أبنائك.',
+  // feedback, class goal, weekly summary
+  '⭐ Great!': '⭐ رائع!', '👏 Well done': '👏 أحسنت', '🌟 Super star': '🌟 نجم متألق', '✍️ Neat work': '✍️ عمل مرتب', '📚 Great reading': '📚 قراءة رائعة',
+  '🧠 Clever thinking': '🧠 تفكير ذكي', '🎨 So creative': '🎨 مبدع جدًا', '📈 Big improvement': '📈 تحسن كبير', '❤️ Kind helper': '❤️ مساعد لطيف', '💪 Keep trying': '💪 واصل المحاولة',
+  'From {name}': 'من {name}', 'your teacher': 'معلمك', 'Listen to your teacher': 'استمع إلى معلمك', 'Stickers from my teacher': 'ملصقات من معلمي',
+  'Our class goal': 'هدف فصلنا', 'We did it! {reward}!': 'لقد نجحنا! {reward}!', '{n} stars → {reward}': '{n} نجمة ← {reward}',
+  'Play, read and do your homework — every star helps the whole class!': 'العب واقرأ وأنجز واجبك — كل نجمة تساعد الفصل كله!',
+  'Class party': 'حفلة الفصل', 'Extra playtime': 'وقت لعب إضافي', 'Movie time': 'وقت فيلم', 'Pyjama day': 'يوم البيجامة', 'Free art time': 'وقت رسم حر', 'Story time with the teacher': 'وقت القصة مع المعلم', 'Stars, homework, stickers and what is coming next week': 'النجوم والواجبات والملصقات وما سيأتي الأسبوع القادم',
+  '{name}’s week': 'أسبوع {name}', 'Homework score this week: {n}%': 'درجة الواجبات هذا الأسبوع: {n}%', 'homework done': 'واجبات منجزة', 'games played': 'ألعاب',
+  stickers: 'ملصقات', 'book work sent': 'أعمال الكتاب', 'days present': 'أيام الحضور', 'What we learned': 'ماذا تعلمنا', 'Coming next week': 'الأسبوع القادم',
+  'Not handed in yet': 'لم يُسلَّم بعد', 'From the teacher': 'من المعلم', 'Class goal': 'هدف الفصل',
+  'Every Friday you also get this summary as a notification (and by email when the school has email switched on).': 'كل يوم جمعة يصلك هذا الملخص كإشعار (وبالبريد الإلكتروني عندما تفعّل المدرسة البريد).',
   // photo and welcome window
   '…or choose a picture': '…أو اختر صورة', Teachers: 'المعلمون', Students: 'الطلاب', Animals: 'الحيوانات', Study: 'الدراسة',
   'You have {n} new posts on the timeline': 'لديك {n} منشورات جديدة في أخبار المدرسة',

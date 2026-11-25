@@ -34,7 +34,7 @@ export class AuthGuard implements CanActivate {
     // Parent accounts: default-deny. Only their own portal, notifications, messages, announcements, live lessons, the school calendar, the school timeline, their own photo and welcome window, and sign-in/out.
     if (req.ctx.roles.length && req.ctx.roles.every((r: string) => r === 'PARENT')) {
       const p = String(req.path || req.url).replace(/\?.*$/, '');
-      const ok = /^\/api\/(parent|notifications|auth|messages|announcements|live|mail|me|timeline)(\/|$)/.test(p) || (req.method === 'GET' && (/^\/api\/calendar\/?$/.test(p) || /^\/api\/users\/[0-9a-f-]{36}\/photo$/.test(p)));
+      const ok = /^\/api\/(parent|notifications|auth|messages|announcements|live|mail|me|timeline|feedback|feedback-stickers)(\/|$)/.test(p) || (req.method === 'GET' && (/^\/api\/calendar\/?$/.test(p) || /^\/api\/users\/[0-9a-f-]{36}\/photo$/.test(p)));
       if (!ok) throw new ForbiddenException('This area is not available for parent accounts');
     }
     const required = this.reflector.getAllAndOverride<string[]>(ROLES, [context.getHandler(), context.getClass()]);

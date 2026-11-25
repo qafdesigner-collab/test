@@ -1,4 +1,5 @@
 'use client';
+import { ClassGoalBanner, FeedbackWall } from '@/components/classroom';
 import { TimelinePeek } from '@/components/timeline';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -56,6 +57,8 @@ export default function LearnHome() {
               <span className="grid size-11 place-items-center rounded-xl bg-white/25 text-2xl">{g.done ? '✅' : g.emoji}</span><span className="text-lg">{g.label}</span></Link>))}</div>
         </div>
       </section>
+      <ClassGoalBanner />
+      {me && <FeedbackWall studentId={me.id} playful limit={3} />}
       <TimelinePeek href="/learn/timeline" playful />
 
       <LiveBoards />

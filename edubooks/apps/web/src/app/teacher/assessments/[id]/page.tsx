@@ -1,4 +1,5 @@
 'use client';
+import { FeedbackEditor } from '@/components/classroom';
 import Link from 'next/link';
 import { GroupPicker } from '@/components/groups';
 import { Suspense, use, useEffect, useState } from 'react';
@@ -198,6 +199,7 @@ function MarkDialog({ a, student, onClose, onNext, left }: { a: any; student: an
             </div>);
         })}
         <Field label="Feedback for the student"><Textarea rows={2} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Well done! …" /></Field>
+        {s.id && <FeedbackEditor kind="submission" targetId={s.id} />}
         <div className="flex items-center justify-between"><span className="text-sm">Total: <b>{total} / {s.maxScore}</b></span>
           <div className="flex gap-2"><Button variant="secondary" loading={save.isPending} onClick={() => save.mutate(false)}>Save marks</Button><Button loading={save.isPending} onClick={() => save.mutate(true)}>{onNext && left ? `Return & mark next (${left})` : 'Return to student'}</Button></div></div>
       </div>

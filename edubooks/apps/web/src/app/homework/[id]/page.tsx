@@ -1,4 +1,5 @@
 'use client';
+import { FeedbackView } from '@/components/classroom';
 import Link from 'next/link';
 import { use, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -37,7 +38,8 @@ function HomeworkPage({ params }: { params: Promise<{ id: string }> }) {
       <div className="my-6 rounded-3xl bg-white p-6 text-center shadow-sm">
         {sub.score !== null ? <><div className="text-6xl">{sub.score === sub.maxScore ? '🏆' : sub.score / sub.maxScore >= 0.5 ? '🌟' : '💪'}</div>
           <div className="mt-2 text-3xl font-extrabold text-amber-600">{sub.score} / {sub.maxScore}</div>
-          {sub.feedback && <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-lg text-slate-700">💬 {sub.feedback}</p>}</>
+          {sub.feedback && <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-lg text-slate-700">💬 {sub.feedback}</p>}
+          {sub.id && <div className="mt-4"><FeedbackView kind="submission" targetId={sub.id} playful /></div>}</>
           : <><div className="text-6xl">⏳</div><p className="mt-2 text-xl font-bold">{t('Handed in! Your teacher is checking it.')}</p></>}
         {h.triesLeft > 0 && <div className="mt-5 border-t border-slate-200 pt-4">
           <p className="text-slate-600">{t('You can try again to get a better score.')} ({t('Try {a} of {b}', { a: sub.attempt + 1, b: h.maxAttempts })})</p>

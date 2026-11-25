@@ -1,4 +1,5 @@
 'use client';
+import { FeedbackEditor } from '@/components/classroom';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -56,6 +57,7 @@ function WorkDialog({ w, onClose }: { w: Work; onClose: () => void }) {
         {w.kind === 'READ' ? (w.audioId ? <div className="rounded-2xl bg-amber-50 p-6"><p className="mb-2 text-sm font-medium text-slate-700">🎤 Listen to the reading</p><VoicePlayer id={w.audioId} big /></div>
             : <p className="text-slate-500">The recording was removed.</p>)
           : <img src={`/api/reader/work/${w.id}/image`} alt="Student's work" className="mx-auto max-h-[55vh] rounded-xl bg-slate-50 object-contain ring-1 ring-slate-200" />}
+        <FeedbackEditor kind="page-work" targetId={w.id} />
         <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-700">Your answer</span>
           <button type="button" onClick={() => setVerdict('OK')} className={cn('rounded-lg px-3 py-1.5 text-sm font-bold', verdict === 'OK' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-800')}>✅ Well done</button>
           <button type="button" onClick={() => setVerdict('REDO')} className={cn('rounded-lg px-3 py-1.5 text-sm font-bold', verdict === 'REDO' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-900')}>🔁 Do it again</button></div>

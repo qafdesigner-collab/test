@@ -1,4 +1,5 @@
 'use client';
+import { FeedbackView } from '@/components/classroom';
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -87,7 +88,7 @@ function WorkView({ h, onClose, page }: { h: Hotspot; onClose: () => void; page?
   const [drawing] = useState(() => (h.kind === 'DRAW' ? (crop ?? blank(h.w, h.h)).toDataURL('image/png') : ''));
   const [readPic] = useState(() => (h.kind === 'READ' && crop ? crop.toDataURL('image/png') : ''));
   const [clip, setClip] = useState<Clip | null>(null); const [sending, setSending] = useState(false);
-  const mine = useQuery({ queryKey: ['my-work', h.id], queryFn: () => api.get<{ stars: number | null; comment: string; verdict: 'OK' | 'REDO' | null; createdAt: string } | null>(`/reader/hotspots/${h.id}/my-work`), enabled: student });
+  const mine = useQuery({ queryKey: ['my-work', h.id], queryFn: () => api.get<{ id: string; stars: number | null; comment: string; verdict: 'OK' | 'REDO' | null; createdAt: string } | null>(`/reader/hotspots/${h.id}/my-work`), enabled: student });
   const send = async (image: string, stars: number | null) => {
     if (!student) { toast('Students see “Send to teacher” here — their work goes to the teacher’s Book work page.'); return; }
     try { await api.post(`/reader/hotspots/${h.id}/work`, { image, ...(stars !== null ? { stars } : {}) }); toast('Sent to your teacher 📤'); qc.invalidateQueries({ queryKey: ['my-work', h.id] }); }
@@ -109,6 +110,7 @@ function WorkView({ h, onClose, page }: { h: Hotspot; onClose: () => void; page?
         {last.verdict === 'OK' && <b> ✅ Your teacher says: well done!</b>}{last.verdict === 'REDO' && <b> 🔁 Your teacher asks you to do it again.</b>}
         {last.stars !== null && last.verdict && <span> {'⭐'.repeat(last.stars)}</span>}
         {last.comment ? <> <b>{last.verdict ? '' : 'Your teacher says:'}</b> “{last.comment}”</> : !last.verdict && ' Your teacher has not answered yet.'}</div>}
+      {last?.id && student && <div className="mb-3"><FeedbackView kind="page-work" targetId={last.id} playful /></div>}
       {!student && <p className="mb-3 rounded-lg bg-sky-50 p-2 text-xs text-sky-900">👁 You see this as staff. Students also get <b>📤 Send to teacher</b>; what they send appears in <b>Teacher → Book work</b>, where the teacher listens or looks, gives stars and answers “well done” or “do it again”.</p>}
       {h.kind === 'READ' ? (
         <div className="space-y-4">

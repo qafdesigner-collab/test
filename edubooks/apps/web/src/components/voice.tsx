@@ -17,7 +17,7 @@ function pickMime() {
 export type Clip = { id: string; durationMs: number };
 
 /** Records from the microphone and uploads the clip. `kind` MESSAGE (chat) or READING (read-aloud homework). */
-export function useRecorder(kind: 'MESSAGE' | 'READING') {
+export function useRecorder(kind: 'MESSAGE' | 'READING' | 'FEEDBACK') {
   const [state, setState] = useState<'idle' | 'recording' | 'uploading'>('idle'); const [ms, setMs] = useState(0); const [error, setError] = useState<string | null>(null);
   const rec = useRef<MediaRecorder | null>(null); const chunks = useRef<Blob[]>([]); const started = useRef(0); const timer = useRef<any>(null); const stream = useRef<MediaStream | null>(null);
   const resolver = useRef<((c: Clip | null) => void) | null>(null);
