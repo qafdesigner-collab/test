@@ -145,7 +145,10 @@ export function ContentForm({ engine, value, onChange }: { engine: Engine; value
   }
 }
 
-export interface GameDraft { id?: string; engine: Engine; title: string; instructions: string; difficulty: number; editionId: string | null; lessonId: string | null; content: any; published: boolean }
+/** Collections a publisher game can be offered in, to every school. */
+export const GAME_COLLECTIONS = [{ id: 'GENERAL', label: 'General games', icon: '🎲' }, { id: 'SPORTS', label: 'Sports', icon: '⚽' }] as const;
+
+export interface GameDraft { id?: string; engine: Engine; title: string; instructions: string; difficulty: number; editionId: string | null; lessonId: string | null; content: any; published: boolean; categories?: string[] }
 
 export function GameEditor({ initial, onSave, saving, error, books, showPublish }: {
   initial: GameDraft; onSave: (g: GameDraft) => void; saving?: boolean; error?: unknown; books?: { editionId: string; title: string; editionLabel: string }[]; showPublish?: boolean;
@@ -165,7 +168,13 @@ export function GameEditor({ initial, onSave, saving, error, books, showPublish 
         </div>
         <Field label="Instructions (read aloud to children)"><Textarea rows={2} value={g.instructions} onChange={(e) => setG({ ...g, instructions: e.target.value })} placeholder="Match each picture with its word." /></Field>
         <BookScope books={books} editionId={g.editionId} lessonId={g.lessonId} onChange={(v) => setG({ ...g, ...v })} />
-        {showPublish && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={g.published} onChange={(e) => setG({ ...g, published: e.target.checked })} />Published (visible to schools licensed for the book)</label>}
+        {showPublish && <div className="space-y-2 rounded-xl bg-slate-50 p-3">
+          <p className="text-sm font-medium text-slate-700">Also offer it in these collections <span className="font-normal text-slate-500">(to every school, with or without a book)</span></p>
+          <div className="flex flex-wrap gap-2">{GAME_COLLECTIONS.map((c) => { const on = (g.categories ?? []).includes(c.id); return (
+            <label key={c.id} className={cn('flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm', on ? 'border-brand-500 bg-brand-50 font-semibold text-brand-800' : 'border-slate-300 bg-white text-slate-700')}>
+              <input type="checkbox" className="accent-brand-600" checked={on} onChange={(e) => setG({ ...g, categories: e.target.checked ? [...(g.categories ?? []), c.id] : (g.categories ?? []).filter((x) => x !== c.id) })} />{c.icon} {c.label}</label>); })}</div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={g.published} onChange={(e) => setG({ ...g, published: e.target.checked })} />Published (visible to schools licensed for the book{(g.categories ?? []).length ? ', and to every school in the collections ticked' : ''})</label>
+        </div>}
       </Card>
       <Card className="p-5"><p className="mb-3 font-semibold">{ENGINE_INFO[g.engine].icon} {ENGINE_INFO[g.engine].label} — content</p><ContentForm engine={g.engine} value={g.content} onChange={(content) => setG({ ...g, content })} /></Card>
       {error ? <ErrorBox error={error} /> : null}

@@ -16,8 +16,8 @@ export default function TeacherGame({ params }: { params: Promise<{ id: string }
   const q = useQuery({ queryKey: ['teacherGame', id], queryFn: () => api.get(`/teacher/games/${id}`), enabled: !isNew });
   const [tab, setTab] = useState<'play' | 'edit'>('play'); const [del, setDel] = useState(false);
   const save = useAction((g: GameDraft) => {
-    const body = { engine: g.engine, title: g.title, instructions: g.instructions, difficulty: g.difficulty, editionId: g.editionId, lessonId: g.lessonId, content: g.content };
-    return isNew ? api.post('/teacher/games', body) : api.patch(`/teacher/games/${id}`, body);
+    const body = { title: g.title, instructions: g.instructions, difficulty: g.difficulty, editionId: g.editionId, lessonId: g.lessonId, content: g.content };
+    return isNew ? api.post('/teacher/games', { engine: g.engine, ...body }) : api.patch(`/teacher/games/${id}`, body);
   }, { ok: 'Game saved', keys: ['teacherGames', 'teacherGame'], after: (r) => isNew && router.replace(`/teacher/games/${r.id}`) });
   const remove = useAction(() => api.del(`/teacher/games/${id}`), { ok: 'Deleted', keys: ['teacherGames'], after: () => router.push('/teacher/games') });
   if (!isNew && q.isLoading) return <PageLoader />;

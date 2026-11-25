@@ -31,7 +31,7 @@ export default function TeacherGames() {
               <div className="flex items-start gap-3"><span className="grid size-12 shrink-0 place-items-center rounded-xl text-2xl" style={{ background: `${info.color}22` }}>{info.icon}</span>
                 <div className="min-w-0 flex-1"><div className="font-semibold">{g.title}</div><div className="text-xs text-slate-500">{info.label}{g.bookTitle && ` · ${g.bookTitle}`}</div>
                   {g.lesson && <div className="truncate text-xs text-slate-500">{g.lesson}</div>}</div>
-                {g.own ? <Badge tone="info">Our school</Badge> : <Badge>Publisher</Badge>}</div>
+                {g.own ? <Badge tone="info">Our school</Badge> : <Badge>Publisher</Badge>}{(g.categories ?? []).includes('SPORTS') && <Badge tone="info">⚽ Sports</Badge>}{(g.categories ?? []).includes('GENERAL') && <Badge tone="info">🎲 General</Badge>}</div>
               <div className="mt-3 flex flex-wrap gap-1">{g.assignments.map((a: any) => (
                 <span key={a.id} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800">{cls(a.classId) ? className(cls(a.classId)!) : 'Class'}{a.dueAt && ` · ${fmtDay(a.dueAt)}`}
                   <button aria-label="Unassign" onClick={() => unassign.mutate(a.id)}><X className="size-3" /></button></span>))}</div>

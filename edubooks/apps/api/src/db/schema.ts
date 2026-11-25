@@ -721,6 +721,8 @@ export const gameActivities = pgTable('game_activities', {
   difficulty: integer('difficulty').notNull().default(1),
   content: jsonb('content').notNull(),
   published: boolean('published').notNull().default(false),
+  /** collections the game is offered in to every school, e.g. GENERAL, SPORTS */
+  categories: text('categories').array().notNull().default(sql`'{}'::text[]`),
   createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),

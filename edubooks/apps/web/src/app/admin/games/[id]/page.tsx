@@ -16,16 +16,17 @@ export default function AdminGame({ params }: { params: Promise<{ id: string }> 
   const q = useQuery({ queryKey: ['libGame', id], queryFn: () => api.get(`/publishing/games/${id}`), enabled: !isNew });
   const [del, setDel] = useState(false);
   const save = useAction((g: GameDraft) => {
-    const body = { engine: g.engine, title: g.title, instructions: g.instructions, difficulty: g.difficulty, editionId: g.editionId, lessonId: g.lessonId, content: g.content, published: g.published };
-    return isNew ? api.post('/publishing/games', body) : api.patch(`/publishing/games/${id}`, body);
+    const body = { title: g.title, instructions: g.instructions, difficulty: g.difficulty, editionId: g.editionId, lessonId: g.lessonId, content: g.content, published: g.published, categories: g.categories ?? [] };
+    // the game type is chosen once, when the game is made
+    return isNew ? api.post('/publishing/games', { engine: g.engine, ...body }) : api.patch(`/publishing/games/${id}`, body);
   }, { ok: 'Game saved', keys: ['libGames', 'libGame'], after: (r) => isNew && router.replace(`/admin/games/${r.id}`) });
   const remove = useAction(() => api.del(`/publishing/games/${id}`), { ok: 'Deleted', keys: ['libGames'], after: () => router.push('/admin/games') });
   if ((!isNew && q.isLoading) || !eds.data) return <PageLoader />;
   if (q.error) return <ErrorBox error={q.error} />;
   const g = q.data;
   const books = eds.data.map((e) => ({ editionId: e.id, title: e.packageTitle, editionLabel: e.label }));
-  const draft: GameDraft = isNew ? { engine: 'ALPHABET_MATCH', title: '', instructions: '', difficulty: 1, editionId: null, lessonId: null, content: EMPTY_CONTENT.ALPHABET_MATCH, published: false }
-    : { id: g.id, engine: g.engine, title: g.title, instructions: g.instructions, difficulty: g.difficulty, editionId: g.editionId, lessonId: g.lessonId, content: g.content, published: g.published };
+  const draft: GameDraft = isNew ? { engine: 'ALPHABET_MATCH', title: '', instructions: '', difficulty: 1, editionId: null, lessonId: null, content: EMPTY_CONTENT.ALPHABET_MATCH, published: false, categories: [] }
+    : { id: g.id, engine: g.engine, title: g.title, instructions: g.instructions, difficulty: g.difficulty, editionId: g.editionId, lessonId: g.lessonId, content: g.content, published: g.published, categories: g.categories ?? [] };
   return (
     <div className="space-y-6">
       <Link href="/admin/games" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"><ArrowLeft className="size-4" />Game library</Link>

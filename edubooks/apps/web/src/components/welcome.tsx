@@ -106,7 +106,7 @@ const TODO: Record<string, { icon: string; text: string }> = {
   licences: { icon: '🔑', text: '{n} book licences end within 30 days' },
   demos: { icon: '⏳', text: '{n} demo schools end within 7 days' },
 };
-const ICON: Record<string, string> = { HOMEWORK: '📝', RESULT: '✅', LICENCE_EXPIRY: '🔑', DEMO_EXPIRY: '⏳', CALENDAR: '📅', ATTENDANCE: '🗓️', REPORT: '📊', TEST: '💬', DATA: '🛡️' };
+const ICON: Record<string, string> = { HOMEWORK: '📝', RESULT: '✅', LICENCE_EXPIRY: '🔑', DEMO_EXPIRY: '⏳', CALENDAR: '📅', ATTENDANCE: '🗓️', REPORT: '📊', TEST: '💬', TIMELINE: '📰', DATA: '🛡️' };
 
 /**
  * The welcome window after signing in: a greeting for the time of day where the person is, their photo, today's date

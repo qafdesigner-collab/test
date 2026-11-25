@@ -35,8 +35,8 @@ function LearnShell({ children }: { children: React.ReactNode }) {
     <div className="relative isolate min-h-screen pb-28 sm:pb-8"
       style={{ fontFamily: '"Nunito", "Baloo 2", system-ui, sans-serif' }}>
       <KidSky />
-      <header className="mx-auto flex max-w-5xl items-center gap-2 px-4 pt-4 sm:gap-3 sm:px-6">
-        <Link href="/learn" className="flex items-center gap-2 text-2xl font-black text-violet-600">🦉 <span className="hidden sm:inline"><KidBrand /></span></Link>
+      <header className="mx-auto flex max-w-5xl items-center gap-1.5 px-3 pt-4 sm:gap-3 sm:px-6">
+        <Link href="/learn" className="hidden items-center gap-2 text-2xl font-black text-violet-600 min-[440px]:flex">🦉 <span className="hidden sm:inline"><KidBrand /></span></Link>
         <BackButton playful />
         <div className="flex-1" />
         <Link href="/learn/me" className="hidden min-[440px]:block"><LevelBadge stars={ach.data?.stars ?? 0} /></Link>
@@ -44,7 +44,7 @@ function LearnShell({ children }: { children: React.ReactNode }) {
         {ach.data?.streak > 0 && <span className="hidden items-center gap-1 rounded-full bg-white px-4 py-2 text-xl font-black text-orange-600 shadow sm:flex" title={t('Days in a row')}>🔥 {ach.data.streak}</span>}
         <PupilMessagesButton />
         <LangSwitch className="bg-white text-violet-700 shadow" />
-        <InstallAppButton variant="playful" canSaveBooks />
+        <span className="hidden min-[380px]:contents"><InstallAppButton variant="playful" canSaveBooks /></span>
         <NotificationBell playful />
         <MyPhoto size={40} className="ring-4 ring-white" />
         <button onClick={async () => { await api.post('/auth/logout'); qc.clear(); router.replace('/login'); }} className="focus-ring rounded-full bg-white px-3 py-2 text-sm font-bold text-slate-500 shadow sm:px-4" aria-label={t('Sign out')}>👋<span className="hidden sm:inline"> {t('Bye')}</span></button>

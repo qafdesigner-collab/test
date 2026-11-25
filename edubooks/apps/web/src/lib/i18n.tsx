@@ -7,7 +7,11 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
  */
 export type Lang = 'en' | 'ar';
 const AR: Record<string, string> = {
+  // timeline
+  'School news': 'أخبار المدرسة', 'Nothing on the timeline yet.': 'لا يوجد شيء في الأخبار بعد.', 'Show older posts': 'عرض المنشورات الأقدم', 'Pinned': 'مثبّت', 'More': 'المزيد', Edit: 'تعديل', Unpin: 'إلغاء التثبيت', 'Pin to the top': 'تثبيت في الأعلى', Delete: 'حذف', 'Delete this post?': 'حذف هذا المنشور؟',
+  Save: 'حفظ', 'School admin': 'إدارة المدرسة', 'News, photos and events from the school and your children’s classes.': 'أخبار وصور وفعاليات من المدرسة ومن فصول أبنائك.',
   // photo and welcome window
+  '⚽ Sports': '⚽ الرياضة', '🎲 General games': '🎲 ألعاب عامة',
   'My photo': 'صورتي', 'Please choose a picture.': 'يرجى اختيار صورة.', 'Change photo': 'تغيير الصورة', 'Add a photo': 'إضافة صورة', Remove: 'إزالة',
   'Only this person can change their photo.': 'يمكن لصاحب الحساب فقط تغيير صورته.', 'Your photo is seen only by people in your school (and the publisher’s team).': 'لا يرى صورتك إلا من في مدرستك (وفريق دار النشر).',
   'Good noon': 'طاب ظهرك', 'Good night': 'طابت ليلتك', 'Important today': 'المهم اليوم', 'Loading…': 'جارٍ التحميل…',

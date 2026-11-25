@@ -2,14 +2,14 @@ import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, MaxLength, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, MaxLength, Min } from 'class-validator';
 import { sql } from 'drizzle-orm';
 import { Ctx, PUBLISHER_STAFF, Roles } from '../common/decorators';
 import { DbService, TenantCtx } from '../db/db.service';
 import { LmsService } from '../lms/lms.service';
 import { AccessService } from '../lms/access.service';
 import { ENGINES, Engine } from './engines';
-import { GamesService } from './games.service';
+import { CATEGORIES, GamesService } from './games.service';
 
 class GameDto {
   @IsIn(ENGINES) engine: Engine;
@@ -20,8 +20,11 @@ class GameDto {
   @IsOptional() @IsUUID() lessonId?: string | null;
   @IsDefined() content: unknown;
   @IsOptional() @IsBoolean() published?: boolean;
+  @IsOptional() @IsArray() @IsIn(CATEGORIES, { each: true }) categories?: string[];
 }
 class UpdateGameDto {
+  /** the game type cannot change once made; sent back by older pages, so it is accepted and ignored */
+  @IsOptional() @IsIn(ENGINES) engine?: Engine;
   @IsOptional() @IsString() @Length(2, 120) title?: string;
   @IsOptional() @IsString() @MaxLength(500) instructions?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(3) difficulty?: number;
@@ -29,6 +32,7 @@ class UpdateGameDto {
   @IsOptional() @IsUUID() lessonId?: string | null;
   @IsOptional() content?: unknown;
   @IsOptional() @IsBoolean() published?: boolean;
+  @IsOptional() @IsArray() @IsIn(CATEGORIES, { each: true }) categories?: string[];
 }
 class AssignDto { @IsUUID() classId: string; @IsOptional() @IsDateString() dueAt?: string | null; }
 class AttemptDto {
@@ -43,17 +47,17 @@ export class GamesController {
   constructor(private readonly games: GamesService, private readonly lms: LmsService, private readonly db: DbService, private readonly access: AccessService) {}
 
   // Publisher library
-  @Roles(...PUBLISHER_STAFF) @Get('publishing/games') library(@Query('editionId') editionId?: string, @Query('engine') engine?: string) { return this.games.libraryList({ editionId, engine }); }
+  @Roles(...PUBLISHER_STAFF) @Get('publishing/games') library(@Query('editionId') editionId?: string, @Query('engine') engine?: string, @Query('category') category?: string) { return this.games.libraryList({ editionId, engine, category }); }
   @Roles(...PUBLISHER_STAFF) @Get('publishing/games/:id') libGet(@Param('id', Id()) id: string) { return this.games.get(id); }
   @Roles(...PUBLISHER_STAFF) @Post('publishing/games') libCreate(@Body() d: GameDto) { return this.games.create(d, null); }
-  @Roles(...PUBLISHER_STAFF) @Patch('publishing/games/:id') libUpdate(@Param('id', Id()) id: string, @Body() d: UpdateGameDto) { return this.games.update(id, d, null); }
+  @Roles(...PUBLISHER_STAFF) @Patch('publishing/games/:id') libUpdate(@Param('id', Id()) id: string, @Body() d: UpdateGameDto) { const { engine: _e, ...rest } = d; return this.games.update(id, rest, null); }
   @Roles(...PUBLISHER_STAFF) @Delete('publishing/games/:id') libDelete(@Param('id', Id()) id: string) { return this.games.remove(id, null); }
 
   // Teacher
   @Roles('TEACHER') @Get('teacher/games') tList(@Query('editionId') editionId?: string, @Query('lessonId') lessonId?: string) { return this.games.teacherList({ editionId, lessonId }); }
   @Roles('TEACHER') @Get('teacher/games/:id') tGet(@Param('id', Id()) id: string) { return this.games.teacherGet(id); }
   @Roles('TEACHER') @Post('teacher/games') tCreate(@Body() d: GameDto, @Ctx() c: TenantCtx) { return this.games.create(d, c.schoolId); }
-  @Roles('TEACHER') @Patch('teacher/games/:id') tUpdate(@Param('id', Id()) id: string, @Body() d: UpdateGameDto, @Ctx() c: TenantCtx) { return this.games.update(id, d, c.schoolId); }
+  @Roles('TEACHER') @Patch('teacher/games/:id') tUpdate(@Param('id', Id()) id: string, @Body() d: UpdateGameDto, @Ctx() c: TenantCtx) { const { engine: _e, ...rest } = d; return this.games.update(id, rest, c.schoolId); }
   @Roles('TEACHER') @Delete('teacher/games/:id') tDelete(@Param('id', Id()) id: string, @Ctx() c: TenantCtx) { return this.games.remove(id, c.schoolId); }
   @Roles('TEACHER') @Post('teacher/games/:id/assign') assign(@Param('id', Id()) id: string, @Body() d: AssignDto) { return this.games.assign(id, d.classId, d.dueAt); }
   @Roles('TEACHER') @Delete('teacher/game-assignments/:id') unassign(@Param('id', Id()) id: string) { return this.games.unassign(id); }

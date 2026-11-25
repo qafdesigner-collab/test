@@ -10,7 +10,13 @@ export default function LearnGames() {
   const q = useQuery({ queryKey: ['studentGames'], queryFn: () => api.get('/student/games') });
   if (!q.data) return <PageLoader />;
   const assigned = q.data.filter((g: any) => g.assignmentId);
-  const byBook = Object.entries(q.data.filter((g: any) => !g.assignmentId).reduce((m: Record<string, any[]>, g: any) => ((m[g.bookTitle ?? t('More games')] ??= []).push(g), m), {}));
+  // a game shows under its book and under each collection it is in (General games, Sports)
+  const COLL: Record<string, string> = { SPORTS: t('⚽ Sports'), GENERAL: t('🎲 General games') };
+  const byBook = Object.entries(q.data.filter((g: any) => !g.assignmentId).reduce((m: Record<string, any[]>, g: any) => {
+    const where = [...(g.bookTitle ? [g.bookTitle] : []), ...(g.categories ?? []).map((c: string) => COLL[c] ?? c)];
+    for (const w of where.length ? where : [t('More games')]) (m[w] ??= []).push(g);
+    return m;
+  }, {}));
   return (
     <div className="space-y-10"><h1 className="text-4xl font-black text-slate-800">{t('🎮 Play & learn')}</h1>
       {!q.data.length && <p className="rounded-[2rem] bg-white p-8 text-center text-xl font-bold text-slate-500">{t('No games yet!')}</p>}

@@ -1,4 +1,5 @@
 'use client';
+import { TimelinePeek } from '@/components/timeline';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MyChecklists } from '@/components/checklists';
@@ -26,6 +27,7 @@ export default function ParentHome() {
   return (
     <div className="space-y-6">
       <LiveLessons />
+      <TimelinePeek href="/parent/timeline" />
       <Announcements limit={5} />
       <div role="tablist" aria-label={t('Children')} className="flex flex-wrap gap-2">
         {kids.data.children.map((k: any) => (

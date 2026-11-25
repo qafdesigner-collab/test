@@ -1,6 +1,6 @@
 {
   "name": "@edubooks/api",
-  "version": "1.4.20",
+  "version": "1.4.21",
   "private": true,
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

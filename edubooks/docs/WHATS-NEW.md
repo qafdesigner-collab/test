@@ -1,3 +1,24 @@
+# What's new in Knowledge Gate 1.4.21
+
+## 📰 School timeline
+- New **Timeline** page for teachers and the school admin: share **news, photos (up to 8) and events** — for the **whole school** or **one class**.
+  - **📰 Post**: text and photos (made smaller automatically, so posting from a phone is quick).
+  - **📅 Event**: name, date and time, place — shown in **Coming up** at the top of the timeline.
+  - The school admin can **📌 pin** a post to the top. The writer (or the school admin) can edit or delete a post.
+- **Students** (📰 School news on their home page and at /learn/timeline) and **parents** (on their home page and at /parent/timeline) see the school's posts and those of their own / their children's classes — never other classes.
+- Everyone can react with ❤️ 👏 😊 🎉 ⭐. Photos open large and can be swiped through.
+- Students and parents get a notification for class posts and for events; staff for school events.
+
+## 🎮 Game collections: General games and Sports
+- In **Super admin → Game library**, any game can also be put in the **🎲 General games** and/or **⚽ Sports** collections — with or without a book. Published games in a collection are offered to **every school**: teachers can assign them, and students find them on the Play page under **⚽ Sports** and **🎲 General games**.
+- The game library has a new **Collections** column and filter.
+
+## 🔧 Fixed
+- Saving a game attached to a book showed **“property engine should not exist”**. Fixed (for the super admin and for teachers).
+- When a game's book is not on sale any more, the Book box now shows it instead of “— none —”.
+- Parents could not add a photo or see the welcome window (1.4.20). Fixed.
+- On small phones the student header no longer sticks out of the screen.
+
 # What's new in Knowledge Gate 1.4.20
 
 ## 📷 Profile photos for everyone

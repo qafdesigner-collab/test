@@ -8,8 +8,13 @@ import { AccessService } from '../lms/access.service';
 import { BADGES, Engine, starsFor, validateContent } from './engines';
 
 export interface GameInput {
-  engine: Engine; title: string; instructions?: string; difficulty?: number; editionId?: string | null; lessonId?: string | null; content: unknown; published?: boolean;
+  engine: Engine; title: string; instructions?: string; difficulty?: number; editionId?: string | null; lessonId?: string | null; content: unknown; published?: boolean; categories?: string[];
 }
+
+/** The collections a publisher game can be offered in, to every school. */
+export const CATEGORIES = ['GENERAL', 'SPORTS'] as const;
+const cats = (c?: string[]) => [...new Set((c ?? []).filter((x) => (CATEGORIES as readonly string[]).includes(x)))];
+const inCollection = () => sql`cardinality(${qc(gameActivities.categories)}) > 0`;
 
 @Injectable()
 export class GamesService {
@@ -20,7 +25,7 @@ export class GamesService {
   private listSelect() {
     return {
       id: gameActivities.id, engine: gameActivities.engine, title: gameActivities.title, instructions: gameActivities.instructions, difficulty: gameActivities.difficulty,
-      editionId: gameActivities.editionId, lessonId: gameActivities.lessonId, published: gameActivities.published, schoolId: gameActivities.schoolId, updatedAt: gameActivities.updatedAt,
+      editionId: gameActivities.editionId, lessonId: gameActivities.lessonId, published: gameActivities.published, schoolId: gameActivities.schoolId, updatedAt: gameActivities.updatedAt, categories: gameActivities.categories,
       bookTitle: sql<string | null>`(SELECT p.title FROM book_editions e JOIN book_packages p ON p.id = e.package_id WHERE e.id = ${qc(gameActivities.editionId)})`,
       coverColor: sql<string | null>`(SELECT p.cover_color FROM book_editions e JOIN book_packages p ON p.id = e.package_id WHERE e.id = ${qc(gameActivities.editionId)})`,
       lesson: sql<string | null>`(SELECT 'Unit ' || u.number || ' · Lesson ' || l.number || ': ' || l.title FROM book_lessons l JOIN book_units u ON u.id = l.unit_id WHERE l.id = ${qc(gameActivities.lessonId)})`,
@@ -38,8 +43,9 @@ export class GamesService {
   }
 
   // ===================== publisher library =====================
-  libraryList(f: { editionId?: string; engine?: string }) {
+  libraryList(f: { editionId?: string; engine?: string; category?: string }) {
     const w: SQL[] = [isNull(gameActivities.schoolId)];
+    if (f.category) w.push(sql`${f.category} = ANY(${qc(gameActivities.categories)})`);
     if (f.editionId) w.push(eq(gameActivities.editionId, f.editionId));
     if (f.engine) w.push(eq(gameActivities.engine, f.engine as Engine));
     return this.q.select(this.listSelect()).from(gameActivities).where(and(...w)).orderBy(desc(gameActivities.updatedAt)).limit(500);
@@ -54,7 +60,7 @@ export class GamesService {
     const refs = await this.refs(d.editionId, d.lessonId);
     if (schoolId && refs.editionId) await this.access.assertEdition(refs.editionId);
     const [g] = await this.q.insert(gameActivities).values({ publisherId: this.ctx.publisherId, schoolId, ...refs, engine: d.engine, title: d.title.trim(), instructions: d.instructions ?? '',
-      difficulty: d.difficulty ?? 1, content, published: d.published ?? !!schoolId, createdBy: this.ctx.userId }).returning();
+      difficulty: d.difficulty ?? 1, content, published: d.published ?? !!schoolId, categories: schoolId ? [] : cats(d.categories), createdBy: this.ctx.userId }).returning();
     await this.audit.log('games.create', 'game', g.id, `Created game “${g.title}” (${g.engine.toLowerCase().replace('_', ' ')})`);
     return g;
   }
@@ -66,6 +72,7 @@ export class GamesService {
     if (d.instructions !== undefined) patch.instructions = d.instructions;
     if (d.difficulty !== undefined) patch.difficulty = d.difficulty;
     if (d.published !== undefined) patch.published = d.published;
+    if (d.categories !== undefined && !schoolId) patch.categories = cats(d.categories);
     if (d.content !== undefined) patch.content = validateContent((d.engine ?? g.engine) as Engine, d.content).content;
     if (d.editionId !== undefined || d.lessonId !== undefined) Object.assign(patch, await this.refs(d.editionId ?? g.editionId, d.lessonId === undefined ? g.lessonId : d.lessonId));
     const [row] = await this.q.update(gameActivities).set(patch).where(eq(gameActivities.id, id)).returning();
@@ -83,7 +90,7 @@ export class GamesService {
   /** Games a teacher can use: published library games of their licensed books + their school's games. */
   async teacherList(f: { editionId?: string; lessonId?: string }) {
     const eds = await this.access.editions();
-    const lib = eds === 'ALL' ? sql`TRUE` : eds.length ? inArray(gameActivities.editionId, eds) : sql`FALSE`;
+    const lib = eds === 'ALL' ? sql`TRUE` : or(inCollection(), eds.length ? inArray(gameActivities.editionId, eds) : sql`FALSE`)!;
     const w: SQL[] = [or(and(isNull(gameActivities.schoolId), eq(gameActivities.published, true), lib), eq(gameActivities.schoolId, this.ctx.schoolId!))!];
     if (f.editionId) w.push(eq(gameActivities.editionId, f.editionId));
     if (f.lessonId) w.push(eq(gameActivities.lessonId, f.lessonId));
@@ -97,7 +104,7 @@ export class GamesService {
   async teacherGet(id: string) {
     const g = await this.get(id);
     if (g.schoolId ? g.schoolId !== this.ctx.schoolId : !g.published) throw new NotFoundException('Game not found');
-    if (!g.schoolId && g.editionId) await this.access.assertEdition(g.editionId);
+    if (!g.schoolId && g.editionId && !g.categories?.length) await this.access.assertEdition(g.editionId);
     return g;
   }
   async assign(id: string, classId: string, dueAt?: string | null) {
@@ -135,10 +142,10 @@ export class GamesService {
     const edList = eds === 'ALL' ? [] : eds;
     const assigned = classIds.length ? await this.q.select({ activityId: gameAssignments.activityId, assignmentId: gameAssignments.id, dueAt: gameAssignments.dueAt })
       .from(gameAssignments).where(inArray(gameAssignments.classId, classIds)) : [];
-    const w = [and(isNull(gameActivities.schoolId), eq(gameActivities.published, true), edList.length ? inArray(gameActivities.editionId, edList) : sql`FALSE`)!];
+    const w = [and(isNull(gameActivities.schoolId), eq(gameActivities.published, true), or(inCollection(), edList.length ? inArray(gameActivities.editionId, edList) : sql`FALSE`))!];
     // Assigned games: a school's own games, or publisher games of a book the student is licensed for (licensing applies to games too).
     if (assigned.length) w.push(and(inArray(gameActivities.id, assigned.map((a) => a.activityId)),
-      or(isNotNull(gameActivities.schoolId), isNull(gameActivities.editionId), edList.length ? inArray(gameActivities.editionId, edList) : sql`FALSE`))!);
+      or(isNotNull(gameActivities.schoolId), isNull(gameActivities.editionId), inCollection(), edList.length ? inArray(gameActivities.editionId, edList) : sql`FALSE`))!);
     const games = await this.q.select({ ...this.listSelect(),
       best: sql<number | null>`(SELECT max(stars)::int FROM game_attempts a WHERE a.activity_id = ${qc(gameActivities.id)} AND a.student_id = ${me})`,
       plays: sql<number>`(SELECT count(*)::int FROM game_attempts a WHERE a.activity_id = ${qc(gameActivities.id)} AND a.student_id = ${me})` })

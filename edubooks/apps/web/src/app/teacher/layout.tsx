@@ -1,11 +1,12 @@
 'use client';
-import { BookMarked, ClipboardList, Gamepad2, Library, LayoutDashboard, NotebookPen, Sparkles, Users, CalendarDays, UserCheck, Clock, GraduationCap, LineChart, FileText, MessagesSquare, Bird, Building, Presentation, Mail, ListChecks, BarChart3, Palette } from 'lucide-react';
+import { BookMarked, ClipboardList, Gamepad2, Library, LayoutDashboard, NotebookPen, Sparkles, Users, CalendarDays, UserCheck, Clock, GraduationCap, LineChart, FileText, MessagesSquare, Bird, Building, Presentation, Mail, ListChecks, BarChart3, Palette, Newspaper } from 'lucide-react';
 import { Shell } from '@/components/shell';
 
 const NAV = [
   { href: '/teacher', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/teacher/mail', label: 'Mail', icon: Mail },
   { href: '/teacher/messages', label: 'Messages', icon: MessagesSquare },
+  { href: '/teacher/timeline', label: 'Timeline', icon: Newspaper },
   { href: '/teacher/books', label: 'My books', icon: Library },
   { href: '/teacher/whiteboard', label: 'Whiteboard', icon: Presentation },
   { href: '/teacher/ai', label: 'AI assistant', icon: Sparkles },
