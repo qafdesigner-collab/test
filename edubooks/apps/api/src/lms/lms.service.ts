@@ -1,3 +1,4 @@
+import { addPlanToWeek, removePlanFromWeeks } from '../classroom/week-sync';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, isNull, or, sql, SQL } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
@@ -124,11 +125,18 @@ export class LmsService {
     if (id) {
       await this.plan(id);
       const [row] = await this.q.update(lessonPlans).set({ ...values, updatedAt: new Date() }).where(eq(lessonPlans.id, id)).returning();
-      return row;
+      return this.toWeek(row, d.addToWeek);
     }
     const [row] = await this.q.insert(lessonPlans).values({ ...this.base(), teacherId: this.ctx.userId, ...values }).returning();
     await this.audit.log('lms.plan.create', 'lesson_plan', row.id, `Created lesson plan “${row.title}”`);
-    return row;
+    return this.toWeek(row, d.addToWeek);
+  }
+  /** A dated lesson plan also goes on its day of the teacher's weekly plan (unless the teacher unticks it). */
+  private async toWeek(row: typeof lessonPlans.$inferSelect, add?: boolean) {
+    const exec = (q: ReturnType<typeof sql>) => this.q.execute(q) as any;
+    if (add === false || !row.planDate || row.teacherId !== this.ctx.userId) { if (add === false) await removePlanFromWeeks(exec, this.ctx.userId, row.id); return { ...row, weeklyPlanId: null }; }
+    const weeklyPlanId = await addPlanToWeek(exec, this.ctx as any, row);
+    return { ...row, weeklyPlanId };
   }
   async duplicatePlan(id: string) {
     const p = await this.plan(id);
@@ -136,7 +144,7 @@ export class LmsService {
     const [row] = await this.q.insert(lessonPlans).values({ ...rest, title: `${p.title} (copy)`, status: 'DRAFT' }).returning();
     return row;
   }
-  async deletePlan(id: string) { await this.plan(id); await this.q.delete(lessonPlans).where(eq(lessonPlans.id, id)); return { ok: true }; }
+  async deletePlan(id: string) { await this.plan(id); await this.q.delete(lessonPlans).where(eq(lessonPlans.id, id)); await removePlanFromWeeks((q) => this.q.execute(q) as any, this.ctx.userId, id); return { ok: true }; }
 
   // ======================= question bank =======================
   listQuestions(f: { editionId?: string; lessonId?: string; type?: string }) {

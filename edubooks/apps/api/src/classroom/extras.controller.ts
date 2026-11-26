@@ -21,6 +21,7 @@ class EntryDto {
   @IsOptional() @IsString() @MaxLength(200) title?: string;
   @IsOptional() @IsString() @MaxLength(1000) activity?: string;
   @IsOptional() @IsString() @MaxLength(500) homework?: string;
+  @IsOptional() @IsUUID() planId?: string | null;
 }
 class WeeklyDto {
   @IsOptional() @IsUUID() classId?: string | null;
@@ -89,7 +90,7 @@ export class WeeklyPlansService {
       const from = x.pageFrom ?? null; const to = x.pageTo ?? from;
       if (from && to && to < from) throw new BadRequestException(`Entry ${i + 1}: the last page is before the first page`);
       out.push({ day: x.day, editionId: x.editionId ?? null, componentId: x.componentId ?? null, lessonId: x.lessonId ?? null, pageFrom: from, pageTo: from ? to : null,
-        resourceIds: [...new Set(x.resourceIds ?? [])], title: (x.title ?? '').trim(), activity: (x.activity ?? '').trim(), homework: (x.homework ?? '').trim() });
+        resourceIds: [...new Set(x.resourceIds ?? [])], title: (x.title ?? '').trim(), activity: (x.activity ?? '').trim(), homework: (x.homework ?? '').trim(), ...(x.planId ? { planId: x.planId } : {}) });
     }
     return out;
   }

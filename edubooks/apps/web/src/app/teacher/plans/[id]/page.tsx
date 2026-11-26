@@ -40,11 +40,12 @@ function Editor({ id }: { id: string }) {
   const lesson = useMemo(() => book.data?.components.flatMap((c: any) => c.units.flatMap((u: any) => u.lessons.map((l: any) => ({ ...l, unit: u, comp: c })))).find((l: any) => l.id === f?.lessonId), [book.data, f?.lessonId]);
   const resources = (book.data?.resources ?? []).filter((r: any) => lesson && (r.lessonId === lesson.id || (r.unitId === lesson.unit.id && !r.lessonId)));
   useEffect(() => { if (lesson && f && !f.title) setF((x: any) => ({ ...x, title: `${lesson.title} — Lesson plan` })); }, [lesson, f]);
+  const [addToWeek, setAddToWeek] = useState(true); const [weekId, setWeekId] = useState<string | null>(null);
   const save = useAction(() => {
-    const body = { ...f, planDate: f.planDate ? `${f.planDate}T08:00:00Z` : null, classId: f.classId || null, editionId: f.editionId || null, lessonId: f.lessonId || null };
-    ['id', 'publisherId', 'schoolId', 'teacherId', 'createdAt', 'updatedAt'].forEach((k) => delete body[k]);
+    const body = { ...f, planDate: f.planDate ? `${f.planDate}T08:00:00Z` : null, classId: f.classId || null, editionId: f.editionId || null, lessonId: f.lessonId || null, addToWeek };
+    ['id', 'publisherId', 'schoolId', 'teacherId', 'createdAt', 'updatedAt', 'weeklyPlanId'].forEach((k) => delete body[k]);
     return isNew ? api.post('/teacher/lesson-plans', body) : api.put(`/teacher/lesson-plans/${id}`, body);
-  }, { ok: 'Lesson plan saved', keys: ['plans', 'plan'], after: (r) => isNew && router.replace(`/teacher/plans/${r.id}`) });
+  }, { ok: (r: any) => (r.weeklyPlanId ? 'Lesson plan saved — and added to your weekly plan' : 'Lesson plan saved'), keys: ['plans', 'plan', 'weeklyPlans'], after: (r: any) => { setWeekId(r.weeklyPlanId ?? null); if (isNew) router.replace(`/teacher/plans/${r.id}`); } });
   const dup = useAction(() => api.post(`/teacher/lesson-plans/${id}/duplicate`), { ok: 'Copy created', keys: ['plans'], after: (r) => router.push(`/teacher/plans/${r.id}`) });
   const del = useAction(() => api.del(`/teacher/lesson-plans/${id}`), { ok: 'Deleted', keys: ['plans'], after: () => router.push('/teacher/plans') });
   const [confirmDel, setConfirmDel] = useState(false);
@@ -94,6 +95,10 @@ function Editor({ id }: { id: string }) {
               <Field label="Duration (min)"><Input type="number" min={5} max={300} value={f.durationMin} onChange={(e) => setF({ ...f, durationMin: Number(e.target.value) })} /></Field>
               <Field label="Status"><Select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}><option value="DRAFT">Draft</option><option value="READY">Ready to teach</option></Select></Field>
             </div>
+            {f.planDate && <div className="flex flex-wrap items-center gap-3 rounded-xl bg-violet-50 px-3 py-2 text-sm">
+              <label className="flex items-center gap-2 font-medium text-violet-900"><input type="checkbox" checked={addToWeek} onChange={(e) => setAddToWeek(e.target.checked)} />🗓️ Also put it on my weekly plan for that day</label>
+              <a href={weekId ? `/teacher/plans/weekly/${weekId}` : '/teacher/plans/weekly'} className="font-semibold text-violet-700 underline">Weekly plans ▶</a>
+            </div>}
           </Card>
           <Card className="space-y-4 p-5">
             {SECTIONS.slice(0, 3).map(([k, label, ph]) => <Field key={k} label={label}><Textarea rows={k === 'objectives' ? 3 : 2} value={String(c[k])} placeholder={ph} onChange={(e) => setC({ [k]: e.target.value } as any)} /></Field>)}

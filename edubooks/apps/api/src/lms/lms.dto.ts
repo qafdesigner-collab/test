@@ -25,6 +25,8 @@ export class LessonPlanDto {
   @IsOptional() @IsObject() content?: Record<string, unknown>;
   @IsOptional() @IsIn(['DRAFT', 'READY']) status?: 'DRAFT' | 'READY';
   @IsOptional() @IsBoolean() aiGenerated?: boolean;
+  /** also put it on its day of the weekly plan (default: yes, when it has a date) */
+  @IsOptional() @IsBoolean() addToWeek?: boolean;
 }
 
 export class QuestionDto extends ItemDto {

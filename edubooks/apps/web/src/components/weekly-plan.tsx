@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/toast';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const PART_ICON: Record<string, string> = { STUDENT_BOOK: '📘', HOMEWORK_BOOK: '📓', WORKBOOK: '📒', TEACHER_GUIDE: '📗', FLASHCARDS: '🃏', TEACHER_CARDS: '🎴', DANGLERS: '🎏', POSTERS: '🖼️', OTHER: '🗂️', CD: '💿', MOBILE_APP: '📱' };
-export type Entry = { day: number; editionId: string | null; componentId: string | null; lessonId: string | null; pageFrom: number | null; pageTo: number | null; resourceIds: string[]; title: string; activity: string; homework: string;
+export type Entry = { planId?: string | null; day: number; editionId: string | null; componentId: string | null; lessonId: string | null; pageFrom: number | null; pageTo: number | null; resourceIds: string[]; title: string; activity: string; homework: string;
   book?: string | null; part?: string | null; partType?: string | null; lesson?: string | null; resources?: { id: string; title: string; type?: string }[] };
 const mondayOf = (s: string) => { const d = new Date(`${s}T12:00:00`); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
 const dayDate = (monday: string, day: number) => { const d = new Date(`${monday}T12:00:00`); d.setDate(d.getDate() + day - 1); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
@@ -70,6 +70,7 @@ function EntryCard({ e, onEdit, onRemove }: { e: Entry; onEdit?: () => void; onR
       {e.activity && <p className="whitespace-pre-line text-slate-700" dir="auto">{e.activity}</p>}
       {!!e.resources?.length && <p className="text-xs text-slate-600">🗂️ {e.resources.map((r) => r.title).join(', ')}</p>}
       {e.homework && <p className="text-xs font-semibold text-amber-700">🏠 {e.homework}</p>}
+      {e.planId && <a href={`/teacher/plans/${e.planId}`} className="me-3 inline-flex items-center gap-1 text-xs font-semibold text-violet-700 hover:underline print:hidden">📝 Lesson plan</a>}
       {e.editionId && e.componentId && e.pageFrom && <a href={`/read/${e.editionId}?component=${e.componentId}&page=${e.pageFrom}`} className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:underline print:hidden"><BookOpen className="size-3.5" />Open the page</a>}
     </div>
   );

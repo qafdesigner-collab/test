@@ -142,6 +142,27 @@ describe('Stickers and voice feedback, class goals, plan my week, the parents’
     expect((await teacher.delete(`/api/teacher/weekly-plans/${w.body.id}`)).status).toBe(200);
   });
 
+  it('a day’s lesson plan goes on that day of the weekly plan (and moves with it)', async () => {
+    const books = (await teacher.get('/api/teacher/books')).body; const ed = books[0].editionId;
+    const book = (await teacher.get(`/api/reader/editions/${ed}`)).body;
+    const lesson = book.components.flatMap((c: any) => c.units.flatMap((u: any) => u.lessons))[0];
+    const p = await teacher.post('/api/teacher/lesson-plans').send({ title: 'Letters A and B', classId: kg, editionId: ed, lessonId: lesson?.id ?? null, planDate: '2027-01-13T08:00:00Z', content: { objectives: 'Say A and B' } });
+    expect(p.status).toBe(201); expect(p.body.weeklyPlanId).toBeTruthy();
+    let w = (await teacher.get(`/api/teacher/weekly-plans/${p.body.weeklyPlanId}`)).body;
+    expect(w.weekStart).toBe('2027-01-11');
+    expect(w.entries).toEqual([expect.objectContaining({ day: 3, planId: p.body.id, editionId: ed })]);
+    // moved to Friday: it moves on the weekly plan too (not added twice)
+    await teacher.put(`/api/teacher/lesson-plans/${p.body.id}`).send({ title: 'Letters A and B', classId: kg, editionId: ed, lessonId: lesson?.id ?? null, planDate: '2027-01-15T08:00:00Z' });
+    w = (await teacher.get(`/api/teacher/weekly-plans/${p.body.weeklyPlanId}`)).body;
+    expect(w.entries.map((e: any) => e.day)).toEqual([5]);
+    // a plan without “add to week” stays out of it; deleting the plan takes it off the week
+    const q = await teacher.post('/api/teacher/lesson-plans').send({ title: 'Not on the week', classId: kg, planDate: '2027-01-12T08:00:00Z', addToWeek: false });
+    expect(q.body.weeklyPlanId).toBeNull();
+    await teacher.delete(`/api/teacher/lesson-plans/${p.body.id}`);
+    expect((await teacher.get(`/api/teacher/weekly-plans/${w.id}`)).body.entries).toEqual([]);
+    await teacher.delete(`/api/teacher/lesson-plans/${q.body.id}`); await teacher.delete(`/api/teacher/weekly-plans/${w.id}`);
+  });
+
   it('the Hall of Fame: the school admin adds students and leaders and decides who sees it', async () => {
     expect((await teacher.post('/api/fame').send({ kind: 'STUDENT', name: 'X Y' })).status).toBe(403);
     const kid = (await principal.get('/api/fame/people?role=STUDENT&q=Sample Student 1')).body[0];

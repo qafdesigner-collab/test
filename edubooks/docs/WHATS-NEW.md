@@ -1,3 +1,14 @@
+# What's new in Knowledge Gate 1.4.26
+
+## 🗓️ Day lesson plans go on the weekly plan by themselves
+- A lesson plan with a **date** now has **“🗓️ Also put it on my weekly plan for that day”** (ticked). When you save, it appears on that day of your weekly plan for that week and class — the week is made if there is none yet. You see “Lesson plan saved — and added to your weekly plan”.
+- Change the date and it **moves** on the weekly plan (it is never added twice). Untick it, or delete the lesson plan, and it comes off the week.
+- On the weekly plan each such entry has **📝 Lesson plan** to open it. “📅 Plan my week (automatic)” puts its lesson plans on the weekly plan too.
+
+## 🧪 Demo data: everything in Sunrise Grammar School (Demo)
+- **Super admin → Demo data → Load demo data** now also fills **Sunrise Grammar School (Demo)** with all the newest features: the school news timeline (6 posts with pictures and events), the 20 ready-made games (Penalty kick, Running race, Whack-a-mole…), 3D pictures for the demo accounts, **stickers and a note from the teacher** on a student’s homework and drawing, a **class goal** (60 stars → 🔬 Science experiment day) and the school’s own rewards, a **Hall of Fame** (principal, vice principal, teacher of the year and three brilliant students), and **three lesson plans for this week on the weekly plan** with a library visit. The parents’ **📅 This week** summary has something to show.
+- **Remove all demo data** removes all of it again.
+
 # What's new in Knowledge Gate 1.4.25
 
 ## 🏛️ Hall of Fame: choose the student by class and section

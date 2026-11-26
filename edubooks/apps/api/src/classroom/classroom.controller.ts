@@ -11,6 +11,7 @@ import { LmsModule } from '../lms/lms.module';
 import { NotificationsModule } from '../notifications/notifications.controller';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ExtrasController, FameService, WeeklyPlansService } from './extras.controller';
+import { addPlanToWeek } from './week-sync';
 
 /** Stickers a teacher can give with one tap (the key is stored; the label is shown). */
 export const STICKERS: Record<string, string> = {
@@ -264,6 +265,7 @@ export class ClassroomService {
         VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${this.ctx.userId}, ${d.classId}, ${d.editionId}, ${l.id}, ${title}, ${`${it.date}T08:00:00Z`}, 40,
           ${JSON.stringify({ objectives: '', notes: 'Planned with “Plan my week”. Open it and press “Write with AI” to fill in the steps.' })}::jsonb, 'DRAFT') RETURNING id, title, plan_date AS "planDate"`);
       made.push(p);
+      await addPlanToWeek((q) => this.db.q.execute(q) as any, this.ctx as any, { id: p.id, classId: d.classId, editionId: d.editionId, lessonId: l.id, planDate: p.planDate, title });
     }
     await this.audit.log('lms.plan.week', 'class', d.classId, `Planned the week of ${mondayOf(d.weekStart)}: ${made.length} lessons`);
     return { created: made.length, plans: made };

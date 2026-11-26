@@ -2,6 +2,7 @@
  * All units/lessons are clearly marked "(sample)": placeholders, NOT real publisher textbook content.
  * Runs as the OWNER role (bypasses RLS). */
 import { seedDemoPosts } from '../demo/timeline-demo';
+import { addPlanToWeek } from '../classroom/week-sync';
 import { STARTER_GAMES } from '../games/starter-pack';
 import { validateContent } from '../games/engines';
 import * as fs from 'fs';
@@ -318,6 +319,47 @@ export async function demoExtras(db: NodePgDatabase<typeof s>, P: string, admin:
   for (const [k, a] of [['principal', 'teacher-man-2'], ['teacher1', 'teacher-woman'], ['student1', 'girl-hijab'], ['student2', 'boy-2'], ['student3', 'girl'], ['parent1', 'owl']])
     if (u[k]) await x(sql`UPDATE users SET avatar = ${a} WHERE id = ${u[k]}`);
   await seedDemoPosts((q) => x(q) as any, createDriver(), { publisherId: P, schoolId: S, principal: u.principal, teacher: u.teacher1, classId: cls, direct: true });
+  // ---- the classroom: stickers and a note from the teacher, a class goal, the school's rewards, the Hall of Fame, plans ----
+  const [hwRow] = (await x(sql`SELECT id FROM assessments WHERE class_id = ${cls} AND kind = 'HOMEWORK' ORDER BY created_at LIMIT 1`)).rows as any[];
+  if (hwRow) {
+    const sub = (await x(sql`INSERT INTO submissions (publisher_id, school_id, assessment_id, student_id, answers, score, max_score, status, graded_at, graded_by, feedback)
+      VALUES (${P}, ${S}, ${hwRow.id}, ${u.student1}, '[]'::jsonb, 4, 5, 'RETURNED', now() - interval '1 day', ${u.teacher1}, 'Lovely work!') ON CONFLICT DO NOTHING RETURNING id`)).rows[0] as any;
+    if (sub) await x(sql`INSERT INTO work_feedback (publisher_id, school_id, student_id, teacher_id, target_kind, target_id, stickers, note)
+      VALUES (${P}, ${S}, ${u.student1}, ${u.teacher1}, 'SUBMISSION', ${sub.id}, '{GREAT,READING}'::text[], 'Super reading this week — keep it up!')`);
+  }
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const work = (await x(sql`INSERT INTO page_work (publisher_id, school_id, student_id, page, kind, image, stars, comment, commented_by, created_at)
+    VALUES (${P}, ${S}, ${u.student2}, 3, 'DRAW', ${png}, 3, 'Beautiful colours!', ${u.teacher1}, now() - interval '2 days') RETURNING id`)).rows[0] as any;
+  await x(sql`INSERT INTO work_feedback (publisher_id, school_id, student_id, teacher_id, target_kind, target_id, stickers, note)
+    VALUES (${P}, ${S}, ${u.student2}, ${u.teacher1}, 'PAGE_WORK', ${work.id}, '{CREATIVE,SUPER_STAR}'::text[], 'What a lovely drawing!')`);
+  await x(sql`INSERT INTO school_rewards (publisher_id, school_id, emoji, title, created_by) VALUES
+    (${P}, ${S}, '🍦', 'Ice-cream Friday', ${u.principal}), (${P}, ${S}, '🌳', 'Lesson in the garden', ${u.teacher1}), (${P}, ${S}, '🦁', 'Trip to the zoo', ${u.principal})`);
+  await x(sql`INSERT INTO class_goals (publisher_id, school_id, class_id, teacher_id, reward, emoji, target, starts_at)
+    VALUES (${P}, ${S}, ${cls}, ${u.teacher1}, 'Science experiment day', '🔬', 60, now() - interval '10 days')`);
+  await x(sql`INSERT INTO hall_of_fame (publisher_id, school_id, kind, user_id, name, title, achievement, year, emoji, avatar, sort) VALUES
+    (${P}, ${S}, 'LEADER', ${u.principal}, 'Sunrise Grammar School Admin', 'Principal', 'Leading our school with care and big dreams for every child', '', '🎖️', NULL, 1),
+    (${P}, ${S}, 'LEADER', NULL, 'Mrs. Fatima Noor', 'Vice Principal', 'Always there for every child and every family', '', '🎖️', 'teacher-woman-2', 2),
+    (${P}, ${S}, 'LEADER', ${u.teacher1}, 'Sample Teacher', 'Teacher of the Year', 'Made reading fun for the whole of KG Rose', '2026', '🎖️', NULL, 3),
+    (${P}, ${S}, 'STUDENT', ${u.student1}, 'Sample Student 1', 'Reading Champion', 'Read 40 books this term and helped friends to read', '2026', '🏆', NULL, 1),
+    (${P}, ${S}, 'STUDENT', ${u.student2}, 'Sample Student 2', 'Maths Star', 'Top score in every maths test this term', '2026', '🏆', NULL, 2),
+    (${P}, ${S}, 'STUDENT', ${u.student3}, 'Sample Student 3', 'Kindness Award', 'Helps every new friend in class', '2026', '🏆', NULL, 3)`);
+  // three lesson plans this week (they go on the weekly plan by themselves) and a library visit
+  const ed = r.editionByTitle['KG English'];
+  const ls = (await x(sql`SELECT l.id, l.title, l.number, u.number AS unit FROM book_lessons l JOIN book_units u ON u.id = l.unit_id JOIN book_components c ON c.id = u.component_id
+    WHERE c.edition_id = ${ed} ORDER BY c.sort, u.sort, l.sort LIMIT 3`)).rows as any[];
+  const mon = new Date(); mon.setUTCHours(8, 0, 0, 0); mon.setUTCDate(mon.getUTCDate() - ((mon.getUTCDay() + 6) % 7));
+  let weekId: string | null = null;
+  for (const [i, l] of ls.entries()) {
+    const date = new Date(mon.getTime() + [0, 1, 3][i] * 864e5);
+    const title = `Unit ${l.unit} · Lesson ${l.number}: ${l.title}`;
+    const content = { objectives: 'Children can name the letters and sounds of the lesson and use them in words.', homework: i === 1 ? 'Trace the letters on page 4' : '' };
+    const plan = (await x(sql`INSERT INTO lesson_plans (publisher_id, school_id, teacher_id, class_id, edition_id, lesson_id, title, plan_date, duration_min, content, status)
+      VALUES (${P}, ${S}, ${u.teacher1}, ${cls}, ${ed}, ${l.id}, ${title}, ${date}, 40, ${JSON.stringify(content)}::jsonb, 'READY') RETURNING id`)).rows[0] as any;
+    weekId = await addPlanToWeek((q) => x(q) as any, { publisherId: P, schoolId: S, userId: u.teacher1 }, { id: plan.id, classId: cls, editionId: ed, lessonId: l.id, planDate: date, title, content });
+  }
+  if (weekId) await x(sql`UPDATE weekly_plans SET title = 'This week — Letters and sounds', notes = 'Bring crayons on Tuesday. Library books go home on Wednesday.',
+    entries = entries || ${JSON.stringify([{ day: 3, editionId: null, componentId: null, lessonId: null, pageFrom: null, pageTo: null, resourceIds: [], title: 'Library visit', activity: 'Each child chooses a book to take home', homework: 'Read the library book with a grown-up' }])}::jsonb
+    WHERE id = ${weekId}`);
   // the ready-made General games and Sports games (removed again with the demo data)
   const have = new Set(((await x(sql`SELECT title FROM game_activities WHERE publisher_id = ${P} AND school_id IS NULL`)).rows as any[]).map((g) => g.title));
   for (const g of STARTER_GAMES) {
