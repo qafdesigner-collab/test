@@ -24,6 +24,8 @@ const AR: Record<string, string> = {
   'Library visit': 'زيارة المكتبة', 'Science experiment day': 'يوم التجارب العلمية', 'Puzzle and brain-games time': 'وقت الألغاز وألعاب الذكاء', 'Educational trip': 'رحلة تعليمية',
   'Class play or show': 'مسرحية أو عرض للفصل', 'Computer and coding time': 'وقت الحاسوب والبرمجة', 'Plant a class garden': 'زراعة حديقة الفصل', 'Spelling bee party': 'حفلة مسابقة التهجئة',
   'Choose the next class read-aloud book': 'اختيار كتاب القراءة القادم للفصل', 'Certificates for everyone': 'شهادات للجميع', 'Visit from a guest expert': 'زيارة من خبير ضيف',
+  // live voice on the whiteboard
+  'Listening to your teacher': 'تستمع إلى معلمك', 'Your teacher is speaking — tap to listen': 'معلمك يتحدث — اضغط لتستمع',
   // competitions
   Competitions: 'المسابقات', 'No competitions yet.': 'لا توجد مسابقات بعد.', 'Taking part': 'المشاركة مفتوحة', Voting: 'التصويت', Results: 'النتائج', 'I took part': 'شاركت', Voted: 'صوّتُّ',
   entries: 'مشاركات', 'until {d}': 'حتى {d}', Singing: 'الغناء', Art: 'الفن', Drawing: 'الرسم', Poetry: 'الشعر', 'Quran recitation': 'تلاوة القرآن', Spelling: 'التهجئة', Storytelling: 'رواية القصص',

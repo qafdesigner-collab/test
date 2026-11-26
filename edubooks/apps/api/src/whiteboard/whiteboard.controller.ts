@@ -1,11 +1,14 @@
-import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, Injectable, Module, NotFoundException, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, Injectable, Module, NotFoundException, Param, ParseUUIDPipe, Post, Query, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Length, Min, ValidateNested } from 'class-validator';
 import { sql } from 'drizzle-orm';
 import { DbService } from '../db/db.service';
-import { Roles } from '../common/decorators';
+import { ManualTx, Roles } from '../common/decorators';
 import { AccessService } from '../lms/access.service';
 import { LmsModule } from '../lms/lms.module';
 
@@ -123,6 +126,31 @@ export class WhiteboardService {
 
   async get(id: string) { const b = await this.board(id); await this.canSee(b); return this.view(b); }
 
+  // ---- the teacher's live voice: 2-second sound pieces, kept 2 minutes
+  async voiceIn(id: string, buf: Buffer | undefined) {
+    const b = await this.board(id); await this.canWrite(b);
+    if (!b.live) throw new BadRequestException('Start the board first');
+    if (!buf?.length || buf.length > 400_000) throw new BadRequestException('Empty or too long');
+    const mime = buf.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3])) ? 'audio/webm' : buf.subarray(0, 4).toString() === 'OggS' ? 'audio/ogg' : buf.subarray(4, 8).toString() === 'ftyp' ? 'audio/mp4' : null;
+    if (!mime) throw new BadRequestException('This is not a sound recording we can play');
+    const [r] = await this.rows(sql`INSERT INTO whiteboard_voice (board_id, publisher_id, school_id, mime, data) VALUES (${id}, ${b.publisher_id}, ${b.school_id}, ${mime}, ${buf}) RETURNING seq::text AS seq`);
+    await this.rows(sql`DELETE FROM whiteboard_voice WHERE created_at < now() - interval '2 minutes'`);
+    return { seq: Number(r.seq) };
+  }
+  /** New sound pieces after `after` (only the last 15 seconds, so a late listener starts near "now"). */
+  async voiceList(id: string, after = 0) {
+    const b = await this.board(id); await this.canSee(b);
+    const list = await this.rows(sql`SELECT seq::text AS seq, mime, created_at FROM whiteboard_voice WHERE board_id = ${id} AND seq > ${after} AND created_at > now() - interval '15 seconds' ORDER BY seq LIMIT 20`);
+    const [last] = await this.rows(sql`SELECT max(created_at) AS at FROM whiteboard_voice WHERE board_id = ${id}`);
+    return { speaking: !!last?.at && Date.now() - new Date(last.at).getTime() < 7000, pieces: list.map((p) => ({ seq: Number(p.seq), mime: p.mime })) };
+  }
+  async voiceOut(id: string, seq: number) {
+    const b = await this.board(id); await this.canSee(b);
+    const [p] = await this.rows(sql`SELECT mime, data FROM whiteboard_voice WHERE board_id = ${id} AND seq = ${seq}`);
+    if (!p) throw new NotFoundException('Gone');
+    return { mime: p.mime as string, data: p.data as Buffer };
+  }
+
   async ops(id: string, after = 0) {
     const b = await this.board(id); await this.canSee(b);
     // Students following a live board count as "watching" (refreshed at most every few seconds).
@@ -176,13 +204,22 @@ export class WhiteboardService {
 @ApiTags('whiteboard')
 @Controller('whiteboards')
 export class WhiteboardController {
-  constructor(private readonly svc: WhiteboardService) {}
+  constructor(private readonly svc: WhiteboardService, private readonly db: DbService) {}
   @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT') @Get() list(@Query() q: ListQuery) { return this.svc.list(!!q.live); }
   @Roles('SCHOOL_ADMIN', 'TEACHER') @Post() create(@Body() d: CreateBoardDto) { return this.svc.create(d); }
   @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT') @Get(':id') get(@Param('id', Id()) id: string) { return this.svc.get(id); }
   /** Polled about once a second by every watching student, so it is not rate limited like other calls. */
   @SkipThrottle() @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT') @Get(':id/ops') ops(@Param('id', Id()) id: string, @Query() q: OpsQuery) { return this.svc.ops(id, q.after ?? 0); }
   @Roles('SCHOOL_ADMIN', 'TEACHER') @Post(':id/ops') @HttpCode(200) write(@Param('id', Id()) id: string, @Body() d: OpsDto) { return this.svc.write(id, d); }
+  @Roles('SCHOOL_ADMIN', 'TEACHER') @ManualTx() @Post(':id/voice') @HttpCode(200)
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 400_000, files: 1 } }))
+  voiceIn(@Param('id', Id()) id: string, @UploadedFile() file: Express.Multer.File, @Req() req: any) { return this.db.withContext(req.ctx, () => this.svc.voiceIn(id, file?.buffer)); }
+  @SkipThrottle() @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT') @Get(':id/voice') voiceList(@Param('id', Id()) id: string, @Query('after') after?: string) { return this.svc.voiceList(id, Number(after) || 0); }
+  @SkipThrottle() @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT') @Get(':id/voice/:seq')
+  async voiceOut(@Param('id', Id()) id: string, @Param('seq') seq: string, @Res() res: Response) {
+    const v = await this.svc.voiceOut(id, Number(seq) || 0);
+    res.setHeader('Content-Type', v.mime); res.setHeader('Cache-Control', 'private, max-age=300'); res.setHeader('X-Content-Type-Options', 'nosniff'); res.end(v.data);
+  }
   @Roles('SCHOOL_ADMIN', 'TEACHER') @Get(':id/watchers') watchers(@Param('id', Id()) id: string) { return this.svc.watchers(id); }
   @Roles('SCHOOL_ADMIN', 'TEACHER') @Post(':id/end') @HttpCode(200) end(@Param('id', Id()) id: string) { return this.svc.setLive(id, false); }
   @Roles('SCHOOL_ADMIN', 'TEACHER') @Post(':id/resume') @HttpCode(200) resume(@Param('id', Id()) id: string) { return this.svc.setLive(id, true); }

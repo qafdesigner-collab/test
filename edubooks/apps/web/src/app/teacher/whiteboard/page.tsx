@@ -8,6 +8,7 @@ import { api, fmtDate } from '@/lib/api';
 import { className, useBook, useMyBooks, useMyClasses } from '@/lib/lms';
 import { Button, Card, Dialog, ErrorBox, Field, Input, PageLoader, Select } from '@/components/ui';
 import { PageHeader } from '@/components/common';
+import { PagePicker, parsePageList } from '@/components/page-picker';
 import { useToast } from '@/components/ui/toast';
 
 export default function Page() { return <Suspense fallback={<PageLoader />}><Whiteboards /></Suspense>; }
@@ -53,7 +54,12 @@ function StartBoard({ onClose }: { onClose: () => void }) {
   const classes = useMyClasses(); const books = useMyBooks();
   const [f, setF] = useState({ classId: '', title: '', editionId: params.get('editionId') ?? '', componentId: params.get('componentId') ?? '', page: Number(params.get('page')) || 1 });
   const book = useBook(f.editionId || undefined);
-  const parts = (book.data?.components ?? []).filter((c: any) => c.hasPdf);
+  // parts with pages: a PDF, or a flipbook made of page pictures
+  const parts = (book.data?.components ?? []).filter((c: any) => c.hasPdf || (c.flipbook && c.flipbook !== 'SWF'));
+  const part = parts.find((c: any) => c.id === f.componentId);
+  const lessons: any[] = part ? part.units.flatMap((u: any) => u.lessons.map((l: any) => ({ ...l, unit: u.number }))) : [];
+  // pick the only part straight away
+  useEffect(() => { if (f.editionId && !f.componentId && parts.length === 1) setF((x) => ({ ...x, componentId: parts[0].id, page: 1 })); }, [f.editionId, f.componentId, parts.length]); // eslint-disable-line
   useEffect(() => { if (!f.classId && classes.data?.length) setF((x) => ({ ...x, classId: classes.data![0].id })); }, [classes.data, f.classId]);
   const [busy, setBusy] = useState(false);
   const start = async () => {
@@ -64,7 +70,7 @@ function StartBoard({ onClose }: { onClose: () => void }) {
     } catch (e: any) { toast(e.message, 'err'); setBusy(false); }
   };
   return (
-    <Dialog open onOpenChange={onClose} title="Start a live whiteboard" description="Your students see it on their home page straight away, and follow every line you write.">
+    <Dialog open wide onOpenChange={onClose} title="Start a live whiteboard" description="Your students see it on their home page straight away, and follow every line you write.">
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); start(); }}>
         <Field label="Class"><Select required value={f.classId} onChange={(e) => setF({ ...f, classId: e.target.value })}>
           {classes.data?.map((c) => <option key={c.id} value={c.id}>{className(c)}</option>)}</Select></Field>
@@ -75,11 +81,18 @@ function StartBoard({ onClose }: { onClose: () => void }) {
             {books.data?.map((b) => <option key={b.editionId} value={b.editionId}>{b.title} — {b.editionLabel}</option>)}
           </Select></Field>
         {f.editionId && (
-          <div className="grid grid-cols-[1fr_110px] gap-3">
-            <Field label="Book part"><Select required value={f.componentId} onChange={(e) => setF({ ...f, componentId: e.target.value })}>
-              <option value="">{book.isLoading ? 'Loading…' : parts.length ? 'Choose…' : 'No pages uploaded'}</option>
-              {parts.map((c: any) => <option key={c.id} value={c.id}>{c.title}</option>)}</Select></Field>
-            <Field label="Page"><Input type="number" min={1} value={f.page} onChange={(e) => setF({ ...f, page: Math.max(1, Number(e.target.value) || 1) })} /></Field>
+          <div className="space-y-3">
+            <Field label="Book part"><Select required value={f.componentId} onChange={(e) => setF({ ...f, componentId: e.target.value, page: 1 })}>
+              <option value="">{book.isLoading ? 'Loading…' : parts.length ? 'Choose…' : 'No pages uploaded for this book'}</option>
+              {parts.map((c: any) => <option key={c.id} value={c.id}>{c.title}{c.pageCount ? ` · ${c.pageCount} pages` : ''}</option>)}</Select></Field>
+            {f.componentId && <div className="grid grid-cols-[1fr_110px] gap-3">
+              <Field label="Lesson (optional)"><Select value={lessons.find((l) => l.pageStart === f.page)?.id ?? ''} onChange={(e) => { const l = lessons.find((x) => x.id === e.target.value); if (l?.pageStart) setF({ ...f, page: l.pageStart }); }}>
+                <option value="">{lessons.length ? '— choose a lesson to jump to its page —' : 'No lessons in the index'}</option>
+                {lessons.map((l) => <option key={l.id} value={l.id} disabled={!l.pageStart}>Unit {l.unit} · Lesson {l.number}: {l.title}{l.pageStart ? ` (p. ${l.pageStart})` : ''}</option>)}</Select></Field>
+              <Field label="Page"><Input type="number" min={1} max={part?.pageCount ?? undefined} value={f.page} onChange={(e) => setF({ ...f, page: Math.max(1, Number(e.target.value) || 1) })} /></Field>
+            </div>}
+            {f.componentId && <div className="rounded-xl bg-slate-50 p-2"><p className="mb-1 text-xs font-semibold text-slate-600">👀 Preview — click a page to choose it</p>
+              <PagePicker key={f.componentId} componentId={f.componentId} flipbook={!part?.hasPdf} value={String(f.page)} onChange={(v) => { const n = parsePageList(v).find((x) => x !== f.page) ?? parsePageList(v)[0]; if (n) setF({ ...f, page: n }); }} /></div>}
           </div>
         )}
         <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>

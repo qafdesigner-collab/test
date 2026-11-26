@@ -127,7 +127,8 @@ function drawPaper(cv: HTMLCanvasElement, paper: Paper) {
 /** Book page (or blank paper) behind the ink; reports the page count and shape. */
 function useBackground(bg: Bg, paper: Paper, canvas: React.RefObject<HTMLCanvasElement | null>, size: { w: number; h: number }) {
   const [info, setInfo] = useState<{ pages: number; aspect: number; error?: string }>({ pages: 0, aspect: 16 / 10 });
-  const doc = useRef<{ id: string; d: any } | null>(null);
+  const doc = useRef<{ id: string; d: any; flip?: { n: number; src: string }[] } | null>(null);
+  const task = useRef<any>(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -139,8 +140,26 @@ function useBackground(bg: Bg, paper: Paper, canvas: React.RefObject<HTMLCanvasE
       }
       try {
         if (doc.current?.id !== bg.componentId) {
-          const link = await api.get<FileLink>(`/reader/components/${bg.componentId}/pdf`);
-          const cid = bg.componentId; doc.current = { id: cid, d: await loadPdf(link, () => api.get<FileLink>(`/reader/components/${cid}/pdf`)) };
+          const cid = bg.componentId;
+          try {
+            const link = await api.get<FileLink>(`/reader/components/${cid}/pdf`);
+            doc.current = { id: cid, d: await loadPdf(link, () => api.get<FileLink>(`/reader/components/${cid}/pdf`)) };
+          } catch (e) {
+            // a part made of flipbook pages (pictures) instead of a PDF
+            const r = await api.get<any>(`/reader/components/${cid}/flip-pages`).catch(() => null);
+            if (!r?.pages?.length) throw e;
+            doc.current = { id: cid, d: null, flip: r.pages };
+          }
+        }
+        if (doc.current.flip) {
+          const pages = doc.current.flip; const n = Math.min(Math.max(1, bg.page ?? 1), pages.length);
+          const img = await new Promise<HTMLImageElement>((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => bad(new Error('The book page could not be loaded')); i.src = pages[n - 1].src; });
+          if (cancelled) return;
+          setInfo({ pages: pages.length, aspect: img.naturalWidth / img.naturalHeight });
+          if (!cv || !size.w) return;
+          const r = window.devicePixelRatio || 1; cv.width = size.w * r; cv.height = Math.round((size.w * r * img.naturalHeight) / img.naturalWidth);
+          cv.getContext('2d')!.drawImage(img, 0, 0, cv.width, cv.height);
+          return;
         }
         const d = doc.current.d; const page = await d.getPage(Math.min(Math.max(1, bg.page ?? 1), d.numPages));
         const vp1 = page.getViewport({ scale: 1 });
@@ -149,11 +168,15 @@ function useBackground(bg: Bg, paper: Paper, canvas: React.RefObject<HTMLCanvasE
         if (!cv || !size.w) return;
         const scale = (size.w * (window.devicePixelRatio || 1)) / vp1.width;
         const vp = page.getViewport({ scale });
+        // only one drawing at a time on this canvas: a newer one (other size or page) stops the older one
+        try { task.current?.cancel(); } catch { /* finished */ }
+        if (cancelled) return;
         cv.width = vp.width; cv.height = vp.height;
-        await page.render({ canvasContext: cv.getContext('2d')!, viewport: vp }).promise;
+        const t = page.render({ canvasContext: cv.getContext('2d')!, viewport: vp }); task.current = t;
+        await t.promise.catch((e: any) => { if (e?.name !== 'RenderingCancelledException') throw e; });
       } catch (e: any) { if (!cancelled) setInfo({ pages: 0, aspect: 16 / 10, error: e?.message || 'The book page could not be loaded' }); }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; try { task.current?.cancel(); } catch { /* finished */ } };
   }, [bg.componentId, bg.page, paper, size.w, size.h, canvas]);
   return info;
 }
@@ -381,6 +404,7 @@ export function WhiteboardWriter({ board, onEnd }: { board: any; onEnd: () => vo
             : <button type="button" onClick={() => go({ componentId: book, page: lastBook.current })} className="inline-flex h-9 items-center gap-1 rounded-xl bg-violet-50 px-2.5 text-xs font-semibold text-violet-700 hover:bg-violet-100">📖 Back to the book</button>)}
         </div>
         <div className="ms-auto flex items-center gap-2">
+          <SpeakLive boardId={board.id} />
           {watch && <span title={watch.names.join(', ') || 'Nobody is watching yet'} className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-800"><Eye className="size-3.5" />{watch.watching}{watch.classSize ? ` / ${watch.classSize}` : ''} watching</span>}
           <span className={cn('flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold', offline ? 'bg-amber-100 text-amber-800' : 'bg-red-50 text-red-600')}>
             <span className={cn('size-2 rounded-full', offline ? 'bg-amber-500' : 'bg-red-500 motion-safe:animate-pulse')} />{offline ? 'Reconnecting…' : 'LIVE'}</span>
@@ -447,6 +471,7 @@ export function WhiteboardViewer({ board, playful }: { board: any; playful?: boo
           : <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{t('This lesson has ended. You can still look at the board.')}</span>}
         {bg.componentId ? <span className="rounded-full bg-violet-50 px-3 py-1 text-violet-700">📖 {board.bookTitle ?? 'Book'}{board.partTitle ? ` · ${board.partTitle}` : ''} · {t('page')} {bg.page}</span>
           : <span className="rounded-full bg-slate-50 px-3 py-1 text-slate-600">⬜ {t('page')} {bg.page ?? 1}</span>}
+        {live && <ListenLive boardId={board.id} />}
         <button type="button" onClick={fs.toggle} className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-slate-700 shadow-sm hover:bg-slate-50">{fs.on ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}{fs.on ? t('Exit full screen') : t('Full screen')}</button>
       </div>
       <div ref={box} className="flex w-full justify-center">
@@ -483,4 +508,86 @@ export function LiveBoards() {
       ))}
     </section>
   );
+}
+
+// ====================== the teacher's live voice ======================
+function pickAudioMime() {
+  if (typeof MediaRecorder === 'undefined') return null;
+  for (const m of ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']) if (MediaRecorder.isTypeSupported?.(m)) return m;
+  return '';
+}
+/**
+ * 🎤 Speak live: the microphone is recorded in 2-second pieces (each a complete little sound file) and sent to the
+ * server; students play them one after another, about 3 seconds behind. Nothing is kept after 2 minutes.
+ */
+function SpeakLive({ boardId }: { boardId: string }) {
+  const [on, setOn] = useState(false); const [err, setErr] = useState(''); const [level, setLevel] = useState(0);
+  const stream = useRef<MediaStream | null>(null); const stop = useRef(false); const rec = useRef<MediaRecorder | null>(null); const raf = useRef(0);
+  const end = () => { stop.current = true; try { rec.current?.stop(); } catch { /* stopped */ } stream.current?.getTracks().forEach((t) => t.stop()); stream.current = null; cancelAnimationFrame(raf.current); setOn(false); setLevel(0); };
+  useEffect(() => () => end(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const start = async () => {
+    setErr(''); const mime = pickAudioMime();
+    if (mime === null || !navigator.mediaDevices?.getUserMedia) { setErr('This browser cannot send your voice.'); return; }
+    try { stream.current = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+    catch { setErr('Please allow the microphone.'); return; }
+    stop.current = false; setOn(true);
+    // a small level meter, so the teacher sees the microphone works
+    try {
+      const ac = new AudioContext(); const an = ac.createAnalyser(); an.fftSize = 256; ac.createMediaStreamSource(stream.current).connect(an); const buf = new Uint8Array(an.frequencyBinCount);
+      const tick = () => { an.getByteTimeDomainData(buf); let m = 0; for (const v of buf) m = Math.max(m, Math.abs(v - 128)); setLevel(m / 128); if (!stop.current) raf.current = requestAnimationFrame(tick); else ac.close().catch(() => undefined); };
+      tick();
+    } catch { /* no meter */ }
+    const piece = () => {
+      if (stop.current || !stream.current) return;
+      const chunks: Blob[] = []; const r = new MediaRecorder(stream.current, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : undefined); rec.current = r;
+      r.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      r.onstop = () => {
+        const blob = new Blob(chunks, { type: r.mimeType || mime || 'audio/webm' });
+        if (blob.size > 200) { const f = new FormData(); f.append('file', blob, 'voice'); api.upload(`/whiteboards/${boardId}/voice`, f).catch((e: any) => { if (/ended|Start the board/i.test(e.message)) end(); }); }
+        piece(); // the next piece starts at once
+      };
+      r.start(); setTimeout(() => { try { if (r.state === 'recording') r.stop(); } catch { /* stopped */ } }, 2000);
+    };
+    piece();
+  };
+  return (
+    <span className="flex items-center gap-1.5">
+      {on ? <button type="button" onClick={end} className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-3 py-2 text-sm font-bold text-white">
+          <span className="relative flex h-4 w-1.5 items-end overflow-hidden rounded bg-red-300"><span className="w-full bg-white" style={{ height: `${Math.min(100, 15 + level * 140)}%` }} /></span>🎤 Speaking — stop</button>
+        : <button type="button" onClick={start} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700" title="Students hear you live (about 3 seconds later)">🎤 Speak live</button>}
+      {err && <span className="text-xs text-red-600">{err}</span>}
+    </span>
+  );
+}
+
+/** 🔊 Students: hear the teacher. A tap is needed once (browsers only play sound after a tap). */
+function ListenLive({ boardId }: { boardId: string }) {
+  const { t } = useT();
+  const [on, setOn] = useState(false); const [speaking, setSpeaking] = useState(false);
+  const after = useRef(0); const queue = useRef<number[]>([]); const playing = useRef(false); const audio = useRef<HTMLAudioElement | null>(null);
+  const next = useCallback(() => {
+    if (playing.current) return; const seq = queue.current.shift(); if (seq === undefined) return;
+    playing.current = true; const a = audio.current ?? new Audio(); audio.current = a;
+    a.src = `/api/whiteboards/${boardId}/voice/${seq}`;
+    a.onended = a.onerror = () => { playing.current = false; next(); };
+    a.play().catch(() => { playing.current = false; });
+  }, [boardId]);
+  useEffect(() => {
+    let stop = false; let tm: ReturnType<typeof setTimeout>;
+    const tick = async () => {
+      try {
+        const r = await api.get<any>(`/whiteboards/${boardId}/voice?after=${after.current}`);
+        if (stop) return; setSpeaking(r.speaking);
+        for (const p of r.pieces) { after.current = Math.max(after.current, p.seq); if (on) queue.current.push(p.seq); }
+        if (on) { if (queue.current.length > 4) queue.current = queue.current.slice(-2); next(); } // fell behind: jump to "now"
+      } catch { /* try again */ }
+      if (!stop) tm = setTimeout(tick, 900);
+    };
+    tick(); return () => { stop = true; clearTimeout(tm); };
+  }, [boardId, on, next]);
+  useEffect(() => () => { audio.current?.pause(); }, []);
+  if (!speaking && !on) return null;
+  return on
+    ? <button type="button" onClick={() => { setOn(false); queue.current = []; audio.current?.pause(); playing.current = false; }} className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-white">🔊 {speaking ? t('Listening to your teacher') : t('Sound on')}</button>
+    : <button type="button" onClick={() => { const a = new Audio(); a.play().catch(() => undefined); audio.current = a; setOn(true); }} className="inline-flex animate-pulse items-center gap-1.5 rounded-full bg-amber-400 px-4 py-1.5 font-black text-amber-950 shadow">🔊 {t('Your teacher is speaking — tap to listen')}</button>;
 }

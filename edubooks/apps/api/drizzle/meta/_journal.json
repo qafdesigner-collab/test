@@ -554,6 +554,13 @@
       "when": 1797590000000,
       "tag": "0078_competitions",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1797690000000,
+      "tag": "0079_board_voice",
+      "breakpoints": true
     }
   ]
 }

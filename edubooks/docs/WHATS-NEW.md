@@ -1,3 +1,17 @@
+# What's new in Knowledge Gate 1.4.28
+
+## 🖍️ Live whiteboard: book → part → lesson → page, with a preview
+- **Start a whiteboard → Write on** a book: the **Book part** list now shows every part with pages — parts uploaded as a PDF **and parts uploaded as flipbook pages** (before, those showed “No pages uploaded”). With one part it is chosen for you.
+- Then choose a **Lesson** (optional — it jumps to the lesson's page) or type the **Page**, and see the **preview** of the book pages: click a page to choose it.
+- **Start live** opens that page on the board, ready to write on. Flipbook pages work on the board too.
+
+## 🎤 Speak live — students hear the teacher
+- On the live board the teacher presses **🎤 Speak live** (a small bar shows the microphone is working). Students see **🔊 Your teacher is speaking — tap to listen** and hear the teacher about 3 seconds later, while watching the board. **Stop** any time; it also stops when the lesson ends.
+- Works through the normal school internet without any extra set-up. Nothing is recorded: the sound pieces are deleted after 2 minutes.
+
+## 🔧 Fixed
+- On some students' screens the book page on a live board was drawn upside down and too small.
+
 # What's new in Knowledge Gate 1.4.27
 
 ## 🏆 Competitions
