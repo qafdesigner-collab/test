@@ -1,5 +1,5 @@
 'use client';
-import { BookMarked, ClipboardList, Gamepad2, Library, LayoutDashboard, NotebookPen, Sparkles, Users, CalendarDays, UserCheck, Clock, GraduationCap, LineChart, FileText, MessagesSquare, Bird, Building, Presentation, Mail, ListChecks, BarChart3, Palette, Newspaper, Trophy, Landmark } from 'lucide-react';
+import { BookMarked, ClipboardList, Gamepad2, Library, LayoutDashboard, NotebookPen, Sparkles, Users, CalendarDays, UserCheck, Clock, GraduationCap, LineChart, FileText, MessagesSquare, Bird, Building, Presentation, Mail, ListChecks, BarChart3, Palette, Newspaper, Trophy, Landmark, Medal } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Shell } from '@/components/shell';
@@ -21,6 +21,7 @@ const NAV = [
   { href: '/teacher/book-work', label: 'Book work', icon: Palette },
   { href: '/teacher/rewards', label: 'Class rewards', icon: Trophy },
   { href: '/teacher/fame', label: 'Hall of Fame', icon: Landmark },
+  { href: '/teacher/competitions', label: 'Competitions', icon: Medal },
   { href: '/teacher/classes', label: 'Classes & reports', icon: Users },
   { href: '/teacher/insights', label: 'Insights', icon: LineChart },
   { href: '/teacher/compare', label: 'Compare classes', icon: BarChart3 },

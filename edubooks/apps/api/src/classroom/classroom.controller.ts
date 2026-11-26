@@ -12,6 +12,7 @@ import { NotificationsModule } from '../notifications/notifications.controller';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ExtrasController, FameService, WeeklyPlansService } from './extras.controller';
 import { addPlanToWeek } from './week-sync';
+import { CompetitionsController, CompetitionsService } from './competitions.controller';
 
 /** Stickers a teacher can give with one tap (the key is stored; the label is shown). */
 export const STICKERS: Record<string, string> = {
@@ -387,5 +388,5 @@ export class ClassroomController {
   private kind(k: string): Kind { const u = k.toUpperCase().replace('-', '_'); if (!(KINDS as readonly string[]).includes(u)) throw new BadRequestException('Unknown kind of work'); return u as Kind; }
 }
 
-@Module({ imports: [LmsModule, NotificationsModule], controllers: [ClassroomController, ExtrasController], providers: [ClassroomService, WeeklyDigestJob, WeeklyPlansService, FameService], exports: [ClassroomService, WeeklyDigestJob] })
+@Module({ imports: [LmsModule, NotificationsModule], controllers: [ClassroomController, ExtrasController, CompetitionsController], providers: [ClassroomService, WeeklyDigestJob, WeeklyPlansService, FameService, CompetitionsService], exports: [ClassroomService, WeeklyDigestJob] })
 export class ClassroomModule {}

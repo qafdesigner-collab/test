@@ -24,6 +24,15 @@ const AR: Record<string, string> = {
   'Library visit': 'زيارة المكتبة', 'Science experiment day': 'يوم التجارب العلمية', 'Puzzle and brain-games time': 'وقت الألغاز وألعاب الذكاء', 'Educational trip': 'رحلة تعليمية',
   'Class play or show': 'مسرحية أو عرض للفصل', 'Computer and coding time': 'وقت الحاسوب والبرمجة', 'Plant a class garden': 'زراعة حديقة الفصل', 'Spelling bee party': 'حفلة مسابقة التهجئة',
   'Choose the next class read-aloud book': 'اختيار كتاب القراءة القادم للفصل', 'Certificates for everyone': 'شهادات للجميع', 'Visit from a guest expert': 'زيارة من خبير ضيف',
+  // competitions
+  Competitions: 'المسابقات', 'No competitions yet.': 'لا توجد مسابقات بعد.', 'Taking part': 'المشاركة مفتوحة', Voting: 'التصويت', Results: 'النتائج', 'I took part': 'شاركت', Voted: 'صوّتُّ',
+  entries: 'مشاركات', 'until {d}': 'حتى {d}', Singing: 'الغناء', Art: 'الفن', Drawing: 'الرسم', Poetry: 'الشعر', 'Quran recitation': 'تلاوة القرآن', Spelling: 'التهجئة', Storytelling: 'رواية القصص',
+  Science: 'العلوم', Sports: 'الرياضة', Other: 'أخرى', 'All competitions': 'كل المسابقات', 'entries until {d}': 'المشاركة حتى {d}', 'voting until {d}': 'التصويت حتى {d}',
+  'The winners': 'الفائزون', 'Your entry': 'مشاركتك', 'Take part!': 'شارك!', 'Name of your entry, e.g. My favourite song': 'اسم مشاركتك، مثلاً: أغنيتي المفضلة', 'Add a photo of your work': 'أضف صورة لعملك',
+  Record: 'سجّل', 'Write your entry here…': 'اكتب مشاركتك هنا…', 'Tell us about it (optional)…': 'أخبرنا عنها (اختياري)…', 'Save my entry': 'احفظ مشاركتي', 'Send my entry': 'أرسل مشاركتي',
+  'Take it back': 'سحب المشاركة', 'Take your entry back?': 'هل تريد سحب مشاركتك؟', 'Vote for your favourite! You have one vote and can change it until the voting closes.': 'صوّت لمشاركتك المفضلة! لديك صوت واحد ويمكنك تغييره حتى يُغلق التصويت.',
+  Entries: 'المشاركات', 'No entries yet.': 'لا توجد مشاركات بعد.', 'My vote': 'صوتي', Vote: 'صوّت', 'Voting is open!': 'التصويت مفتوح!',
+  '📷 A photo': '📷 صورة', '🎤 A voice recording': '🎤 تسجيل صوتي', '✍️ Writing': '✍️ كتابة', '📷 🎤 ✍️ Photo, recording or writing': '📷 🎤 ✍️ صورة أو تسجيل أو كتابة',
   // hall of fame
   'Hall of Fame': 'لوحة الشرف', 'Celebrating the people who make our school shine': 'نحتفي بمن يجعلون مدرستنا تتألق', 'Our leadership': 'قيادتنا',
   'Our brilliant students': 'طلابنا المتميزون', 'The Hall of Fame is empty for now.': 'لوحة الشرف فارغة الآن.', 'Our brilliant students and leadership': 'طلابنا المتميزون وقيادتنا',

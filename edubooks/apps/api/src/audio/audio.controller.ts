@@ -28,7 +28,7 @@ const AUDIO: { ext: string; mime: string; sniff: (h: Buffer) => boolean }[] = [
 ];
 
 class UploadDto {
-  @IsIn(['MESSAGE', 'READING', 'FEEDBACK']) kind!: 'MESSAGE' | 'READING' | 'FEEDBACK';
+  @IsIn(['MESSAGE', 'READING', 'FEEDBACK', 'ENTRY']) kind!: 'MESSAGE' | 'READING' | 'FEEDBACK' | 'ENTRY';
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(15 * 60_000) durationMs?: number;
 }
 
@@ -42,6 +42,7 @@ export class AudioService {
       if (!file) throw new BadRequestException('No recording received');
       if (!this.db.ctx.schoolId) throw new ForbiddenException('Recordings belong to a school account');
       if (d.kind === 'FEEDBACK' && !this.access.is('TEACHER') && !this.access.is('SCHOOL_ADMIN')) throw new ForbiddenException('Only teachers record feedback');
+      if (d.kind === 'ENTRY' && !this.access.is('STUDENT')) throw new ForbiddenException('Only students record competition entries');
       if (!file.size || file.size > MAX_BYTES) throw new BadRequestException('The recording is empty or too long');
       const fd = await fs.promises.open(file.path, 'r'); const head = Buffer.alloc(16);
       await fd.read(head, 0, 16, 0); await fd.close();
@@ -63,6 +64,11 @@ export class AudioService {
     if (c.kind === 'MESSAGE') {
       const [m] = await this.rows(sql`SELECT 1 FROM messages m JOIN conversations v ON v.id = m.conversation_id WHERE m.audio_id = ${c.id} AND (v.parent_id = ${me} OR v.staff_id = ${me})`);
       return !!m;
+    }
+    if (c.kind === 'ENTRY') {
+      // a competition entry: everyone in the school who can see the entry can listen (voters must hear it)
+      const [e] = await this.rows(sql`SELECT 1 FROM competition_entries e WHERE e.audio_id = ${c.id}`);
+      return !!e;
     }
     if (c.kind === 'FEEDBACK') {
       // a teacher's voice note on a child's work: the child, their parents and their teachers

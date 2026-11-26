@@ -343,6 +343,17 @@ export async function demoExtras(db: NodePgDatabase<typeof s>, P: string, admin:
     (${P}, ${S}, 'STUDENT', ${u.student1}, 'Sample Student 1', 'Reading Champion', 'Read 40 books this term and helped friends to read', '2026', '🏆', NULL, 1),
     (${P}, ${S}, 'STUDENT', ${u.student2}, 'Sample Student 2', 'Maths Star', 'Top score in every maths test this term', '2026', '🏆', NULL, 2),
     (${P}, ${S}, 'STUDENT', ${u.student3}, 'Sample Student 3', 'Kindness Award', 'Helps every new friend in class', '2026', '🏆', NULL, 3)`);
+  // a poetry competition with two entries, voting open; and a finished art competition
+  const poem = (await x(sql`INSERT INTO competitions (publisher_id, school_id, title, category, emoji, description, entry_kind, status, created_by)
+    VALUES (${P}, ${S}, 'Little Poets 2026', 'POETRY', '📜', 'Write a short poem (4 to 8 lines) about something you love. The best poems will be read in the assembly!', 'TEXT', 'VOTING', ${u.principal}) RETURNING id`)).rows[0] as any;
+  await x(sql`INSERT INTO competition_entries (publisher_id, school_id, competition_id, student_id, title, description) VALUES
+    (${P}, ${S}, ${poem.id}, ${u.student1}, 'My Cat', 'My cat is soft, my cat is grey,\nshe sleeps in the sun the whole long day.\nAt night she plays with a ball of string,\nmy cat is the best of everything!'),
+    (${P}, ${S}, ${poem.id}, ${u.student2}, 'The Rain', 'Pitter patter on the ground,\nraindrops make a happy sound.\nPuddles here and puddles there,\nsplashing, splashing everywhere!')`);
+  const art = (await x(sql`INSERT INTO competitions (publisher_id, school_id, title, category, emoji, description, entry_kind, status, results_at, results_note, created_by)
+    VALUES (${P}, ${S}, 'Spelling Bee', 'SPELLING', '🐝', 'Spell 10 words from our books.', 'TEXT', 'RESULTS', now() - interval '3 days', 'Well done to everyone who took part!', ${u.principal}) RETURNING id`)).rows[0] as any;
+  await x(sql`INSERT INTO competition_entries (publisher_id, school_id, competition_id, student_id, title, description, place) VALUES
+    (${P}, ${S}, ${art.id}, ${u.student3}, 'My words', 'apple, ball, cat, dog, egg, fish, goat, hat, ink, jam', 1),
+    (${P}, ${S}, ${art.id}, ${u.student1}, 'My words', 'apple, ball, cat, dog, egg, fish, goat, hat, igloo, jug', 2)`);
   // three lesson plans this week (they go on the weekly plan by themselves) and a library visit
   const ed = r.editionByTitle['KG English'];
   const ls = (await x(sql`SELECT l.id, l.title, l.number, u.number AS unit FROM book_lessons l JOIN book_units u ON u.id = l.unit_id JOIN book_components c ON c.id = u.component_id

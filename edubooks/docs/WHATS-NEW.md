@@ -1,3 +1,17 @@
+# What's new in Knowledge Gate 1.4.27
+
+## 🏆 Competitions
+- **School admin → Competitions → ➕ New competition**: choose the kind — 🎤 Singing, 🎨 Art, ✏️ Drawing, 📜 Poetry, 📖 Quran recitation, 🐝 Spelling, 📚 Storytelling, 🔬 Science, ⚽ Sports or other — write what to do, choose **what students send** (📷 a photo, 🎤 a voice recording, ✍️ writing, or any), **which classes** take part (or the whole school), optional closing dates, and **who votes** (students, teachers or both). Students, parents and teachers are told.
+- **Students take part** from their home page (🏆 Competitions card): take a photo of their work, record their song or recitation, or write their poem — and change or take back their entry while entries are open.
+- **Teachers** (sidebar → Competitions) see **who is taking part** class by class (✓ entered / not yet), look at and listen to the entries, and vote.
+- When the school admin presses **🗳️ Open the voting**, students and teachers **vote for their favourite** — one vote each, which they can change; nobody can vote for their own entry. Students do not see the vote counts until the results; teachers and the admin do.
+- **🏆 Announce the results**: 1st, 2nd and 3rd place are suggested from the votes (change them as you like), add a message, and optionally **📰 post the winners on the timeline** and **🏛️ put the 1st place in the Hall of Fame**. Everyone, and the parents, get the results; the winners are shown with 🥇🥈🥉.
+- Parents see the competitions of their children's classes and the results.
+- Demo data: a poetry competition with voting open and a finished spelling bee.
+
+## 🏛️ Hall of Fame: edit and delete on the board
+- The school admin now has **✏️ edit** and **🗑️ delete** right on every card of the Hall of Fame board (as well as in the list).
+
 # What's new in Knowledge Gate 1.4.26
 
 ## 🗓️ Day lesson plans go on the weekly plan by themselves

@@ -547,6 +547,13 @@
       "when": 1797490000000,
       "tag": "0077_weekly_fame",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1797590000000,
+      "tag": "0078_competitions",
+      "breakpoints": true
     }
   ]
 }

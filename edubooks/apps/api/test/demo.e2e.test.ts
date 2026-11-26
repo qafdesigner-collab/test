@@ -39,6 +39,7 @@ describe('Demo data: load for testing, remove afterwards', () => {
     expect((await teacher.get('/api/classroom/rewards')).body.length).toBe(3);
     const fame = (await parent.get('/api/fame')).body; expect(fame.leaders.length).toBe(3); expect(fame.students.length).toBe(3);
     const weeks = (await teacher.get('/api/teacher/weekly-plans')).body; expect(weeks[0].entries).toBeGreaterThanOrEqual(2);
+    expect((await kid.get('/api/competitions')).body.map((c: any) => c.title)).toEqual(expect.arrayContaining(['Little Poets 2026', 'Spelling Bee']));
     expect((await parent.get(`/api/parent/week/${(await parent.get('/api/parent/week/children')).body[0].id}`)).status).toBe(200);
     await kid.post('/api/tutor/ask').send({ editionId: (await kid.get('/api/library')).body[0].editionId, componentId: '00000000-0000-4000-8000-000000000000', page: 1, mode: 'EXPLAIN' });
 

@@ -8,7 +8,16 @@ import { cn } from '@/components/ui';
 import { Avatar } from '@/components/welcome';
 
 /** The Hall of Fame board: leadership on top, then the school's brilliant students. */
-export function FameBoard({ data, playful }: { data: any; playful?: boolean }) {
+/** Edit / delete buttons on a card, for the school admin. */
+function CardTools({ f, onEdit, onDelete }: { f: any; onEdit?: (f: any) => void; onDelete?: (f: any) => void }) {
+  if (!onEdit && !onDelete) return null;
+  return <span className="absolute end-2 top-2 z-10 flex gap-1">
+    {onEdit && <button type="button" onClick={() => onEdit(f)} className="rounded-full bg-white/90 p-1.5 text-slate-600 shadow ring-1 ring-slate-200 hover:text-violet-700" aria-label={`Edit ${f.name}`} title="Edit"><Pencil className="size-3.5" /></button>}
+    {onDelete && <button type="button" onClick={() => onDelete(f)} className="rounded-full bg-white/90 p-1.5 text-red-600 shadow ring-1 ring-slate-200 hover:bg-red-50" aria-label={`Delete ${f.name}`} title="Delete"><Trash2 className="size-3.5" /></button>}
+  </span>;
+}
+
+export function FameBoard({ data, playful, onEdit, onDelete }: { data: any; playful?: boolean; onEdit?: (f: any) => void; onDelete?: (f: any) => void }) {
   const { t } = useT();
   if (!data?.leaders?.length && !data?.students?.length) return (
     <div className="rounded-3xl bg-white p-10 text-center shadow-sm"><div className="text-6xl">🏛️</div><p className="mt-2 text-slate-600">{t('The Hall of Fame is empty for now.')}</p></div>);
@@ -23,7 +32,8 @@ export function FameBoard({ data, playful }: { data: any; playful?: boolean }) {
       {data.leaders.length > 0 && <section>
         <h2 className={cn('mb-4 text-center font-black text-amber-800', playful ? 'text-3xl' : 'text-2xl')}>🎖️ {t('Our leadership')}</h2>
         <div className="flex flex-wrap justify-center gap-5">{data.leaders.map((f: any) => (
-          <article key={f.id} className="w-60 rounded-3xl bg-gradient-to-b from-amber-50 to-white p-5 text-center shadow-md ring-2 ring-amber-300">
+          <article key={f.id} className="relative w-60 rounded-3xl bg-gradient-to-b from-amber-50 to-white p-5 text-center shadow-md ring-2 ring-amber-300">
+            <CardTools f={f} onEdit={onEdit} onDelete={onDelete} />
             <div className="mx-auto w-fit rounded-full p-1 ring-4 ring-amber-400"><Avatar name={f.name} photoUrl={f.picture} size={104} open /></div>
             <h3 className="mt-3 text-lg font-extrabold text-slate-900">{f.name}</h3>
             <p className="font-bold text-amber-700">{f.emoji} {f.title}</p>
@@ -35,6 +45,7 @@ export function FameBoard({ data, playful }: { data: any; playful?: boolean }) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{data.students.map((f: any, i: number) => (
           <article key={f.id} className="relative flex gap-4 overflow-hidden rounded-3xl bg-white p-4 shadow-sm ring-1 ring-amber-200">
             <span aria-hidden className="absolute -end-3 -top-3 text-6xl opacity-15">{f.emoji}</span>
+            <CardTools f={f} onEdit={onEdit} onDelete={onDelete} />
             <div className="shrink-0 rounded-full p-0.5 ring-[3px] ring-amber-300"><Avatar name={f.name} photoUrl={f.picture} size={72} open /></div>
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-wide text-amber-600">{['🥇', '🥈', '🥉'][i] ?? '🏅'} {f.title}{f.year ? ` · ${f.year}` : ''}</p>
@@ -86,6 +97,7 @@ export function FameAdmin() {
     catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   };
   const del = async (id: string) => { if (!confirm('Remove from the Hall of Fame?')) return; await api.del(`/fame/${id}`); qc.invalidateQueries({ queryKey: ['fame'] }); };
+  const startEdit = (x: any) => { setEdit(x.id); setF({ kind: x.kind, userId: x.userId ?? '', name: x.name, title: x.title, achievement: x.achievement, year: x.year, emoji: x.emoji, avatar: x.avatar ?? '' }); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const all = [...(q.data?.leaders ?? []), ...(q.data?.students ?? [])];
   const pickPerson = (id: string) => { const p = people.data?.find((x) => x.id === id); setF({ ...f, userId: id, name: p?.name ?? f.name, title: f.title || (f.kind === 'LEADER' ? p?.designation ?? '' : '') }); };
   const toggle = (k: string, label: string) => (
@@ -128,10 +140,10 @@ export function FameAdmin() {
         <ul className="divide-y divide-slate-100">{all.map((x: any) => (
           <li key={x.id} className="flex items-center gap-3 py-2"><Avatar name={x.name} photoUrl={x.picture} size={40} />
             <span className="min-w-0 flex-1"><b className="text-slate-900">{x.name}</b> <span className="text-sm text-slate-500">· {x.kind === 'LEADER' ? '🎖️' : '🌟'} {x.title}</span></span>
-            <button type="button" onClick={() => { setEdit(x.id); setF({ kind: x.kind, userId: x.userId ?? '', name: x.name, title: x.title, achievement: x.achievement, year: x.year, emoji: x.emoji, avatar: x.avatar ?? '' }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Change"><Pencil className="size-4" /></button>
+            <button type="button" onClick={() => startEdit(x)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Change"><Pencil className="size-4" /></button>
             <button type="button" onClick={() => del(x.id)} className="rounded-lg p-2 text-red-600 hover:bg-red-50" aria-label="Remove"><Trash2 className="size-4" /></button></li>))}</ul></section>}
-      <h2 className="pt-2 text-lg font-extrabold text-slate-900">👀 How it looks</h2>
-      {q.data && <FameBoard data={q.data} />}
+      <h2 className="pt-2 text-lg font-extrabold text-slate-900">👀 How it looks <span className="text-sm font-normal text-slate-500">— ✏️ edit or 🗑️ delete right on a card</span></h2>
+      {q.data && <FameBoard data={q.data} onEdit={startEdit} onDelete={(x) => del(x.id)} />}
     </div>
   );
 }

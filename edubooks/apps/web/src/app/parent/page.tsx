@@ -1,4 +1,5 @@
 'use client';
+import { CompetitionPeek } from '@/components/competitions';
 import { FamePeek } from '@/components/fame';
 import { FeedbackWall } from '@/components/classroom';
 import { TimelinePeek } from '@/components/timeline';
@@ -30,6 +31,7 @@ export default function ParentHome() {
     <div className="space-y-6">
       <LiveLessons />
       <TimelinePeek href="/parent/timeline" />
+      <CompetitionPeek href="/parent/competitions" />
       <FamePeek href="/parent/fame" />
       <Announcements limit={5} />
       <div role="tablist" aria-label={t('Children')} className="flex flex-wrap gap-2">

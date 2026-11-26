@@ -6,7 +6,7 @@ import { Bell, CheckCheck } from 'lucide-react';
 import { api, fmtDate } from '@/lib/api';
 import { cn } from '@/components/ui';
 
-const ICON: Record<string, string> = { HOMEWORK: '📝', RESULT: '✅', LICENCE_EXPIRY: '🔑', DEMO_EXPIRY: '⏳', CALENDAR: '📅', ATTENDANCE: '🗓️', REPORT: '📊', TEST: '💬', TIMELINE: '📰' };
+const ICON: Record<string, string> = { HOMEWORK: '📝', RESULT: '✅', LICENCE_EXPIRY: '🔑', DEMO_EXPIRY: '⏳', CALENDAR: '📅', ATTENDANCE: '🗓️', REPORT: '📊', TEST: '💬', TIMELINE: '📰', COMPETITION: '🏆', FEEDBACK: '🏅', GOAL: '🎉', WEEKLY: '📅' };
 
 /** Bell with unread count and the latest notifications. `playful` = children's portal style. */
 export function NotificationBell({ playful }: { playful?: boolean }) {
