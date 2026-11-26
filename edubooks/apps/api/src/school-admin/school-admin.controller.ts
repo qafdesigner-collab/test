@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsOptional, IsString, IsUUID, Length, MaxLength, ValidateNested, IsBoolean } from 'class-validator';
@@ -42,6 +42,12 @@ class LoginsQuery { @IsIn(['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PARENT', 'ALL'
 export class ResetLoginsDto { @IsIn(['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PARENT', 'ALL']) role!: 'STUDENT' | 'TEACHER' | 'SCHOOL_ADMIN' | 'PARENT' | 'ALL'; @IsOptional() @IsBoolean() onlyMissing?: boolean; @IsOptional() @IsUUID() classId?: string; @IsOptional() @IsArray() @ArrayMaxSize(600) @IsUUID('all', { each: true }) userIds?: string[]; }
 class PoolGradesDto { @IsArray() @ArrayMaxSize(30) @IsUUID('all', { each: true }) gradeIds!: string[]; }
 class AssignDto { @IsArray() @ArrayMinSize(1) @ArrayMaxSize(1000) @IsUUID('all', { each: true }) userIds: string[]; }
+class BulkAssignDto {
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(50) @IsUUID('all', { each: true }) poolIds: string[];
+  @IsOptional() @IsArray() @ArrayMaxSize(200) @IsUUID('all', { each: true }) classIds?: string[];
+  @IsOptional() @IsBoolean() dryRun?: boolean;
+}
+class AutoDto { @IsBoolean() on: boolean; }
 class TransferDto { @IsUUID() assignmentId: string; @IsUUID() toUserId: string; @IsString() @Length(3, 500) reason: string; }
 class ReasonDto { @IsOptional() @IsString() @MaxLength(500) reason?: string; }
 class ProfileDto {
@@ -96,6 +102,9 @@ export class SchoolAdminController {
   @Get('pools/:id/eligible') eligible(@Param('id', Id()) id: string) { return this.licensing.eligibleUsers(id); }
   @Get('pools/:id/grades') poolGrades(@Param('id', Id()) id: string) { return this.licensing.poolGrades(id); }
   @Put('pools/:id/grades') setPoolGrades(@Param('id', Id()) id: string, @Body() d: PoolGradesDto) { return this.licensing.setPoolGrades(id, d.gradeIds); }
+  @Get('book-board') bookBoard(@Ctx() c: TenantCtx) { return this.licensing.bookBoard(this.sid(c)); }
+  @Put('pools/:id/auto') auto(@Ctx() c: TenantCtx, @Param('id', ParseUUIDPipe) id: string, @Body() d: AutoDto) { return this.licensing.setAuto(this.sid(c), id, d.on); }
+  @Post('pools/bulk-assign') @HttpCode(200) bulk(@Ctx() c: TenantCtx, @Body() d: BulkAssignDto) { return this.licensing.bulkAssign(this.sid(c), d.poolIds, d.classIds ?? [], !!d.dryRun); }
   @Post('pools/:id/assign') assign(@Param('id', Id()) id: string, @Body() d: AssignDto) { return this.licensing.assign(id, d.userIds); }
   @Post('assignments/:id/release') release(@Param('id', Id()) id: string, @Body() d: ReasonDto) { return this.licensing.release(id, d.reason ?? ''); }
 

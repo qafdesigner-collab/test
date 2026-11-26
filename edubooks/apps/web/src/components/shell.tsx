@@ -48,7 +48,7 @@ export function Shell({ role, roleLabel, nav, children, deny, theme = 'teacher',
         </div>
         <nav className="space-y-0.5" aria-label="Main">
           {nav.filter((n) => !n.roles || n.roles.some((r) => me.roles.includes(r))).map(({ href, label, icon: Icon, exact, color }, i) => {
-            const on = exact ? path === href : path.startsWith(href);
+            const on = exact ? path === href : path.startsWith(href) && !nav.some((o) => o.href.length > href.length && path.startsWith(o.href));
             return (
               <Link key={href} href={href} aria-current={on ? 'page' : undefined}
                 className={cn('flex items-center gap-3 rounded-2xl px-2.5 py-2 text-[14px] font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-white/70',

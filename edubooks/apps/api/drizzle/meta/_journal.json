@@ -561,6 +561,13 @@
       "when": 1797690000000,
       "tag": "0079_board_voice",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1797780000000,
+      "tag": "0080_auto_books",
+      "breakpoints": true
     }
   ]
 }

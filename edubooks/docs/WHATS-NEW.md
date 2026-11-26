@@ -1,3 +1,14 @@
+# What's new in Knowledge Gate 1.4.29
+
+## 🎒 Give books by class (school admin)
+- **Book licences → Give books by class** (also in the sidebar). Three easy steps:
+  1. **Grade** — tap a grade (e.g. KG).
+  2. **Sections** — all its sections are ticked (KG – Rose, KG – Tulip …); untick any you want to leave out.
+  3. **Books** — the books for that grade appear ticked, each showing **seats free** and **how many in these sections already have it**.
+- **Check and give** shows, per book: already have · will get it · no seat (with names) · **seats left after**. Then **Give books now** gives every student a student seat and the **class teachers** a teacher seat — several books and several sections in one click. People who already have a book are skipped.
+- **⚡ Automatic**: switch it on for a book and everyone in the book's grade gets it now, and every **new student** put in a class of that grade (and every teacher put on such a class) gets it by themselves, while seats last.
+- “Show books of other grades too” lets you give a book to a grade it was not made for.
+
 # What's new in Knowledge Gate 1.4.28
 
 ## 🖍️ Live whiteboard: book → part → lesson → page, with a preview

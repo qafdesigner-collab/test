@@ -5,10 +5,11 @@ import { qc } from '../db/qualify';
 import { academicYears, classTeachers, classes, enrolments, grades, subjects, users } from '../db/schema';
 import { AuditService } from '../audit/audit.service';
 import { AccessService } from '../lms/access.service';
+import { LicensingService } from '../licensing/licensing.service';
 
 @Injectable()
 export class ClassesService {
-  constructor(private readonly db: DbService, private readonly audit: AuditService, private readonly access: AccessService) {}
+  constructor(private readonly db: DbService, private readonly audit: AuditService, private readonly access: AccessService, private readonly licensing: LicensingService) {}
   private get q() { return this.db.q; }
   private get sid() { return this.db.ctx.schoolId!; }
 
@@ -65,7 +66,8 @@ export class ClassesService {
     await this.q.delete(classTeachers).where(eq(classTeachers.classId, id));
     if (list.length) await this.q.insert(classTeachers).values(list.map((t) => ({ classId: id, userId: t.userId, subjectId: t.subjectId || null, publisherId: c.publisherId, schoolId: c.schoolId })));
     await this.audit.log('school.class.teachers', 'class', id, `Set ${list.length} teacher(s) for ${c.name}`);
-    return { ok: true };
+    const booksGiven = await this.licensing.autoGive(id, list.map((t) => t.userId), 'TEACHER');
+    return { ok: true, booksGiven };
   }
 
   async enrol(id: string, studentIds: string[]) {
@@ -80,7 +82,8 @@ export class ClassesService {
     if (ids.length) await this.q.insert(enrolments).values(ids.map((studentId) => ({ classId: id, studentId, academicYearId: c.academicYearId, publisherId: c.publisherId, schoolId: c.schoolId })))
       .onConflictDoNothing();
     await this.audit.log('school.class.enrol', 'class', id, `Enrolled ${ids.length} student(s) in ${c.name}`);
-    return { ok: true };
+    const booksGiven = await this.licensing.autoGive(id, ids, 'STUDENT');
+    return { ok: true, booksGiven };
   }
 
   async unenrol(id: string, studentId: string) {
