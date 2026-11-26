@@ -1,3 +1,16 @@
+# What's new in Knowledge Gate 1.4.30
+
+## 📚 Book licences: tick books → Assign to class
+- **Book licences** now lists every book (English, Maths, Science, Urdu, Arabic …) with a tick box, its **student seats** and **teacher seats** (used / total · free) and the **classes** that have it.
+- Tick one book, several, or **Select all** → **Assign to class** → tick the classes (or “tick all” for a whole grade). Before you confirm, a table shows per book: already have · will get it · no seat · **seats left after**.
+- On assign, **every student of the class gets a student seat** and **the class teachers get a teacher seat**, all at once. The book stays on the class: students who join the class later, and teachers put on the class later, get it **automatically**.
+- **Manage** a book to add or remove single people, as before. It also shows “Classes with this book” and an **Assign to class** button.
+- Click **×** on a class to take the book off that class. You can also take back the seats of that class. Student seats older than the undo period stay with the student and move only by Transfer.
+- The separate “Give books by class” page from 1.4.29 is replaced by this.
+
+## 🔧 Fix
+- Whiteboard “Speak live”: after the 9th voice piece, students could hear pieces in the wrong order. Fixed.
+
 # What's new in Knowledge Gate 1.4.29
 
 ## 🎒 Give books by class (school admin)

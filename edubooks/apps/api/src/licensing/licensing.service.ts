@@ -237,6 +237,59 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
     return { auto: on, given };
   }
 
+  /** Which classes each licence is assigned to. */
+  async classBooks(schoolId: string) {
+    const { rows } = await this.q.execute(sql`SELECT b.pool_id AS "poolId", c.id AS "classId", trim(c.name || ' ' || c.section) AS name, coalesce(g.name, '') AS grade
+      FROM class_books b JOIN classes c ON c.id = b.class_id LEFT JOIN grades g ON g.id = c.grade_id WHERE b.school_id = ${schoolId} ORDER BY g.sort, c.name, c.section`);
+    return rows;
+  }
+
+  /** Classes the school admin can assign books to (this year's), with head counts. */
+  async assignableClasses(schoolId: string) {
+    const { rows } = await this.q.execute(sql`SELECT c.id, trim(c.name || ' ' || c.section) AS name, coalesce(g.name, 'No grade') AS grade,
+        (SELECT count(*)::int FROM enrolments e JOIN users u ON u.id = e.student_id AND u.status = 'ACTIVE' WHERE e.class_id = c.id) AS students,
+        (SELECT count(*)::int FROM class_teachers t WHERE t.class_id = c.id) AS teachers
+      FROM classes c LEFT JOIN grades g ON g.id = c.grade_id JOIN academic_years y ON y.id = c.academic_year_id
+      WHERE c.school_id = ${schoolId} AND NOT c.archived AND current_date <= y.ends_on ORDER BY coalesce(g.sort, 9999), c.name, c.section`);
+    return rows;
+  }
+
+  /**
+   * Assign books to classes: the class's students get a student seat, its teachers a teacher seat (pass both pools
+   * of a book), and the book stays on the class so new students / teachers get it too. `dryRun` only previews.
+   */
+  async assignToClasses(schoolId: string, poolIds: string[], classIds: string[], dryRun: boolean) {
+    if (!classIds.length) throw new BadRequestException('Choose at least one class.');
+    const { rows } = await this.q.execute(sql`SELECT id FROM classes WHERE school_id = ${schoolId} AND id = ANY(${`{${classIds.join(',')}}`}::uuid[])`) as { rows: any[] };
+    if (rows.length !== new Set(classIds).size) throw new BadRequestException('A class was not found');
+    const r = await this.bulkAssign(schoolId, poolIds, classIds, dryRun);
+    if (!dryRun) {
+      const pools = await this.q.select().from(licensePools).where(inArray(licensePools.id, poolIds));
+      for (const p of pools) for (const c of classIds)
+        await this.q.execute(sql`INSERT INTO class_books (class_id, pool_id, school_id, publisher_id) VALUES (${c}, ${p.id}, ${schoolId}, ${p.publisherId}) ON CONFLICT DO NOTHING`);
+      await this.audit.log('licensing.class_books', 'school', schoolId, `Assigned ${pools.length} licence(s) to ${classIds.length} class(es); ${r.given} seat(s) given`);
+    }
+    return r;
+  }
+
+  /** Take a book off a class. With `takeBack`, the class's students (and its teachers, unless another class of theirs has the book) give their seats back. */
+  async unassignClass(schoolId: string, poolId: string, classId: string, takeBack: boolean) {
+    const [pool] = await this.q.select().from(licensePools).where(and(eq(licensePools.id, poolId), eq(licensePools.schoolId, schoolId)));
+    if (!pool) throw new NotFoundException('Licence pool not found');
+    await this.q.execute(sql`DELETE FROM class_books WHERE pool_id = ${poolId} AND class_id = ${classId}`);
+    let released = 0; let kept = 0;
+    if (takeBack) {
+      const { rows } = await this.q.execute(pool.seatType === 'STUDENT'
+        ? sql`SELECT a.id FROM license_assignments a JOIN enrolments e ON e.student_id = a.user_id AND e.class_id = ${classId} WHERE a.pool_id = ${poolId} AND a.status IN ('ACTIVE','SUSPENDED')`
+        : sql`SELECT a.id FROM license_assignments a JOIN class_teachers t ON t.user_id = a.user_id AND t.class_id = ${classId} WHERE a.pool_id = ${poolId} AND a.status IN ('ACTIVE','SUSPENDED')
+            AND NOT EXISTS (SELECT 1 FROM class_teachers t2 JOIN class_books b ON b.class_id = t2.class_id AND b.pool_id = ${poolId} WHERE t2.user_id = a.user_id)`) as { rows: any[] };
+      for (const r of rows) {
+        try { await this.release(r.id, 'Book taken off the class'); released++; } catch (e) { if (e instanceof ForbiddenException) kept++; else throw e; }
+      }
+    }
+    return { released, kept };
+  }
+
   /**
    * Called when students join a class or teachers are put on a class: every "give automatically" licence of the
    * class's grade gives them a seat while seats last. Never fails the enrolment.
@@ -244,14 +297,18 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
   async autoGive(classId: string, userIds: string[], seatType: 'STUDENT' | 'TEACHER') {
     if (!userIds.length) return 0;
     const { rows: [c] } = await this.q.execute(sql`SELECT school_id, grade_id FROM classes WHERE id = ${classId}`) as { rows: any[] };
-    if (!c?.grade_id) return 0;
+    if (!c) return 0;
+    const { rows: linked } = await this.q.execute(sql`SELECT pool_id FROM class_books WHERE class_id = ${classId}`) as { rows: any[] };
     const { rows: autos } = await this.q.execute(sql`SELECT pool_id FROM school_auto_books WHERE school_id = ${c.school_id}`) as { rows: any[] };
-    if (!autos.length) return 0;
+    if (!autos.length && !linked.length) return 0;
     let given = 0;
-    const pools = (await this.listPools({ schoolId: c.school_id, seatType }) as any[]).filter((p) => autos.some((a) => a.pool_id === p.id) && this.live(p));
+    const pools = (await this.listPools({ schoolId: c.school_id, seatType }) as any[]).filter((p) => [...autos, ...linked].some((a) => a.pool_id === p.id) && this.live(p));
     for (const p of pools) {
-      const g = await this.gradeSets({ id: p.id, schoolId: c.school_id, productVersionId: p.productVersionId });
-      if (![...g.book, ...g.extra].some((x) => x.id === c.grade_id)) continue;
+      if (!linked.some((l) => l.pool_id === p.id)) {
+        if (!c.grade_id) continue;
+        const g = await this.gradeSets({ id: p.id, schoolId: c.school_id, productVersionId: p.productVersionId });
+        if (![...g.book, ...g.extra].some((x) => x.id === c.grade_id)) continue;
+      }
       const { rows } = await this.q.execute(sql`SELECT u.id FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role = ${seatType}
         WHERE u.id = ANY(${`{${userIds.join(',')}}`}::uuid[]) AND u.school_id = ${c.school_id} AND u.status = 'ACTIVE'
           AND NOT EXISTS (SELECT 1 FROM license_assignments a WHERE a.pool_id = ${p.id} AND a.user_id = u.id AND a.status IN ('ACTIVE','SUSPENDED'))`) as { rows: any[] };

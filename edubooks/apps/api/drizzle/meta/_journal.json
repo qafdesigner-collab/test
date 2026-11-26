@@ -568,6 +568,13 @@
       "when": 1797780000000,
       "tag": "0080_auto_books",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1797870000000,
+      "tag": "0081_class_books",
+      "breakpoints": true
     }
   ]
 }

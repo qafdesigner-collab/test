@@ -28,6 +28,7 @@ describe('Give books by class: whole sections at once, seats left, and automatic
     await owner.query(`UPDATE license_seats SET status = 'AVAILABLE' WHERE id IN (SELECT seat_id FROM license_assignments WHERE ${mine})`, [pool.id, start]);
     await owner.query(`UPDATE license_assignments SET status = 'RELEASED', ended_at = now() WHERE ${mine}`, [pool.id, start]);
     await owner.query(`DELETE FROM school_auto_books WHERE pool_id = $1`, [pool.id]);
+    await owner.query(`DELETE FROM class_books WHERE pool_id = $1`, [pool.id]);
     await owner.query(`DELETE FROM school_book_grades WHERE grade_id = $1`, [g]);
     await owner.end(); await app.close();
   });
@@ -62,5 +63,21 @@ describe('Give books by class: whole sections at once, seats left, and automatic
     expect((await principal.put(`/api/school/pools/${pool.id}/auto`).send({ on: false })).body.auto).toBe(false);
     const late2 = await addKid('e');
     expect((await principal.post(`/api/classes/${tulip.id}/students`).send({ studentIds: [late2] })).body.booksGiven).toBe(0);
+  });
+
+  it('books are assigned to a class: everyone in it gets a seat, newcomers too; taking it off gives seats back', async () => {
+    const classes = (await principal.get('/api/school/class-books/classes')).body;
+    expect(classes.find((c: any) => c.id === tulip.id)).toMatchObject({ students: 3 });
+    const dry = (await principal.post('/api/school/class-books').send({ poolIds: [pool.id], classIds: [tulip.id], dryRun: true })).body;
+    expect(dry.plan[0]).toMatchObject({ people: 3, already: 2, willGet: 1 });
+    expect((await principal.get('/api/school/class-books')).body.some((x: any) => x.poolId === pool.id)).toBe(false); // a preview saves nothing
+    expect((await principal.post('/api/school/class-books').send({ poolIds: [pool.id], classIds: [tulip.id] })).body.given).toBe(1);
+    expect((await principal.get('/api/school/class-books')).body).toContainEqual(expect.objectContaining({ poolId: pool.id, classId: tulip.id }));
+    const late = await addKid('f');
+    expect((await principal.post(`/api/classes/${tulip.id}/students`).send({ studentIds: [late] })).body.booksGiven).toBe(1);
+    expect((await teacher.post('/api/school/class-books').send({ poolIds: [pool.id], classIds: [tulip.id] })).status).toBe(403);
+    const off = (await principal.post('/api/school/class-books/remove').send({ poolId: pool.id, classId: tulip.id, takeBack: true })).body;
+    expect(off.released).toBe(4);
+    expect((await principal.get('/api/school/class-books')).body.some((x: any) => x.poolId === pool.id)).toBe(false);
   });
 });

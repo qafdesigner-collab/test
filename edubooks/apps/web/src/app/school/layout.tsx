@@ -1,5 +1,5 @@
 'use client';
-import { BookOpenCheck, ArrowLeftRight, School, GraduationCap, KeyRound, LayoutDashboard, Users, CalendarDays, HeartHandshake, UserCheck, Clock, Award, LineChart, FileText, MessagesSquare, Bird, Building, Mail , ListChecks, Sparkles, BarChart3, Newspaper, Trophy, Landmark, Medal } from 'lucide-react';
+import { ArrowLeftRight, School, GraduationCap, KeyRound, LayoutDashboard, Users, CalendarDays, HeartHandshake, UserCheck, Clock, Award, LineChart, FileText, MessagesSquare, Bird, Building, Mail , ListChecks, Sparkles, BarChart3, Newspaper, Trophy, Landmark, Medal } from 'lucide-react';
 import { Shell } from '@/components/shell';
 
 const NAV = [
@@ -25,7 +25,6 @@ const NAV = [
   { href: '/school/students', label: 'Students', icon: Users },
   { href: '/school/parents', label: 'Parents', icon: HeartHandshake },
   { href: '/school/licences', label: 'Book licences', icon: KeyRound },
-  { href: '/school/licences/give', label: 'Give books by class', icon: BookOpenCheck },
   { href: '/school/transfers', label: 'Transfer requests', icon: ArrowLeftRight },
   { href: '/school/publisher', label: 'Our publisher', icon: Building },
 ];

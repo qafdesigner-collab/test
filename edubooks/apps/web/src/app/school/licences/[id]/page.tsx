@@ -8,6 +8,7 @@ import { useAction } from '@/lib/hooks';
 import { Badge, Button, Card, Dialog, ErrorBox, Field, Input, PageLoader, Select, Textarea } from '@/components/ui';
 import { SeatBar, Status } from '@/components/common';
 import { poolLive } from '@/components/pools';
+import { AssignToClassDialog, ClassChips } from '@/components/class-books';
 
 export default function PoolPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -16,6 +17,7 @@ export default function PoolPage({ params }: { params: Promise<{ id: string }> }
   const grades = useQuery({ queryKey: ['poolGrades', id], queryFn: () => api.get<any>(`/school/pools/${id}/grades`) });
   const [scope, setScope] = useState<'grade' | 'all' | null>(null); const [editGrades, setEditGrades] = useState(false);
   const [picked, setPicked] = useState<string[]>([]); const [search, setSearch] = useState(''); const [showEnded, setShowEnded] = useState(false);
+  const links = useQuery({ queryKey: ['classBooks'], queryFn: () => api.get<any[]>('/school/class-books') }); const [toClass, setToClass] = useState(false);
   const [transfer, setTransfer] = useState<any>(null); const [release, setRelease] = useState<any>(null);
   const keys = ['schoolPool', 'eligible', 'schoolPools', 'schoolOverview', 'people', 'transfers'];
   const assign = useAction(() => api.post(`/school/pools/${id}/assign`, { userIds: picked }), { ok: (r) => `${r.assigned.length} seat(s) assigned 🎉`, keys, after: () => setPicked([]) });
@@ -40,6 +42,12 @@ export default function PoolPage({ params }: { params: Promise<{ id: string }> }
         {grades.data && !grades.data.book.length && !grades.data.extra.length && <span className="text-sm text-slate-500">no grade set</span>}
         <Button size="sm" variant="ghost" className="ms-auto" onClick={() => setEditGrades(true)}><Pencil className="size-4" />Use for other grades</Button>
       </Card>
+      <Card className="flex flex-wrap items-center gap-2 p-4">
+        <span className="text-sm font-medium text-slate-700">Classes with this book:</span>
+        <ClassChips classes={(links.data ?? []).filter((l: any) => l.poolId === id)} poolIds={[id]} book={p.productName} />
+        {live && <Button size="sm" variant="secondary" className="ms-auto" onClick={() => setToClass(true)}>Assign to class</Button>}
+      </Card>
+      {toClass && <AssignToClassDialog books={[{ name: p.productName, poolIds: [id] }]} onClose={() => setToClass(false)} />}
       <Card className="p-5"><SeatBar assigned={p.assigned + p.suspended} total={p.quantity - p.revoked} /><p className="mt-2 text-sm text-slate-600">{free} of {p.quantity - p.revoked} seats free</p></Card>
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

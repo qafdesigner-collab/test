@@ -140,7 +140,7 @@ export class WhiteboardService {
   /** New sound pieces after `after` (only the last 15 seconds, so a late listener starts near "now"). */
   async voiceList(id: string, after = 0) {
     const b = await this.board(id); await this.canSee(b);
-    const list = await this.rows(sql`SELECT seq::text AS seq, mime, created_at FROM whiteboard_voice WHERE board_id = ${id} AND seq > ${after} AND created_at > now() - interval '15 seconds' ORDER BY seq LIMIT 20`);
+    const list = await this.rows(sql`SELECT seq::text AS seq, mime, created_at FROM whiteboard_voice WHERE board_id = ${id} AND seq > ${after} AND created_at > now() - interval '15 seconds' ORDER BY whiteboard_voice.seq LIMIT 20`);
     const [last] = await this.rows(sql`SELECT max(created_at) AS at FROM whiteboard_voice WHERE board_id = ${id}`);
     return { speaking: !!last?.at && Date.now() - new Date(last.at).getTime() < 7000, pieces: list.map((p) => ({ seq: Number(p.seq), mime: p.mime })) };
   }

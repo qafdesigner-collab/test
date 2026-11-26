@@ -47,6 +47,7 @@ class BulkAssignDto {
   @IsOptional() @IsArray() @ArrayMaxSize(200) @IsUUID('all', { each: true }) classIds?: string[];
   @IsOptional() @IsBoolean() dryRun?: boolean;
 }
+class UnassignDto { @IsUUID() poolId: string; @IsUUID() classId: string; @IsOptional() @IsBoolean() takeBack?: boolean; }
 class AutoDto { @IsBoolean() on: boolean; }
 class TransferDto { @IsUUID() assignmentId: string; @IsUUID() toUserId: string; @IsString() @Length(3, 500) reason: string; }
 class ReasonDto { @IsOptional() @IsString() @MaxLength(500) reason?: string; }
@@ -102,6 +103,10 @@ export class SchoolAdminController {
   @Get('pools/:id/eligible') eligible(@Param('id', Id()) id: string) { return this.licensing.eligibleUsers(id); }
   @Get('pools/:id/grades') poolGrades(@Param('id', Id()) id: string) { return this.licensing.poolGrades(id); }
   @Put('pools/:id/grades') setPoolGrades(@Param('id', Id()) id: string, @Body() d: PoolGradesDto) { return this.licensing.setPoolGrades(id, d.gradeIds); }
+  @Get('class-books') classBooks(@Ctx() c: TenantCtx) { return this.licensing.classBooks(this.sid(c)); }
+  @Get('class-books/classes') bookClasses(@Ctx() c: TenantCtx) { return this.licensing.assignableClasses(this.sid(c)); }
+  @Post('class-books') @HttpCode(200) assignClasses(@Ctx() c: TenantCtx, @Body() d: BulkAssignDto) { return this.licensing.assignToClasses(this.sid(c), d.poolIds, d.classIds ?? [], !!d.dryRun); }
+  @Post('class-books/remove') @HttpCode(200) unassignClass(@Ctx() c: TenantCtx, @Body() d: UnassignDto) { return this.licensing.unassignClass(this.sid(c), d.poolId, d.classId, !!d.takeBack); }
   @Get('book-board') bookBoard(@Ctx() c: TenantCtx) { return this.licensing.bookBoard(this.sid(c)); }
   @Put('pools/:id/auto') auto(@Ctx() c: TenantCtx, @Param('id', ParseUUIDPipe) id: string, @Body() d: AutoDto) { return this.licensing.setAuto(this.sid(c), id, d.on); }
   @Post('pools/bulk-assign') @HttpCode(200) bulk(@Ctx() c: TenantCtx, @Body() d: BulkAssignDto) { return this.licensing.bulkAssign(this.sid(c), d.poolIds, d.classIds ?? [], !!d.dryRun); }
