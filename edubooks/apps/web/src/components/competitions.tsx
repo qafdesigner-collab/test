@@ -181,7 +181,7 @@ export function CompetitionDetail({ id, back, playful }: { id: string; back: str
   useEffect(() => { const k = (e: KeyboardEvent) => e.key === 'Escape' && setView(null); window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []);
   const c = q.data; if (!c) return <p className="p-6 text-slate-500">{t('Loading…')}</p>;
   const mine = c.entries.find((e: any) => e.mine);
-  const vote = async (entryId: string) => { await api.post(`/competitions/${id}/vote`, { entryId }); qc.invalidateQueries({ queryKey: ['competition', id] }); qc.invalidateQueries({ queryKey: ['competitions'] }); };
+  const vote = async (entryId: string) => { if (!confirm(t('Give your one vote to this entry? It cannot be changed.'))) return; await api.post(`/competitions/${id}/vote`, { entryId }); qc.invalidateQueries({ queryKey: ['competition', id] }); qc.invalidateQueries({ queryKey: ['competitions'] }); };
   const status = async (s: string) => { await api.post(`/competitions/${id}/status`, { status: s }); qc.invalidateQueries({ queryKey: ['competition', id] }); qc.invalidateQueries({ queryKey: ['competitions'] }); };
   const del = async () => { if (!confirm('Delete this competition and all its entries?')) return; await api.del(`/competitions/${id}`); qc.invalidateQueries({ queryKey: ['competitions'] }); router.push(back); };
   const entered = c.roster?.filter((r: any) => r.entered).length ?? 0;
@@ -210,7 +210,7 @@ export function CompetitionDetail({ id, back, playful }: { id: string; back: str
           <div key={e.id} className="text-center"><div className="text-5xl">{MEDAL[e.place - 1]}</div><div className="mx-auto mt-1 w-fit"><Avatar name={e.name} photoUrl={e.picture} size={64} /></div><p className="mt-1 font-extrabold text-slate-900">{e.name}</p><p className="text-xs text-slate-500">{e.className}</p></div>))}</div>
         {c.resultsNote && <p className="mt-3 text-slate-700" dir="auto">{c.resultsNote}</p>}</section>}
       {c.canEnter && <EntryForm key={mine?.id ?? 'new'} c={c} mine={mine} />}
-      {c.canVote && <p className="rounded-2xl bg-violet-50 p-3 text-center font-bold text-violet-900">🗳️ {t('Vote for your favourite! You have one vote and can change it until the voting closes.')}</p>}
+      {c.canVote && !c.myVote && <p className="rounded-2xl bg-violet-50 p-3 text-center font-bold text-violet-900">🗳️ {t('Vote for your favourite! You have one vote, and it cannot be changed. Nobody can see who you voted for.')}</p>}
       <section>
         <h2 className={cn('mb-3 font-black text-slate-800', playful ? 'text-2xl' : 'text-lg')}>{t('Entries')} ({c.entries.length})</h2>
         {!c.entries.length ? <p className="rounded-3xl bg-white p-6 text-center text-slate-500">{t('No entries yet.')}</p> : (
@@ -223,8 +223,8 @@ export function CompetitionDetail({ id, back, playful }: { id: string; back: str
               {e.image && <button type="button" onClick={() => setView(e.image)} className="block w-full overflow-hidden rounded-2xl bg-slate-100"><img src={e.image} alt={e.title} loading="lazy" className="aspect-[4/3] w-full object-cover" /></button>}
               {e.audioId && <VoicePlayer id={e.audioId} big={playful} />}
               {e.description && <p className="whitespace-pre-line text-sm text-slate-700" dir="auto">{e.description}</p>}
-              {c.canVote && !e.mine && <button type="button" onClick={() => vote(e.id)} className={cn('w-full rounded-2xl py-2 font-black', c.myVote === e.id ? 'bg-violet-600 text-white' : 'bg-violet-50 text-violet-800 hover:bg-violet-100')}>
-                {c.myVote === e.id ? `✓ ${t('My vote')}` : `🗳️ ${t('Vote')}`}</button>}
+              {c.myVote === e.id ? <p className="w-full rounded-2xl bg-violet-600 py-2 text-center font-black text-white">✓ {t('My vote')}</p>
+                : c.canVote && !c.myVote && !e.mine && <button type="button" onClick={() => vote(e.id)} className="w-full rounded-2xl bg-violet-50 py-2 font-black text-violet-800 hover:bg-violet-100">🗳️ {t('Vote')}</button>}
             </article>))}</div>)}
       </section>
       {c.roster && <section className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">

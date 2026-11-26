@@ -1,3 +1,10 @@
+# What's new in Knowledge Gate 1.4.31
+
+## 🗳️ Competitions: one vote, secret ballot
+- **One vote per person per competition.** Once given, a vote cannot be changed (the app asks “It cannot be changed” before voting). After voting, the vote buttons disappear and your choice shows “✓ My vote”.
+- **Nobody in the school sees who voted**: not school admins, teachers, students or parents. Everyone sees only **how many votes** each entry has.
+- **Super admin → Competitions** (new): every school's competitions with entries and votes. **Who voted** shows, for each entry, the people who voted for it (name, login, student/teacher). Each look is recorded in the audit log.
+
 # What's new in Knowledge Gate 1.4.30
 
 ## 📚 Book licences: tick books → Assign to class

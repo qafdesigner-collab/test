@@ -32,7 +32,7 @@ const AR: Record<string, string> = {
   Science: 'العلوم', Sports: 'الرياضة', Other: 'أخرى', 'All competitions': 'كل المسابقات', 'entries until {d}': 'المشاركة حتى {d}', 'voting until {d}': 'التصويت حتى {d}',
   'The winners': 'الفائزون', 'Your entry': 'مشاركتك', 'Take part!': 'شارك!', 'Name of your entry, e.g. My favourite song': 'اسم مشاركتك، مثلاً: أغنيتي المفضلة', 'Add a photo of your work': 'أضف صورة لعملك',
   Record: 'سجّل', 'Write your entry here…': 'اكتب مشاركتك هنا…', 'Tell us about it (optional)…': 'أخبرنا عنها (اختياري)…', 'Save my entry': 'احفظ مشاركتي', 'Send my entry': 'أرسل مشاركتي',
-  'Take it back': 'سحب المشاركة', 'Take your entry back?': 'هل تريد سحب مشاركتك؟', 'Vote for your favourite! You have one vote and can change it until the voting closes.': 'صوّت لمشاركتك المفضلة! لديك صوت واحد ويمكنك تغييره حتى يُغلق التصويت.',
+  'Take it back': 'سحب المشاركة', 'Take your entry back?': 'هل تريد سحب مشاركتك؟', 'Vote for your favourite! You have one vote, and it cannot be changed. Nobody can see who you voted for.': 'صوّت لمشاركتك المفضلة! لديك صوت واحد ولا يمكن تغييره. لا أحد يرى لمن صوّتّ.', 'Give your one vote to this entry? It cannot be changed.': 'هل تمنح صوتك الوحيد لهذه المشاركة؟ لا يمكن تغييره.',
   Entries: 'المشاركات', 'No entries yet.': 'لا توجد مشاركات بعد.', 'My vote': 'صوتي', Vote: 'صوّت', 'Voting is open!': 'التصويت مفتوح!',
   '📷 A photo': '📷 صورة', '🎤 A voice recording': '🎤 تسجيل صوتي', '✍️ Writing': '✍️ كتابة', '📷 🎤 ✍️ Photo, recording or writing': '📷 🎤 ✍️ صورة أو تسجيل أو كتابة',
   // hall of fame

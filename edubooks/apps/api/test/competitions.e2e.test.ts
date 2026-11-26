@@ -59,15 +59,23 @@ describe('Competitions: the school admin runs them, students enter, students and
     expect((await principal.post(`/api/competitions/${id}/status`).send({ status: 'VOTING' })).body.status).toBe('VOTING');
     expect((await s1.post(`/api/competitions/${id}/entry`).send({ title: 'late', audioId: null })).status).toBe(400);
     const d = (await s1.get(`/api/competitions/${id}`)).body;
-    expect(d.canVote).toBe(true); expect(d.entries.every((e: any) => e.votes === null)).toBe(true); // counts hidden from students
+    expect(d.canVote).toBe(true); expect(d.entries.every((e: any) => e.votes === 0)).toBe(true); // everyone sees the counts, never the voters
     const mine = d.entries.find((e: any) => e.mine); const theirs = d.entries.find((e: any) => !e.mine);
     expect((await s1.post(`/api/competitions/${id}/vote`).send({ entryId: mine.id })).status).toBe(400);
     expect((await s1.post(`/api/competitions/${id}/vote`).send({ entryId: theirs.id })).body.myVote).toBe(theirs.id);
     expect((await s2.post(`/api/competitions/${id}/vote`).send({ entryId: mine.id })).status).toBe(200);
     expect((await teacher.post(`/api/competitions/${id}/vote`).send({ entryId: mine.id })).status).toBe(200);
-    expect((await teacher.post(`/api/competitions/${id}/vote`).send({ entryId: mine.id })).status).toBe(200); // changing / repeating keeps one vote
+    expect((await teacher.post(`/api/competitions/${id}/vote`).send({ entryId: theirs.id })).status).toBe(409); // one vote, it cannot be changed
+    expect((await s1.post(`/api/competitions/${id}/vote`).send({ entryId: theirs.id })).status).toBe(409);
     expect((await parent.post(`/api/competitions/${id}/vote`).send({ entryId: mine.id })).status).toBe(403);
     const t = (await teacher.get(`/api/competitions/${id}`)).body;
+    expect(JSON.stringify(t)).not.toContain('voter');
+    expect((await teacher.get(`/api/competitions/publisher/${id}/voters`)).status).toBe(403);
+    expect((await principal.get(`/api/competitions/publisher/${id}/voters`)).status).toBe(403);
+    const sa = await login(app, 'admin', 'Admin@12345');
+    expect((await sa.get('/api/competitions/publisher/all')).body.some((x: any) => x.id === id)).toBe(true);
+    const v = (await sa.get(`/api/competitions/publisher/${id}/voters`)).body;
+    expect(v.entries.find((e: any) => e.id === mine.id).voters.map((x: any) => x.username).sort()).toEqual(['student2', 'teacher1']);
     expect(t.entries.find((e: any) => e.id === mine.id).votes).toBe(2);
     expect((await teacher.post(`/api/competitions/${id}/results`).send({ places: [{ entryId: mine.id, place: 1 }] })).status).toBe(403);
     const r = await principal.post(`/api/competitions/${id}/results`).send({ places: [{ entryId: mine.id, place: 1 }, { entryId: theirs.id, place: 2 }], note: 'Wonderful voices!', toTimeline: true, toFame: true });

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, Injectable, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Res } from '@nestjs/common';
+import { BadRequestException, ConflictException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, Injectable, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
@@ -90,7 +90,7 @@ export class CompetitionsService {
 
   async detail(id: string) {
     const c = await this.one(id);
-    const admin = this.is('SCHOOL_ADMIN'); const showVotes = this.staff || c.status === 'RESULTS';
+    const admin = this.is('SCHOOL_ADMIN'); const showVotes = true; // everyone sees how many votes an entry has — never who voted
     // a parent sees only their own children's entries until the results are out
     const kids = this.is('PARENT') ? (await this.rows(sql`SELECT student_id FROM parent_students WHERE parent_id = ${this.ctx.userId}`)).map((r) => r.student_id) : null;
     const entries = await this.rows(sql`SELECT e.*, u.display_name AS name, u.photo_key IS NOT NULL AS has, u.photo_at, u.avatar,
@@ -248,17 +248,38 @@ export class CompetitionsService {
     if (r[0]?.image_key) this.assets.driver.remove(r[0].image_key).catch(() => undefined);
     return { ok: true };
   }
-  /** One vote per person (it can be changed while voting is open); never for your own entry. */
+  /** One vote per person per competition — it cannot be changed; never for your own entry. Who voted is never shown in the school. */
   async vote(id: string, entryId: string) {
     const c = await this.one(id);
     if (!this.canVote(c)) throw new ForbiddenException(c.status !== 'VOTING' ? 'Voting is not open' : 'You cannot vote in this competition');
     const [e] = await this.rows(sql`SELECT student_id FROM competition_entries WHERE id = ${entryId} AND competition_id = ${id}`);
     if (!e) throw new NotFoundException('Entry not found');
     if (e.student_id === this.ctx.userId) throw new BadRequestException('You cannot vote for your own entry');
-    await this.rows(sql`INSERT INTO competition_votes (competition_id, voter_id, entry_id, publisher_id, school_id) VALUES (${id}, ${this.ctx.userId}, ${entryId}, ${this.ctx.publisherId}, ${this.ctx.schoolId})
-      ON CONFLICT (competition_id, voter_id) DO UPDATE SET entry_id = EXCLUDED.entry_id, created_at = now()`);
+    const r = await this.rows(sql`INSERT INTO competition_votes (competition_id, voter_id, entry_id, publisher_id, school_id) VALUES (${id}, ${this.ctx.userId}, ${entryId}, ${this.ctx.publisherId}, ${this.ctx.schoolId})
+      ON CONFLICT (competition_id, voter_id) DO NOTHING RETURNING entry_id`);
+    if (!r.length) throw new ConflictException('You have already voted in this competition. A vote cannot be changed.');
     return { myVote: entryId };
   }
+
+  // ---------------- the publisher's super admin: every school, and who voted ----------------
+  async allSchools() {
+    return this.rows(sql`SELECT c.id, c.title, c.emoji, c.category, c.status, c.created_at AS "createdAt", s.name AS school, s.code AS "schoolCode",
+        (SELECT count(*)::int FROM competition_entries e WHERE e.competition_id = c.id) AS entries,
+        (SELECT count(*)::int FROM competition_votes v WHERE v.competition_id = c.id) AS votes
+      FROM competitions c JOIN schools s ON s.id = c.school_id ORDER BY c.created_at DESC LIMIT 500`);
+  }
+  async voters(id: string) {
+    const [c] = await this.rows(sql`SELECT c.id, c.title, c.emoji, c.status, s.name AS school FROM competitions c JOIN schools s ON s.id = c.school_id WHERE c.id = ${id}`);
+    if (!c) throw new NotFoundException('Competition not found');
+    const entries = await this.rows(sql`SELECT e.id, e.title, e.place, u.display_name AS name FROM competition_entries e JOIN users u ON u.id = e.student_id
+      WHERE e.competition_id = ${id} ORDER BY e.place NULLS LAST, e.created_at`);
+    const votes = await this.rows(sql`SELECT v.entry_id AS "entryId", v.created_at AS at, u.display_name AS name, u.username::text AS username,
+        (SELECT string_agg(r.role::text, ',') FROM user_roles r WHERE r.user_id = u.id) AS roles
+      FROM competition_votes v JOIN users u ON u.id = v.voter_id WHERE v.competition_id = ${id} ORDER BY v.created_at`);
+    await this.audit.log('competition.voters_viewed', 'competition', id, `Viewed the voters of “${c.title}”`);
+    return { ...c, entries: entries.map((e) => ({ ...e, voters: votes.filter((v) => v.entryId === e.id) })) };
+  }
+
   async image(id: string, entryId: string) {
     await this.one(id);
     const [e] = await this.rows(sql`SELECT image_key FROM competition_entries WHERE id = ${entryId} AND competition_id = ${id}`);
@@ -275,6 +296,8 @@ export class CompetitionsController {
   constructor(private readonly svc: CompetitionsService) {}
   @Roles(...ALL) @Get() list() { return this.svc.list(); }
   @Roles('STUDENT') @Post('uploads') @HttpCode(200) upload(@Body() d: UploadDto) { return this.svc.upload(d.image); }
+  @Roles('PUBLISHER_ADMIN') @Get('publisher/all') allSchools() { return this.svc.allSchools(); }
+  @Roles('PUBLISHER_ADMIN') @Get('publisher/:id/voters') voters(@Param('id', ParseUUIDPipe) id: string) { return this.svc.voters(id); }
   @Roles(...ALL) @Get(':id') get(@Param('id', ParseUUIDPipe) id: string) { return this.svc.detail(id); }
   @Roles('SCHOOL_ADMIN') @Post() create(@Body() d: CompetitionDto) { return this.svc.create(d); }
   @Roles('SCHOOL_ADMIN') @Patch(':id') update(@Param('id', ParseUUIDPipe) id: string, @Body() d: CompetitionDto) { return this.svc.update(id, d); }

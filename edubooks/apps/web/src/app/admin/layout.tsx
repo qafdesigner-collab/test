@@ -1,5 +1,5 @@
 'use client';
-import { LayoutDashboard, Library, Tags, ScrollText, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle, Palette, TrendingUp, GraduationCap, LineChart, FlaskConical, Building, Users, Mail, AtSign, UserCog, Presentation } from 'lucide-react';
+import { Trophy, LayoutDashboard, Library, Tags, ScrollText, Package, Building2, KeyRound, Sparkles, Receipt, Gamepad2, RefreshCw, CalendarDays, MessageCircle, Palette, TrendingUp, GraduationCap, LineChart, FlaskConical, Building, Users, Mail, AtSign, UserCog, Presentation } from 'lucide-react';
 import { Shell } from '@/components/shell';
 
 const A = 'PUBLISHER_ADMIN', E = 'PUBLISHER_EDITOR', S = 'PUBLISHER_SALES';
@@ -16,6 +16,7 @@ const NAV = [
   { href: '/admin/insights', label: 'Usage Insights', icon: LineChart, roles: [A, E, S] },
   { href: '/admin/licences', label: 'Licences', icon: KeyRound, roles: [A, E, S] },
   { href: '/admin/games', label: 'Game Library', icon: Gamepad2, roles: [A, E] },
+  { href: '/admin/competitions', label: 'Competitions', icon: Trophy, roles: [A] },
   { href: '/admin/training', label: 'Teacher Training', icon: GraduationCap, roles: [A, E, S] },
   { href: '/admin/ai', label: 'AI Assistant', icon: Sparkles, roles: [A, E, S] },
   { href: '/admin/catalog', label: 'Curricula & Grades', icon: Tags, roles: [A, E] },
