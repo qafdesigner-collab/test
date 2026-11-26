@@ -89,7 +89,14 @@ export function FeedbackWall({ studentId, playful, limit = 4 }: { studentId: str
 }
 
 // ====================== class reward goals ======================
-const REWARDS = [['🎉', 'Class party'], ['⚽', 'Extra playtime'], ['🎬', 'Movie time'], ['🧸', 'Pyjama day'], ['🎨', 'Free art time'], ['📖', 'Story time with the teacher']];
+const REWARDS = [
+  // fun
+  ['🎉', 'Class party'], ['⚽', 'Extra playtime'], ['🎬', 'Movie time'], ['🎨', 'Free art time'],
+  // educational
+  ['📖', 'Story time with the teacher'], ['📚', 'Library visit'], ['🔬', 'Science experiment day'], ['🧩', 'Puzzle and brain-games time'],
+  ['🌍', 'Educational trip'], ['🎭', 'Class play or show'], ['💻', 'Computer and coding time'], ['🌱', 'Plant a class garden'],
+  ['🐝', 'Spelling bee party'], ['🗣️', 'Choose the next class read-aloud book'], ['🏅', 'Certificates for everyone'], ['👩‍🔬', 'Visit from a guest expert'],
+];
 function Progress({ g, big }: { g: any; big?: boolean }) {
   const pct = Math.min(100, Math.round((g.stars / g.target) * 100));
   return (
@@ -111,7 +118,6 @@ export function ClassGoals({ classes, manageRewards = true }: { classes: { id: s
   const free = classes.filter((c) => !active.some((g) => g.classId === c.id));
   const cls = classes.find((c) => c.id === (f.classId || free[0]?.id));
   const suggested = Math.max(30, Math.round(((cls?.students ?? 10) * 15) / 10) * 10);
-  const options = [...(rw.data ?? []).map((r) => [r.emoji, r.title]), ...REWARDS.filter(([, t]) => !(rw.data ?? []).some((r) => r.title.toLowerCase() === t.toLowerCase()))];
   const other = f.pick === 'OTHER';
   const start = async () => {
     setBusy(true); setErr('');
@@ -139,7 +145,10 @@ export function ClassGoals({ classes, manageRewards = true }: { classes: { id: s
       {free.length > 0 && <div className="flex flex-wrap items-end gap-2 rounded-2xl bg-white/60 p-3">
         <label className="text-xs font-semibold text-slate-600">Class<select value={f.classId || free[0]?.id} onChange={(e) => setF({ ...f, classId: e.target.value })} className="mt-1 block rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm">{free.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
         <label className="text-xs font-semibold text-slate-600">Reward<select value={f.pick} onChange={(e) => setF({ ...f, pick: e.target.value })} className="mt-1 block max-w-60 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm">
-          {options.map(([e, r]) => <option key={r} value={`${e}|${r}`}>{e} {r}</option>)}<option value="OTHER">✏️ Other reward…</option></select></label>
+          {(rw.data ?? []).length > 0 && <optgroup label="Our school's rewards">{(rw.data ?? []).map((r) => <option key={r.id} value={`${r.emoji}|${r.title}`}>{r.emoji} {r.title}</option>)}</optgroup>}
+          <optgroup label="Fun">{REWARDS.slice(0, 4).filter(([, t]) => !(rw.data ?? []).some((r) => r.title.toLowerCase() === t.toLowerCase())).map(([e, r]) => <option key={r} value={`${e}|${r}`}>{e} {r}</option>)}</optgroup>
+          <optgroup label="Learning rewards">{REWARDS.slice(4).filter(([, t]) => !(rw.data ?? []).some((r) => r.title.toLowerCase() === t.toLowerCase())).map(([e, r]) => <option key={r} value={`${e}|${r}`}>{e} {r}</option>)}</optgroup>
+          <option value="OTHER">✏️ Other reward…</option></select></label>
         {other && <>
           <label className="text-xs font-semibold text-slate-600">Emoji<input value={f.emoji} onChange={(e) => setF({ ...f, emoji: e.target.value })} maxLength={16} className="mt-1 block w-16 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-center text-lg" /></label>
           <label className="text-xs font-semibold text-slate-600">Your reward<input autoFocus value={f.reward} onChange={(e) => setF({ ...f, reward: e.target.value })} maxLength={120} placeholder="e.g. Ice-cream Friday" className="mt-1 block w-52 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm" /></label>

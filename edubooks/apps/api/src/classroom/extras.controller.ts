@@ -155,10 +155,17 @@ export class FameService {
   }
   /** For the nav: is there a Hall of Fame to show me? */
   async shown() { const s = await this.settings(); return { shown: this.visible(s) }; }
-  async people(role: string, q?: string) {
+  /** People to choose from: students (of one class and section, when given) or staff. */
+  async people(role: string, q?: string, classId?: string) {
     const roles = role === 'STUDENT' ? ['STUDENT'] : ['TEACHER', 'SCHOOL_ADMIN'];
     return this.rows(sql`SELECT DISTINCT u.id, u.display_name AS name, u.designation FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role::text IN ${roles}
-      WHERE u.school_id = ${this.ctx.schoolId} AND u.status = 'ACTIVE' ${q?.trim() ? sql`AND u.display_name ILIKE ${`%${q.trim()}%`}` : sql``} ORDER BY u.display_name LIMIT 50`);
+      ${classId ? sql`JOIN enrolments e ON e.student_id = u.id AND e.class_id = ${classId}` : sql``}
+      WHERE u.school_id = ${this.ctx.schoolId} AND u.status = 'ACTIVE' ${q?.trim() ? sql`AND u.display_name ILIKE ${`%${q.trim()}%`}` : sql``} ORDER BY u.display_name LIMIT ${classId ? 500 : 50}`);
+  }
+  /** Classes (with section) to pick a student from. */
+  classes() {
+    return this.rows(sql`SELECT c.id, c.name, c.section, g.name AS grade, (SELECT count(*)::int FROM enrolments e WHERE e.class_id = c.id) AS students
+      FROM classes c LEFT JOIN grades g ON g.id = c.grade_id WHERE NOT c.archived ORDER BY g.sort NULLS LAST, c.name, c.section`);
   }
   private async checkUser(userId?: string | null) {
     if (!userId) return null;
@@ -197,7 +204,11 @@ export class ExtrasController {
   // the Hall of Fame (under /fame; parents may read it)
   @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT') @Get('fame') view() { return this.fame.view(); }
   @Roles('SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT') @Get('fame/shown') shown() { return this.fame.shown(); }
-  @Roles('SCHOOL_ADMIN') @Get('fame/people') people(@Query('role') role: string, @Query('q') q?: string) { return this.fame.people(role, q); }
+  @Roles('SCHOOL_ADMIN') @Get('fame/people') people(@Query('role') role: string, @Query('q') q?: string, @Query('classId') classId?: string) {
+    if (classId && !/^[0-9a-f-]{36}$/.test(classId)) throw new BadRequestException('Unknown class');
+    return this.fame.people(role, q, classId);
+  }
+  @Roles('SCHOOL_ADMIN') @Get('fame/classes') classes() { return this.fame.classes(); }
   @Roles('SCHOOL_ADMIN') @Post('fame') add(@Body() d: FameDto) { return this.fame.create(d); }
   @Roles('SCHOOL_ADMIN') @Put('fame/settings') settings(@Body() d: FameSettingsDto) { return this.fame.saveSettings(d); }
   @Roles('SCHOOL_ADMIN') @Patch('fame/:id') edit(@Param('id', ParseUUIDPipe) id: string, @Body() d: FameDto) { return this.fame.update(id, d); }

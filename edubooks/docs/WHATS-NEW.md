@@ -1,3 +1,12 @@
+# What's new in Knowledge Gate 1.4.25
+
+## 🏛️ Hall of Fame: choose the student by class and section
+- When adding a brilliant student, choose **1. the class**, then **2. the section** (with the number of students), then **3. the student** from that section.
+
+## 🎁 Class rewards: learning rewards
+- New ready-made **learning rewards**: 📚 Library visit, 🔬 Science experiment day, 🧩 Puzzle and brain-games time, 🌍 Educational trip, 🎭 Class play or show, 💻 Computer and coding time, 🌱 Plant a class garden, 🐝 Spelling bee party, 🗣️ Choose the next class read-aloud book, 🏅 Certificates for everyone, 👩‍🔬 Visit from a guest expert (and 📖 Story time with the teacher). In the list they are grouped: **Our school's rewards**, **Fun** and **Learning rewards** (also in Arabic).
+- “Pyjama day” was removed from the ready-made rewards.
+
 # What's new in Knowledge Gate 1.4.24
 
 ## 🎁 Class rewards: your own rewards, for teachers and the school admin

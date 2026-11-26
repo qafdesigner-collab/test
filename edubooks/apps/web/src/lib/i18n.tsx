@@ -21,6 +21,9 @@ const AR: Record<string, string> = {
   stickers: 'ملصقات', 'book work sent': 'أعمال الكتاب', 'days present': 'أيام الحضور', 'What we learned': 'ماذا تعلمنا', 'Coming next week': 'الأسبوع القادم',
   'Not handed in yet': 'لم يُسلَّم بعد', 'From the teacher': 'من المعلم', 'Class goal': 'هدف الفصل',
   'Every Friday you also get this summary as a notification (and by email when the school has email switched on).': 'كل يوم جمعة يصلك هذا الملخص كإشعار (وبالبريد الإلكتروني عندما تفعّل المدرسة البريد).',
+  'Library visit': 'زيارة المكتبة', 'Science experiment day': 'يوم التجارب العلمية', 'Puzzle and brain-games time': 'وقت الألغاز وألعاب الذكاء', 'Educational trip': 'رحلة تعليمية',
+  'Class play or show': 'مسرحية أو عرض للفصل', 'Computer and coding time': 'وقت الحاسوب والبرمجة', 'Plant a class garden': 'زراعة حديقة الفصل', 'Spelling bee party': 'حفلة مسابقة التهجئة',
+  'Choose the next class read-aloud book': 'اختيار كتاب القراءة القادم للفصل', 'Certificates for everyone': 'شهادات للجميع', 'Visit from a guest expert': 'زيارة من خبير ضيف',
   // hall of fame
   'Hall of Fame': 'لوحة الشرف', 'Celebrating the people who make our school shine': 'نحتفي بمن يجعلون مدرستنا تتألق', 'Our leadership': 'قيادتنا',
   'Our brilliant students': 'طلابنا المتميزون', 'The Hall of Fame is empty for now.': 'لوحة الشرف فارغة الآن.', 'Our brilliant students and leadership': 'طلابنا المتميزون وقيادتنا',

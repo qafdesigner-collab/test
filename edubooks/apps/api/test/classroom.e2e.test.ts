@@ -145,6 +145,14 @@ describe('Stickers and voice feedback, class goals, plan my week, the parents’
   it('the Hall of Fame: the school admin adds students and leaders and decides who sees it', async () => {
     expect((await teacher.post('/api/fame').send({ kind: 'STUDENT', name: 'X Y' })).status).toBe(403);
     const kid = (await principal.get('/api/fame/people?role=STUDENT&q=Sample Student 1')).body[0];
+    // choose the class and section first, then a student of that section
+    const fc = (await principal.get('/api/fame/classes')).body;
+    expect(fc.find((c: any) => c.id === kg)).toMatchObject({ id: kg });
+    const inKg = (await principal.get(`/api/fame/people?role=STUDENT&classId=${kg}`)).body.map((x: any) => x.id);
+    expect(inKg).toContain(kid.id);
+    expect((await principal.get(`/api/fame/people?role=STUDENT&classId=00000000-0000-4000-8000-000000000000`)).body).toEqual([]);
+    expect((await principal.get('/api/fame/people?role=STUDENT&classId=nope')).status).toBe(400);
+    expect((await teacher.get('/api/fame/classes')).status).toBe(403);
     const a = await principal.post('/api/fame').send({ kind: 'STUDENT', userId: kid.id, name: kid.name, title: 'Reading Champion', achievement: 'Read 40 books this term', year: '2026' });
     const b = await principal.post('/api/fame').send({ kind: 'LEADER', name: 'Mrs. Aisha Khan', title: 'Principal', achievement: 'Leading our school with heart', avatar: 'teacher-woman' });
     expect(a.status).toBe(201); expect(b.status).toBe(201);

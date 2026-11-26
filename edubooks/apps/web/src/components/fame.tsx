@@ -71,7 +71,12 @@ export function FameAdmin() {
   const q = useQuery({ queryKey: ['fame'], queryFn: () => api.get<any>('/fame') });
   const qc = useQueryClient();
   const [f, setF] = useState<any>(blank); const [edit, setEdit] = useState<string | null>(null); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
-  const people = useQuery({ queryKey: ['famePeople', f.kind], queryFn: () => api.get<any[]>(`/fame/people?role=${f.kind === 'STUDENT' ? 'STUDENT' : 'STAFF'}`) });
+  const [cls, setCls] = useState({ name: '', classId: '' });
+  const classes = useQuery({ queryKey: ['fameClasses'], queryFn: () => api.get<any[]>('/fame/classes') });
+  const names = [...new Set((classes.data ?? []).map((c) => c.name))];
+  const sections = (classes.data ?? []).filter((c) => c.name === cls.name);
+  const people = useQuery({ queryKey: ['famePeople', f.kind, cls.classId], enabled: f.kind !== 'STUDENT' || !!cls.classId,
+    queryFn: () => api.get<any[]>(f.kind === 'STUDENT' ? `/fame/people?role=STUDENT&classId=${cls.classId}` : '/fame/people?role=STAFF') });
   const s = q.data?.settings;
   const setS = async (k: string, v: boolean) => { await api.put('/fame/settings', { ...s, [k]: v }); qc.invalidateQueries({ queryKey: ['fame'] }); };
   const save = async () => {
@@ -98,8 +103,15 @@ export function FameAdmin() {
         <div className="flex gap-2">{[['STUDENT', '🌟 Brilliant student'], ['LEADER', '🎖️ Leadership / honoured teacher']].map(([k, l]) => (
           <button key={k} type="button" onClick={() => setF({ ...blank, kind: k, emoji: k === 'LEADER' ? '🎖️' : '🏆' })} className={cn('rounded-xl px-3 py-2 text-sm font-bold', f.kind === k ? 'bg-amber-500 text-white' : 'bg-white text-slate-700 ring-1 ring-amber-200')}>{l}</button>))}</div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="text-sm font-medium text-slate-700">{f.kind === 'STUDENT' ? 'Student (from the school)' : 'Person (optional — or type the name)'}
-            <select value={f.userId} onChange={(e) => pickPerson(e.target.value)} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">— choose —</option>{people.data?.map((p) => <option key={p.id} value={p.id}>{p.name}{p.designation ? ` · ${p.designation}` : ''}</option>)}</select></label>
+          {f.kind === 'STUDENT' && <div className="grid grid-cols-2 gap-3 sm:col-span-2">
+            <label className="text-sm font-medium text-slate-700">1. Class<select value={cls.name} onChange={(e) => { const n = e.target.value; const secs = (classes.data ?? []).filter((c) => c.name === n); setCls({ name: n, classId: secs.length === 1 ? secs[0].id : '' }); setF({ ...f, userId: '' }); }} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+              <option value="">— choose a class —</option>{names.map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
+            <label className="text-sm font-medium text-slate-700">2. Section<select value={cls.classId} disabled={!cls.name} onChange={(e) => { setCls({ ...cls, classId: e.target.value }); setF({ ...f, userId: '' }); }} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100">
+              <option value="">— choose a section —</option>{sections.map((c) => <option key={c.id} value={c.id}>{c.section || '(no section)'} · {c.students} students</option>)}</select></label>
+          </div>}
+          <label className="text-sm font-medium text-slate-700">{f.kind === 'STUDENT' ? '3. Student' : 'Person (optional — or type the name)'}
+            <select value={f.userId} disabled={f.kind === 'STUDENT' && !cls.classId} onChange={(e) => pickPerson(e.target.value)} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100">
+              <option value="">{f.kind === 'STUDENT' && !cls.classId ? '— choose the class and section first —' : '— choose —'}</option>{people.data?.map((p) => <option key={p.id} value={p.id}>{p.name}{p.designation ? ` · ${p.designation}` : ''}</option>)}</select></label>
           <label className="text-sm font-medium text-slate-700">Name shown<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} maxLength={120} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
           <label className="text-sm font-medium text-slate-700">{f.kind === 'STUDENT' ? 'Award' : 'Role'}<input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} maxLength={120} placeholder={f.kind === 'STUDENT' ? 'e.g. Reading Champion, Top in Maths' : 'e.g. Principal, Vice Principal, Teacher of the Year'} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
           <label className="text-sm font-medium text-slate-700">Year<input value={f.year} onChange={(e) => setF({ ...f, year: e.target.value })} maxLength={20} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
