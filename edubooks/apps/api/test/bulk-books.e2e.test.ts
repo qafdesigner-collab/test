@@ -23,7 +23,7 @@ describe('Give books by class: whole sections at once, seats left, and automatic
     await principal.put(`/api/school/pools/${pool.id}/grades`).send({ gradeIds: [g] }); // the book is for this grade too
   });
   afterAll(async () => {
-    const mine = `(pool_id = $1 AND assigned_at >= $2 AND status = 'ACTIVE')`;
+    const mine = `(pool_id = $1 AND created_at >= $2 AND status = 'ACTIVE')`;
     await owner.query(`UPDATE access_entitlements SET active = false WHERE assignment_id IN (SELECT id FROM license_assignments WHERE ${mine})`, [pool.id, start]);
     await owner.query(`UPDATE license_seats SET status = 'AVAILABLE' WHERE id IN (SELECT seat_id FROM license_assignments WHERE ${mine})`, [pool.id, start]);
     await owner.query(`UPDATE license_assignments SET status = 'RELEASED', ended_at = now() WHERE ${mine}`, [pool.id, start]);
