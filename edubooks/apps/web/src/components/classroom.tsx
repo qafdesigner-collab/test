@@ -100,25 +100,35 @@ function Progress({ g, big }: { g: any; big?: boolean }) {
   );
 }
 
-/** For teachers: start a class goal ("200 stars → class party") and watch it fill up. */
-export function ClassGoals({ classes }: { classes: { id: string; name: string; students?: number }[] }) {
+/** For teachers and the school admin: start a class goal ("200 stars → class party") and watch it fill up. */
+export function ClassGoals({ classes, manageRewards = true }: { classes: { id: string; name: string; students?: number }[]; manageRewards?: boolean }) {
   const q = useQuery({ queryKey: ['classGoals'], queryFn: () => api.get<any[]>('/classroom/goals') });
+  const rw = useQuery({ queryKey: ['schoolRewards'], queryFn: () => api.get<any[]>('/classroom/rewards') });
   const qc = useQueryClient();
-  const [f, setF] = useState({ classId: '', reward: 'Class party', emoji: '🎉', target: 0 }); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
-  const cls = classes.find((c) => c.id === (f.classId || classes[0]?.id));
-  const suggested = Math.max(30, Math.round(((cls?.students ?? 10) * 15) / 10) * 10);
+  const [f, setF] = useState({ classId: '', pick: '🎉|Class party', emoji: '🎁', reward: '', target: 0, keep: true });
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState(''); const [manage, setManage] = useState(false);
   const active = (q.data ?? []).filter((g) => g.status === 'ACTIVE'); const done = (q.data ?? []).filter((g) => g.status === 'DONE').slice(0, 3);
   const free = classes.filter((c) => !active.some((g) => g.classId === c.id));
+  const cls = classes.find((c) => c.id === (f.classId || free[0]?.id));
+  const suggested = Math.max(30, Math.round(((cls?.students ?? 10) * 15) / 10) * 10);
+  const options = [...(rw.data ?? []).map((r) => [r.emoji, r.title]), ...REWARDS.filter(([, t]) => !(rw.data ?? []).some((r) => r.title.toLowerCase() === t.toLowerCase()))];
+  const other = f.pick === 'OTHER';
   const start = async () => {
     setBusy(true); setErr('');
-    try { await api.post('/classroom/goals', { classId: f.classId || free[0]?.id, reward: f.reward, emoji: f.emoji, target: f.target || suggested }); qc.invalidateQueries({ queryKey: ['classGoals'] }); }
-    catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+    try {
+      const [emoji, reward] = other ? [f.emoji || '🎁', f.reward.trim()] : f.pick.split('|');
+      if (other && f.keep && reward.length >= 2) await api.post('/classroom/rewards', { emoji, title: reward }).catch(() => undefined);
+      await api.post('/classroom/goals', { classId: f.classId || free[0]?.id, reward, emoji, target: f.target || suggested });
+      setF({ ...f, classId: '', reward: '', target: 0 }); qc.invalidateQueries({ queryKey: ['classGoals'] }); qc.invalidateQueries({ queryKey: ['schoolRewards'] });
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   };
   const stop = async (id: string) => { if (!confirm('Stop this class goal?')) return; await api.del(`/classroom/goals/${id}`); qc.invalidateQueries({ queryKey: ['classGoals'] }); };
   return (
     <section className="space-y-3 rounded-3xl bg-gradient-to-br from-amber-50 to-pink-50 p-5 shadow-sm ring-1 ring-amber-200">
-      <div><h2 className="text-lg font-extrabold text-slate-900">🏆 Class reward board</h2>
+      <div className="flex flex-wrap items-start gap-2"><div className="min-w-0 flex-1"><h2 className="text-lg font-extrabold text-slate-900">🏆 Class reward board</h2>
         <p className="text-sm text-slate-600">One goal for the whole class — every star from games, homework, book work and your stickers counts. No ranking of children.</p></div>
+        {manageRewards && <button type="button" onClick={() => setManage(!manage)} className="rounded-xl bg-white px-3 py-1.5 text-sm font-bold text-amber-800 ring-1 ring-amber-200 hover:bg-amber-50">🎁 {manage ? 'Close' : 'Our rewards'}</button>}</div>
+      {manage && <RewardList />}
       {active.map((g) => (
         <div key={g.id} className="space-y-2 rounded-2xl bg-white/80 p-3">
           <div className="flex items-center gap-2"><span className="text-2xl">{g.emoji}</span><b className="flex-1 text-slate-900">{g.className}: {g.target} stars → {g.reward}</b>
@@ -128,13 +138,46 @@ export function ClassGoals({ classes }: { classes: { id: string; name: string; s
       {done.map((g) => <p key={g.id} className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">✅ {g.className} reached {g.target} stars → {g.emoji} {g.reward}</p>)}
       {free.length > 0 && <div className="flex flex-wrap items-end gap-2 rounded-2xl bg-white/60 p-3">
         <label className="text-xs font-semibold text-slate-600">Class<select value={f.classId || free[0]?.id} onChange={(e) => setF({ ...f, classId: e.target.value })} className="mt-1 block rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm">{free.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-        <label className="text-xs font-semibold text-slate-600">Reward<select value={`${f.emoji}|${f.reward}`} onChange={(e) => { const [emoji, reward] = e.target.value.split('|'); setF({ ...f, emoji, reward }); }} className="mt-1 block rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm">
-          {REWARDS.map(([e, r]) => <option key={r} value={`${e}|${r}`}>{e} {r}</option>)}</select></label>
+        <label className="text-xs font-semibold text-slate-600">Reward<select value={f.pick} onChange={(e) => setF({ ...f, pick: e.target.value })} className="mt-1 block max-w-60 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm">
+          {options.map(([e, r]) => <option key={r} value={`${e}|${r}`}>{e} {r}</option>)}<option value="OTHER">✏️ Other reward…</option></select></label>
+        {other && <>
+          <label className="text-xs font-semibold text-slate-600">Emoji<input value={f.emoji} onChange={(e) => setF({ ...f, emoji: e.target.value })} maxLength={16} className="mt-1 block w-16 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-center text-lg" /></label>
+          <label className="text-xs font-semibold text-slate-600">Your reward<input autoFocus value={f.reward} onChange={(e) => setF({ ...f, reward: e.target.value })} maxLength={120} placeholder="e.g. Ice-cream Friday" className="mt-1 block w-52 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm" /></label>
+          <label className="flex items-center gap-1.5 pb-2 text-xs text-slate-600"><input type="checkbox" checked={f.keep} onChange={(e) => setF({ ...f, keep: e.target.checked })} />Add to our school's list</label>
+        </>}
         <label className="text-xs font-semibold text-slate-600">Stars<input type="number" min={10} max={10000} value={f.target || suggested} onChange={(e) => setF({ ...f, target: Number(e.target.value) })} className="mt-1 block w-24 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm" /></label>
-        <button type="button" disabled={busy} onClick={start} className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white shadow disabled:opacity-50">🚀 Start the goal</button>
+        <button type="button" disabled={busy || (other && f.reward.trim().length < 2)} onClick={start} className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white shadow disabled:opacity-50">🚀 Start the goal</button>
         {err && <p className="w-full text-xs text-red-700">{err}</p>}
       </div>}
     </section>
+  );
+}
+
+const EMOJIS = ['🎉', '🎈', '🍦', '🍕', '🎬', '⚽', '🧸', '🎨', '📖', '🎮', '🏖️', '🎵', '🌳', '🧁', '🏅', '🎁'];
+/** The school's own rewards: teachers and the school admin add them; everyone in the school can choose them. */
+export function RewardList() {
+  const q = useQuery({ queryKey: ['schoolRewards'], queryFn: () => api.get<any[]>('/classroom/rewards') });
+  const qc = useQueryClient(); const [emoji, setEmoji] = useState('🎁'); const [title, setTitle] = useState(''); const [err, setErr] = useState('');
+  const add = async () => {
+    setErr('');
+    try { await api.post('/classroom/rewards', { emoji, title }); setTitle(''); qc.invalidateQueries({ queryKey: ['schoolRewards'] }); } catch (e: any) { setErr(e.message); }
+  };
+  const del = async (id: string) => { await api.del(`/classroom/rewards/${id}`); qc.invalidateQueries({ queryKey: ['schoolRewards'] }); };
+  return (
+    <div className="space-y-3 rounded-2xl bg-white p-4 ring-1 ring-amber-200">
+      <p className="text-sm font-bold text-slate-800">🎁 Our school's rewards <span className="font-normal text-slate-500">— added by teachers and the school admin; everyone can choose them for a class goal</span></p>
+      <ul className="flex flex-wrap gap-2">{(q.data ?? []).map((r) => (
+        <li key={r.id} className="flex items-center gap-1.5 rounded-full bg-amber-50 py-1 pe-1 ps-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-200" title={r.by ? `Added by ${r.by}` : ''}>
+          {r.emoji} {r.title}{r.canDelete && <button type="button" onClick={() => del(r.id)} className="rounded-full p-1 text-amber-700 hover:bg-amber-100" aria-label={`Remove ${r.title}`}><Trash2 className="size-3.5" /></button>}</li>))}
+        {!q.data?.length && <li className="text-sm text-slate-500">No rewards of your own yet — the usual ones (class party, movie time…) are always there.</li>}</ul>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-1">{EMOJIS.map((e) => <button key={e} type="button" onClick={() => setEmoji(e)} className={cn('size-9 rounded-lg text-xl', emoji === e ? 'bg-amber-200 ring-2 ring-amber-400' : 'hover:bg-amber-50')}>{e}</button>)}</div>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="New reward, e.g. Ice-cream Friday" onKeyDown={(e) => e.key === 'Enter' && title.trim().length >= 2 && add()}
+          className="min-w-48 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+        <button type="button" disabled={title.trim().length < 2} onClick={add} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">+ Add</button>
+      </div>
+      {err && <p className="text-xs text-red-700">{err}</p>}
+    </div>
   );
 }
 

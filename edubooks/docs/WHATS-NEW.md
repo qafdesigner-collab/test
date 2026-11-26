@@ -1,3 +1,24 @@
+# What's new in Knowledge Gate 1.4.24
+
+## 🎁 Class rewards: your own rewards, for teachers and the school admin
+- New **Class rewards** in the sidebar of **teachers** and the **school admin**.
+- **Our school's rewards**: teachers and the school admin add their own rewards (pick an emoji, type the reward, e.g. 🍦 Ice-cream Friday). Everyone in the school can choose them for a class goal. Whoever added a reward (or the school admin) can remove it.
+- When starting a goal you can also choose **✏️ Other reward…** and type one just for this time (and add it to the list).
+- The school admin can start and follow star goals for **every class**.
+
+## 🏛️ Hall of Fame
+- **School admin → Hall of Fame**: add **brilliant students** (award, achievement, year) and the **leadership** — principal, vice principal, honoured teachers (role and a few words). Choose a person from the school (their own photo is used) or a 3D picture.
+- A beautiful gold board shows **🎖️ Our leadership** and **🌟 Our brilliant students**. Students and parents find it on their home page; teachers in their sidebar.
+- **Only the school admin controls it**: show it or not, and separately for **teachers**, **students** and **parents**.
+
+## 🗓️ Weekly plans made by hand
+- **Lesson planner → 🗓️ Weekly plans → New week**: for each day of the week press **+ Add** and choose the **book**, then the **part** of the book (Student Book Part 1, Part 2, Homework book, Workbook, Flashcards, Posters, CD…), the **lesson** (optional — its pages are filled in) or just the **pages**, the **resources** of that part or lesson, what the class will do and the homework. Or add something without a book (library visit, assembly…).
+- Saturday and Sunday can be shown too. Every entry has **📖 Open the page**. **Print** gives a clean one-page table of the week.
+- “📅 Plan my week (automatic)” is still there to fill a week from the book index in one click.
+
+## 🔧 Fixed
+- 3D pictures in some lists showed far too big.
+
 # What's new in Knowledge Gate 1.4.23
 
 ## 🏅 Stickers and voice notes on children's work

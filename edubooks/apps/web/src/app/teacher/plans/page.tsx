@@ -16,7 +16,8 @@ export default function Plans() {
   return (
     <div className="space-y-6">
       <PageHeader title="Lesson planner" sub="Plan lessons from your books. Plans are private to you; print, download or reuse them.">
-        <button type="button" onClick={() => setWeek(true)} className="focus-ring inline-flex h-10 items-center gap-1.5 rounded-lg bg-white px-4 text-sm font-medium text-slate-800 ring-1 ring-slate-300 hover:bg-slate-50">📅 Plan my week</button>
+        <Link href="/teacher/plans/weekly" className="focus-ring inline-flex h-10 items-center gap-1.5 rounded-lg bg-white px-4 text-sm font-medium text-slate-800 ring-1 ring-slate-300 hover:bg-slate-50">🗓️ Weekly plans</Link>
+        <button type="button" onClick={() => setWeek(true)} className="focus-ring inline-flex h-10 items-center gap-1.5 rounded-lg bg-white px-4 text-sm font-medium text-slate-800 ring-1 ring-slate-300 hover:bg-slate-50">📅 Plan my week (automatic)</button>
         <Link href="/teacher/plans/new" className="focus-ring inline-flex h-10 items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700"><Plus className="size-4" />New plan</Link>
       </PageHeader>
       {week && <Dialog open onOpenChange={setWeek} wide title="📅 Plan my week" description="The next lessons of a book go on the days of the week. Holidays from the school calendar are skipped; with a timetable, lessons go on the days of that subject.">

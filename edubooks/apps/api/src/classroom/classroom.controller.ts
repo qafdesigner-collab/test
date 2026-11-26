@@ -10,6 +10,7 @@ import { AccessService } from '../lms/access.service';
 import { LmsModule } from '../lms/lms.module';
 import { NotificationsModule } from '../notifications/notifications.controller';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ExtrasController, FameService, WeeklyPlansService } from './extras.controller';
 
 /** Stickers a teacher can give with one tap (the key is stored; the label is shown). */
 export const STICKERS: Record<string, string> = {
@@ -27,8 +28,12 @@ class FeedbackDto {
 class GoalDto {
   @IsUUID() classId!: string;
   @IsString() @Length(2, 120) reward!: string;
-  @IsOptional() @IsString() @MaxLength(8) emoji?: string;
+  @IsOptional() @IsString() @MaxLength(16) emoji?: string;
   @Type(() => Number) @IsInt() @Min(10) @Max(10000) target!: number;
+}
+class RewardDto {
+  @IsString() @Length(2, 120) title!: string;
+  @IsOptional() @IsString() @MaxLength(16) emoji?: string;
 }
 class WeekDto {
   @IsUUID() classId!: string;
@@ -168,7 +173,7 @@ export class ClassroomService {
     const [has] = await this.rows(sql`SELECT 1 FROM class_goals WHERE class_id = ${d.classId} AND status = 'ACTIVE'`);
     if (has) throw new BadRequestException('This class already has a goal. Stop it first to start a new one.');
     const [g] = await this.rows(sql`INSERT INTO class_goals (publisher_id, school_id, class_id, teacher_id, reward, emoji, target)
-      VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${d.classId}, ${this.ctx.userId}, ${d.reward.trim()}, ${(d.emoji || '🎉').slice(0, 8)}, ${d.target}) RETURNING id`);
+      VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${d.classId}, ${this.ctx.userId}, ${d.reward.trim()}, ${(d.emoji || '🎉').slice(0, 16)}, ${d.target}) RETURNING id`);
     const kids = await this.rows(sql`SELECT student_id AS id FROM enrolments WHERE class_id = ${d.classId}`);
     await this.notifications.notify(kids, { kind: 'GOAL', title: `${d.emoji || '🎉'} New class goal: ${d.target} stars → ${d.reward.trim()}`, body: 'Play, read and do your homework — every star counts for the whole class!', link: '/learn' });
     await this.audit.log('classroom.goal', 'class', d.classId, `Started a class goal: ${d.target} stars → ${d.reward}`);
@@ -182,6 +187,28 @@ export class ClassroomService {
     await this.rows(sql`UPDATE class_goals SET status = 'STOPPED' WHERE id = ${id} AND status = 'ACTIVE'`);
     return { ok: true };
   }
+  /** The school's reward list: everyone in the school sees it; teachers and the school admin add to it. */
+  async rewards() {
+    return this.rows(sql`SELECT r.id, r.emoji, r.title, r.created_by AS "createdBy", u.display_name AS "by",
+        (r.created_by = ${this.ctx.userId} OR ${this.is('SCHOOL_ADMIN')}) AS "canDelete"
+      FROM school_rewards r LEFT JOIN users u ON u.id = r.created_by ORDER BY r.created_at`);
+  }
+  async addReward(d: RewardDto) {
+    const title = d.title.trim().replace(/\s+/g, ' ');
+    const [dup] = await this.rows(sql`SELECT id FROM school_rewards WHERE lower(title) = lower(${title})`);
+    if (dup) throw new BadRequestException('This reward is already in the list');
+    const [r] = await this.rows(sql`INSERT INTO school_rewards (publisher_id, school_id, emoji, title, created_by)
+      VALUES (${this.ctx.publisherId}, ${this.ctx.schoolId}, ${(d.emoji || '🎁').trim().slice(0, 16)}, ${title}, ${this.ctx.userId}) RETURNING id, emoji, title`);
+    return r;
+  }
+  async removeReward(id: string) {
+    const [r] = await this.rows(sql`SELECT created_by FROM school_rewards WHERE id = ${id}`);
+    if (!r) throw new NotFoundException('Reward not found');
+    if (r.created_by !== this.ctx.userId && !this.is('SCHOOL_ADMIN')) throw new ForbiddenException('Only the person who added it, or the school admin, can remove it');
+    await this.rows(sql`DELETE FROM school_rewards WHERE id = ${id}`);
+    return { ok: true };
+  }
+
   /** A student's class goals (active, or reached in the last week), with what they themselves added. */
   async myGoals() {
     const classes = await this.access.studentClassIds();
@@ -345,6 +372,9 @@ export class ClassroomController {
   @Roles('TEACHER', 'SCHOOL_ADMIN') @Get('classroom/goals') goals(@Query('classId') classId?: string) { return this.svc.teacherGoals(classId); }
   @Roles('TEACHER', 'SCHOOL_ADMIN') @Post('classroom/goals') createGoal(@Body() d: GoalDto) { return this.svc.createGoal(d); }
   @Roles('TEACHER', 'SCHOOL_ADMIN') @Delete('classroom/goals/:id') stopGoal(@Param('id', ParseUUIDPipe) id: string) { return this.svc.stopGoal(id); }
+  @Roles('TEACHER', 'SCHOOL_ADMIN') @Get('classroom/rewards') rewards() { return this.svc.rewards(); }
+  @Roles('TEACHER', 'SCHOOL_ADMIN') @Post('classroom/rewards') addReward(@Body() d: RewardDto) { return this.svc.addReward(d); }
+  @Roles('TEACHER', 'SCHOOL_ADMIN') @Delete('classroom/rewards/:id') removeReward(@Param('id', ParseUUIDPipe) id: string) { return this.svc.removeReward(id); }
   @Roles('STUDENT') @Get('classroom/my-goals') myGoals() { return this.svc.myGoals(); }
   // plan my week
   @Roles('TEACHER', 'SCHOOL_ADMIN') @Post('teacher/plans/week/preview') @HttpCode(200) preview(@Body() d: WeekDto) { return this.svc.weekPreview(d); }
@@ -355,5 +385,5 @@ export class ClassroomController {
   private kind(k: string): Kind { const u = k.toUpperCase().replace('-', '_'); if (!(KINDS as readonly string[]).includes(u)) throw new BadRequestException('Unknown kind of work'); return u as Kind; }
 }
 
-@Module({ imports: [LmsModule, NotificationsModule], controllers: [ClassroomController], providers: [ClassroomService, WeeklyDigestJob], exports: [ClassroomService, WeeklyDigestJob] })
+@Module({ imports: [LmsModule, NotificationsModule], controllers: [ClassroomController, ExtrasController], providers: [ClassroomService, WeeklyDigestJob, WeeklyPlansService, FameService], exports: [ClassroomService, WeeklyDigestJob] })
 export class ClassroomModule {}

@@ -1,4 +1,5 @@
 'use client';
+import { FamePeek } from '@/components/fame';
 import { FeedbackWall } from '@/components/classroom';
 import { TimelinePeek } from '@/components/timeline';
 import { useEffect, useState } from 'react';
@@ -29,6 +30,7 @@ export default function ParentHome() {
     <div className="space-y-6">
       <LiveLessons />
       <TimelinePeek href="/parent/timeline" />
+      <FamePeek href="/parent/fame" />
       <Announcements limit={5} />
       <div role="tablist" aria-label={t('Children')} className="flex flex-wrap gap-2">
         {kids.data.children.map((k: any) => (

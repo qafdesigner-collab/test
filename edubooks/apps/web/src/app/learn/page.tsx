@@ -1,4 +1,5 @@
 'use client';
+import { FamePeek } from '@/components/fame';
 import { ClassGoalBanner, FeedbackWall } from '@/components/classroom';
 import { TimelinePeek } from '@/components/timeline';
 import Link from 'next/link';
@@ -58,6 +59,7 @@ export default function LearnHome() {
         </div>
       </section>
       <ClassGoalBanner />
+      <FamePeek href="/learn/fame" playful />
       {me && <FeedbackWall studentId={me.id} playful limit={3} />}
       <TimelinePeek href="/learn/timeline" playful />
 

@@ -1,5 +1,7 @@
 'use client';
-import { BookMarked, ClipboardList, Gamepad2, Library, LayoutDashboard, NotebookPen, Sparkles, Users, CalendarDays, UserCheck, Clock, GraduationCap, LineChart, FileText, MessagesSquare, Bird, Building, Presentation, Mail, ListChecks, BarChart3, Palette, Newspaper } from 'lucide-react';
+import { BookMarked, ClipboardList, Gamepad2, Library, LayoutDashboard, NotebookPen, Sparkles, Users, CalendarDays, UserCheck, Clock, GraduationCap, LineChart, FileText, MessagesSquare, Bird, Building, Presentation, Mail, ListChecks, BarChart3, Palette, Newspaper, Trophy, Landmark } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { Shell } from '@/components/shell';
 
 const NAV = [
@@ -17,6 +19,8 @@ const NAV = [
   { href: '/teacher/checklists', label: 'Checklists', icon: ListChecks },
   { href: '/teacher/games', label: 'Games', icon: Gamepad2 },
   { href: '/teacher/book-work', label: 'Book work', icon: Palette },
+  { href: '/teacher/rewards', label: 'Class rewards', icon: Trophy },
+  { href: '/teacher/fame', label: 'Hall of Fame', icon: Landmark },
   { href: '/teacher/classes', label: 'Classes & reports', icon: Users },
   { href: '/teacher/insights', label: 'Insights', icon: LineChart },
   { href: '/teacher/compare', label: 'Compare classes', icon: BarChart3 },
@@ -28,5 +32,7 @@ const NAV = [
   { href: '/teacher/publisher', label: 'Our publisher', icon: Building },
 ];
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
-  return <Shell role="TEACHER" roleLabel="Teacher" nav={NAV}>{children}</Shell>;
+  // the Hall of Fame is in the menu only when the school admin shows it to teachers
+  const fame = useQuery({ queryKey: ['fameShown'], queryFn: () => api.get<{ shown: boolean }>('/fame/shown'), staleTime: 300_000 });
+  return <Shell role="TEACHER" roleLabel="Teacher" nav={NAV.filter((n) => n.href !== '/teacher/fame' || fame.data?.shown)}>{children}</Shell>;
 }

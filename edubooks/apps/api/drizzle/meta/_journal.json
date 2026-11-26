@@ -533,6 +533,20 @@
       "when": 1797290000000,
       "tag": "0075_classroom",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1797390000000,
+      "tag": "0076_school_rewards",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1797490000000,
+      "tag": "0077_weekly_fame",
+      "breakpoints": true
     }
   ]
 }

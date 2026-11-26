@@ -16,8 +16,8 @@ export function Avatar({ name, photoUrl, size = 40, className, style, open }: { 
   const [big, setBig] = useState(false);
   const pic = photoUrl?.startsWith('/avatars/');
   const face = photoUrl
-    ? <img src={photoUrl} alt={name ?? ''} className={cn('shrink-0 rounded-full shadow', pic ? 'bg-gradient-to-br from-sky-100 via-violet-100 to-amber-100 object-contain p-[8%]' : 'object-cover', className)}
-        style={{ width: size, height: size, ...style, ...(pic ? { background: undefined } : {}) }} />
+    ? <img src={photoUrl} alt={name ?? ''} className={cn('shrink-0 rounded-full shadow', pic ? 'bg-gradient-to-br from-sky-100 via-violet-100 to-amber-100 object-contain' : 'object-cover', className)}
+        style={{ width: size, height: size, ...style, ...(pic ? { background: undefined, padding: Math.round(size * 0.08) } : {}) }} />
     : <span className={cn('grid shrink-0 place-items-center rounded-full font-extrabold text-white shadow', className)} style={{ width: size, height: size, fontSize: size * 0.36, background: 'linear-gradient(115deg,#6857cf,#d9847a)', ...style }} aria-hidden={!name}>{initials(name)}</span>;
   if (!open || !photoUrl) return face;
   return <>

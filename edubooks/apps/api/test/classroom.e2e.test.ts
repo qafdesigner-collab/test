@@ -72,6 +72,25 @@ describe('Stickers and voice feedback, class goals, plan my week, the parents’
     expect((await teacher.delete(`/api/classroom/goals/${g.body.id}`)).status).toBe(200);
   });
 
+  it('teachers and the school admin add rewards to the school list; the admin can start goals for any class', async () => {
+    expect((await student.post('/api/classroom/rewards').send({ title: 'Free sweets' })).status).toBe(403);
+    const r1 = await principal.post('/api/classroom/rewards').send({ emoji: '🍦', title: 'Ice-cream Friday' });
+    expect(r1.status).toBe(201);
+    const r2 = await teacher.post('/api/classroom/rewards').send({ emoji: '🌳', title: 'Lesson in the garden' });
+    expect(r2.status).toBe(201);
+    expect((await teacher.post('/api/classroom/rewards').send({ title: 'ice-cream friday' })).status).toBe(400);
+    const list = (await teacher.get('/api/classroom/rewards')).body;
+    expect(list.map((r: any) => r.title)).toEqual(expect.arrayContaining(['Ice-cream Friday', 'Lesson in the garden']));
+    expect(list.find((r: any) => r.title === 'Ice-cream Friday').canDelete).toBe(false);
+    expect((await teacher.delete(`/api/classroom/rewards/${r1.body.id}`)).status).toBe(403);
+    const g = await principal.post('/api/classroom/goals').send({ classId: kg, reward: 'Ice-cream Friday', emoji: '🍦', target: 40 });
+    expect(g.status).toBe(201); expect(g.body).toMatchObject({ reward: 'Ice-cream Friday', emoji: '🍦' });
+    expect((await teacher.get('/api/classroom/goals')).body.find((x: any) => x.id === g.body.id)).toBeTruthy();
+    expect((await principal.delete(`/api/classroom/goals/${g.body.id}`)).status).toBe(200);
+    expect((await teacher.delete(`/api/classroom/rewards/${r2.body.id}`)).status).toBe(200);
+    expect((await principal.delete(`/api/classroom/rewards/${r1.body.id}`)).status).toBe(200);
+  });
+
   it('plans the week from the book index, skipping holidays', async () => {
     const books = (await teacher.get('/api/teacher/books')).body; const book = books.find((b: any) => /English/.test(b.title ?? b.packageTitle ?? '')) ?? books[0];
     const editionId = book.editionId;
@@ -93,6 +112,60 @@ describe('Stickers and voice feedback, class goals, plan my week, the parents’
     const firstNext = after.days.find((d: any) => d.lessons.length)?.lessons[0]?.lessonId;
     if (firstNext) expect(items.map((i: any) => i.lessonId)).not.toContain(firstNext);
     const o = ownerPool(); await o.query(`DELETE FROM calendar_events WHERE title = 'Test holiday'`); await o.end();
+  });
+
+  it('a teacher makes a weekly plan by hand: book → part → lesson / pages → resources, per day', async () => {
+    const books = (await teacher.get('/api/teacher/books')).body; const ed = books[0].editionId;
+    const book = (await teacher.get(`/api/reader/editions/${ed}`)).body;
+    const part = book.components.find((c: any) => c.units.some((u: any) => u.lessons.length)) ?? book.components[0];
+    const lesson = part.units.flatMap((u: any) => u.lessons)[0];
+    const res = book.resources.find((r: any) => !r.componentId || r.componentId === part.id);
+    const other = book.components.find((c: any) => c.id !== part.id);
+    const body = { classId: kg, weekStart: '2026-12-09', title: 'Week of 7 December', notes: 'Bring crayons on Tuesday',
+      entries: [
+        { day: 1, editionId: ed, componentId: part.id, lessonId: lesson?.id, pageFrom: 2, pageTo: 4, resourceIds: res ? [res.id] : [], activity: 'Read together, then trace the letters' },
+        { day: 2, editionId: ed, componentId: other?.id ?? part.id, pageFrom: 5, homework: 'Colour page 5' },
+        { day: 3, title: 'Library visit', activity: 'Choose a book to take home' },
+      ] };
+    expect((await teacher.post('/api/teacher/weekly-plans').send({ ...body, entries: [{ day: 1 }] })).status).toBe(400);
+    expect((await teacher.post('/api/teacher/weekly-plans').send({ ...body, entries: [{ day: 1, editionId: ed, componentId: part.id, pageFrom: 5, pageTo: 2 }] })).status).toBe(400);
+    const w = await teacher.post('/api/teacher/weekly-plans').send(body);
+    expect(w.status).toBe(201);
+    expect(w.body.weekStart).toBe('2026-12-07'); // always the Monday
+    expect(w.body.entries[0]).toMatchObject({ day: 1, part: part.title, pageFrom: 2, pageTo: 4 });
+    if (lesson) expect(w.body.entries[0].lesson).toContain(lesson.title);
+    expect(w.body.entries[2]).toMatchObject({ title: 'Library visit', editionId: null });
+    expect((await teacher.get('/api/teacher/weekly-plans')).body[0]).toMatchObject({ id: w.body.id, entries: 3 });
+    const up = await teacher.put(`/api/teacher/weekly-plans/${w.body.id}`).send({ ...body, entries: body.entries.slice(0, 2) });
+    expect(up.body.entries).toHaveLength(2);
+    expect((await student.get(`/api/teacher/weekly-plans/${w.body.id}`)).status).toBe(403);
+    expect((await teacher.delete(`/api/teacher/weekly-plans/${w.body.id}`)).status).toBe(200);
+  });
+
+  it('the Hall of Fame: the school admin adds students and leaders and decides who sees it', async () => {
+    expect((await teacher.post('/api/fame').send({ kind: 'STUDENT', name: 'X Y' })).status).toBe(403);
+    const kid = (await principal.get('/api/fame/people?role=STUDENT&q=Sample Student 1')).body[0];
+    const a = await principal.post('/api/fame').send({ kind: 'STUDENT', userId: kid.id, name: kid.name, title: 'Reading Champion', achievement: 'Read 40 books this term', year: '2026' });
+    const b = await principal.post('/api/fame').send({ kind: 'LEADER', name: 'Mrs. Aisha Khan', title: 'Principal', achievement: 'Leading our school with heart', avatar: 'teacher-woman' });
+    expect(a.status).toBe(201); expect(b.status).toBe(201);
+    for (const who of [teacher, student, parent]) {
+      const f = (await who.get('/api/fame')).body;
+      expect(f.visible).toBe(true); expect(f.settings).toBeUndefined();
+      expect(f.students.map((x: any) => x.title)).toContain('Reading Champion');
+      expect(f.leaders.find((x: any) => x.id === b.body.id)).toMatchObject({ title: 'Principal', picture: '/avatars/teacher-woman.webp' });
+    }
+    // show it to parents only
+    expect((await principal.put('/api/fame/settings').send({ enabled: true, teachers: false, students: false, parents: true })).body).toMatchObject({ parents: true, students: false });
+    expect((await student.get('/api/fame')).body).toEqual({ visible: false, admin: false });
+    expect((await teacher.get('/api/fame/shown')).body.shown).toBe(false);
+    expect((await parent.get('/api/fame')).body.visible).toBe(true);
+    // switched off: only the admin still sees it
+    await principal.put('/api/fame/settings').send({ enabled: false, teachers: true, students: true, parents: true });
+    expect((await parent.get('/api/fame')).body.visible).toBe(false);
+    expect((await principal.get('/api/fame')).body).toMatchObject({ visible: true, admin: true, settings: { enabled: false } });
+    expect((await teacher.put('/api/fame/settings').send({ enabled: true, teachers: true, students: true, parents: true })).status).toBe(403);
+    await principal.put('/api/fame/settings').send({ enabled: true, teachers: true, students: true, parents: true });
+    await principal.delete(`/api/fame/${a.body.id}`); await principal.delete(`/api/fame/${b.body.id}`);
   });
 
   it('parents get their child’s week; the Friday job sends it once', async () => {
