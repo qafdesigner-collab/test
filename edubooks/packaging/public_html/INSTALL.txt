@@ -5,7 +5,7 @@ INSTALL
 1. Open your domain in the browser, e.g. https://lms.yourdomain.com
 2. Follow the setup wizard:
      Check  ->  Super admin  ->  Database  ->  Install
-3. Sign in at /login (choose "Publisher staff").
+3. Sign in at /login?staff=1 (or the small "Staff" button on the sign-in page).
 
 UPDATE TO A NEW VERSION (recommended way)
 1. Sign in as super admin -> Updates (left menu).

@@ -314,7 +314,7 @@ function installer() {
       const steps = await install(f);
       send(200, page('Knowledge Gate installed', `<div class="card"><div class="logo">🎉</div><h1>Knowledge Gate is installed!</h1>${list}
 <ul class="res">${steps.map((s) => `<li class="ok">✅ ${esc(s)}</li>`).join('')}</ul>
-<p>The app is starting now. In a few seconds, <a href="/login">open the sign-in page</a> and choose <strong>Publisher staff</strong>.</p>
+<p>The app is starting now. In a few seconds, <a href="/login?staff=1">open the staff sign-in page</a>.</p>
 <p>Next: set up a daily backup (see the README) and enable the <strong>AutoSSL</strong> certificate for this domain if it is not already active.</p></div>`));
       bootApp().catch((e) => { console.error('Start failed after install:', e); handler = (rq, rs) => { rs.statusCode = 500; rs.end('Knowledge Gate was installed but could not start. Restart the app in cPanel → Setup Node.js App, and check the log file.'); }; });
     } catch (e) {

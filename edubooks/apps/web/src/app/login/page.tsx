@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { BookOpen, Building2 } from 'lucide-react';
+import { ArrowLeft, BookOpen, Building2, KeyRound, School } from 'lucide-react';
 import { api } from '@/lib/api';
 import { homeFor, Me } from '@/lib/session';
 import { BrandMark, useBranding } from '@/lib/branding';
@@ -15,7 +15,8 @@ import { LoginContact } from '@/components/company-card';
 function LoginForm() {
   const { t } = useT();
   const router = useRouter(); const params = useSearchParams(); const qc = useQueryClient();
-  const [staff, setStaff] = useState(false);
+  // Publisher staff sign in through a small, quiet button (or /login?staff=1); schools see only the school login.
+  const [staff, setStaff] = useState(params.get('staff') === '1');
   // QR login cards open /login?school=CODE&u=username with these filled in
   const [form, setForm] = useState({ schoolCode: params.get('school') ?? '', username: params.get('u') ?? '', password: '' });
   const [error, setError] = useState<unknown>(null); const [busy, setBusy] = useState(false);
@@ -31,15 +32,24 @@ function LoginForm() {
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
   return (
     <form onSubmit={submit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-sm font-medium" role="tablist">
-        <button type="button" role="tab" aria-selected={!staff} onClick={() => setStaff(false)} className={`rounded-md py-2 ${!staff ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600'}`}>{t('School')}</button>
-        <button type="button" role="tab" aria-selected={staff} onClick={() => setStaff(true)} className={`rounded-md py-2 ${staff ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600'}`}>{t('Publisher staff')}</button>
-      </div>
+      {!staff ? (
+        <div className="mb-2 flex items-center gap-3">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-brand-600 text-white shadow"><School className="size-7" /></span>
+          <div><h2 className="text-3xl font-bold text-slate-900">{t('School login')}</h2>
+            <p className="mt-0.5 text-sm text-slate-500">{t('Students, parents, teachers and school admins')}</p></div>
+        </div>
+      ) : (
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-800"><KeyRound className="size-5" />{t('Publisher staff')}</h2>
+          <button type="button" onClick={() => setStaff(false)} className="flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900"><ArrowLeft className="size-3.5 rtl:rotate-180" />{t('School login')}</button>
+        </div>)}
       {!staff && <Field label={t('School code')}><Input required dir="ltr" value={form.schoolCode} onChange={set('schoolCode')} placeholder={t('e.g. SUN01')} autoComplete="organization" /></Field>}
       <Field label={t('Login ID or email')}><Input required dir="ltr" value={form.username} onChange={set('username')} autoComplete="username" /></Field>
       <Field label={t('Password')}><Input required dir="ltr" type="password" value={form.password} onChange={set('password')} autoComplete="current-password" /></Field>
       {error ? <ErrorBox error={error} /> : null}
       <Button type="submit" loading={busy} className="w-full">{t('Sign in')}</Button>
+      {!staff && <div className="flex justify-end"><button type="button" onClick={() => setStaff(true)} title={t('Publisher staff')} aria-label={t('Publisher staff')}
+        className="rounded-full p-1.5 text-slate-300 hover:bg-slate-100 hover:text-slate-500"><KeyRound className="size-3.5" /></button></div>}
     </form>
   );
 }
@@ -54,8 +64,6 @@ function LoginScreen() {
       <BrandPanel />
       <div className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
-          <h2 className="text-2xl font-semibold text-slate-900">{t('Sign in')}</h2>
-          <p className="mb-6 mt-1 text-sm text-slate-500">{t('Use the login your school or publisher gave you.')}</p>
           <Suspense><LoginForm /></Suspense>
           <RegisterLink />
           <div className="mt-5 flex justify-center"><InstallAppButton className="ring-1 ring-slate-200" /></div>

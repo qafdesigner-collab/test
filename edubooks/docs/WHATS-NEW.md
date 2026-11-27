@@ -1,3 +1,9 @@
+# What's new in Knowledge Gate 1.4.34
+
+## 🔑 Sign-in page: school login first, staff login hidden
+- The sign-in page now shows only the big **School login** (for students, parents, teachers and school admins). The “Publisher staff” tab is gone.
+- Publisher staff (super admin, editors, sales team) sign in with the **tiny key icon** under the Sign in button, or open **/login?staff=1** directly (good to bookmark).
+
 # What's new in Knowledge Gate 1.4.33
 
 ## 🪪 Login cards with the current passwords

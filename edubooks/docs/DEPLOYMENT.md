@@ -43,7 +43,7 @@ This runs only once and creates **no demo data**:
 ```bash
 docker compose -f compose.prod.yml exec -e PUBLISHER_NAME="Your Publishing House" api node dist/db/setup.js
 ```
-It prints a one-time password. Sign in at `https://lms.yourpublisher.com/login` with the **Publisher staff** tab. You must choose a new password on first sign-in.
+It prints a one-time password. Sign in at `https://lms.yourpublisher.com/login?staff=1` (or the small **Staff** button on the sign-in page). You must choose a new password on first sign-in.
 Then, in the admin portal: add grades and subjects (Catalog), create book packages and upload the PDFs, create products, add schools and orders.
 
 > Do **not** run `db:seed` in production. It creates demo schools and well-known passwords.

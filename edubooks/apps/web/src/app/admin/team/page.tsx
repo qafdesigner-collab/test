@@ -43,7 +43,7 @@ export default function TeamPage() {
         </table>
       </Card>
       {adding && <AddDialog onClose={() => setAdding(false)} onDone={(r) => { setAdding(false); setShown(r); qc.invalidateQueries({ queryKey: ['team'] }); }} />}
-      {shown && <Dialog open onOpenChange={() => setShown(null)} title="Sign-in details" description="Give these to the team member. They sign in on the “Publisher staff” tab and choose their own password the first time.">
+      {shown && <Dialog open onOpenChange={() => setShown(null)} title="Sign-in details" description="Give these to the team member. They sign in with the small “Staff” button at the bottom of the sign-in page (or at /login?staff=1) and choose their own password the first time.">
         <div className="space-y-2 rounded-xl bg-slate-50 p-4 font-mono text-lg"><div>Username: <b>{shown.username}</b></div><div>Password: <b>{shown.password}</b></div></div>
         <div className="mt-4 flex justify-end"><Button onClick={() => { navigator.clipboard?.writeText(`Username: ${shown.username}\nPassword: ${shown.password}`).catch(() => undefined); toast('Copied'); }}>Copy</Button></div>
       </Dialog>}

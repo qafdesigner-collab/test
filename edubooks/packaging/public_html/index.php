@@ -370,7 +370,7 @@ async function poll(){tries++;
    if(s.message)$("m").textContent=s.message;
    if(s.steps)$("steps").innerHTML=s.steps.map(x=>"<li class=ok>✅ "+x.replace(/[<>&]/g,"")+"</li>").join("");
    if($("manual"))$("manual").hidden=true;
-   if(s.state==="done"){$("t").textContent="Knowledge Gate is ready! 🎉";$("m").textContent="Sign in with the super admin account you just created (choose Publisher staff).";$("bar").hidden=true;$("go").hidden=false;return}
+   if(s.state==="done"){$("t").textContent="Knowledge Gate is ready! 🎉";$("m").textContent="Sign in with the super admin account you just created (at /login?staff=1, or the small “Staff” button on the sign-in page).";$("bar").hidden=true;$("go").hidden=false;return}
    if(s.state==="error"){$("t").textContent="Installation stopped";$("m").innerHTML="";$("bar").hidden=true;$("steps").innerHTML="<li class=err>❌ "+(s.message||"").replace(/[<>&]/g,"")+"</li><li class=warn>Fix the problem, then open your website: the installer form will let you try again (its key is in edubooks-app/install-key.txt).</li>";return}
   }}catch(e){}
  if(tries>150&&!document.getElementById("manual")){$("m").textContent="This is taking longer than expected. Reload this page in a minute, or check edubooks-app/stderr.log.";return}
