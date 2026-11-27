@@ -1,0 +1,12 @@
+Sound effects used in the games
+
+All files in this folder are dedicated to the public domain under Creative Commons CC0 1.0
+(https://creativecommons.org/publicdomain/zero/1.0/). No attribution is required.
+
+- success, error, level-up, streak, achievement, select, reward, badge, complete:
+  UI SFX library ("organic" set) by Romain Simon, https://github.com/romainsimon/uisfx (CC0 1.0),
+  as redistributed in the npm package @wubbleai/community-sfx 0.1.0.
+- coin, gem: Kenney (https://kenney.nl), CC0 1.0, as redistributed in the npm package
+  @netforge/asset-library-files 0.2.0 (converted from Ogg to MP3).
+
+Bubble pops, applause, chalk and crayon sounds are made live in the browser (no files).

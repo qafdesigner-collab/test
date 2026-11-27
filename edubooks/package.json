@@ -1,0 +1,20 @@
+{
+  "name": "edubooks",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w apps/api",
+    "dev:web": "npm run dev -w apps/web",
+    "db:migrate": "npm run db:migrate -w apps/api",
+    "db:seed": "npm run db:seed -w apps/api",
+    "test": "npm test -w apps/api",
+    "build": "npm run build -w apps/api && npm run build -w apps/web",
+    "build:cpanel": "node packaging/cpanel/build.mjs",
+    "build:public-html": "node packaging/public_html/build.mjs"
+  },
+  "overrides": {
+    "postcss": "^8.5.32"
+  }
+}

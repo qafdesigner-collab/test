@@ -1,0 +1,83 @@
+'use client';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Maximize, Minimize, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import { cn } from '@/components/ui';
+import { ENGINE_INFO, ENGINES, Engine, maxScore } from './engines';
+import { Mascot } from './mascot';
+import { useT } from '@/lib/i18n';
+import { preloadGameSounds, setGameSound, sfx } from '@/lib/sfx';
+import { speakText, stopVoice } from '@/lib/voice';
+
+export interface PlayResult { stars: number; best?: number; starsGained?: number; totalStars?: number; newBadges?: { key: string; label: string; emoji: string }[] }
+
+/** Wraps any engine: start screen, progress, read-aloud, finish screen with stars & badges. */
+export function GamePlayer({ game, onDone, preview }: { game: { engine: Engine; title: string; instructions: string; content: any }; onDone?: (score: number, ms: number) => Promise<PlayResult | void>; preview?: boolean }) {
+  const [phase, setPhase] = useState<'start' | 'play' | 'done'>('start');
+  const [run, setRun] = useState(0); const [progress, setProgress] = useState([0, 1]); const [result, setResult] = useState<(PlayResult & { score: number; max: number }) | null>(null);
+  const [sound, setSound] = useState(true); const started = useRef(0); const { t } = useT();
+  // full screen: the real browser full screen where it works, and always a page-filling view (iPhone has no real full screen)
+  const root = useRef<HTMLDivElement>(null); const [full, setFull] = useState(false);
+  const camera = game.engine === 'BUBBLE_POP' || game.engine === 'FINGERS' || game.engine === 'AIR_WRITING';
+  const goFull = (on: boolean) => {
+    setFull(on);
+    try { if (on && root.current?.requestFullscreen && !document.fullscreenElement) void root.current.requestFullscreen().catch(() => undefined); else if (!on && document.fullscreenElement) void document.exitFullscreen(); } catch { /* the page-filling view is enough */ }
+  };
+  useEffect(() => { const f = () => { if (!document.fullscreenElement) setFull(false); }; document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f); }, []);
+  // the natural voice (or the device voice when it is not installed) for instructions, words and praise
+  const say = useCallback((t: string) => { if (!sound || typeof window === 'undefined' || !t?.trim()) return; void speakText(t).catch(() => undefined); }, [sound]);
+  useEffect(() => { setGameSound(sound); if (!sound) stopVoice(); }, [sound]);
+  // a happy sound for every step done right
+  const lastDone = useRef(0);
+  const [cheer, setCheer] = useState(0);
+  const onProgress = useCallback((d: number, total: number) => { if (d > lastDone.current) { sfx.correct(); setCheer((c) => c + 1); } lastDone.current = d; setProgress([d, total]); }, []);
+  const Engine = ENGINES[game.engine]; const info = ENGINE_INFO[game.engine]; const max = maxScore(game.engine, game.content);
+  const start = () => { preloadGameSounds(); sfx.whoosh(); lastDone.current = 0; if (camera) goFull(true); setPhase('play'); setRun(run + 1); setResult(null); started.current = Date.now(); say(game.instructions || game.title); };
+  const finish = async (score: number) => {
+    const local = { stars: score / max >= 0.9 ? 3 : score / max >= 0.6 ? 2 : score > 0 ? 1 : 0 };
+    setPhase('done'); setResult({ ...local, score, max }); sfx.finish(local.stars);
+    const r = await onDone?.(score, Date.now() - started.current).catch(() => undefined);
+    if (r) setResult({ ...local, ...r, score, max });
+    say(local.stars === 3 ? 'Amazing! Three stars!' : local.stars ? 'Well done!' : 'Good try! Play again?');
+  };
+  useEffect(() => () => stopVoice(), []);
+  return (
+    <div ref={root} className={cn('relative', full && 'fixed inset-0 z-50 flex flex-col overflow-y-auto bg-gradient-to-b from-sky-50 to-amber-50 p-2 sm:p-4')}
+      style={{ ['--game-chrome' as any]: full ? '275px' : '380px' }}>
+      <div className={cn('flex items-center gap-3', full ? 'mb-2' : 'mb-6')}>
+        <span className="grid size-12 shrink-0 place-items-center rounded-2xl text-2xl" style={{ background: info.color }}>{info.icon}</span>
+        <div className="min-w-0 flex-1"><h1 className="truncate text-2xl font-extrabold text-slate-800">{game.title}</h1>
+          {phase === 'play' && <div className="mt-1 h-3 overflow-hidden rounded-full bg-white" role="progressbar" aria-valuenow={progress[0]} aria-valuemax={progress[1]}>
+            <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-pink-500 transition-all" style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} /></div>}</div>
+        <button onClick={() => goFull(!full)} aria-label={full ? t('Exit full screen') : t('Full screen')} title={full ? t('Exit full screen') : t('Full screen')} className="focus-ring rounded-2xl bg-white p-3 shadow">{full ? <Minimize className="size-6" /> : <Maximize className="size-6" />}</button>
+        <button onClick={() => setSound(!sound)} aria-label={sound ? t('Sound off') : t('Sound on')} className="focus-ring rounded-2xl bg-white p-3 shadow">{sound ? <Volume2 className="size-6" /> : <VolumeX className="size-6" />}</button>
+      </div>
+      {phase === 'start' && (
+        <div className="flex flex-col items-center gap-6 rounded-[2rem] bg-white/80 p-8 text-center shadow-sm">
+          <Mascot mood="happy" say={game.instructions || t('Ready to play?')} />
+          <button onClick={start} className="focus-ring rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 px-12 py-5 text-3xl font-extrabold text-white shadow-[0_8px_0_#0f766e] active:translate-y-1 active:shadow-none">{t('▶ Play')}</button>
+          {preview && <p className="text-sm text-slate-500">{t('Preview — scores are not saved.')}</p>}
+        </div>
+      )}
+      {phase === 'play' && cheer > 0 && <div key={`cheer-${cheer}`} aria-hidden className="pointer-events-none fixed inset-x-0 top-1/3 z-[60] flex justify-center">
+        <span className="text-6xl font-black text-amber-400 drop-shadow-[0_3px_0_rgba(0,0,0,0.15)] motion-safe:animate-[cheer_0.9s_ease-out_both]">⭐ +1</span></div>}
+      {phase === 'play' && <div key={run} className={cn('rounded-[2rem] bg-white/60', full || camera ? 'p-2 sm:p-4' : 'p-4 sm:p-8')}><Engine content={game.content} onFinish={finish} say={say} onProgress={onProgress} /></div>}
+      {phase === 'done' && result && (
+        <div className="relative overflow-hidden rounded-[2rem] bg-white p-8 text-center shadow-sm">
+          {result.stars > 0 && <Confetti />}
+          <div className="mb-2 flex justify-center gap-2 text-7xl">{[1, 2, 3].map((n) => <span key={n} className={cn('motion-safe:animate-[pop-in_.5s_both]', n > result.stars && 'opacity-20 grayscale')} style={{ animationDelay: `${n * 0.25}s` }}>⭐</span>)}</div>
+          <p className="text-3xl font-extrabold text-slate-800">{t(result.stars === 3 ? 'Amazing!' : result.stars === 2 ? 'Great job!' : result.stars === 1 ? 'Well done!' : 'Good try!')}</p>
+          <p className="mt-1 text-lg text-slate-500">{t('{a} of {b} right', { a: result.score, b: result.max })}{result.starsGained ? ` · +${result.starsGained} ⭐` : ''}{result.totalStars !== undefined ? ` · ${t('{n} stars in total', { n: result.totalStars })}` : ''}</p>
+          {!!result.newBadges?.length && <div className="mt-6 flex flex-wrap justify-center gap-4">{result.newBadges.map((b) => (
+            <div key={b.key} className="rounded-3xl bg-amber-100 px-6 py-4 motion-safe:animate-[pop-in_.6s_.8s_both]"><div className="text-5xl">{b.emoji}</div><div className="font-extrabold text-amber-800">{t('New badge: {name}', { name: t(b.label) })}</div></div>))}</div>}
+          <button onClick={start} className="focus-ring mt-8 inline-flex items-center gap-2 rounded-full bg-sky-700 px-8 py-4 text-2xl font-extrabold text-white shadow-[0_6px_0_#0369a1] active:translate-y-1 active:shadow-none"><RotateCcw className="size-6" />{t('Play again')}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Confetti() {
+  const bits = Array.from({ length: 40 }, (_, i) => ({ left: Math.random() * 100, delay: Math.random() * 0.8, color: ['#f472b6', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa'][i % 5], size: 8 + Math.random() * 8 }));
+  return <div aria-hidden className="pointer-events-none fixed inset-0 z-40 overflow-hidden">{bits.map((b, i) => (
+    <span key={i} className="absolute top-0 rounded-sm motion-safe:animate-[confetti-fall_2.6s_ease-in_both]" style={{ left: `${b.left}%`, width: b.size, height: b.size * 0.6, background: b.color, animationDelay: `${b.delay}s` }} />))}</div>;
+}
