@@ -7,14 +7,17 @@ import { academicYears, productVersions, products, schools, sessions, users } fr
 import { AuditService } from '../audit/audit.service';
 import { LicensingService } from '../licensing/licensing.service';
 import { SchoolUsersService } from './school-users.service';
+import { assertMySchool, mySchoolsWhere, salesOnly } from '../common/sales-scope';
 
 @Injectable()
 export class SchoolsService {
   constructor(private readonly db: DbService, private readonly audit: AuditService, private readonly users: SchoolUsersService, private readonly licensing: LicensingService) {}
   private get q() { return this.db.q; }
+  private mine(id: string) { return assertMySchool(this.q as any, this.db.ctx, id); }
 
   // ---------- one school's books: switch a book off (INACTIVE) or take it away (REMOVED), and undo ----------
   async books(schoolId: string) {
+    await this.mine(schoolId);
     const [sc] = await this.q.select({ id: schools.id }).from(schools).where(eq(schools.id, schoolId));
     if (!sc) throw new NotFoundException('School not found');
     const { rows } = await this.q.execute(sql`SELECT bp.id, bp.title, bp.cover_color AS "coverColor",
@@ -47,16 +50,19 @@ export class SchoolsService {
     return { status };
   }
 
-  async list(f: { search?: string; status?: string; demo?: string; page: number; pageSize: number }) {
+  async list(f: { search?: string; status?: string; demo?: string; salesOwnerId?: string; page: number; pageSize: number }) {
     const w: SQL[] = [];
     if (f.search) w.push(or(ilike(schools.name, `%${f.search}%`), ilike(schools.code, `%${f.search}%`), ilike(schools.city, `%${f.search}%`))!);
     if (f.status) w.push(eq(schools.status, f.status as any));
     if (f.demo) w.push(eq(schools.isDemo, f.demo === 'true'));
+    const mine = mySchoolsWhere(this.db.ctx); if (mine) w.push(mine);
+    if (f.salesOwnerId) w.push(f.salesOwnerId === 'none' ? sql`${schools.salesOwnerId} IS NULL` : eq(schools.salesOwnerId, f.salesOwnerId));
     const where = w.length ? and(...w) : undefined;
     const items = await this.q.select({
       id: schools.id, name: schools.name, code: schools.code, city: schools.city, status: schools.status, isDemo: schools.isDemo, demoExpiresAt: schools.demoExpiresAt,
       curriculumId: schools.curriculumId, curriculumName: sql<string | null>`(SELECT c.name FROM curricula c WHERE c.id = ${qc(schools.curriculumId)})`,
-      createdAt: schools.createdAt,
+      createdAt: schools.createdAt, salesOwnerId: schools.salesOwnerId,
+      salesOwnerName: sql<string | null>`(SELECT u.display_name FROM users u WHERE u.id = ${qc(schools.salesOwnerId)})`,
       students: sql<number>`(SELECT count(*)::int FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role = 'STUDENT' WHERE u.school_id = ${qc(schools.id)})`,
       teachers: sql<number>`(SELECT count(*)::int FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role = 'TEACHER' WHERE u.school_id = ${qc(schools.id)})`,
       seats: sql<number>`(SELECT coalesce(sum(quantity),0)::int FROM license_pools p WHERE p.school_id = ${qc(schools.id)} AND p.status = 'ACTIVE' AND p.valid_until > now() AND p.seat_type = 'STUDENT')`,
@@ -81,6 +87,7 @@ export class SchoolsService {
     if (dup) throw new ConflictException(`School code ${code} is already taken`);
     const [s] = await this.q.insert(schools).values({
       publisherId: this.db.ctx.publisherId, name: d.name.trim(), code, city: d.city, phone: d.phone, address: d.address, curriculumId: d.curriculumId ?? null, createdBy: this.db.ctx.userId,
+      salesOwnerId: salesOnly(this.db.ctx) ? this.db.ctx.userId : null, // a salesperson's new school is theirs
     }).returning();
     const [admin] = await this.users.create(s.id, 'SCHOOL_ADMIN', [{ displayName: d.adminName, username: d.adminUsername, password: d.adminPassword }]);
     await this.audit.log('school.create', 'school', s.id, `Registered school ${s.name} (${code})`, undefined, s, s.id);
@@ -88,6 +95,7 @@ export class SchoolsService {
   }
 
   async get(id: string) {
+    await this.mine(id);
     const [s] = await this.q.select().from(schools).where(eq(schools.id, id));
     if (!s) throw new NotFoundException('School not found');
     const years = await this.q.select().from(academicYears).where(eq(academicYears.schoolId, id)).orderBy(desc(academicYears.startsOn));
@@ -100,12 +108,37 @@ export class SchoolsService {
   }
 
   async update(id: string, d: { name?: string; city?: string; phone?: string; address?: string; curriculumId?: string | null }) {
+    await this.mine(id);
     const [before] = await this.q.select().from(schools).where(eq(schools.id, id));
     if (!before) throw new NotFoundException('School not found');
     await this.checkCurriculum(d.curriculumId);
     const [row] = await this.q.update(schools).set({ ...d, updatedAt: new Date() }).where(eq(schools.id, id)).returning();
     await this.audit.log('school.update', 'school', id, `Updated profile of ${row.name}`, before, row, id);
     return row;
+  }
+
+  /** Sales team members (for the "Salesperson" choice), with how many schools each has. */
+  async salesTeam() {
+    const { rows } = await this.q.execute(sql`SELECT u.id, u.display_name AS name, u.username::text AS username,
+        (SELECT count(*)::int FROM schools s WHERE s.sales_owner_id = u.id) AS schools
+      FROM users u WHERE u.school_id IS NULL AND u.status = 'ACTIVE' AND EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role = 'PUBLISHER_SALES')
+      ORDER BY u.display_name`);
+    return rows;
+  }
+
+  /** The super admin gives a school to a salesperson (or takes it back with null). */
+  async setSalesOwner(ids: string[], userId: string | null) {
+    let name = 'nobody';
+    if (userId) {
+      const { rows } = await this.q.execute(sql`SELECT u.display_name AS n FROM users u WHERE u.id = ${userId} AND u.school_id IS NULL AND u.status = 'ACTIVE'
+        AND EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role IN ('PUBLISHER_SALES', 'PUBLISHER_ADMIN'))`);
+      if (!rows.length) throw new BadRequestException('Choose an active member of the sales team.');
+      name = (rows[0] as any).n;
+    }
+    const rows = await this.q.update(schools).set({ salesOwnerId: userId, updatedAt: new Date() }).where(inArray(schools.id, ids)).returning({ id: schools.id, name: schools.name });
+    if (rows.length !== new Set(ids).size) throw new NotFoundException('School not found');
+    for (const r of rows) await this.audit.log('school.sales_owner', 'school', r.id, `${r.name} assigned to ${name}`, undefined, { salesOwnerId: userId }, r.id);
+    return { updated: rows.length };
   }
 
   async setStatus(id: string, status: 'ACTIVE' | 'SUSPENDED', reason?: string) {
@@ -119,6 +152,7 @@ export class SchoolsService {
   }
 
   async addAcademicYear(schoolId: string, d: { name: string; startsOn: string; endsOn: string }) {
+    await this.mine(schoolId);
     const [s] = await this.q.select().from(schools).where(eq(schools.id, schoolId));
     if (!s) throw new NotFoundException('School not found');
     const startsOn = new Date(d.startsOn); const endsOn = new Date(d.endsOn);
@@ -183,6 +217,7 @@ export class SchoolsService {
   }
 
   async extendDemo(id: string, days: number) {
+    await this.mine(id);
     const [s] = await this.q.select().from(schools).where(eq(schools.id, id));
     if (!s?.isDemo) throw new ConflictException('Not a demo school');
     const base = Math.max(Date.now(), s.demoExpiresAt?.getTime() ?? 0);

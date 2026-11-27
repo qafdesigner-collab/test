@@ -55,6 +55,8 @@ export const schools = pgTable('schools', {
   createdBy: uuid('created_by'),
   /** A sales person's own demo school (one each), for giving demos. */
   demoOwnerId: uuid('demo_owner_id'),
+  /** The salesperson this school belongs to (set by the super admin). */
+  salesOwnerId: uuid('sales_owner_id'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [index('schools_publisher_idx').on(t.publisherId)]);

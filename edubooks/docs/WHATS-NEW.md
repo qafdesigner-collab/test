@@ -1,3 +1,15 @@
+# What's new in Knowledge Gate 1.4.33
+
+## 🪪 Login cards with the current passwords
+- **Download logins** (students, teachers, parents or the whole school) has a new button: **Login cards with current passwords**. It prints the colourful cards with school code, login ID, password and a **QR code**, and nobody's password changes.
+- People without a password on file (they chose their own) are left out and counted, so you can make new passwords for just them. **New passwords and login cards** still works as before.
+- Parents' cards and lists now say whose parent they are (“Parent of Ali Khan”).
+
+## 🤝 Sales team: each salesperson sees only their schools
+- **Super admin → Schools** has a new **Salesperson** column. Choose a member of the sales team for each school, and filter the list by salesperson (or “Not assigned”).
+- A sales login now sees only **its own schools**: the ones assigned to it, its demo school, and schools it registered itself (those are assigned to it automatically). That applies to **Schools, Orders, Licences and the Sales dashboard**. Other schools cannot be opened.
+- The super admin still sees everything.
+
 # What's new in Knowledge Gate 1.4.32
 
 ## 🖥️ Install on CyberPanel (OpenLiteSpeed)

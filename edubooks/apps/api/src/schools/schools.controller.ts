@@ -14,6 +14,11 @@ class SchoolQuery extends PageQuery {
   @IsOptional() @IsString() @MaxLength(100) search?: string;
   @IsOptional() @IsIn(['ACTIVE', 'SUSPENDED']) status?: string;
   @IsOptional() @IsIn(['true', 'false']) demo?: string;
+  @IsOptional() @IsString() @MaxLength(40) salesOwnerId?: string;
+}
+class SalesOwnerDto {
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(500) @IsUUID('all', { each: true }) schoolIds: string[];
+  @IsOptional() @IsUUID() userId?: string | null;
 }
 class CreateSchoolDto {
   @IsString() @Length(2, 160) name: string;
@@ -65,6 +70,8 @@ export class SchoolsController {
   @Roles(...SALES, 'PUBLISHER_EDITOR') @Get() list(@Query() q: SchoolQuery) { return this.svc.list(q); }
   @Roles(...SALES) @Post() create(@Body() d: CreateSchoolDto) { return this.svc.create(d); }
   @Roles(...SALES) @Post('demo') demo(@Body() d: DemoDto) { return this.svc.createDemo(d); }
+  @Roles('PUBLISHER_ADMIN') @Get('sales-team') salesTeam() { return this.svc.salesTeam(); }
+  @Roles('PUBLISHER_ADMIN') @Put('sales-owner') salesOwner(@Body() d: SalesOwnerDto) { return this.svc.setSalesOwner(d.schoolIds, d.userId ?? null); }
   @Roles(...SALES, 'PUBLISHER_EDITOR') @Get(':id') get(@Param('id', Id()) id: string) { return this.svc.get(id); }
   @Roles(...SALES) @Patch(':id') update(@Param('id', Id()) id: string, @Body() d: UpdateSchoolDto) { return this.svc.update(id, d); }
   @Roles(...SALES, 'PUBLISHER_EDITOR') @Get(':id/books') books(@Param('id', Id()) id: string) { return this.svc.books(id); }

@@ -9,6 +9,8 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { CreateOrderDto, CreateProductDto, OrderLineDto, OrderQuery, ProductQuery, UpdateOrderDto, UpdateProductDto, UpdateVersionDto } from './commerce.dto';
 
+import { assertMySchool, mySchoolIdIn } from '../common/sales-scope';
+
 @Injectable()
 export class CommerceService {
   constructor(private readonly db: DbService, private readonly audit: AuditService) {}
@@ -199,6 +201,7 @@ export class CommerceService {
     const w: SQL[] = [];
     if (f.schoolId) w.push(eq(orders.schoolId, f.schoolId));
     if (f.status) w.push(eq(orders.status, f.status as any));
+    w.push(mySchoolIdIn(this.db.ctx, sql`${orders.schoolId}`)); // sales team: only their schools
     const where = w.length ? and(...w) : undefined;
     const items = await this.q.select({
       id: orders.id, orderNo: orders.orderNo, type: orders.type, status: orders.status, createdAt: orders.createdAt, fulfilledAt: orders.fulfilledAt,
@@ -223,6 +226,7 @@ export class CommerceService {
   }
 
   async createOrder(dto: CreateOrderDto) {
+    await assertMySchool(this.q as any, this.db.ctx, dto.schoolId);
     const [school] = await this.q.select().from(schools).where(eq(schools.id, dto.schoolId));
     if (!school) throw new NotFoundException('School not found');
     const [ay] = await this.q.select().from(academicYears).where(and(eq(academicYears.id, dto.academicYearId), eq(academicYears.schoolId, school.id)));
@@ -241,6 +245,7 @@ export class CommerceService {
   private async order(id: string) {
     const [o] = await this.q.select().from(orders).where(eq(orders.id, id));
     if (!o) throw new NotFoundException('Order not found');
+    await assertMySchool(this.q as any, this.db.ctx, o.schoolId);
     return o;
   }
 

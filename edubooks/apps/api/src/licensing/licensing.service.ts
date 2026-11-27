@@ -17,6 +17,8 @@ const LIVE = ['ACTIVE', 'SUSPENDED'] as const;
 /** Days within which a school admin may take back (undo) a student seat it gave by mistake. */
 export const UNDO_DAYS = Number(process.env.SEAT_UNDO_DAYS || 7);
 
+import { assertMySchool, mySchoolIdIn } from '../common/sales-scope';
+
 @Injectable()
 export class LicensingService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger('Licensing');
@@ -67,6 +69,7 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
     if (f.schoolId) w.push(eq(licensePools.schoolId, f.schoolId));
     if (f.status) w.push(eq(licensePools.status, f.status as any));
     if (f.seatType) w.push(eq(licensePools.seatType, f.seatType as any));
+    w.push(mySchoolIdIn(this.ctx, sql`${licensePools.schoolId}`)); // sales team: only their schools
     return this.q.select(this.poolSelect()).from(licensePools)
       .innerJoin(productVersions, eq(productVersions.id, licensePools.productVersionId)).innerJoin(products, eq(products.id, productVersions.productId))
       .innerJoin(schools, eq(schools.id, licensePools.schoolId)).innerJoin(academicYears, eq(academicYears.id, licensePools.academicYearId))
@@ -79,6 +82,7 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
       .innerJoin(schools, eq(schools.id, licensePools.schoolId)).innerJoin(academicYears, eq(academicYears.id, licensePools.academicYearId))
       .where(eq(licensePools.id, id)));
     if (!pool) throw new NotFoundException('Licence pool not found');
+    await assertMySchool(this.q as any, this.ctx, pool.schoolId);
     const assignments = await this.q.select({
       id: licenseAssignments.id, status: licenseAssignments.status, assignedAt: licenseAssignments.assignedAt, endedAt: licenseAssignments.endedAt,
       endReason: licenseAssignments.endReason, seatNo: licenseSeats.seatNo, userId: users.id, displayName: users.displayName, username: users.username,
@@ -522,6 +526,7 @@ export class LicensingService implements OnModuleInit, OnModuleDestroy {
     const w: SQL[] = [];
     if (f.status) w.push(eq(licenseTransfers.status, f.status as any));
     if (f.schoolId) w.push(eq(licenseTransfers.schoolId, f.schoolId));
+    w.push(mySchoolIdIn(this.ctx, sql`${licenseTransfers.schoolId}`));
     return this.q.select({
       id: licenseTransfers.id, status: licenseTransfers.status, reason: licenseTransfers.reason, requestedAt: licenseTransfers.requestedAt,
       decidedAt: licenseTransfers.decidedAt, decisionNote: licenseTransfers.decisionNote, assignmentId: licenseTransfers.assignmentId,

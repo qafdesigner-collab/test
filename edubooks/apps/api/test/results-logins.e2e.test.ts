@@ -59,7 +59,7 @@ describe('Exam result sheets and downloadable logins', () => {
     const made = (await principal.post(`/api/school/students/${kid.id}/parents`).send({ displayName: 'Login Parent' })).body.credentials;
     const all = (await admin.get(`/api/schools/${s.id}/logins?role=ALL`)).body.items;
     expect(new Set(all.map((u: any) => u.role))).toEqual(new Set(['School admin', 'Teacher', 'Student', 'Parent']));
-    expect(all.find((u: any) => u.id === made.id)).toMatchObject({ role: 'Parent', password: made.password });
+    expect(all.find((u: any) => u.id === made.id)).toMatchObject({ role: 'Parent', password: made.password, children: 'Login Kid' }); // the card says whose parent
     expect(all.find((u: any) => u.id === kid.id).password).toBe(kid.password);
     // only one role
     const parents = (await admin.get(`/api/schools/${s.id}/logins?role=PARENT`)).body.items;

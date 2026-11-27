@@ -138,7 +138,8 @@ export class SchoolUsersService {
     const roles = role === 'ALL' ? ['SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT'] : [role];
     const { rows } = await this.q.execute(sql`SELECT u.id, u.display_name AS "displayName", u.username::text AS username, u.email::text AS email, u.designation, u.status, u.last_login_at AS "lastLoginAt", u.issued_password AS issued,
         (SELECT r.role::text FROM user_roles r WHERE r.user_id = u.id AND r.role::text = ANY(${`{${roles.join(',')}}`}::text[]) ORDER BY array_position(ARRAY['SCHOOL_ADMIN','TEACHER','STUDENT','PARENT'], r.role::text) LIMIT 1) AS "roleKey",
-        (SELECT string_agg(c.name || CASE WHEN c.section <> '' THEN ' ' || c.section ELSE '' END, ', ') FROM enrolments e JOIN classes c ON c.id = e.class_id AND NOT c.archived WHERE e.student_id = u.id) AS "className"
+        (SELECT string_agg(c.name || CASE WHEN c.section <> '' THEN ' ' || c.section ELSE '' END, ', ') FROM enrolments e JOIN classes c ON c.id = e.class_id AND NOT c.archived WHERE e.student_id = u.id) AS "className",
+        (SELECT string_agg(k.display_name, ', ' ORDER BY k.display_name) FROM parent_students ps JOIN users k ON k.id = ps.student_id WHERE ps.parent_id = u.id) AS children
       FROM users u WHERE u.school_id = ${schoolId} AND EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role::text = ANY(${`{${roles.join(',')}}`}::text[]))
         ${classId ? sql`AND EXISTS (SELECT 1 FROM enrolments e WHERE e.student_id = u.id AND e.class_id = ${classId})` : sql``}
       ORDER BY array_position(ARRAY['SCHOOL_ADMIN','TEACHER','STUDENT','PARENT'], (SELECT min(r.role::text) FROM user_roles r WHERE r.user_id = u.id)), "className" NULLS LAST, u.display_name`);
@@ -161,7 +162,7 @@ export class SchoolUsersService {
       const password = friendlyPassword();
       await this.q.update(users).set({ passwordHash: await hashPassword(password), issuedPassword: seal(password), mustChangePassword: u.role === 'Teacher', failedLogins: 0, lockedUntil: null, updatedAt: new Date() }).where(eq(users.id, u.id));
       await this.q.update(sessions).set({ revokedAt: new Date() }).where(and(eq(sessions.userId, u.id), sql`revoked_at IS NULL`));
-      out.push({ id: u.id, displayName: u.displayName, username: u.username, password, className: u.className, role: u.role });
+      out.push({ id: u.id, displayName: u.displayName, username: u.username, password, className: u.className ?? (u.roleKey === 'PARENT' && u.children ? `Parent of ${u.children}` : null), role: u.role });
     }
     await this.audit.log('school.user.reset_passwords', 'school', schoolId, `New passwords for ${out.length} ${role.toLowerCase()} account(s)${opts.classId ? ' in one class' : ''}`, undefined, out.map((o) => ({ id: o.id, username: o.username })), schoolId);
     return out;

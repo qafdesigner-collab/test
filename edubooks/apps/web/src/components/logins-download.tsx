@@ -1,7 +1,9 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, KeyRound, Printer } from 'lucide-react';
+import { Download, IdCard, KeyRound, Printer } from 'lucide-react';
+import { printLoginCards } from '@/lib/login-cards';
+import { usePrintBrand } from '@/lib/branding';
 import { showPrintPreview } from '@/lib/print-preview';
 import { api, downloadCsv } from '@/lib/api';
 import { Button, Dialog, ErrorBox, PageLoader, Select } from '@/components/ui';
@@ -20,7 +22,7 @@ const CHOICES: [Role, string][] = [['ALL', 'Whole school'], ['SCHOOL_ADMIN', 'Sc
  * `base` is "/school" for the school admin or "/schools/<id>" for the super admin.
  */
 export function LoginsDialog({ base, role: startRole, onClose }: { base: string; role: Role; onClose: () => void }) {
-  const toast = useToast(); const qc = useQueryClient(); const [role, setRole] = useState<Role>(startRole);
+  const toast = useToast(); const qc = useQueryClient(); const brand = usePrintBrand(); const [role, setRole] = useState<Role>(startRole);
   const q = useQuery({ queryKey: ['logins', base, role], queryFn: () => api.get<any>(`${base}/logins?role=${role}`) });
   const [cls, setCls] = useState(''); const [busy, setBusy] = useState(false); const [ask, setAsk] = useState<null | 'missing' | 'all'>(null); const [creds, setCreds] = useState<Credential[] | null>(null);
   const items: any[] = q.data?.items ?? [];
@@ -30,13 +32,21 @@ export function LoginsDialog({ base, role: startRole, onClose }: { base: string;
   const school = q.data?.school;
   const active = shown.filter((u) => u.status === 'ACTIVE'); const missing = active.filter((u) => !u.password);
   const pw = (u: any) => u.password ?? (u.status === 'ACTIVE' ? 'not on file' : '—');
-  const extra = (u: any) => (u.roleKey === 'STUDENT' ? u.className : u.designation) || '';
+  const extra = (u: any) => (u.roleKey === 'STUDENT' ? u.className : u.roleKey === 'PARENT' ? (u.children ? `Parent of ${u.children}` : '') : u.designation) || '';
   const save = () => downloadCsv(`${school?.code ?? 'school'} ${noun} logins${cls ? ` - ${cls}` : ''}.csv`, shown.map((u, i) => ({ no: i + 1, role: u.role, name: u.displayName, classOrDesignation: extra(u), schoolCode: school?.code ?? '', loginId: u.username, password: pw(u), email: u.email ?? '', status: u.status.toLowerCase() })));
   const print = () => {
     showPrintPreview(`${school?.name ?? 'School'} — ${noun} logins`, `<!doctype html><html><head><meta charset="utf-8"><title>${esc(school?.name)} — ${noun} logins</title><style>body{font-family:Arial,sans-serif;margin:14mm;font-size:12px;background:#fff}h1{font-size:18px;margin:0}p{color:#475569}table{width:100%;border-collapse:collapse;margin-top:5mm}th,td{border-bottom:1px solid #e2e8f0;padding:1.8mm;text-align:left}th{background:#f1f5f9}td.m{font-family:monospace;font-size:12.5px}tr.g td{background:#eef2ff;font-weight:bold}</style></head><body>
       <h1>${esc(school?.name)}</h1><p>School code <b>${esc(school?.code)}</b> · ${esc(noun)}${cls ? ` · ${esc(cls)}` : ''} · sign in at ${esc(location.host)} with the school code, login ID (or email) and password</p>
       <table><thead><tr><th>#</th><th>Name</th><th>Role</th><th>Class / designation</th><th>Login ID</th><th>Password</th></tr></thead><tbody>${shown.map((u, i) => `${i === 0 || shown[i - 1].role !== u.role ? `<tr class="g"><td colspan="6">${esc(u.role)}s</td></tr>` : ''}<tr><td>${i + 1}</td><td>${esc(u.displayName)}</td><td>${esc(u.role)}</td><td>${esc(extra(u))}</td><td class="m">${esc(u.username)}</td><td class="m">${esc(pw(u))}</td></tr>`).join('')}</tbody></table>
       </body></html>`);
+  };
+  // Login cards (with QR code) using the passwords already on file — nobody's password changes.
+  const withPw = active.filter((u) => u.password);
+  const cards = () => {
+    if (!withPw.length) { toast('No passwords on file for these people. Make new passwords below.', 'err'); return; }
+    printLoginCards(withPw.map((u) => ({ displayName: u.displayName, username: u.username, password: u.password, role: u.role, className: extra(u) || null })), { code: school?.code, name: school?.name }, brand)
+      .catch((e) => toast(e.message, 'err'));
+    if (missing.length) toast(`${withPw.length} card(s) ready. ${missing.length} without a password on file were left out — make new passwords for them below.`);
   };
   const reset = async (which: 'missing' | 'all') => {
     setBusy(true);
@@ -69,11 +79,13 @@ export function LoginsDialog({ base, role: startRole, onClose }: { base: string;
             <p className="font-medium text-slate-900">1. Download the list <span className="font-normal text-slate-500">({shown.length} people)</span></p>
             <p className="mt-0.5 text-sm text-slate-600">Name, role, class, login ID and password, with the school code. {missing.length > 0 && <>“Not on file” means the person chose their own password (nobody can see it), or the account was made before passwords were kept. Give them a new one below — it will then appear here.</>}</p>
             <div className="mt-3 flex flex-wrap gap-2"><Button variant="secondary" onClick={save} disabled={!shown.length}><Download className="size-4" />Save (Excel / CSV)</Button>
-              <Button variant="secondary" onClick={print} disabled={!shown.length}><Printer className="size-4" />Print / PDF</Button></div>
+              <Button variant="secondary" onClick={print} disabled={!shown.length}><Printer className="size-4" />Print / PDF</Button>
+              <Button onClick={cards} disabled={!withPw.length}><IdCard className="size-4" />Login cards with current passwords ({withPw.length})</Button></div>
+            <p className="mt-2 text-xs text-slate-500">Cards show the school code, login ID, password and a QR code to sign in. Passwords do not change.</p>
           </div>
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
             <p className="font-medium text-amber-900">2. New passwords and login cards</p>
-            <p className="mt-0.5 text-sm text-amber-900">Makes a new simple password and printable login cards (with QR codes). <b>Their old password stops working.</b> Teachers and school admins choose their own password at their next sign-in.</p>
+            <p className="mt-0.5 text-sm text-amber-900">Makes a new simple password for each person and printable login cards (with QR codes) with the new passwords. <b>Their old password stops working.</b> Teachers and school admins choose their own password at their next sign-in.</p>
             {!ask ? <div className="mt-3 flex flex-wrap gap-2">
                 {missing.length > 0 && <Button variant="secondary" onClick={() => setAsk('missing')}><KeyRound className="size-4" />New passwords for the {missing.length} without one…</Button>}
                 <Button variant="ghost" onClick={() => setAsk('all')} disabled={!active.length}>New passwords for everyone shown ({active.length})…</Button></div>

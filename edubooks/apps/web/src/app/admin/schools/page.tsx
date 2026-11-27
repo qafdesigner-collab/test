@@ -60,10 +60,24 @@ function NewDemo({ onClose }: { onClose: () => void }) {
   );
 }
 
+/** Super admin: give a school to a salesperson. The salesperson then sees only their schools and their orders. */
+function SalesOwner({ school, team }: { school: any; team: any[] }) {
+  const m = useAction((userId: string) => api.put('/schools/sales-owner', { schoolIds: [school.id], userId: userId || null }),
+    { ok: (_r: any) => 'Salesperson saved', keys: ['schools', 'salesTeam'] });
+  return (
+    <Select className="w-44" aria-label={`Salesperson for ${school.name}`} value={school.salesOwnerId ?? ''} disabled={m.isPending} onChange={(e) => m.mutate(e.target.value)}>
+      <option value="">— not assigned —</option>
+      {team.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+    </Select>
+  );
+}
+
 export default function SchoolsPage() {
-  const [f, setF] = useState({ search: '', status: '', demo: '', page: 1 });
+  const { data: me } = useMe(); const admin = hasRole(me, 'PUBLISHER_ADMIN');
+  const [f, setF] = useState({ search: '', status: '', demo: '', salesOwnerId: '', page: 1 });
   const [dlg, setDlg] = useState<'' | 'new' | 'demo'>('');
   const q = useQuery({ queryKey: ['schools', f], queryFn: () => api.get(`/schools${qs({ ...f, pageSize: 25 })}`), placeholderData: keepPreviousData });
+  const team = useQuery({ queryKey: ['salesTeam'], queryFn: () => api.get<any[]>('/schools/sales-team'), enabled: admin });
   return (
     <div className="space-y-6">
       <PageHeader title="Schools" sub="Customer schools, their codes, accounts and licence usage.">
@@ -74,17 +88,21 @@ export default function SchoolsPage() {
       <div className="flex flex-wrap gap-3">
         <Input className="max-w-xs" placeholder="Search name, code or city…" aria-label="Search" value={f.search} onChange={(e) => setF({ ...f, search: e.target.value, page: 1 })} />
         <Select className="w-40" aria-label="Status" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value, page: 1 })}><option value="">Any status</option><option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option></Select>
+        {admin && (team.data?.length ?? 0) > 0 && <Select className="w-48" aria-label="Salesperson" value={f.salesOwnerId} onChange={(e) => setF({ ...f, salesOwnerId: e.target.value, page: 1 })}>
+          <option value="">Every salesperson</option><option value="none">Not assigned</option>{team.data!.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.schools})</option>)}</Select>}
         <Select className="w-44" aria-label="Type" value={f.demo} onChange={(e) => setF({ ...f, demo: e.target.value, page: 1 })}><option value="">Customers & demos</option><option value="false">Customers</option><option value="true">Demos</option></Select>
       </div>
       {q.error ? <ErrorBox error={q.error} /> : !q.data ? <PageLoader /> : q.data.items.length === 0 ? <EmptyState icon={<Building2 className="size-10" />} title="No schools found" /> : (
         <>
-          <Table head={['School', 'Code', 'People', 'Student seats in use', 'Status']}>
+          {!admin && hasRole(me, 'PUBLISHER_SALES') && <p className="text-sm text-slate-600">These are <b>your schools</b>: the ones the super admin assigned to you, your demo school and schools you registered.</p>}
+          <Table head={['School', 'Code', 'People', 'Student seats in use', 'Status', ...(admin ? ['Salesperson'] : [])]}>
             {q.data.items.map((s: any) => (
               <tr key={s.id} className="hover:bg-slate-50">
                 <Td><Link className="font-medium text-slate-900 hover:text-brand-700" href={`/admin/schools/${s.id}`}>{s.name}</Link><div className="text-xs text-slate-600">{[s.city, s.curriculumName].filter(Boolean).join(' · ')}</div></Td>
                 <Td className="font-mono">{s.code}</Td><Td className="text-slate-600">{s.teachers} teacher{s.teachers === 1 ? "" : "s"} · {s.students} student{s.students === 1 ? "" : "s"}</Td>
                 <Td className="min-w-44">{s.seats ? <SeatBar assigned={s.assigned} total={s.seats} /> : <span className="text-xs text-slate-500">No active licences</span>}</Td>
                 <Td><Status s={s.status} />{s.isDemo && <Badge tone={daysLeft(s.demoExpiresAt) < 0 ? 'danger' : 'info'} className="ml-1">{daysLeft(s.demoExpiresAt) < 0 ? 'demo expired' : `demo · ${daysLeft(s.demoExpiresAt)}d left`}</Badge>}</Td>
+                {admin && <Td>{team.data?.length ? <SalesOwner school={s} team={team.data} /> : <span className="text-xs text-slate-500">Add sales people in Team</span>}</Td>}
               </tr>
             ))}
           </Table>
