@@ -371,7 +371,8 @@ const busyPage = (req, res) => {
 };
 
 // ---------- start ----------
-server.listen(process.env.PORT || 3000, () => console.log(`Knowledge Gate listening (${fs.existsSync(LOCK_FILE) ? 'app' : 'installer'} mode)`));
+// HOST is set by the CyberPanel setup (127.0.0.1), so the app is reachable only through the website.
+server.listen(Number(process.env.PORT) || 3000, ...(process.env.HOST ? [process.env.HOST] : []), () => console.log(`Knowledge Gate listening (${fs.existsSync(LOCK_FILE) ? 'app' : 'installer'} mode)`));
 if (fs.existsSync(LOCK_FILE)) {
   bootApp().catch((e) => {
     console.error('Knowledge Gate failed to start:', e);

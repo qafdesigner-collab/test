@@ -22,6 +22,11 @@ NOTES
 - Install into the ROOT folder of a domain or subdomain (public_html, or the
   subdomain's own folder). Sub-folders like /lms are not supported.
 - MySQL is not used. Knowledge Gate brings its own private database.
+- CyberPanel (OpenLiteSpeed) servers: extract the zip into the website's
+  public_html with CyberPanel's File Manager and open the domain. The wizard
+  recognises CyberPanel. After "Install" it shows ONE command to paste into
+  CyberPanel -> Terminal:  bash /home/<your-domain>/edubooks-app/setup-cyberpanel.sh
+  It starts the app as a service, connects the domain and issues SSL.
 - Your hosting must allow Node.js apps (cPanel: "Setup Node.js App"). The wizard
   tests this. On some servers it asks you for one extra click in cPanel and
   shows exactly what to enter.

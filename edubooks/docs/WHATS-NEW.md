@@ -1,3 +1,11 @@
+# What's new in Knowledge Gate 1.4.32
+
+## 🖥️ Install on CyberPanel (OpenLiteSpeed)
+- The same zip now installs on **CyberPanel** servers (for example a Hostinger VPS with the CyberPanel template). Extract it in the website's `public_html` with File Manager and open the domain.
+- The wizard now **first asks where you are installing: cPanel or CyberPanel** (it suggests the one it detects), and sets itself up for that panel. With CyberPanel, instead of the cPanel “Setup Node.js App” message, after **Install** it shows **one command** to paste into CyberPanel → **Terminal**, with a Copy button.
+- That command (`setup-cyberpanel.sh`) starts Knowledge Gate as a service that restarts by itself (after updates and reboots too), connects the domain to it, restarts the web server and issues SSL. Running it again is safe.
+- The app can now listen on the server only (`HOST=127.0.0.1`), so it is reachable only through the website.
+
 # What's new in Knowledge Gate 1.4.31
 
 ## 🗳️ Competitions: one vote, secret ballot

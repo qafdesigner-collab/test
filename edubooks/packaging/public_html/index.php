@@ -95,6 +95,13 @@ function passenger_test(string $docroot, string $home, string $payload): array {
   return $result;
 }
 
+/** CyberPanel / OpenLiteSpeed: Node.js apps are connected by a one-time root command instead of cPanel's Node.js page. */
+function is_cyberpanel(string $home): bool {
+  $ls = stripos((string)($_SERVER['SERVER_SOFTWARE'] ?? ''), 'litespeed') !== false;
+  return $ls && (@is_dir('/usr/local/CyberCP') || @is_dir('/usr/local/lsws/conf/vhosts') || strpos(basename($home), '.') !== false);
+}
+function cyber_command(): string { return 'bash ' . $GLOBALS['target'] . '/setup-cyberpanel.sh'; }
+
 function self_request(string $path): array {
   $url = site_url() . $path;
   $ch = curl_init($url);
@@ -196,13 +203,32 @@ $step = $_POST['step'] ?? $_GET['step'] ?? 'check';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !hash_equals($_SESSION['csrf'], (string)($_POST['csrf'] ?? ''))) $step = 'check';
 $errors = [];
 
+// ---------------------------------------------------------------- step 0: which control panel
+if ($step === 'panel_save') {
+  $pick = (string)($_POST['panel'] ?? '');
+  if (in_array($pick, ['cpanel', 'cyberpanel'], true)) { $_SESSION['panel'] = $pick; unset($_SESSION['ptest'], $_SESSION['node']); $step = 'check'; }
+  else $step = 'panel';
+}
+if ($step === 'panel' || (($step === 'check' || $step === 'retest') && empty($_SESSION['panel']))) {
+  $guess = is_cyberpanel($home) ? 'cyberpanel' : 'cpanel';
+  $opt = function (string $v, string $title, string $text) use ($guess) {
+    return '<label class="pick"><input type="radio" name="panel" value="' . $v . '"' . ($v === $guess ? ' checked' : '') . '><span><b>' . $title . '</b>' . ($v === $guess ? ' <em>(looks like this server)</em>' : '') . '<br><small>' . $text . '</small></span></label>';
+  };
+  layout('Control panel', 1, '<form method="post" class="card">' . hidden() . '<h1>Where are you installing? 🖥️</h1><p>Choose the control panel of this server. Knowledge Gate sets itself up the right way for it.</p>'
+    . '<style>.pick{display:flex;gap:12px;align-items:flex-start;border:2px solid #c7d2fe;border-radius:14px;padding:14px;margin:10px 0;cursor:pointer;background:#fff}.pick:has(input:checked){border-color:var(--brand);background:#eef2ff}.pick input{margin-top:4px;width:18px;height:18px}.pick em{color:var(--brand);font-style:normal;font-size:.85em}</style>'
+    . $opt('cpanel', 'cPanel', 'Shared or reseller hosting with cPanel (Setup Node.js App). The domain is connected automatically, or with one step in cPanel.')
+    . $opt('cyberpanel', 'CyberPanel (OpenLiteSpeed)', 'A VPS with CyberPanel, for example Hostinger VPS with the CyberPanel template. After Install you paste one command into CyberPanel → Terminal.')
+    . '<div class="btns"><span></span><button class="btn" name="step" value="panel_save">Next →</button></div></form>');
+}
+
 // ---------------------------------------------------------------- step 1: checks
 if ($step === 'check' || $step === 'retest') {
   $rows = checks($docroot, $home, $payload, $target);
   $hardFail = (bool)array_filter($rows, fn($r) => $r[0] === 'err');
   $passengerOk = false;
   if (!$hardFail) {
-    if (empty($_SESSION['node']) || $step === 'retest') {
+    if ($_SESSION['panel'] === 'cyberpanel') { make_executable($payload); $_SESSION['ptest'] = [false, 'CyberPanel']; }
+    elseif (empty($_SESSION['node']) || $step === 'retest') {
       [$ok, $node, $detail] = passenger_test($docroot, $home, $payload);
       if ($ok) { $_SESSION['node'] = $node; }
       else { unset($_SESSION['node']); }
@@ -210,13 +236,15 @@ if ($step === 'check' || $step === 'retest') {
     }
     [$ok, $detail] = $_SESSION['ptest'];
     $passengerOk = $ok;
-    $_SESSION['mode'] = $ok ? 'auto' : 'manual';
+    $_SESSION['mode'] = $_SESSION['panel'] === 'cyberpanel' ? 'cyberpanel' : ($ok ? 'auto' : 'manual');
     $rows[] = $ok ? ['ok', 'Node.js apps run on this server (' . h($detail) . '). The domain will be connected automatically.']
-                  : ['warn', 'The domain cannot be connected automatically on this server, so you will do <b>one extra step</b> in cPanel → <b>Setup Node.js App</b>. The last page shows exactly what to enter. <small>(' . h($detail) . ')</small>'];
+                  : ($_SESSION['mode'] === 'cyberpanel' ? ['ok', '<b>CyberPanel</b> server found. After you click Install, you paste <b>one command</b> into CyberPanel → <b>Terminal</b>. It starts the app, connects the domain and adds SSL.']
+                  : ['warn', 'The domain cannot be connected automatically on this server, so you will do <b>one extra step</b> in cPanel → <b>Setup Node.js App</b>. The last page shows exactly what to enter. <small>(' . h($detail) . ')</small>']);
   }
-  $help = $passengerOk || $hardFail ? '' : '<div class="note">Before you continue, check that cPanel has <b>Setup Node.js App</b> (or <i>Application Manager</i>) under <i>Software</i>. If it is missing, ask your host: <i>"Please enable Node.js applications for my account."</i></div>';
+  $help = $passengerOk || $hardFail || ($_SESSION['mode'] ?? '') === 'cyberpanel' ? '' : '<div class="note">Before you continue, check that cPanel has <b>Setup Node.js App</b> (or <i>Application Manager</i>) under <i>Software</i>. If it is missing, ask your host: <i>"Please enable Node.js applications for my account."</i></div>';
   $can = !$hardFail;
   layout('Server check', 1, '<form method="post" class="card">' . hidden() . '<h1>Welcome! 👋</h1><p>This wizard installs Knowledge Gate on <b>' . h($_SERVER['HTTP_HOST'] ?? '') . '</b>. First, a quick check of your server:</p>' . list_html($rows) . $help
+    . '<p><small>Control panel: <b>' . ($_SESSION['panel'] === 'cyberpanel' ? 'CyberPanel' : 'cPanel') . '</b> · <button class="btn ghost" style="padding:4px 10px" name="step" value="panel">Change</button></small></p>'
     . '<div class="btns"><button class="btn ghost" name="step" value="retest">Test again</button>' . ($can ? '<button class="btn" name="step" value="admin">Next →</button>' : '') . '</div></form>');
 }
 
@@ -275,7 +303,9 @@ if ($step === 'review') {
       ['ok', $a['demo'] ? 'Demo data (sample books and schools)' : 'Publisher: <b>' . h($a['publisher']) . '</b> · super admin: <b>' . h($a['adminUser']) . '</b>'],
       ['ok', 'Built-in database · username <b>' . h($d['dbUser']) . '</b>'],
       ['ok', 'App folder (private, outside public_html): <code>' . h($GLOBALS['target']) . '</code>'],
-      $_SESSION['mode'] === 'auto' ? ['ok', 'The domain is connected to the app automatically'] : ['warn', 'After you click Install, one step in cPanel → Setup Node.js App (shown on the next page)'],
+      $_SESSION['mode'] === 'auto' ? ['ok', 'The domain is connected to the app automatically']
+        : ($_SESSION['mode'] === 'cyberpanel' ? ['warn', 'After you click Install, paste one command into CyberPanel → Terminal (shown on the next page)']
+        : ['warn', 'After you click Install, one step in cPanel → Setup Node.js App (shown on the next page)']),
     ])
     . (is_https() ? '' : '<div class="note">⚠️ You opened this page with <b>http://</b>. For a real site, enable <b>AutoSSL</b> in cPanel → SSL/TLS Status and reopen with <b>https://</b> before installing, so sign-ins are encrypted.</div>')
     . '<div class="btns"><button class="btn ghost" name="step" value="database">← Back</button><button class="btn" name="step" value="install">Install now</button></div></form>');
@@ -283,7 +313,7 @@ if ($step === 'review') {
 
 if ($step === 'install') {
   if (empty($_SESSION['db']) || empty($_SESSION['admin']) || empty($_SESSION['mode'])) { header('Location: ./'); exit; }
-  $a = $_SESSION['admin']; $d = $_SESSION['db']; $node = (string)($_SESSION['node'] ?? ''); $manual = $_SESSION['mode'] !== 'auto';
+  $a = $_SESSION['admin']; $d = $_SESSION['db']; $node = (string)($_SESSION['node'] ?? ''); $manual = $_SESSION['mode'] !== 'auto'; $mode = (string)$_SESSION['mode'];
   try {
     if (!is_dir($payload)) throw new RuntimeException('The folder "' . APP_DIR_NAME . '" is missing. Extract the zip again.');
     // 1. Move the app out of public_html.
@@ -316,14 +346,21 @@ if ($step === 'install') {
     layout('Install', 4, '<div class="card"><h1>Something went wrong</h1>' . list_html([['err', h($e->getMessage())]]) . '<p><a class="btn" href="./">Start again</a></p></div>');
   }
   $host = h(preg_replace('/:\d+$/', '', $_SERVER['HTTP_HOST'] ?? ''));
-  $manualBox = !$manual ? '' : '<div class="note" id="manual"><b>Last step — connect your domain in cPanel</b> (keep this page open):<ol style="margin:8px 0 0;padding-left:20px;line-height:1.9">'
+  $cmd = h(cyber_command());
+  $cyberBox = '<div class="note" id="manual"><b>Last step — one command</b> (keep this page open):<ol style="margin:8px 0 0;padding-left:20px;line-height:1.9">'
+    . '<li>Open <b>CyberPanel</b> in a new tab → left menu <b>Terminal</b> (or SSH / your host\'s browser terminal, as root)</li>'
+    . '<li>Paste this and press Enter:<pre style="white-space:pre-wrap;word-break:break-all;background:#1e1b4b;color:#e0e7ff;padding:10px 12px;border-radius:8px;margin:6px 0" id="cmd">' . $cmd . '</pre>'
+    . '<button type="button" class="btn ghost" onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById(\'cmd\').textContent).then(()=>{this.textContent=\'Copied ✓\'})">Copy command</button></li>'
+    . '<li>Wait for <b>✅ Done</b> (about a minute). It starts the app as a service, connects <b>' . $host . '</b> and adds SSL.</li></ol>'
+    . '<p style="margin:8px 0 0">This page continues by itself as soon as the app starts. Running the command again later is safe.</p></div>';
+  $manualBox = !$manual ? '' : ($mode === 'cyberpanel' ? $cyberBox : '<div class="note" id="manual"><b>Last step — connect your domain in cPanel</b> (keep this page open):<ol style="margin:8px 0 0;padding-left:20px;line-height:1.9">'
     . '<li>Open cPanel → <b>Setup Node.js App</b> (or <i>Application Manager</i>) → <b>Create Application</b></li>'
     . '<li>Node.js version: <b>20 or newer</b> · Application mode: <b>Production</b></li>'
     . '<li>Application root: <code>' . h(APP_DIR_NAME) . '</code></li>'
     . '<li>Application URL: <code>' . $host . '</code> (leave the path empty)</li>'
     . '<li>Application startup file: <code>app.js</code></li>'
     . '<li>Click <b>Create</b>. <b>Do not</b> click “Run NPM Install”: everything is already included.</li></ol>'
-    . '<p style="margin:8px 0 0">This page continues by itself as soon as the app starts.</p></div>';
+    . '<p style="margin:8px 0 0">This page continues by itself as soon as the app starts.</p></div>');
   layout('Installing', 4, '<div class="card"><h1 id="t">' . ($manual ? 'Almost done!' : 'Installing Knowledge Gate…') . '</h1>' . $manualBox . '<p id="m">' . ($manual ? 'Waiting for the app to start…' : 'Starting the app. This takes about a minute — please keep this page open.') . '</p><div class="bar" id="bar"><i></i></div><ul class="res" id="steps"></ul><p id="go" hidden><a class="btn" href="/login">Open Knowledge Gate →</a></p></div>
 <script>
 const $=(id)=>document.getElementById(id);let tries=0;

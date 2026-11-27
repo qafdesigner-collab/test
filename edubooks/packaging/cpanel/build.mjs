@@ -22,6 +22,7 @@ fs.mkdirSync(STAGE, { recursive: true });
 copy('packaging/cpanel/app.js', 'app.js');
 copy('packaging/cpanel/embedded-db.js', 'embedded-db.js');
 copy('packaging/cpanel/updater.js', 'updater.js');
+copy('packaging/cpanel/setup-cyberpanel.sh', 'setup-cyberpanel.sh');
 copy('packaging/cpanel/README.md', 'README.md');
 copy('docs/WHATS-NEW.md', 'WHATS-NEW.md');
 copy('apps/api/dist', 'api/dist', (src) => !src.endsWith('.tsbuildinfo'));

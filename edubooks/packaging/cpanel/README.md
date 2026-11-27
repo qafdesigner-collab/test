@@ -100,3 +100,23 @@ If your hosting *does* offer PostgreSQL 13+, you can choose **My hosting's Postg
 
 ## Limits of shared hosting
 This is fine for getting started, demos and a modest number of schools (a few hundred pupils online at the same time). For many schools at once, a VPS with the Docker setup is faster and adds virus scanning of uploads and OCR for scanned books. To move, take a backup file from `backups/`. It contains a standard PostgreSQL 16 data folder that any PostgreSQL 16 server can start from.
+
+
+## CyberPanel / OpenLiteSpeed
+
+CyberPanel has no "Setup Node.js App" page. Instead:
+
+1. Create the website in CyberPanel, open **File Manager** for it, upload the zip into `public_html` and extract it.
+2. Open the domain in the browser and follow the wizard (it recognises CyberPanel) and click **Install**.
+3. Open CyberPanel → **Terminal** (it runs as root) and paste the command the wizard shows:
+   ```bash
+   bash /home/<your-domain>/edubooks-app/setup-cyberpanel.sh
+   ```
+   The script runs the app as a systemd service (`kgate-<domain>`, listening only on 127.0.0.1),
+   adds a proxy to the site's OpenLiteSpeed settings (`/usr/local/lsws/conf/vhosts/<domain>/vhost.conf`),
+   writes the rewrite rule to `public_html/.htaccess`, restarts OpenLiteSpeed and tries to issue SSL.
+   Running it again is safe. Backups of the changed files end in `.before-kgate`.
+4. The wizard page continues by itself.
+
+Updates from **Super admin → Updates** work as usual: the app restarts itself and the service starts the new version.
+Logs: `edubooks-app/stderr.log` · status: `systemctl status kgate-<domain>`.
